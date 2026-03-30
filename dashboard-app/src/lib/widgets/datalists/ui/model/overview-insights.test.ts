@@ -1,0 +1,340 @@
+import { describe, expect, it } from "vitest";
+import {
+  averagePercent,
+  buildControlPlaneChecks,
+  buildMetricsUnavailableMessage,
+  buildOverviewResourceInsights,
+  buildUsageCards,
+  detectManagedProvider,
+  parseCpuQuantityToCores,
+  parseMemoryQuantityToBytes,
+  parsePercent,
+} from "./overview-insights";
+import type { ClusterHealthChecks, WarningEventItem } from "$features/check-health/model/types";
+import type { WorkloadOverview } from "$shared";
+
+const overview: WorkloadOverview = {
+  nodes: { quantity: 1 },
+  pods: { quantity: 4 },
+  deployments: { quantity: 2 },
+  daemonsets: { quantity: 1 },
+  statefulsets: { quantity: 1 },
+  replicasets: { quantity: 2 },
+  jobs: { quantity: 1 },
+  cronjobs: { quantity: 1 },
+};
+
+function makeChecks(overrides?: Partial<ClusterHealthChecks>): ClusterHealthChecks {
+  return {
+    daemonSets: 1,
+    deployments: 2,
+    jobs: 1,
+    replicaSets: 2,
+    pods: 4,
+    statefulSets: 1,
+    namespaces: ["default"],
+    podRestarts: [],
+    cronJobs: 1,
+    cronJobsHealth: {
+      items: [],
+      summary: { total: 1, ok: 1, warning: 0, critical: 0, unknown: 0 },
+      updatedAt: Date.now(),
+    },
+    nodes: {
+      checks: [],
+      summary: {
+        className: "ok",
+        status: "Ok",
+        count: {
+          ready: 1,
+          total: 1,
+          pressures: { diskPressure: 0, memoryPressure: 0, pidPressure: 0, networkUnavailable: 0 },
+        },
+      },
+    },
+    metricsChecks: {
+      endpoints: {
+        kubelet: {
+          title: "Kubelet",
+          status: "✅ Available",
+          lastSync: "now",
+        },
+        metrics_server: {
+          title: "Metrics Server",
+          status: "❌ Not found",
+          lastSync: "now",
+        },
+      },
+    },
+    apiServerHealth: {
+      status: "ok",
+      live: { ok: true, output: "ok" },
+      ready: { ok: true, output: "[+]scheduler ok\n[+]controller-manager ok\n[+]etcd ok" },
+      updatedAt: Date.now(),
+    },
+    podIssues: {
+      status: "critical",
+      summary: { status: "critical", warnings: [], updatedAt: Date.now(), message: "issues" },
+      items: [],
+      crashLoopCount: 1,
+      pendingCount: 0,
+      totalPods: 4,
+      updatedAt: Date.now(),
+    },
+    apfHealth: {
+      status: "warning",
+      summary: { status: "warning", warnings: [], updatedAt: Date.now(), message: "queue high" },
+      metrics: null,
+      metricRates: {},
+      updatedAt: Date.now(),
+    },
+    etcdHealth: {
+      status: "ok",
+      summary: { status: "ok", warnings: [], updatedAt: Date.now() },
+      health: [],
+      endpointStatus: [],
+      metrics: [],
+      metricRates: {},
+      updatedAt: Date.now(),
+    },
+    timestamp: Date.now(),
+    ...overrides,
+  };
+}
+
+describe("overview-insights", () => {
+  it("parses and averages percent values", () => {
+    expect(parsePercent("44%")).toBe(44);
+    expect(parsePercent("N/A")).toBeNull();
+    expect(averagePercent(["40%", "60%", "N/A"])).toBe(50);
+  });
+
+  it("builds resource insights with severity from pod issues and warning events", () => {
+    const warningItems: WarningEventItem[] = [
+      {
+        timestamp: Date.now(),
+        type: "Warning",
+        namespace: "default",
+        objectKind: "Deployment",
+        objectName: "api",
+        reason: "Failed",
+        message: "x",
+        count: 1,
+      },
+    ];
+    const insights = buildOverviewResourceInsights(overview, makeChecks(), warningItems);
+    const podsInsight = insights.find((item) => item.key === "pods");
+    const deploymentsInsight = insights.find((item) => item.key === "deployments");
+    expect(podsInsight?.severity).toBe("critical");
+    expect(deploymentsInsight?.severity).toBe("warning");
+  });
+
+  it("returns resource insights in stable UI order", () => {
+    const insights = buildOverviewResourceInsights(overview, makeChecks(), []);
+    expect(insights.map((item) => item.key)).toEqual([
+      "pods",
+      "deployments",
+      "daemonsets",
+      "statefulsets",
+      "replicasets",
+      "jobs",
+      "cronjobs",
+      "nodes",
+    ]);
+  });
+
+  it("builds usage cards and detects missing metrics", () => {
+    const usageCards = buildUsageCards({
+      cpuAveragePercent: null,
+      memoryAveragePercent: null,
+      podCount: 10,
+      podCapacity: 100,
+    });
+    const message = buildMetricsUnavailableMessage(makeChecks(), usageCards);
+    expect(message).toContain("CPU and memory metrics are unavailable");
+  });
+
+  it("formats used/reserved values for cpu, memory and pods", () => {
+    const usageCards = buildUsageCards({
+      cpuAveragePercent: 50,
+      memoryAveragePercent: 25,
+      podCount: 20,
+      podCapacity: 100,
+      cpuReservedCores: 4,
+      memoryReservedBytes: 8 * 1024 ** 3,
+    });
+    expect(usageCards.find((card) => card.id === "cpu")?.usedReserved).toBe(
+      "2.00 cores / 4.00 cores",
+    );
+    expect(usageCards.find((card) => card.id === "memory")?.usedReserved).toBe(
+      "2.00 GiB / 8.00 GiB",
+    );
+    expect(usageCards.find((card) => card.id === "pods")?.usedReserved).toBe("20 / 100");
+  });
+
+  it("does not show metrics warning when checks are unavailable or endpoints are healthy", () => {
+    const usageCards = buildUsageCards({
+      cpuAveragePercent: null,
+      memoryAveragePercent: null,
+      podCount: 10,
+      podCapacity: 100,
+    });
+    expect(buildMetricsUnavailableMessage(null, usageCards)).toBeNull();
+    expect(
+      buildMetricsUnavailableMessage(makeChecks(), usageCards, { coreMetricsUnavailable: false }),
+    ).toContain("Metrics sources are available");
+    expect(
+      buildMetricsUnavailableMessage(
+        makeChecks({
+          metricsChecks: {
+            endpoints: {
+              kubelet: { title: "Kubelet", status: "✅ Available", lastSync: "now" },
+              metrics_server: { title: "Metrics Server", status: "✅ Available", lastSync: "now" },
+            },
+          },
+        }),
+        usageCards,
+      ),
+    ).toBeNull();
+  });
+
+  it("marks managed providers by providerID", () => {
+    expect(detectManagedProvider(["aws:///eu-central-1a/i-1"])).toBe(true);
+    expect(detectManagedProvider(["baremetal://node-1"])).toBe(false);
+  });
+
+  it("builds control-plane checks and marks etcd as N/A on managed clusters", () => {
+    const controlPlaneManaged = buildControlPlaneChecks({
+      checks: makeChecks(),
+      isManagedCluster: true,
+    });
+    const controlPlaneSelf = buildControlPlaneChecks({
+      checks: makeChecks(),
+      isManagedCluster: false,
+    });
+    const etcdManaged = controlPlaneManaged.find((item) => item.id === "etcd");
+    const etcdSelf = controlPlaneSelf.find((item) => item.id === "etcd");
+    expect(etcdManaged?.severity).toBe("not_applicable");
+    expect(etcdSelf?.severity).toBe("ok");
+  });
+
+  it("uses kube-system pod fallback for self-managed clusters when /readyz omits scheduler probes", () => {
+    const controlPlaneChecks = buildControlPlaneChecks({
+      checks: makeChecks({
+        apiServerHealth: {
+          status: "ok",
+          live: { ok: true, output: "ok" },
+          ready: { ok: true, output: "readyz check passed" },
+          updatedAt: Date.now(),
+        },
+        controlPlaneComponents: {
+          scheduler: {
+            source: "pod",
+            status: "ok",
+            matchedPods: 1,
+            readyPods: 1,
+            totalRestarts: 0,
+            podNames: ["kube-scheduler-minikube"],
+            message: "Pod fallback: 1/1 kube-system pod(s) ready.",
+          },
+          controllerManager: {
+            source: "pod",
+            status: "ok",
+            matchedPods: 1,
+            readyPods: 1,
+            totalRestarts: 0,
+            podNames: ["kube-controller-manager-minikube"],
+            message: "Pod fallback: 1/1 kube-system pod(s) ready.",
+          },
+          updatedAt: Date.now(),
+        },
+      }),
+      isManagedCluster: false,
+    });
+
+    expect(controlPlaneChecks.find((item) => item.id === "scheduler")).toMatchObject({
+      severity: "ok",
+      detail: "Pod fallback: 1/1 kube-system pod(s) ready.",
+    });
+    expect(controlPlaneChecks.find((item) => item.id === "controller-manager")).toMatchObject({
+      severity: "ok",
+      detail: "Pod fallback: 1/1 kube-system pod(s) ready.",
+    });
+  });
+
+  it("treats /readyz as supporting evidence instead of the primary scheduler signal", () => {
+    const controlPlaneChecks = buildControlPlaneChecks({
+      checks: makeChecks({
+        apiServerHealth: {
+          status: "ok",
+          live: { ok: true, output: "ok" },
+          ready: { ok: true, output: "[+]scheduler ok\n[+]controller-manager ok" },
+          updatedAt: Date.now(),
+        },
+        controlPlaneComponents: undefined,
+      }),
+      isManagedCluster: false,
+    });
+
+    expect(controlPlaneChecks.find((item) => item.id === "scheduler")).toMatchObject({
+      severity: "unavailable",
+      detail: "No visible kube-system control-plane pods. API server /readyz note: [+]scheduler ok",
+    });
+    expect(controlPlaneChecks.find((item) => item.id === "controller-manager")).toMatchObject({
+      severity: "unavailable",
+      detail:
+        "No visible kube-system control-plane pods. API server /readyz note: [+]controller-manager ok",
+    });
+  });
+
+  it("marks provider-managed scheduler and controller manager as not applicable when probes are hidden", () => {
+    const controlPlaneChecks = buildControlPlaneChecks({
+      checks: makeChecks({
+        apiServerHealth: {
+          status: "ok",
+          live: { ok: true, output: "ok" },
+          ready: { ok: true, output: "readyz check passed" },
+          updatedAt: Date.now(),
+        },
+        controlPlaneComponents: undefined,
+      }),
+      isManagedCluster: true,
+    });
+
+    expect(controlPlaneChecks.find((item) => item.id === "scheduler")).toMatchObject({
+      severity: "not_applicable",
+    });
+    expect(controlPlaneChecks.find((item) => item.id === "controller-manager")).toMatchObject({
+      severity: "not_applicable",
+    });
+  });
+
+  it("marks self-managed scheduler and controller manager as unavailable when neither probes nor pods are visible", () => {
+    const controlPlaneChecks = buildControlPlaneChecks({
+      checks: makeChecks({
+        apiServerHealth: {
+          status: "ok",
+          live: { ok: true, output: "ok" },
+          ready: { ok: true, output: "readyz check passed" },
+          updatedAt: Date.now(),
+        },
+        controlPlaneComponents: undefined,
+      }),
+      isManagedCluster: false,
+    });
+
+    expect(controlPlaneChecks.find((item) => item.id === "scheduler")).toMatchObject({
+      severity: "unavailable",
+    });
+    expect(controlPlaneChecks.find((item) => item.id === "controller-manager")).toMatchObject({
+      severity: "unavailable",
+    });
+  });
+
+  it("parses cpu and memory allocatable quantities", () => {
+    expect(parseCpuQuantityToCores("1500m")).toBe(1.5);
+    expect(parseCpuQuantityToCores("2")).toBe(2);
+    expect(parseMemoryQuantityToBytes("1Gi")).toBe(1024 ** 3);
+    expect(parseMemoryQuantityToBytes("512Mi")).toBe(512 * 1024 ** 2);
+  });
+});

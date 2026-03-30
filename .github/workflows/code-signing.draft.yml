@@ -1,0 +1,169 @@
+# ============================================================================
+# DRAFT - Code Signing Workflow for Windows and macOS
+# ============================================================================
+# This workflow is NOT active. It is a reference for when code signing
+# certificates are purchased and configured.
+#
+# To activate:
+#   1. Rename this file to code-signing.yml
+#   2. Configure the required secrets (see below)
+#   3. Update tauri.conf.json with signing config
+#
+# Required GitHub Secrets:
+#
+#   Windows (EV Code Signing):
+#     WINDOWS_CERTIFICATE        - Base64-encoded .pfx certificate
+#     WINDOWS_CERTIFICATE_PASSWORD - Password for the .pfx file
+#
+#   macOS (Developer ID + Notarization):
+#     APPLE_CERTIFICATE          - Base64-encoded .p12 certificate
+#     APPLE_CERTIFICATE_PASSWORD - Password for the .p12 file
+#     APPLE_SIGNING_IDENTITY     - e.g. "Developer ID Application: ROZOOM (TEAM_ID)"
+#     APPLE_ID                   - Apple ID email for notarization
+#     APPLE_PASSWORD             - App-specific password (NOT your Apple ID password)
+#     APPLE_TEAM_ID              - 10-character team identifier
+#     KEYCHAIN_PASSWORD          - Arbitrary password for the temporary CI keychain
+# ============================================================================
+
+name: "Code Signing (draft)"
+
+on:
+  workflow_dispatch: {} # Manual trigger only while in draft
+
+defaults:
+  run:
+    working-directory: ./dashboard-app
+
+concurrency:
+  group: code-signing-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write # Needed to upload release assets
+
+jobs:
+  # -------------------------------------------------------
+  # Windows - EV Code Signing
+  # -------------------------------------------------------
+  sign-windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: ./.github/actions/setup-pnpm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: dashboard-app/src-tauri -> target
+
+      - name: Import code signing certificate
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $certBytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+          $certPath = Join-Path $env:RUNNER_TEMP "certificate.pfx"
+          [IO.File]::WriteAllBytes($certPath, $certBytes)
+          Import-PfxCertificate -FilePath $certPath -CertStoreLocation Cert:\CurrentUser\My -Password (ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force)
+          Remove-Item $certPath
+        shell: powershell
+
+      - name: Download sidecar binaries
+        run: node download-binaries.js
+
+      - name: Build and sign Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Tauri reads these from tauri.conf.json > bundle > windows
+          # certificateThumbprint and timestampUrl must be set there
+        with:
+          projectPath: dashboard-app
+
+      # If not using tauri-action for signing, sign manually:
+      # - name: Sign with signtool
+      #   env:
+      #     WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+      #   run: |
+      #     $cert = Join-Path $env:RUNNER_TEMP "certificate.pfx"
+      #     $targets = Get-ChildItem -Recurse -Include "*.exe","*.msi" src-tauri/target/release/bundle/
+      #     foreach ($file in $targets) {
+      #       & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign `
+      #         /f $cert /p $env:WINDOWS_CERTIFICATE_PASSWORD `
+      #         /tr http://timestamp.digicert.com /td sha256 /fd sha256 `
+      #         $file.FullName
+      #     }
+      #   shell: powershell
+
+  # -------------------------------------------------------
+  # macOS - Code Signing + Notarization
+  # -------------------------------------------------------
+  sign-macos:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: ./.github/actions/setup-pnpm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: dashboard-app/src-tauri -> target
+
+      - name: Import Apple certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERT_PATH=$RUNNER_TEMP/certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain-db
+
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security default-keychain -s "$KEYCHAIN_PATH"
+
+          rm "$CERT_PATH"
+
+      - name: Download sidecar binaries
+        run: node download-binaries.js
+
+      - name: Build, sign, and notarize Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Tauri v2 auto-notarizes when these env vars are set:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          projectPath: dashboard-app
+
+      - name: Cleanup keychain
+        if: always()
+        run: security delete-keychain $RUNNER_TEMP/build.keychain-db

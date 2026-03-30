@@ -1,0 +1,44 @@
+name: Workloads Perf Budget
+
+on:
+  pull_request:
+    paths:
+      - "dashboard-app/src/lib/features/workloads-management/**"
+      - "dashboard-app/src/lib/widgets/datalists/ui/**"
+      - "dashboard-app/src/lib/shared/lib/**"
+      - "dashboard-app/e2e/**"
+      - ".github/workflows/workloads-perf-budget.yml"
+  push:
+    branches: ["main", "master", "feat/**"]
+    paths:
+      - "dashboard-app/src/lib/features/workloads-management/**"
+      - "dashboard-app/src/lib/widgets/datalists/ui/**"
+      - "dashboard-app/src/lib/shared/lib/**"
+      - "dashboard-app/e2e/**"
+      - ".github/workflows/workloads-perf-budget.yml"
+
+jobs:
+  perf-budget-gate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard-app
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: "pnpm"
+          cache-dependency-path: dashboard-app/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Perf budget contracts
+        run: >
+          pnpm vitest run
+          src/lib/features/workloads-management/model/workload-telemetry.test.ts
+          src/lib/widgets/datalists/ui/workload-cache-invalidation.contract.test.ts
+          src/lib/widgets/datalists/ui/workload-details-abort-manager.contract.test.ts
+      - name: Build gate
+        run: pnpm build

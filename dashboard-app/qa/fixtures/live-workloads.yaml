@@ -1,0 +1,533 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: qa-workloads
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qa-config
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+data:
+  app.yaml: |
+    mode: qa
+    feature: workloads
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: qa-secret
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+type: Opaque
+stringData:
+  token: qa-token
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: qa-serviceaccount
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: qa-quota
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  hard:
+    pods: "20"
+    requests.cpu: "2"
+    requests.memory: 2Gi
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: qa-limits
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 200m
+        memory: 256Mi
+      defaultRequest:
+        cpu: 50m
+        memory: 64Mi
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: qa-priority
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+value: 1000
+globalDefault: false
+description: QA priority class for dashboard workload coverage.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qa-web
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/name: qa-web
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: qa-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: qa-web
+        app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+    spec:
+      serviceAccountName: qa-serviceaccount
+      priorityClassName: qa-priority
+      containers:
+        - name: web
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qa-api
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/name: qa-api
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: qa-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: qa-api
+        app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+    spec:
+      serviceAccountName: qa-serviceaccount
+      containers:
+        - name: api
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              while true; do
+                echo "qa-api alive $(date -Iseconds)";
+                sleep 5;
+              done
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qa-web
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/name: qa-web
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  selector:
+    app.kubernetes.io/name: qa-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qa-stateful
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/name: qa-stateful
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: qa-stateful
+  ports:
+    - name: shell
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qa-storage-claim
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: qa-stateful
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/name: qa-stateful
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  serviceName: qa-stateful
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: qa-stateful
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: qa-stateful
+        app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+    spec:
+      containers:
+        - name: app
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              while true; do
+                echo "qa-stateful alive $(date -Iseconds)";
+                sleep 5;
+              done
+          ports:
+            - containerPort: 8080
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: qa-daemon
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/name: qa-daemon
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: qa-daemon
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: qa-daemon
+        app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+    spec:
+      containers:
+        - name: daemon
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              while true; do
+                echo "qa-daemon alive $(date -Iseconds)";
+                sleep 10;
+              done
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: qa-job
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/name: qa-job
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: qa-job
+        app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: job
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - echo "qa job done"
+  backoffLimit: 0
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: qa-cron
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/name: qa-cron
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  schedule: "*/15 * * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: qa-cron
+            app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: cron
+              image: busybox:1.36
+              command:
+                - sh
+                - -c
+                - echo "qa cron tick"
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: qa-web-pdb
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: qa-web
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: qa-web
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: qa-web
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: qa-default-deny
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: qa-nginx
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  controller: k8s.io/ingress-nginx
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: qa-web
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  ingressClassName: qa-nginx
+  rules:
+    - host: qa-web.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: qa-web
+                port:
+                  number: 80
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: qa-reader
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: qa-reader
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+subjects:
+  - kind: ServiceAccount
+    name: qa-serviceaccount
+    namespace: qa-workloads
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: qa-reader
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: qa-cluster-reader
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces", "nodes"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: qa-cluster-reader
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+subjects:
+  - kind: ServiceAccount
+    name: qa-serviceaccount
+    namespace: qa-workloads
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: qa-cluster-reader
+---
+apiVersion: coordination.k8s.io/v1
+kind: Lease
+metadata:
+  name: qa-lease
+  namespace: qa-workloads
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  holderIdentity: qa-lease-holder
+  leaseDurationSeconds: 30
+---
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: qa-runtime
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+handler: runc
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: qa-mutating
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+webhooks:
+  - name: qa-mutating.example.com
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    failurePolicy: Ignore
+    clientConfig:
+      url: https://127.0.0.1:9443/mutate
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: qa-validating
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+webhooks:
+  - name: qa-validating.example.com
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    failurePolicy: Ignore
+    clientConfig:
+      url: https://127.0.0.1:9443/validate
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["services"]
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: qaexamples.qa.rozoom.dev
+  labels:
+    app.kubernetes.io/managed-by: svelte-dashboard-live-qa
+spec:
+  group: qa.rozoom.dev
+  scope: Namespaced
+  names:
+    plural: qaexamples
+    singular: qaexample
+    kind: QaExample
+    shortNames:
+      - qae
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                displayName:
+                  type: string

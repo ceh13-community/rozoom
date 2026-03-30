@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1320 660" width="1320" height="660" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+
+    <!-- ── Background ── -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="70%">
+      <stop offset="0%"   stop-color="#1c3d70"/>
+      <stop offset="42%"  stop-color="#0d2140"/>
+      <stop offset="100%" stop-color="#040c1a"/>
+    </radialGradient>
+
+    <!-- ── Letter fill gradient ── -->
+    <linearGradient id="letterFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#d8eeff"/>
+      <stop offset="10%"  stop-color="#92c8fa"/>
+      <stop offset="38%"  stop-color="#2b7be0"/>
+      <stop offset="68%"  stop-color="#1148b8"/>
+      <stop offset="100%" stop-color="#082590"/>
+    </linearGradient>
+
+    <!-- ── Wheel gradient (same hue, slightly brighter top) ── -->
+    <linearGradient id="wheelFill" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0%"   stop-color="#c8e4ff"/>
+      <stop offset="18%"  stop-color="#5daaf6"/>
+      <stop offset="55%"  stop-color="#1555cc"/>
+      <stop offset="100%" stop-color="#0a3098"/>
+    </linearGradient>
+
+    <!-- ── Hub fill ── -->
+    <radialGradient id="hubFill" cx="40%" cy="35%" r="65%">
+      <stop offset="0%"   stop-color="#4888d8"/>
+      <stop offset="100%" stop-color="#0b2880"/>
+    </radialGradient>
+
+    <!-- ── Shine overlay (top ⅓ of letters) ── -->
+    <linearGradient id="shineGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="white" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="white" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- ── Drop-shadow / depth ── -->
+    <filter id="depthShadow" x="-8%" y="-8%" width="120%" height="130%">
+      <feDropShadow dx="0"  dy="7"  stdDeviation="14" flood-color="#0028b8" flood-opacity="0.85"/>
+      <feDropShadow dx="0"  dy="2"  stdDeviation="4"  flood-color="#00114d" flood-opacity="0.6"/>
+    </filter>
+
+    <!-- ── Soft glow behind whole logo ── -->
+    <filter id="logoGlow" x="-25%" y="-35%" width="150%" height="170%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="22" result="blur"/>
+      <feColorMatrix in="blur" type="matrix"
+        values="0 0 0 0 0.05  0 0 0 0 0.28  0 0 0 0 1   0 0 0 0.55 0"
+        result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- ── Clip for shine on letters (top portion only) ── -->
+    <clipPath id="shineClip">
+      <rect x="0" y="250" width="1320" height="110"/>
+    </clipPath>
+
+  </defs>
+
+  <!-- ════════════════ BACKGROUND ════════════════ -->
+  <rect width="1320" height="660" fill="url(#bgGrad)"/>
+
+  <!-- Radial ambient glow behind logo -->
+  <ellipse cx="660" cy="332" rx="560" ry="195" fill="#1a48cc" opacity="0.10"/>
+  <ellipse cx="660" cy="332" rx="360" ry="130" fill="#2255dd" opacity="0.08"/>
+
+  <!-- ════════════════ LOGO GROUP ════════════════ -->
+  <g filter="url(#logoGlow)">
+
+    <!-- ── Stroke "ghost" layer for 3-D depth ── -->
+    <g opacity="0.45" transform="translate(0,5)">
+      <text x="166" y="430"
+        font-family="Impact,'Arial Black',sans-serif"
+        font-size="240" font-weight="900"
+        fill="#04128a" stroke="#04128a" stroke-width="6">R</text>
+      <text x="492" y="430"
+        font-family="Impact,'Arial Black',sans-serif"
+        font-size="240" font-weight="900"
+        fill="#04128a" stroke="#04128a" stroke-width="6">ZOOM</text>
+    </g>
+
+    <!-- ── "R" ── -->
+    <text x="166" y="430"
+      font-family="Impact,'Arial Black',sans-serif"
+      font-size="240" font-weight="900"
+      fill="url(#letterFill)"
+      filter="url(#depthShadow)">R</text>
+
+    <!-- ── "ZOOM" (after wheel gap) ── -->
+    <text x="492" y="430"
+      font-family="Impact,'Arial Black',sans-serif"
+      font-size="240" font-weight="900"
+      fill="url(#letterFill)"
+      filter="url(#depthShadow)">ZOOM</text>
+
+    <!-- ── SHIP WHEEL (replaces first "O", centre ≈ 403, 342) ── -->
+    <g transform="translate(403,342)" filter="url(#depthShadow)">
+
+      <!-- 8 spokes -->
+      <line x1="0"    y1="-110" x2="0"    y2="110"  stroke="url(#wheelFill)" stroke-width="18" stroke-linecap="round"/>
+      <line x1="-110" y1="0"    x2="110"  y2="0"    stroke="url(#wheelFill)" stroke-width="18" stroke-linecap="round"/>
+      <line x1="-78"  y1="-78"  x2="78"   y2="78"   stroke="url(#wheelFill)" stroke-width="18" stroke-linecap="round"/>
+      <line x1="78"   y1="-78"  x2="-78"  y2="78"   stroke="url(#wheelFill)" stroke-width="18" stroke-linecap="round"/>
+
+      <!-- Outer rim ring -->
+      <circle r="110" fill="none" stroke="url(#wheelFill)" stroke-width="26"/>
+
+      <!-- Spoke tip handles (small knobs protruding beyond rim) -->
+      <circle cx="0"   cy="-125" r="10" fill="url(#wheelFill)"/>
+      <circle cx="0"   cy="125"  r="10" fill="url(#wheelFill)"/>
+      <circle cx="-125" cy="0"   r="10" fill="url(#wheelFill)"/>
+      <circle cx="125"  cy="0"   r="10" fill="url(#wheelFill)"/>
+      <circle cx="-88"  cy="-88" r="10" fill="url(#wheelFill)"/>
+      <circle cx="88"   cy="-88" r="10" fill="url(#wheelFill)"/>
+      <circle cx="-88"  cy="88"  r="10" fill="url(#wheelFill)"/>
+      <circle cx="88"   cy="88"  r="10" fill="url(#wheelFill)"/>
+
+      <!-- Inner hub circle -->
+      <circle r="42" fill="url(#hubFill)"/>
+      <circle r="42" fill="none" stroke="#6aaaee" stroke-width="2.5" opacity="0.5"/>
+
+      <!-- Hub dark inset -->
+      <circle r="28" fill="#0a1e60"/>
+
+      <!-- Hub square decorative cutout (same as original) -->
+      <rect x="-11" y="-11" width="22" height="22" rx="3" fill="#1a3890"/>
+      <rect x="-6"  y="-6"  width="12" height="12" rx="2" fill="#070e34"/>
+
+      <!-- Wheel rim highlight arc (top-left gloss) -->
+      <path d="M -68,-88 A 110 110 0 0 1 68,-88"
+        fill="none" stroke="white" stroke-width="6"
+        stroke-linecap="round" opacity="0.35"/>
+
+      <!-- Hub top gloss dot -->
+      <ellipse cx="-8" cy="-16" rx="9" ry="6" fill="white" opacity="0.28"/>
+    </g>
+
+    <!-- ── Shine overlay on letters (upper gloss strip) ── -->
+    <g clip-path="url(#shineClip)" opacity="0.9">
+      <text x="166" y="430"
+        font-family="Impact,'Arial Black',sans-serif"
+        font-size="240" font-weight="900"
+        fill="url(#shineGrad)">R</text>
+      <text x="492" y="430"
+        font-family="Impact,'Arial Black',sans-serif"
+        font-size="240" font-weight="900"
+        fill="url(#shineGrad)">ZOOM</text>
+    </g>
+
+    <!-- ── Top edge highlight line on letters ── -->
+    <g opacity="0.5">
+      <text x="166" y="430"
+        font-family="Impact,'Arial Black',sans-serif"
+        font-size="240" font-weight="900"
+        fill="none" stroke="#b0d8ff" stroke-width="1.5">R</text>
+      <text x="492" y="430"
+        font-family="Impact,'Arial Black',sans-serif"
+        font-size="240" font-weight="900"
+        fill="none" stroke="#b0d8ff" stroke-width="1.5">ZOOM</text>
+    </g>
+
+  </g>
+</svg>

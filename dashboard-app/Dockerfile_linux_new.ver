@@ -1,0 +1,124 @@
+# syntax=docker/dockerfile:1.4
+
+#######################################################################
+# STAGE 1 - DEPS (pnpm install with cache)
+#######################################################################
+FROM node:20-bookworm AS deps
+
+WORKDIR /app
+RUN npm i -g pnpm
+
+COPY package.json pnpm-lock.yaml components.json ./
+RUN --mount=type=cache,id=pnpm-store,target=/root/.pnpm-store \
+    pnpm install --frozen-lockfile
+
+
+#######################################################################
+# STAGE 2 - VALIDATE (mirrors CI pr_checks job)
+#   - svelte-kit sync + prettier + eslint + svelte-check
+#   - vitest (unit + contract tests)
+#   - vite build (web bundle)
+#######################################################################
+FROM deps AS validate
+WORKDIR /app
+
+COPY . .
+
+# Static checks - same as CI `pnpm run check`
+RUN pnpm run -s check
+
+# Unit + contract tests - same as CI `pnpm vitest run`
+RUN pnpm exec vitest run
+
+# Web build - same as CI `pnpm run build`
+RUN pnpm run build
+
+# E2E tests - visual regression + critical user journeys
+RUN pnpm exec playwright install --with-deps chromium
+RUN VITE_ENABLE_SYNTHETIC_FLEET_HARNESS=true pnpm run build && \
+    VITE_ENABLE_SYNTHETIC_FLEET_HARNESS=true pnpm preview --host 127.0.0.1 --port 4173 & \
+    sleep 5 && \
+    pnpm exec playwright test critical-user-journeys visual-regression --reporter=list && \
+    kill %1 || true
+
+
+#######################################################################
+# STAGE 3 - TAURI BUILD (deb + rpm)
+#######################################################################
+FROM node:20-bookworm AS tauri-build
+
+WORKDIR /app
+
+# System deps for Tauri + bundling
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libwebkit2gtk-4.1-dev \
+    javascriptcoregtk-4.1-dev \
+    libsoup-3.0-dev \
+    build-essential \
+    curl wget git file \
+    libxdo-dev \
+    libssl-dev \
+    libayatana-appindicator3-dev \
+    librsvg2-dev \
+    pkg-config \
+    xdg-utils \
+    libharfbuzz-dev \
+    libpango1.0-dev \
+    patchelf \
+    libfuse2 \
+    rpm \
+    gnupg \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN npm i -g pnpm
+
+# Rust toolchain
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN rustup target add x86_64-unknown-linux-gnu
+
+# Install JS deps (cache-friendly)
+COPY package.json pnpm-lock.yaml components.json ./
+RUN --mount=type=cache,id=pnpm-store-tauri,target=/root/.pnpm-store \
+    pnpm install --frozen-lockfile
+
+# Copy sources
+COPY . .
+
+# Download CLI binaries (persisted in image - needed by Tauri build)
+RUN pnpm download:binaries
+
+# Cache Cargo deps
+RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry \
+    --mount=type=cache,id=cargo-git,target=/root/.cargo/git \
+    cargo fetch --manifest-path src-tauri/Cargo.toml
+
+ENV CARGO_TARGET_DIR=/app/src-tauri/target
+
+# Build + bundle (deb + rpm)
+RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry \
+    --mount=type=cache,id=cargo-git,target=/root/.cargo/git \
+    pnpm run build:deb && \
+    pnpm run build:rpm
+
+# Collect artifacts
+RUN mkdir -p /app/dist && \
+    (cp -r /app/src-tauri/target/release/bundle/* /app/dist/ || \
+      (echo "!!! No bundle output found" && \
+       find /app/src-tauri/target -maxdepth 6 -type f \( -name "*.deb" -o -name "*.rpm" \) -print && \
+       exit 1))
+
+
+#######################################################################
+# FINAL - Artifact image (minimal)
+#######################################################################
+FROM debian:bookworm-slim AS dist
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=tauri-build /app/dist ./
+CMD ["ls", "-lh", "/app"]

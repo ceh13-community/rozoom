@@ -1,0 +1,10 @@
+---
+services:
+  k8s-dashboard-app:
+    build:
+      context: .
+      dockerfile: Dockerfile_linux
+      args:
+        TERMINAL_DEBUG: "true"
+    image: k8s-dashboard-app:latest
+    command: sleep infinity

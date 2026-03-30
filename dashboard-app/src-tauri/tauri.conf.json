@@ -1,0 +1,63 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ROZOOM_K8s_Linter_IDE",
+  "version": "0.20.0",
+  "identifier": "com.rozoom.k8s-linter-ide",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "ROZOOM - K8s Linter IDE",
+        "width": 1024,
+        "height": 768,
+        "devtools": false
+      }
+    ],
+    "security": {
+      "dangerousDisableAssetCspModification": false,
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' http://127.0.0.1:* http://localhost:*; worker-src 'self' blob:"
+    }
+  },
+  "bundle": {
+    "externalBin": [
+      "binaries/rozoom-kubectl",
+      "binaries/rozoom-helm",
+      "binaries/rozoom-doctl",
+      "binaries/rozoom-pluto",
+      "binaries/rozoom-velero",
+      "binaries/rozoom-kustomize",
+      "binaries/rozoom-kubeconform",
+      "binaries/rozoom-stern",
+      "binaries/rozoom-yq",
+      "binaries/rozoom-hcloud",
+      "binaries/rozoom-oc",
+      "binaries/rozoom-az-cli"
+    ],
+    "resources": [
+      "binaries/aws-dist",
+      "binaries/az-dist"
+    ],
+    "active": true,
+    "targets": [
+      "deb",
+      "rpm"
+    ],
+    "linux": {
+      "deb": {
+        "desktopTemplate": "desktop-template.desktop"
+      }
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
