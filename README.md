@@ -4,7 +4,9 @@
 
 ROZOOM is an open-source desktop application for managing Kubernetes clusters. It bundles everything you need - kubectl, helm, stern, velero, and 10 more CLI tools - so you never depend on system PATH or manual installs.
 
-<!-- TODO: hero screenshot here -->
+<p align="center">
+  <img src=".github/rozoom-hero-screenshot.png" alt="ROZOOM Fleet Dashboard" width="100%">
+</p>
 
 ## Why ROZOOM?
 
