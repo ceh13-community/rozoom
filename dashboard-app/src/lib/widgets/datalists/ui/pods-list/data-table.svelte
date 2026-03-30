@@ -45,6 +45,7 @@
     onRunDebugDescribe: (row: PodListRow) => void;
     onCopyDebug: (row: PodListRow) => void;
     onPreviousLogs: (row: PodListRow) => void;
+    onPortForward: (row: PodListRow) => void;
     onEvict: (row: PodListRow) => void;
     onDelete: (row: PodListRow) => void;
     isDeleting: (id: string) => boolean;
@@ -103,6 +104,7 @@
     onRunDebugDescribe,
     onCopyDebug,
     onPreviousLogs,
+    onPortForward,
     onEvict,
     onDelete,
     isDeleting,
@@ -162,14 +164,20 @@
       return "pods-k9s-status-completed";
     }
     if (normalized.includes("pending")) return "pods-k9s-status-pending";
-    if (normalized.includes("error") || normalized.includes("crash") || normalized.includes("failed")) {
+    if (
+      normalized.includes("error") ||
+      normalized.includes("crash") ||
+      normalized.includes("failed")
+    ) {
       return "pods-k9s-status-error";
     }
     return "pods-k9s-status-neutral";
   }
 
   function getAvailableNamespaces() {
-    return [...new Set(rows.map((row) => row.namespace))].sort((left, right) => left.localeCompare(right));
+    return [...new Set(rows.map((row) => row.namespace))].sort((left, right) =>
+      left.localeCompare(right),
+    );
   }
 
   const namespaceFilteredRows = $derived.by(() => {
@@ -228,7 +236,9 @@
   }
 
   const podTotalPages = $derived(calcTotalPages(sortedRows.length, podPageSize));
-  const paginatedPods = $derived(sortedRows.slice(podPageIndex * podPageSize, (podPageIndex + 1) * podPageSize));
+  const paginatedPods = $derived(
+    sortedRows.slice(podPageIndex * podPageSize, (podPageIndex + 1) * podPageSize),
+  );
 
   const flatVirtualWindow = $derived.by(() =>
     computeVirtualWindow({
@@ -246,7 +256,7 @@
   function getGroupedRows() {
     const groups = new Map<string, PodListRow[]>();
     for (const row of sortedRows) {
-      const groupKey = viewMode === "node" ? (row.node?.trim() || "Unscheduled") : row.namespace;
+      const groupKey = viewMode === "node" ? row.node?.trim() || "Unscheduled" : row.namespace;
       const bucket = groups.get(groupKey) ?? [];
       bucket.push(row);
       groups.set(groupKey, bucket);
@@ -287,7 +297,10 @@
   }
 
   function eventTargetsPodActionsArea(event: Event) {
-    return event.target instanceof Element && Boolean(event.target.closest("[data-pod-actions-menu='true']"));
+    return (
+      event.target instanceof Element &&
+      Boolean(event.target.closest("[data-pod-actions-menu='true']"))
+    );
   }
 
   function getColumnEntries() {
@@ -361,14 +374,16 @@
   function toggleAllGroups() {
     const visibleGroupIds = getGroupedRows().map(([groupKey]) => getGroupId(groupKey));
     const allCollapsed =
-      visibleGroupIds.length > 0 && visibleGroupIds.every((groupId) => collapsedGroups.has(groupId));
+      visibleGroupIds.length > 0 &&
+      visibleGroupIds.every((groupId) => collapsedGroups.has(groupId));
     collapsedGroups = allCollapsed ? new Set<string>() : new Set(visibleGroupIds);
   }
 
   function getToggleAllGroupsLabel() {
     const visibleGroupIds = getGroupedRows().map(([groupKey]) => getGroupId(groupKey));
     const allCollapsed =
-      visibleGroupIds.length > 0 && visibleGroupIds.every((groupId) => collapsedGroups.has(groupId));
+      visibleGroupIds.length > 0 &&
+      visibleGroupIds.every((groupId) => collapsedGroups.has(groupId));
     return allCollapsed ? "Expand groups" : "Collapse groups";
   }
 
@@ -379,7 +394,9 @@
   }
 
   async function downloadCsv() {
-    const headers = getColumnEntries().filter((column) => column.checked).map((column) => column.label);
+    const headers = getColumnEntries()
+      .filter((column) => column.checked)
+      .map((column) => column.label);
     const lines = [headers.map(toCsvCell).join(",")];
     for (const row of namespaceFilteredRows) {
       const values: unknown[] = [];
@@ -387,8 +404,10 @@
       if (isColumnVisible("namespace")) values.push(row.namespace);
       if (isColumnVisible("status")) values.push(row.status);
       if (isColumnVisible("ready")) values.push(`${row.readyContainers}/${row.totalContainers}`);
-      if (enrichedTableEnabled && isColumnVisible("cpu")) values.push(getMetricsForRow(row)?.cpu ?? "n/a");
-      if (enrichedTableEnabled && isColumnVisible("memory")) values.push(getMetricsForRow(row)?.memory ?? "n/a");
+      if (enrichedTableEnabled && isColumnVisible("cpu"))
+        values.push(getMetricsForRow(row)?.cpu ?? "n/a");
+      if (enrichedTableEnabled && isColumnVisible("memory"))
+        values.push(getMetricsForRow(row)?.memory ?? "n/a");
       if (isColumnVisible("restarts")) values.push(row.restarts);
       if (isColumnVisible("node")) values.push(row.node);
       if (isColumnVisible("age")) values.push(row.age);
@@ -422,7 +441,8 @@
     }
 
     const changed =
-      next.size !== selectedNamespaces.size || [...next].some((namespace) => !selectedNamespaces.has(namespace));
+      next.size !== selectedNamespaces.size ||
+      [...next].some((namespace) => !selectedNamespaces.has(namespace));
     previousAvailableNamespaces = availableNamespaces;
     if (changed) {
       selectedNamespaces = next;
@@ -457,7 +477,13 @@
         onSelectAll={showAllColumns}
         onClearAll={hideAllColumns}
       />
-      <Button variant="outline" size="sm" onclick={downloadCsv} title="Download CSV" aria-label="Download CSV">
+      <Button
+        variant="outline"
+        size="sm"
+        onclick={downloadCsv}
+        title="Download CSV"
+        aria-label="Download CSV"
+      >
         <FileDown class="mr-1 h-4 w-4" />
         Download CSV
       </Button>
@@ -500,9 +526,9 @@
       <WatcherToolbarControls
         {watcherEnabled}
         {watcherRefreshSeconds}
-        onToggleWatcher={onToggleWatcher}
-        onWatcherRefreshSecondsChange={onWatcherRefreshSecondsChange}
-        onResetWatcherSettings={onResetWatcherSettings}
+        {onToggleWatcher}
+        {onWatcherRefreshSecondsChange}
+        {onResetWatcherSettings}
       />
       {#if (viewMode === "namespace" || viewMode === "node") && getGroupedRows().length > 0}
         <Button variant="outline" size="sm" onclick={toggleAllGroups}>
@@ -517,13 +543,17 @@
       Rows: <span class="font-medium text-foreground">{sortedRows.length}</span>
     </div>
     <div>
-      Watcher: <span class="font-medium text-foreground">{watcherEnabled ? "Active" : "Paused"}</span>
+      Watcher: <span class="font-medium text-foreground"
+        >{watcherEnabled ? "Active" : "Paused"}</span
+      >
     </div>
     <div class="min-w-[18rem] flex-1">{metricsSummary}</div>
   </div>
 
   {#if watcherError}
-    <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+    <div
+      class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+    >
       {watcherError}
     </div>
   {/if}
@@ -545,7 +575,10 @@
   {/if}
 
   <div class="grid w-full grid-cols-1 overflow-visible">
-    <div class="pods-k9s-table max-h-[70vh] overflow-auto rounded-lg border border-border/60 bg-background/40" onscroll={handleTableScroll}>
+    <div
+      class="pods-k9s-table max-h-[70vh] overflow-auto rounded-lg border border-border/60 bg-background/40"
+      onscroll={handleTableScroll}
+    >
       <div
         class="sticky-table-header pods-k9s-table__header grid gap-3 border-b border-border px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
         style={`grid-template-columns: ${tableGridTemplate};`}
@@ -559,15 +592,42 @@
           />
         </div>
         <div>Actions</div>
-        {#if isColumnVisible("name")}<SortingButton label="Name" onclick={() => toggleSort("name")} />{/if}
-        {#if isColumnVisible("namespace")}<SortingButton label="Namespace" onclick={() => toggleSort("namespace")} />{/if}
-        {#if isColumnVisible("status")}<SortingButton label="Status" onclick={() => toggleSort("status")} />{/if}
-        {#if isColumnVisible("ready")}<SortingButton label="Ready" onclick={() => toggleSort("ready")} />{/if}
-        {#if enrichedTableEnabled && isColumnVisible("cpu")}<SortingButton label="CPU" onclick={() => toggleSort("cpu")} />{/if}
-        {#if enrichedTableEnabled && isColumnVisible("memory")}<SortingButton label="Memory" onclick={() => toggleSort("memory")} />{/if}
-        {#if isColumnVisible("restarts")}<SortingButton label="Restarts" onclick={() => toggleSort("restarts")} />{/if}
-        {#if isColumnVisible("node")}<SortingButton label="Node" onclick={() => toggleSort("node")} />{/if}
-        {#if isColumnVisible("age")}<SortingButton label="Age" onclick={() => toggleSort("age")} />{/if}
+        {#if isColumnVisible("name")}<SortingButton
+            label="Name"
+            onclick={() => toggleSort("name")}
+          />{/if}
+        {#if isColumnVisible("namespace")}<SortingButton
+            label="Namespace"
+            onclick={() => toggleSort("namespace")}
+          />{/if}
+        {#if isColumnVisible("status")}<SortingButton
+            label="Status"
+            onclick={() => toggleSort("status")}
+          />{/if}
+        {#if isColumnVisible("ready")}<SortingButton
+            label="Ready"
+            onclick={() => toggleSort("ready")}
+          />{/if}
+        {#if enrichedTableEnabled && isColumnVisible("cpu")}<SortingButton
+            label="CPU"
+            onclick={() => toggleSort("cpu")}
+          />{/if}
+        {#if enrichedTableEnabled && isColumnVisible("memory")}<SortingButton
+            label="Memory"
+            onclick={() => toggleSort("memory")}
+          />{/if}
+        {#if isColumnVisible("restarts")}<SortingButton
+            label="Restarts"
+            onclick={() => toggleSort("restarts")}
+          />{/if}
+        {#if isColumnVisible("node")}<SortingButton
+            label="Node"
+            onclick={() => toggleSort("node")}
+          />{/if}
+        {#if isColumnVisible("age")}<SortingButton
+            label="Age"
+            onclick={() => toggleSort("age")}
+          />{/if}
       </div>
 
       {#if sortedRows.length === 0}
@@ -583,7 +643,11 @@
               onclick={() => toggleGroup(groupKey)}
             >
               <span>{groupKey}</span>
-              <span>{isGroupCollapsed(groupKey) ? `Show ${groupRows.length}` : `Hide ${groupRows.length}`}</span>
+              <span
+                >{isGroupCollapsed(groupKey)
+                  ? `Show ${groupRows.length}`
+                  : `Hide ${groupRows.length}`}</span
+              >
             </button>
             {#if !isGroupCollapsed(groupKey)}
               {#each groupRows as row (row.uid)}
@@ -625,7 +689,7 @@
                       namespace={row.namespace}
                       showExportIncident={false}
                       showDownloadYaml={false}
-                      showPortForward={false}
+                      showPortForward={true}
                       isDeleting={isDeleting(row.uid)}
                       isEvicting={isEvicting(row.uid)}
                       isYamlBusy={false}
@@ -643,14 +707,18 @@
                       onRunDebugDescribe={() => onRunDebugDescribe(row)}
                       onCopyDebug={() => onCopyDebug(row)}
                       onPreviousLogs={() => onPreviousLogs(row)}
-                      onPortForward={() => {}}
+                      onPortForward={() => onPortForward(row)}
                       onEvict={() => onEvict(row)}
                       onLogs={() => onLogs(row)}
                       onDelete={() => onDelete(row)}
                     />
                   </div>
                   {#if isColumnVisible("name")}
-                    <div class="min-w-0 truncate font-medium text-foreground underline-offset-2 hover:underline">{row.name}</div>
+                    <div
+                      class="min-w-0 truncate font-medium text-foreground underline-offset-2 hover:underline"
+                    >
+                      {row.name}
+                    </div>
                   {/if}
                   {#if isColumnVisible("namespace")}
                     <div class="min-w-0 truncate text-muted-foreground">{row.namespace}</div>
@@ -696,11 +764,11 @@
           </div>
         {/each}
       {:else}
-          {#if flatVirtualWindow.paddingTop > 0}
-            <div aria-hidden="true" style={`height:${flatVirtualWindow.paddingTop}px;`}></div>
-          {/if}
-          {#each flatVisibleRows as row (row.uid)}
-            <div
+        {#if flatVirtualWindow.paddingTop > 0}
+          <div aria-hidden="true" style={`height:${flatVirtualWindow.paddingTop}px;`}></div>
+        {/if}
+        {#each flatVisibleRows as row (row.uid)}
+          <div
             class={`pods-k9s-table__row grid gap-3 border-b border-border/60 px-4 py-2.5 text-sm transition-colors ${isSelected(row.uid) ? "bg-muted/30" : "hover:bg-muted/20"}`}
             style={`grid-template-columns: ${tableGridTemplate};`}
             role="button"
@@ -761,7 +829,11 @@
               />
             </div>
             {#if isColumnVisible("name")}
-              <div class="min-w-0 truncate font-medium text-foreground underline-offset-2 hover:underline">{row.name}</div>
+              <div
+                class="min-w-0 truncate font-medium text-foreground underline-offset-2 hover:underline"
+              >
+                {row.name}
+              </div>
             {/if}
             {#if isColumnVisible("namespace")}
               <div class="min-w-0 truncate text-muted-foreground">{row.namespace}</div>
@@ -803,9 +875,9 @@
             {/if}
           </div>
         {/each}
-          {#if flatVirtualWindow.paddingBottom > 0}
-            <div aria-hidden="true" style={`height:${flatVirtualWindow.paddingBottom}px;`}></div>
-          {/if}
+        {#if flatVirtualWindow.paddingBottom > 0}
+          <div aria-hidden="true" style={`height:${flatVirtualWindow.paddingBottom}px;`}></div>
+        {/if}
       {/if}
     </div>
   </div>
@@ -814,7 +886,14 @@
     totalPages={podTotalPages}
     totalRows={sortedRows.length}
     pageSize={podPageSize}
-    onPageChange={(p) => { podPageIndex = p; tableScrollTop = 0; }}
-    onPageSizeChange={(s) => { podPageSize = s; podPageIndex = 0; tableScrollTop = 0; }}
+    onPageChange={(p) => {
+      podPageIndex = p;
+      tableScrollTop = 0;
+    }}
+    onPageSizeChange={(s) => {
+      podPageSize = s;
+      podPageIndex = 0;
+      tableScrollTop = 0;
+    }}
   />
 </div>
