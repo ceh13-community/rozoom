@@ -6,6 +6,9 @@
   import type { PodItem } from "$shared/model/clusters";
   import { openPodAttachModal, openPodShellModal } from "$features/shell";
   import { runDebugDescribe } from "$features/resource-debug-runtime";
+  import { startPortForward } from "$shared/api/port-forward";
+  import { requestPortForwardStartMode } from "$shared/lib/port-forward-start-mode";
+  import { popOutPortForwardPreview } from "$shared/lib/port-forward-preview";
   import {
     destroyPodsSync,
     markPodsSyncError,
@@ -44,9 +47,7 @@
   import PodBulkActions from "./pod-bulk-actions.svelte";
   import PodDetailsSheet from "./pod-details-sheet.svelte";
   import PodMetricsBoundary from "./pod-metrics-boundary.svelte";
-  import PodWorkbenchPanel, {
-    type WorkbenchOpenRequest,
-  } from "./pod-workbench-panel.svelte";
+  import PodWorkbenchPanel, { type WorkbenchOpenRequest } from "./pod-workbench-panel.svelte";
   import {
     buildPodsSnapshotScopeKey,
     loadPersistedPodsSnapshot,
@@ -116,7 +117,9 @@
   let previewWorkbenchFallback = $state<{ title: string } | null>(null);
   let metricsRefreshToken = $state(0);
   let podsMetricsLoading = $state(false);
-  let podsMetricsByKey = $state(new Map<string, { cpu: string; memory: string; cpuMillicores: number; memoryBytes: number }>());
+  let podsMetricsByKey = $state(
+    new Map<string, { cpu: string; memory: string; cpuMillicores: number; memoryBytes: number }>(),
+  );
   let podsMetricsError = $state<string | null>(null);
   let metricsSourceChecks = $state<MetricsSourceCheck[] | null>(null);
   let cachedPodsAt = $state<number | null>(null);
@@ -199,7 +202,8 @@
   );
   const podsRuntimeSourceState = $derived.by(() => {
     if (!watcherEnabled) return "paused";
-    if ((snapshotRefreshState === "error" || podsSyncStatus.error) && hasCachedPods) return "cached";
+    if ((snapshotRefreshState === "error" || podsSyncStatus.error) && hasCachedPods)
+      return "cached";
     if (snapshotRefreshState === "error" || podsSyncStatus.error) return "error";
     if (snapshotRefreshState === "loading" && hasCachedPods) return "cached";
     if (podsSyncStatus.lastUpdatedAt) return "live";
@@ -212,7 +216,8 @@
     return `updated ${formatRelativeCachedAt(timestamp)}`;
   });
   const podsRuntimeDetail = $derived.by(() => {
-    if (!watcherEnabled) return "Watcher disabled. Initial snapshot loads once, then background refresh stays paused.";
+    if (!watcherEnabled)
+      return "Watcher disabled. Initial snapshot loads once, then background refresh stays paused.";
     if (snapshotRefreshState === "loading" || podsSyncStatus.isLoading) {
       return "Background snapshot refresh in flight.";
     }
@@ -222,7 +227,8 @@
     return "Active pod snapshot refresh is healthy.";
   });
   const podsRuntimeReason = $derived.by(() => {
-    if (watcherError) return "Pod runtime degraded. Inspect the active error banner for the latest transport detail.";
+    if (watcherError)
+      return "Pod runtime degraded. Inspect the active error banner for the latest transport detail.";
     if (snapshotRefreshError) {
       return "Pod snapshot runtime degraded. Inspect the active error banner for the latest transport detail.";
     }
@@ -413,7 +419,9 @@
 
   async function withSnapshotTimeout<T>(request: Promise<T>) {
     const isBrowserOnly =
-      typeof window !== "undefined" && window.location.protocol.startsWith("http") && !isTauriAvailable();
+      typeof window !== "undefined" &&
+      window.location.protocol.startsWith("http") &&
+      !isTauriAvailable();
     const timeoutMs = isBrowserOnly
       ? BROWSER_SNAPSHOT_REFRESH_TIMEOUT_MS
       : RUNTIME_SNAPSHOT_REFRESH_TIMEOUT_MS;
@@ -473,7 +481,9 @@
       hydratePodsFromPersistedSnapshot();
 
       const isBrowserOnlyPreview =
-        typeof window !== "undefined" && window.location.protocol.startsWith("http") && !isTauriAvailable();
+        typeof window !== "undefined" &&
+        window.location.protocol.startsWith("http") &&
+        !isTauriAvailable();
       if (isBrowserOnlyPreview && cachedSnapshotPods.length > 0) {
         const message = "Pod watcher sync failed.";
         watcherError = message;
@@ -617,6 +627,37 @@
     await navigator.clipboard.writeText(value);
   }
 
+  async function handlePortForward(pod: Partial<PodItem>) {
+    const containers = (pod.spec as unknown as Record<string, unknown>)?.containers as
+      | Array<{ ports?: Array<{ containerPort: number }> }>
+      | undefined;
+    const firstPort = containers?.[0]?.ports?.[0]?.containerPort;
+    if (!firstPort) {
+      toast.error("No container ports defined for this pod.");
+      return;
+    }
+    const mode = requestPortForwardStartMode(firstPort);
+    if (!mode) return;
+    const name = pod.metadata?.name ?? "unknown";
+    const namespace = pod.metadata?.namespace ?? "default";
+    const uniqueKey = `pod/${namespace}/${name}:${firstPort}`;
+    const result = await startPortForward({
+      namespace,
+      resource: `pod/${name}`,
+      remotePort: firstPort,
+      clusterId: data.slug,
+      uniqueKey,
+    });
+    if (result.success) {
+      toast.success(`Port-forward started: localhost:${firstPort} -> ${name}:${firstPort}`);
+      if (mode === "start-and-open") {
+        void popOutPortForwardPreview(`http://localhost:${firstPort}`);
+      }
+    } else {
+      toast.error(result.error ?? "Failed to start port-forward.");
+    }
+  }
+
   async function copyDescribeCommand(pod: Partial<PodItem>) {
     await copyText(
       buildPodDescribeCommand({
@@ -653,7 +694,10 @@
 
   async function deletePods(podsToDelete: Partial<PodItem>[]) {
     if (!data.slug || podsToDelete.length === 0) return;
-    const confirmed = await confirmAction(`Delete ${podsToDelete.length} pod(s)?`, "Confirm delete");
+    const confirmed = await confirmAction(
+      `Delete ${podsToDelete.length} pod(s)?`,
+      "Confirm delete",
+    );
     if (!confirmed) return;
 
     for (const pod of podsToDelete) {
@@ -679,7 +723,10 @@
     }
 
     showActionSuccess(`Deleted ${podsToDelete.length} pod(s).`);
-    selectedPodIds = pruneSelection(selectedPodIds, availableIds.filter((id) => !podsToDelete.some((pod) => getPodUid(pod) === id)));
+    selectedPodIds = pruneSelection(
+      selectedPodIds,
+      availableIds.filter((id) => !podsToDelete.some((pod) => getPodUid(pod) === id)),
+    );
     void loadPodsSnapshot();
   }
 
@@ -707,7 +754,9 @@
           if (!fallbackArgs) {
             throw new Error(response.errors);
           }
-          const fallbackResponse = await kubectlRawArgsFront(fallbackArgs, { clusterId: data.slug });
+          const fallbackResponse = await kubectlRawArgsFront(fallbackArgs, {
+            clusterId: data.slug,
+          });
           if (fallbackResponse.errors) {
             throw new Error(fallbackResponse.errors);
           }
@@ -721,7 +770,10 @@
     }
 
     showActionSuccess(`Evicted ${podsToEvict.length} pod(s).`);
-    selectedPodIds = pruneSelection(selectedPodIds, availableIds.filter((id) => !podsToEvict.some((pod) => getPodUid(pod) === id)));
+    selectedPodIds = pruneSelection(
+      selectedPodIds,
+      availableIds.filter((id) => !podsToEvict.some((pod) => getPodUid(pod) === id)),
+    );
     void loadPodsSnapshot();
   }
 
@@ -865,7 +917,8 @@
 <div class="grid w-full grid-cols-1 gap-4 overflow-visible">
   {#if ENABLE_PODS_SAFE_MODE_HOTFIX && pods.length < sourcePods.length}
     <InlineNotice class="border-amber-300/60 bg-amber-50 text-amber-950" title="Safe mode">
-      Rendering first {PODS_SAFE_MODE_MAX_ROWS} of {sourcePods.length} pods while the page stays in safe mode.
+      Rendering first {PODS_SAFE_MODE_MAX_ROWS} of {sourcePods.length} pods while the page stays in safe
+      mode.
     </InlineNotice>
   {/if}
 
@@ -891,86 +944,86 @@
   {#if selectedPods.length > 0}
     <WorkloadSelectionBar count={selectedPods.length}>
       {#snippet children()}
-      <PodBulkActions
-        canOpenShell={selectedPods.length === 1}
-        canAttach={selectedPods.length === 1}
-        canEditYaml={selectedPods.length === 1}
-        canInvestigate={selectedPods.length === 1}
-        canCopyDescribe={selectedPods.length === 1}
-        canRunDebugDescribe={selectedPods.length === 1}
-        canCopyDebug={selectedPods.length === 1}
-        canExportIncident={false}
-        canDownloadYaml={false}
-        canOpenLogs={selectedPods.length === 1}
-        canOpenPreviousLogs={selectedPods.length === 1}
-        isYamlBusy={false}
-        isExportingIncident={false}
-        isDownloadingYaml={false}
-        isDeleting={selectedPods.some((pod) => deletingPodIds.has(getPodUid(pod)))}
-        isEvicting={selectedPods.some((pod) => evictingPodIds.has(getPodUid(pod)))}
-        onShell={() => {
-          const pod = selectedPods[0];
-          if (!pod) return;
-          void openPodShellModal(data.slug, pod);
-        }}
-        onAttach={() => {
-          const pod = selectedPods[0];
-          if (!pod) return;
-          void openPodAttachModal(data.slug, pod);
-        }}
-        onEditYaml={() => {
-          const pod = selectedPods[0];
-          if (!pod) return;
-          openWorkbench("yaml", pod);
-        }}
-        onInvestigate={() => {
-          const pod = selectedPods[0];
-          if (!pod) return;
-          openWorkbench("investigate", pod);
-        }}
-        onCopyDescribe={() => {
-          const pod = selectedPods[0];
-          if (!pod) return;
-          void copyDescribeCommand(pod);
-        }}
-        onRunDebugDescribe={() => {
-          const pod = selectedPods[0];
-          if (!pod) return;
-          runPodDebugDescribe(pod);
-        }}
-        onCopyDebug={() => {
-          const pod = selectedPods[0];
-          if (!pod) return;
-          void copyDebugCommand(pod);
-        }}
-        onExportIncident={() => {}}
-        onDownloadYaml={() => {}}
-        onEvict={() => {
-          void evictPods(selectedPods);
-        }}
-        onLogs={() => {
-          const pod = selectedPods[0];
-          if (!pod) return;
-          openWorkbench("logs", pod);
-        }}
-        onPreviousLogs={() => {
-          const pod = selectedPods[0];
-          if (!pod) return;
-          openWorkbench("logs", pod, { logsPrevious: true });
-        }}
-        onDelete={() => {
-          void deletePods(selectedPods);
-        }}
-      />
-      <Button
-        variant="outline"
-        size="sm"
-        onclick={() => {
-          selectedPodIds = new Set<string>();
-        }}
-      >
-        Clear
-      </Button>
+        <PodBulkActions
+          canOpenShell={selectedPods.length === 1}
+          canAttach={selectedPods.length === 1}
+          canEditYaml={selectedPods.length === 1}
+          canInvestigate={selectedPods.length === 1}
+          canCopyDescribe={selectedPods.length === 1}
+          canRunDebugDescribe={selectedPods.length === 1}
+          canCopyDebug={selectedPods.length === 1}
+          canExportIncident={false}
+          canDownloadYaml={false}
+          canOpenLogs={selectedPods.length === 1}
+          canOpenPreviousLogs={selectedPods.length === 1}
+          isYamlBusy={false}
+          isExportingIncident={false}
+          isDownloadingYaml={false}
+          isDeleting={selectedPods.some((pod) => deletingPodIds.has(getPodUid(pod)))}
+          isEvicting={selectedPods.some((pod) => evictingPodIds.has(getPodUid(pod)))}
+          onShell={() => {
+            const pod = selectedPods[0];
+            if (!pod) return;
+            void openPodShellModal(data.slug, pod);
+          }}
+          onAttach={() => {
+            const pod = selectedPods[0];
+            if (!pod) return;
+            void openPodAttachModal(data.slug, pod);
+          }}
+          onEditYaml={() => {
+            const pod = selectedPods[0];
+            if (!pod) return;
+            openWorkbench("yaml", pod);
+          }}
+          onInvestigate={() => {
+            const pod = selectedPods[0];
+            if (!pod) return;
+            openWorkbench("investigate", pod);
+          }}
+          onCopyDescribe={() => {
+            const pod = selectedPods[0];
+            if (!pod) return;
+            void copyDescribeCommand(pod);
+          }}
+          onRunDebugDescribe={() => {
+            const pod = selectedPods[0];
+            if (!pod) return;
+            runPodDebugDescribe(pod);
+          }}
+          onCopyDebug={() => {
+            const pod = selectedPods[0];
+            if (!pod) return;
+            void copyDebugCommand(pod);
+          }}
+          onExportIncident={() => {}}
+          onDownloadYaml={() => {}}
+          onEvict={() => {
+            void evictPods(selectedPods);
+          }}
+          onLogs={() => {
+            const pod = selectedPods[0];
+            if (!pod) return;
+            openWorkbench("logs", pod);
+          }}
+          onPreviousLogs={() => {
+            const pod = selectedPods[0];
+            if (!pod) return;
+            openWorkbench("logs", pod, { logsPrevious: true });
+          }}
+          onDelete={() => {
+            void deletePods(selectedPods);
+          }}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          onclick={() => {
+            selectedPodIds = new Set<string>();
+          }}
+        >
+          Clear
+        </Button>
       {/snippet}
     </WorkloadSelectionBar>
   {/if}
@@ -1015,7 +1068,7 @@
     }}
     {enrichedTableEnabled}
     metricsByKey={podsMetricsByKey}
-    metricsCoverageCount={metricsCoverageCount}
+    {metricsCoverageCount}
     metricsLoading={podsMetricsLoading}
     metricsError={podsMetricsError}
     metricsRecommendation={podMetricsRecommendation}
@@ -1088,6 +1141,11 @@
       if (!pod) return;
       void copyDebugCommand(pod);
     }}
+    onPortForward={(row) => {
+      const pod = getPodByUid(row.uid);
+      if (!pod) return;
+      void handlePortForward(pod);
+    }}
     onEvict={(row) => {
       const pod = getPodByUid(row.uid);
       if (!pod) return;
@@ -1100,28 +1158,35 @@
     }}
     isDeleting={(id) => deletingPodIds.has(id)}
     isEvicting={(id) => evictingPodIds.has(id)}
-    watcherEnabled={watcherEnabled}
-    watcherRefreshSeconds={watcherRefreshSeconds}
-    watcherError={watcherError}
-    onToggleWatcher={onToggleWatcher}
+    {watcherEnabled}
+    {watcherRefreshSeconds}
+    {watcherError}
+    {onToggleWatcher}
     onWatcherRefreshSecondsChange={(value) => {
       watcherRefreshSeconds = clampWatcherRefreshSeconds(value);
     }}
-    onResetWatcherSettings={onResetWatcherSettings}
+    {onResetWatcherSettings}
   />
 
   <PodDetailsSheet
     data={selectedPod}
     isOpen={detailsOpen}
     clusterId={data.slug}
-    metricsByKey={new Map([...podsMetricsByKey.entries()].map(([key, value]) => [key, { cpu: value.cpu, memory: value.memory }]))}
+    metricsByKey={new Map(
+      [...podsMetricsByKey.entries()].map(([key, value]) => [
+        key,
+        { cpu: value.cpu, memory: value.memory },
+      ]),
+    )}
     metricsError={podsMetricsError}
     runtimeProfileLabel={podsRuntimeProfileLabel}
     runtimeSourceState={podsRuntimeSourceState}
     runtimeLastUpdatedLabel={podsRuntimeLastUpdatedLabel}
     runtimeDetail={podsRuntimeDetail}
     runtimeReason={podsRuntimeReason}
-    runtimeRequestPath={watcherEnabled ? `snapshot refresh every ${watcherRefreshSeconds}s` : "manual refresh only"}
+    runtimeRequestPath={watcherEnabled
+      ? `snapshot refresh every ${watcherRefreshSeconds}s`
+      : "manual refresh only"}
     runtimeSyncError={watcherError ?? snapshotRefreshError}
     onShell={(pod) => {
       void openPodShellModal(data.slug, pod);

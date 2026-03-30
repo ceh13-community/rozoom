@@ -60,7 +60,7 @@ describe("pod-shell helpers", () => {
       "--overrides",
       '{"spec":{"serviceAccountName":"cluster-debug-shell"}}',
       "--labels",
-      "app.kubernetes.io/name=cluster-debug-shell,app.kubernetes.io/managed-by=svelte-dashboard",
+      "app.kubernetes.io/name=cluster-debug-shell,app.kubernetes.io/managed-by=rozoom",
       "--command",
       "--",
       "sleep",
