@@ -1,0 +1,76 @@
+import { derived, writable, type Readable } from "svelte/store";
+
+export type CronJobsSyncStatus = {
+  enabled: boolean;
+  isLoading: boolean;
+  error: string | null;
+  lastUpdatedAt: number | null;
+};
+
+const DEFAULT_STATUS: CronJobsSyncStatus = {
+  enabled: false,
+  isLoading: false,
+  error: null,
+  lastUpdatedAt: null,
+};
+
+const statuses = writable<Record<string, CronJobsSyncStatus>>({});
+
+function upsertStatus(
+  clusterId: string,
+  updater: (prev: CronJobsSyncStatus) => CronJobsSyncStatus,
+) {
+  if (!clusterId) return;
+  statuses.update((current) => {
+    const prev = current[clusterId] ?? DEFAULT_STATUS;
+    return {
+      ...current,
+      [clusterId]: updater(prev),
+    };
+  });
+}
+
+export function selectClusterCronJobsSyncStatus(clusterId: string): Readable<CronJobsSyncStatus> {
+  return derived(statuses, ($statuses) => $statuses[clusterId] ?? DEFAULT_STATUS);
+}
+
+export function setCronJobsSyncEnabled(clusterId: string, enabled: boolean) {
+  upsertStatus(clusterId, (prev) => ({
+    ...prev,
+    enabled,
+    isLoading: enabled ? prev.isLoading : false,
+    error: enabled ? prev.error : null,
+  }));
+}
+
+export function markCronJobsSyncLoading(clusterId: string) {
+  upsertStatus(clusterId, (prev) => ({
+    ...prev,
+    isLoading: true,
+    error: null,
+  }));
+}
+
+export function markCronJobsSyncSuccess(clusterId: string) {
+  upsertStatus(clusterId, (prev) => ({
+    ...prev,
+    isLoading: false,
+    error: null,
+    lastUpdatedAt: Date.now(),
+  }));
+}
+
+export function markCronJobsSyncError(clusterId: string, error: string) {
+  upsertStatus(clusterId, (prev) => ({
+    ...prev,
+    isLoading: false,
+    error: error || "CronJobs watcher sync failed.",
+  }));
+}
+
+export function resetCronJobsSyncStatus(clusterId: string) {
+  if (!clusterId) return;
+  statuses.update((current) => {
+    return Object.fromEntries(Object.entries(current).filter(([key]) => key !== clusterId));
+  });
+}

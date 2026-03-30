@@ -1,0 +1,16 @@
+{
+  "$schema": "https://next.shadcn-svelte.com/schema.json",
+  "tailwind": {
+    "css": "src\\lib\\app\\styles\\index.css",
+    "baseColor": "zinc"
+  },
+  "aliases": {
+    "components": "$shared/ui",
+    "utils": "$shared/lib",
+    "ui": "$shared/ui",
+    "hooks": "$shared/hooks",
+    "lib": "$shared/lib"
+  },
+  "typescript": true,
+  "registry": "https://tw3.shadcn-svelte.com/registry/new-york"
+}

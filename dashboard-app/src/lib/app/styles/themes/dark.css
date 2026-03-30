@@ -1,0 +1,125 @@
+@layer components {
+  .dark:not(.k9s) .dashboard-shell {
+    background:
+      radial-gradient(circle at top left, hsl(217 75% 18% / 0.28) 0%, transparent 34%),
+      linear-gradient(180deg, hsl(222 47% 7%) 0%, hsl(223 37% 9%) 100%);
+  }
+
+  .dark:not(.k9s) .app-sidebar-rail {
+    background: linear-gradient(180deg, hsl(221 44% 10%) 0%, hsl(224 38% 8%) 100%);
+    border-right-color: hsl(217 91% 60% / 0.22);
+    color: hsl(210 40% 96%);
+    box-shadow:
+      inset 0 1px 0 hsl(217 91% 60% / 0.12),
+      0 20px 40px hsl(222 47% 3% / 0.45);
+  }
+
+  .dark:not(.k9s) .dashboard-workloads-sidebar,
+  .dark:not(.k9s) .cluster-sticky-shell {
+    background: linear-gradient(180deg, hsl(222 34% 11% / 0.96) 0%, hsl(223 31% 10% / 0.92) 100%);
+    border-color: hsl(217 24% 20%);
+    box-shadow:
+      inset 0 1px 0 hsl(217 91% 60% / 0.06),
+      0 12px 28px hsl(222 47% 3% / 0.28);
+  }
+
+  .dark:not(.k9s) .data-mode-card,
+  .dark:not(.k9s) .namespace-select-trigger {
+    background: linear-gradient(180deg, hsl(222 30% 12% / 0.95) 0%, hsl(223 25% 11% / 0.9) 100%);
+    border-color: hsl(217 24% 20%);
+    box-shadow: inset 0 1px 0 hsl(217 91% 60% / 0.05);
+  }
+
+  .dark:not(.k9s) .menu-desktop.active,
+  .dark:not(.k9s) .menu-mobile.active,
+  .dark:not(.k9s) .menu-collapsed.active {
+    background: linear-gradient(90deg, hsl(217 48% 20%) 0%, hsl(221 43% 16%) 100%);
+    box-shadow: inset 0 0 0 1px hsl(217 91% 60% / 0.18);
+  }
+
+  .dark:not(.k9s) .menu-desktop:hover,
+  .dark:not(.k9s) .menu-mobile:hover,
+  .dark:not(.k9s) .menu-collapsed:hover {
+    background-color: hsl(217 33% 18%);
+  }
+
+  /* ── Cluster cards ─────────────────────────────────────────────── */
+
+  .dark:not(.k9s) [data-testid="cluster-card"] {
+    background: linear-gradient(180deg, hsl(222 34% 11% / 0.95) 0%, hsl(223 31% 10% / 0.9) 100%);
+    border-color: hsl(217 24% 22%);
+    box-shadow:
+      inset 0 1px 0 hsl(217 91% 60% / 0.05),
+      0 4px 16px hsl(222 47% 3% / 0.3);
+  }
+
+  /* ── Fleet Control Plane panels ────────────────────────────────── */
+
+  .dark:not(.k9s) section.rounded-xl {
+    background: linear-gradient(180deg, hsl(222 34% 11% / 0.96) 0%, hsl(223 31% 10% / 0.92) 100%);
+    border-color: hsl(217 24% 20%);
+    box-shadow:
+      inset 0 1px 0 hsl(217 91% 60% / 0.06),
+      0 4px 16px hsl(222 47% 3% / 0.25);
+  }
+
+  /* ── Diagnostics / Infrastructure load banners ─────────────────── */
+
+  .dark:not(.k9s) [class*="border-amber-300"][class*="bg-amber"] {
+    background: hsl(41 30% 12% / 0.95) !important;
+    border-color: hsl(41 80% 40% / 0.4) !important;
+    color: hsl(41 100% 80%) !important;
+  }
+
+  .dark:not(.k9s) [class*="border-amber-300"][class*="bg-amber"] * {
+    color: inherit !important;
+  }
+
+  .dark:not(.k9s) [class*="border-sky-300"][class*="bg-sky"] {
+    background: hsl(210 30% 12% / 0.95) !important;
+    border-color: hsl(210 80% 50% / 0.4) !important;
+    color: hsl(210 100% 82%) !important;
+  }
+
+  .dark:not(.k9s) [class*="border-sky-300"][class*="bg-sky"] * {
+    color: inherit !important;
+  }
+
+  .dark:not(.k9s) [class*="border-teal-300"][class*="bg-teal"] {
+    background: hsl(180 25% 11% / 0.95) !important;
+    border-color: hsl(180 60% 40% / 0.4) !important;
+    color: hsl(180 80% 78%) !important;
+  }
+
+  .dark:not(.k9s) [class*="border-teal-300"][class*="bg-teal"] * {
+    color: inherit !important;
+  }
+
+  /* ── Load buttons inside banners ───────────────────────────────── */
+
+  .dark:not(.k9s) [class*="border-amber"] button,
+  .dark:not(.k9s) [class*="border-sky"] button,
+  .dark:not(.k9s) [class*="border-teal"] button {
+    background: hsl(222 30% 14%) !important;
+    border-color: hsl(217 24% 28%) !important;
+    color: hsl(210 40% 90%) !important;
+  }
+
+  .dark:not(.k9s) [class*="border-amber"] button:hover,
+  .dark:not(.k9s) [class*="border-sky"] button:hover,
+  .dark:not(.k9s) [class*="border-teal"] button:hover {
+    background: hsl(217 33% 18%) !important;
+  }
+
+  /* ── Primary Alert card ────────────────────────────────────────── */
+
+  .dark:not(.k9s) [data-testid="cluster-card"] button.rounded-xl {
+    background: hsl(222 30% 12% / 0.9);
+    border-color: hsl(217 24% 22%);
+  }
+
+  .dark:not(.k9s) [data-testid="cluster-card"] button.rounded-xl .text-slate-950,
+  .dark:not(.k9s) [data-testid="cluster-card"] button.rounded-xl .text-slate-700 {
+    color: hsl(210 20% 75%) !important;
+  }
+}

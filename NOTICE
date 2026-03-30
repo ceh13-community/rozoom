@@ -1,0 +1,37 @@
+ROZOOM - K8s Linter IDE
+Copyright 2024-2026 ROZOOM K8s Linter IDE Contributors
+
+This product includes software developed by the ROZOOM project
+(https://github.com/ceh13-community/svelte-dashboard).
+
+This product bundles the following third-party CLI tools as binary
+resources. Each tool retains its original license:
+
+  kubectl          - Apache 2.0 - The Kubernetes Authors
+  helm             - Apache 2.0 - The Helm Authors
+  kustomize        - Apache 2.0 - Kubernetes SIGs
+  kubeconform      - Apache 2.0 - Yann Hamon
+  pluto            - Apache 2.0 - Fairwinds
+  stern            - Apache 2.0 - stern authors
+  velero           - Apache 2.0 - VMware
+  yq               - MIT        - Mike Farah
+  aws CLI v2       - Apache 2.0 - Amazon Web Services
+  gke-gcloud-auth-plugin - Apache 2.0 - Google LLC
+  doctl            - Apache 2.0 - DigitalOcean
+  hcloud           - MIT        - Hetzner Cloud GmbH
+  oc               - Apache 2.0 - Red Hat
+  az CLI           - MIT        - Microsoft Corporation
+
+Note: Google Cloud SDK (gcloud) is NOT bundled due to Google Cloud SDK
+Terms of Service restrictions on redistribution. Only the standalone
+gke-gcloud-auth-plugin (Apache 2.0) is included. Users who need full
+gcloud CLI should install it separately: https://cloud.google.com/sdk/install
+
+This product references but does not bundle the following Helm charts
+(installed on user's clusters at their discretion):
+
+  kube-prometheus-stack, cert-manager, ArgoCD, Flux, Kyverno,
+  Trivy Operator, KubeArmor, Velero, OpenCost, External Secrets,
+  OpenTelemetry Collector, Ingress NGINX, KEDA, Descheduler,
+  Goldilocks, Reloader, Loki, Promtail, Envoy Gateway,
+  External DNS, VPA, Sealed Secrets, Falco, Kubescape, Prometheus Adapter

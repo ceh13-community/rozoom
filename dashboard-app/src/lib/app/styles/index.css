@@ -1,0 +1,129 @@
+@import "./themes/light.css";
+@import "./themes/dark.css";
+@import "./themes/k9s.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 100% 99%;
+    --foreground: 217 45% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 217 45% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 217 45% 15%;
+    --primary: 219 75% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 70% 96%;
+    --secondary-foreground: 217 46% 23%;
+    --muted: 210 60% 96%;
+    --muted-foreground: 217 24% 34%;
+    --accent: 208 100% 96%;
+    --accent-foreground: 217 46% 23%;
+    --destructive: 0 72.22% 50.59%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 41% 86%;
+    --input: 214 41% 86%;
+    --ring: 219 75% 55%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 96%;
+    --card: 222 36% 11%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 36% 11%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 9%;
+    --secondary: 222 24% 16%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 222 22% 15%;
+    --muted-foreground: 215 20% 70%;
+    --accent: 217 33% 18%;
+    --accent-foreground: 210 40% 96%;
+    --destructive: 0 72% 52%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 217 24% 20%;
+    --input: 217 24% 20%;
+    --ring: 217 91% 60%;
+  }
+
+  .k9s {
+    --background: 0 0% 2%;
+    --foreground: 203 100% 74%;
+    --card: 0 0% 4%;
+    --card-foreground: 203 100% 74%;
+    --popover: 0 0% 4%;
+    --popover-foreground: 203 100% 74%;
+    --primary: 41 100% 50%;
+    --primary-foreground: 0 0% 6%;
+    --secondary: 199 57% 10%;
+    --secondary-foreground: 187 100% 74%;
+    --muted: 197 44% 8%;
+    --muted-foreground: 202 34% 63%;
+    --accent: 198 62% 12%;
+    --accent-foreground: 187 100% 74%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 191 88% 44%;
+    --input: 191 62% 20%;
+    --ring: 191 88% 44%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    font-family:
+      "Source Sans 3",
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
+    font-weight: 450;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    @apply bg-background text-foreground;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  input[placeholder^="Filter"],
+  input[placeholder^="filter"] {
+    @apply border-emerald-500;
+  }
+
+  input[placeholder^="Filter"]:focus-visible,
+  input[placeholder^="filter"]:focus-visible {
+    @apply border-emerald-500 ring-emerald-500/50;
+  }
+}
+
+@layer components {
+  .sticky-table-header {
+    @apply sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80;
+  }
+
+  .sticky-table-cell {
+    @apply sticky top-0 z-10 h-10 bg-background/95 text-muted-foreground backdrop-blur supports-[backdrop-filter]:bg-background/80;
+  }
+
+  .sticky-table-group-header {
+    @apply sticky top-0 z-10 bg-muted/95 py-2 text-xs font-medium text-muted-foreground backdrop-blur supports-[backdrop-filter]:bg-muted/80;
+  }
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}

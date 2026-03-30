@@ -1,0 +1,498 @@
+@layer components {
+  .k9s .dashboard-shell {
+    background: linear-gradient(180deg, hsl(0 0% 2%) 0%, hsl(210 18% 4%) 100%);
+  }
+
+  .k9s .app-sidebar-rail {
+    background: linear-gradient(180deg, hsl(0 0% 0%) 0%, hsl(214 40% 4%) 48%, hsl(0 0% 0%) 100%);
+    color: hsl(203 100% 74%);
+    border-right-color: hsl(191 88% 44% / 0.5);
+    box-shadow:
+      inset 0 1px 0 hsl(0 100% 50% / 0.9),
+      0 0 0 1px hsl(191 88% 44% / 0.12),
+      0 24px 48px hsl(0 0% 0% / 0.45);
+  }
+
+  .k9s .dashboard-workloads-sidebar,
+  .k9s .cluster-sticky-shell,
+  .k9s .data-mode-card,
+  .k9s .namespace-select-trigger,
+  .k9s .live-usage-callout {
+    border-color: hsl(191 88% 44% / 0.5);
+    box-shadow: inset 0 0 0 1px hsl(191 88% 44% / 0.08);
+  }
+
+  .k9s .dashboard-workloads-sidebar,
+  .k9s .cluster-sticky-shell {
+    background: linear-gradient(180deg, hsl(0 0% 3% / 0.96) 0%, hsl(210 26% 6% / 0.9) 100%);
+  }
+
+  .k9s .dashboard-workloads-nav::after {
+    background: linear-gradient(to top, hsl(0 0% 3%) 0%, transparent 100%);
+  }
+
+  .k9s .data-mode-card,
+  .k9s .live-usage-callout {
+    background: linear-gradient(180deg, hsl(0 0% 4% / 0.95) 0%, hsl(199 57% 8% / 0.92) 100%);
+  }
+
+  .k9s .namespace-select-trigger {
+    background: hsl(0 0% 5% / 0.92);
+    color: hsl(187 100% 74%);
+  }
+
+  .k9s .namespace-select-trigger:hover {
+    background: hsl(198 62% 12% / 0.92);
+  }
+
+  .k9s .menu-desktop,
+  .k9s .menu-mobile,
+  .k9s .menu-collapsed {
+    color: hsl(203 100% 74%);
+  }
+
+  .k9s .menu-desktop:hover,
+  .k9s .menu-mobile:hover,
+  .k9s .menu-collapsed:hover {
+    color: hsl(41 100% 57%);
+    background-color: hsl(198 62% 12% / 0.7);
+  }
+
+  .k9s .menu-desktop.active,
+  .k9s .menu-mobile.active,
+  .k9s .menu-collapsed.active {
+    background: linear-gradient(90deg, hsl(198 62% 13% / 0.95) 0%, hsl(198 62% 9% / 0.9) 100%);
+    color: hsl(41 100% 57%);
+    box-shadow: inset 0 0 0 1px hsl(191 88% 44% / 0.35);
+  }
+
+  .k9s .text-primary {
+    color: hsl(41 100% 57%);
+  }
+
+  .k9s .pods-k9s-table,
+  .k9s .nodes-k9s-table-surface {
+    background: linear-gradient(180deg, hsl(0 0% 3%) 0%, hsl(214 36% 5%) 100%);
+    border-color: hsl(191 88% 44% / 0.5);
+    box-shadow:
+      inset 0 1px 0 hsl(0 100% 50% / 0.75),
+      inset 0 0 0 1px hsl(191 88% 44% / 0.14);
+  }
+
+  .k9s .pods-k9s-table,
+  .k9s .nodes-k9s-table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .k9s .pods-k9s-table__header {
+    background-color: hsl(0 0% 4%);
+    color: hsl(41 100% 57%);
+    border-bottom-color: hsl(191 88% 44% / 0.45);
+    text-shadow: 0 0 8px hsl(41 100% 50% / 0.18);
+  }
+
+  .k9s .pods-k9s-table__row {
+    border-bottom-color: hsl(191 88% 44% / 0.18);
+    color: hsl(203 100% 74%);
+  }
+
+  .k9s .pods-k9s-table__row:hover {
+    background-color: hsl(198 62% 12% / 0.42) !important;
+  }
+
+  .k9s .pods-k9s-table__row.bg-muted\/30 {
+    background-color: hsl(205 18% 66%) !important;
+    color: hsl(0 0% 4%) !important;
+  }
+
+  .k9s .pods-k9s-table__row.bg-muted\/30 .text-muted-foreground,
+  .k9s .pods-k9s-table__row.bg-muted\/30 .text-foreground,
+  .k9s .pods-k9s-table__row.bg-muted\/30 .pods-k9s-status-running,
+  .k9s .pods-k9s-table__row.bg-muted\/30 .pods-k9s-status-completed,
+  .k9s .pods-k9s-table__row.bg-muted\/30 .pods-k9s-status-pending,
+  .k9s .pods-k9s-table__row.bg-muted\/30 .pods-k9s-status-error,
+  .k9s .pods-k9s-table__row.bg-muted\/30 .pods-k9s-status-neutral {
+    color: hsl(0 0% 4%) !important;
+  }
+
+  .k9s .pods-k9s-status-running {
+    color: hsl(203 100% 74%);
+  }
+
+  .k9s .pods-k9s-status-completed {
+    color: hsl(205 18% 66%);
+  }
+
+  .k9s .pods-k9s-status-pending {
+    color: hsl(41 100% 57%);
+  }
+
+  .k9s .pods-k9s-status-error {
+    color: hsl(0 84% 66%);
+  }
+
+  .k9s .pods-k9s-status-neutral {
+    color: hsl(187 32% 72%);
+  }
+
+  .k9s .nodes-k9s-table thead {
+    background-color: hsl(0 0% 4%);
+  }
+
+  .k9s .nodes-k9s-table thead th {
+    color: hsl(41 100% 57%);
+    border-bottom-color: hsl(191 88% 44% / 0.45);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.72rem;
+  }
+
+  .k9s .nodes-k9s-table tbody tr {
+    color: hsl(203 100% 74%);
+    border-bottom-color: hsl(191 88% 44% / 0.18);
+  }
+
+  .k9s .nodes-k9s-table tbody tr:hover {
+    background-color: hsl(198 62% 12% / 0.42);
+  }
+
+  .k9s .nodes-k9s-table tbody tr[data-state="selected"] {
+    background-color: hsl(205 18% 66%);
+    color: hsl(0 0% 4%);
+  }
+
+  .k9s .nodes-k9s-table tbody tr[data-state="selected"] td,
+  .k9s .nodes-k9s-table tbody tr[data-state="selected"] .text-muted-foreground {
+    color: hsl(0 0% 4%) !important;
+  }
+
+  .k9s thead tr {
+    background-color: hsl(0 0% 4%);
+  }
+
+  .k9s thead th {
+    color: hsl(41 100% 57%);
+    border-bottom-color: hsl(191 88% 44% / 0.45);
+    letter-spacing: 0.015em;
+  }
+
+  .k9s tbody tr {
+    border-bottom-color: hsl(191 88% 44% / 0.18);
+  }
+
+  .k9s tbody tr:hover {
+    background-color: hsl(198 62% 12% / 0.42);
+  }
+
+  .k9s tbody tr[data-state="selected"] {
+    background-color: hsl(199 61% 18%);
+  }
+
+  .k9s .rounded-lg.border,
+  .k9s .rounded-md.border,
+  .k9s .rounded-xl.border {
+    border-color: hsl(191 88% 44% / 0.35);
+  }
+
+  .k9s button[variant="outline"],
+  .k9s .border-input {
+    border-color: hsl(191 88% 44% / 0.4);
+  }
+
+  .k9s .bg-emerald-500 {
+    background-color: hsl(136 84% 42%) !important;
+    color: hsl(140 55% 96%) !important;
+    border-color: hsl(136 84% 28%) !important;
+  }
+
+  .k9s .bg-amber-500 {
+    background-color: hsl(41 100% 50%) !important;
+    color: hsl(0 0% 8%) !important;
+    border-color: hsl(35 90% 36%) !important;
+  }
+
+  .k9s .bg-rose-600 {
+    background-color: hsl(0 84% 58%) !important;
+    color: hsl(350 100% 96%) !important;
+    border-color: hsl(356 58% 31%) !important;
+  }
+
+  .k9s .bg-slate-500,
+  .k9s .bg-slate-400 {
+    background-color: hsl(153 16% 30%) !important;
+    color: hsl(125 38% 89%) !important;
+    border-color: hsl(153 19% 22%) !important;
+  }
+
+  /* ── Cluster cards ─────────────────────────────────────────────── */
+
+  .k9s [data-testid="cluster-card"] {
+    background: linear-gradient(180deg, hsl(0 0% 3%) 0%, hsl(214 36% 5%) 100%) !important;
+    border-color: hsl(191 88% 44% / 0.35) !important;
+    box-shadow:
+      inset 0 1px 0 hsl(191 88% 44% / 0.08),
+      0 4px 16px hsl(0 0% 0% / 0.4) !important;
+  }
+
+  .k9s [data-testid="cluster-card"] .text-muted-foreground {
+    color: hsl(187 32% 58%) !important;
+  }
+
+  .k9s [data-testid="cluster-card"] details > summary {
+    color: hsl(41 100% 57%);
+    text-shadow: 0 0 6px hsl(41 100% 50% / 0.12);
+  }
+
+  .k9s [data-testid="cluster-card"] details > summary:hover {
+    color: hsl(41 100% 70%);
+  }
+
+  /* ── Fleet Control Plane panels ────────────────────────────────── */
+
+  .k9s section.rounded-xl {
+    background: linear-gradient(
+      180deg,
+      hsl(0 0% 3% / 0.96) 0%,
+      hsl(210 26% 5% / 0.92) 100%
+    ) !important;
+    border-color: hsl(191 88% 44% / 0.35) !important;
+    box-shadow:
+      inset 0 1px 0 hsl(0 100% 50% / 0.5),
+      0 4px 16px hsl(0 0% 0% / 0.3) !important;
+  }
+
+  .k9s section.rounded-xl h3 {
+    color: hsl(41 100% 57%);
+    text-shadow: 0 0 8px hsl(41 100% 50% / 0.15);
+  }
+
+  .k9s .rounded-md.border.border-border\/60 {
+    background: hsl(0 0% 4% / 0.9) !important;
+    border-color: hsl(191 88% 44% / 0.25) !important;
+  }
+
+  /* ── Diagnostics / Infrastructure load banners ─────────────────── */
+
+  /* Config diagnostics banner */
+  .k9s .border-amber-300.bg-amber-100\/95,
+  .k9s [class*="border-amber-300"][class*="bg-amber"] {
+    background: linear-gradient(
+      180deg,
+      hsl(41 40% 8% / 0.95) 0%,
+      hsl(35 30% 6% / 0.9) 100%
+    ) !important;
+    border-color: hsl(41 100% 50% / 0.4) !important;
+    color: hsl(41 100% 74%) !important;
+  }
+
+  .k9s .border-amber-300.bg-amber-100\/95 *,
+  .k9s [class*="border-amber-300"][class*="bg-amber"] * {
+    color: inherit !important;
+  }
+
+  /* Health diagnostics banner */
+  .k9s .border-sky-300.bg-sky-100\/95,
+  .k9s [class*="border-sky-300"][class*="bg-sky"] {
+    background: linear-gradient(
+      180deg,
+      hsl(200 40% 8% / 0.95) 0%,
+      hsl(210 30% 6% / 0.9) 100%
+    ) !important;
+    border-color: hsl(191 88% 44% / 0.4) !important;
+    color: hsl(203 100% 74%) !important;
+  }
+
+  .k9s .border-sky-300.bg-sky-100\/95 *,
+  .k9s [class*="border-sky-300"][class*="bg-sky"] * {
+    color: inherit !important;
+  }
+
+  /* Infrastructure banner */
+  .k9s .border-teal-300.bg-teal-100\/95,
+  .k9s [class*="border-teal-300"][class*="bg-teal"] {
+    background: linear-gradient(
+      180deg,
+      hsl(180 30% 7% / 0.95) 0%,
+      hsl(190 25% 5% / 0.9) 100%
+    ) !important;
+    border-color: hsl(191 88% 44% / 0.4) !important;
+    color: hsl(187 100% 74%) !important;
+  }
+
+  .k9s .border-teal-300.bg-teal-100\/95 *,
+  .k9s [class*="border-teal-300"][class*="bg-teal"] * {
+    color: inherit !important;
+  }
+
+  /* Load button inside banners */
+  .k9s [class*="border-amber"] button,
+  .k9s [class*="border-sky"] button,
+  .k9s [class*="border-teal"] button {
+    background: hsl(0 0% 8% / 0.9) !important;
+    border-color: hsl(191 88% 44% / 0.4) !important;
+    color: hsl(203 100% 74%) !important;
+  }
+
+  .k9s [class*="border-amber"] button:hover,
+  .k9s [class*="border-sky"] button:hover,
+  .k9s [class*="border-teal"] button:hover {
+    background: hsl(198 62% 12% / 0.9) !important;
+  }
+
+  /* ── Risk / severity badges ────────────────────────────────────── */
+
+  .k9s .dark\:bg-rose-950\/60 {
+    background-color: hsl(0 40% 12% / 0.8) !important;
+    border: 1px solid hsl(0 84% 50% / 0.3);
+  }
+
+  .k9s .dark\:text-rose-300,
+  .k9s .dark\:text-rose-400 {
+    color: hsl(0 84% 72%) !important;
+  }
+
+  .k9s .dark\:bg-amber-950\/60 {
+    background-color: hsl(35 40% 10% / 0.8) !important;
+    border: 1px solid hsl(41 100% 50% / 0.3);
+  }
+
+  .k9s .dark\:text-amber-300,
+  .k9s .dark\:text-amber-400 {
+    color: hsl(41 100% 68%) !important;
+  }
+
+  .k9s .dark\:bg-yellow-950\/60 {
+    background-color: hsl(45 35% 10% / 0.8) !important;
+    border: 1px solid hsl(48 96% 50% / 0.3);
+  }
+
+  .k9s .dark\:text-yellow-300,
+  .k9s .dark\:text-yellow-400 {
+    color: hsl(48 96% 68%) !important;
+  }
+
+  .k9s .dark\:bg-emerald-950\/60 {
+    background-color: hsl(160 30% 8% / 0.8) !important;
+    border: 1px solid hsl(136 84% 42% / 0.3);
+  }
+
+  .k9s .dark\:text-emerald-300 {
+    color: hsl(136 84% 68%) !important;
+  }
+
+  /* Risk findings panel */
+  .k9s .dark\:bg-rose-950\/30 {
+    background: linear-gradient(
+      180deg,
+      hsl(0 30% 8% / 0.9) 0%,
+      hsl(0 20% 6% / 0.85) 100%
+    ) !important;
+    border-color: hsl(0 84% 50% / 0.35) !important;
+  }
+
+  .k9s .dark\:bg-amber-950\/30 {
+    background: linear-gradient(
+      180deg,
+      hsl(35 30% 8% / 0.9) 0%,
+      hsl(35 20% 6% / 0.85) 100%
+    ) !important;
+    border-color: hsl(41 100% 50% / 0.35) !important;
+  }
+
+  /* ── Badge overrides for additional K9s palette ────────────────── */
+
+  .k9s .bg-emerald-600 {
+    background-color: hsl(136 84% 36%) !important;
+    color: hsl(140 55% 96%) !important;
+  }
+
+  .k9s .bg-amber-600 {
+    background-color: hsl(36 100% 46%) !important;
+    color: hsl(0 0% 6%) !important;
+  }
+
+  .k9s .bg-sky-700 {
+    background-color: hsl(198 62% 28%) !important;
+    color: hsl(203 100% 88%) !important;
+  }
+
+  /* ── Primary Alert card ────────────────────────────────────────── */
+
+  .k9s [data-testid="cluster-card"] button.rounded-xl {
+    background: hsl(0 0% 5% / 0.9) !important;
+    border-color: hsl(191 88% 44% / 0.25) !important;
+    color: hsl(203 100% 74%) !important;
+  }
+
+  .k9s [data-testid="cluster-card"] button.rounded-xl:hover {
+    background: hsl(198 62% 10% / 0.9) !important;
+  }
+
+  .k9s [data-testid="cluster-card"] button.rounded-xl .text-slate-950,
+  .k9s [data-testid="cluster-card"] button.rounded-xl .text-slate-700 {
+    color: hsl(187 32% 72%) !important;
+  }
+
+  /* ── Drift popover ─────────────────────────────────────────────── */
+
+  .k9s .border-rose-300 {
+    background: hsl(0 30% 8% / 0.95) !important;
+    border-color: hsl(0 84% 50% / 0.4) !important;
+  }
+
+  .k9s .border-amber-200 {
+    background: hsl(41 30% 7% / 0.95) !important;
+    border-color: hsl(41 100% 50% / 0.35) !important;
+  }
+
+  .k9s .border-sky-200 {
+    background: hsl(200 30% 8% / 0.95) !important;
+    border-color: hsl(191 88% 44% / 0.35) !important;
+  }
+
+  /* ── Inputs and selects ────────────────────────────────────────── */
+
+  .k9s select,
+  .k9s input[type="number"],
+  .k9s input[type="search"] {
+    background: hsl(0 0% 5% / 0.9) !important;
+    border-color: hsl(191 88% 44% / 0.35) !important;
+    color: hsl(203 100% 74%) !important;
+  }
+
+  .k9s select:focus,
+  .k9s input:focus {
+    border-color: hsl(191 88% 44% / 0.6) !important;
+    box-shadow: 0 0 0 1px hsl(191 88% 44% / 0.2) !important;
+  }
+
+  /* ── Subtle scanline CRT effect ────────────────────────────────── */
+
+  .k9s .dashboard-shell::after {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 9999;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 2px,
+      hsl(0 0% 0% / 0.03) 2px,
+      hsl(0 0% 0% / 0.03) 4px
+    );
+  }
+}
+
+@layer base {
+  .k9s body {
+    font-family:
+      "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+      "Liberation Mono", "Courier New", monospace;
+    letter-spacing: 0.01em;
+    text-rendering: geometricPrecision;
+  }
+}

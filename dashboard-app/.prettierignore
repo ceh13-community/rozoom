@@ -1,0 +1,23 @@
+# Ignore artifacts:
+build
+coverage
+src-tauri
+pnpm-lock.yaml
+
+.svelte-kit/
+
+*.exe
+*.dll
+*.wasm
+*.dat
+
+node_modules/
+
+*.snap
+
+# **/*.test.ts
+
+dist
+.next
+
+../release/

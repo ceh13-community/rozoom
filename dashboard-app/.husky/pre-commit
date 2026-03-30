@@ -1,0 +1,1 @@
+cd dashboard-app && npx lint-staged

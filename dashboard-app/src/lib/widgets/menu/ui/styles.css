@@ -1,0 +1,22 @@
+.menu-desktop {
+  @apply flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary;
+}
+.menu-desktop.active {
+  @apply flex items-center gap-3 rounded-lg bg-muted px-3 py-2 text-primary transition-all hover:text-primary;
+}
+
+.menu-mobile {
+  @apply mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground;
+}
+
+.menu-mobile.active {
+  @apply mx-[-0.65rem] flex items-center gap-4 rounded-xl bg-muted px-3 py-2 text-foreground hover:text-foreground;
+}
+
+.menu-collapsed {
+  @apply flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-all hover:text-primary hover:bg-muted;
+}
+
+.menu-collapsed.active {
+  @apply flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-primary transition-all;
+}

@@ -1,0 +1,22 @@
+name: 'Setup rust Action'
+description: 'This action sets up rust for use in workflows.'
+runs:
+  using: "composite"
+  steps:
+    - name: Install dependencies (ubuntu only)
+      if: runner.os == 'Linux'
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+        version: 1.0
+
+    - name: Install Rust stable
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
+        targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+    - name: Rust cache
+      uses: swatinem/rust-cache@v2
+      with:
+        workspaces: './dashboard-app/src-tauri -> target'

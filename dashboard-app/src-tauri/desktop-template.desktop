@@ -1,0 +1,9 @@
+[Desktop Entry]
+Categories=Development;Utility;
+Comment=Desktop Kubernetes fleet IDE
+Exec=rozoom-k8s-linter-ide
+StartupWMClass=rozoom-k8s-linter-ide
+Icon=rozoom-k8s-linter-ide
+Name=ROZOOM - K8s Linter IDE
+Terminal=false
+Type=Application

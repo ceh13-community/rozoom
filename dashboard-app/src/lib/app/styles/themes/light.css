@@ -1,0 +1,89 @@
+@layer components {
+  html:not(.dark):not(.k9s) .dashboard-shell {
+    background:
+      radial-gradient(circle at top left, hsl(208 100% 97%) 0%, transparent 38%),
+      linear-gradient(180deg, hsl(210 100% 99%) 0%, hsl(210 56% 97%) 100%);
+  }
+
+  html:not(.dark):not(.k9s) .app-sidebar-rail {
+    background: linear-gradient(180deg, hsl(214 76% 44%) 0%, hsl(217 72% 38%) 100%);
+    border-right-color: hsl(215 67% 34% / 0.45);
+    color: hsl(0 0% 100%);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.16),
+      0 24px 40px hsl(218 57% 52% / 0.16);
+  }
+
+  html:not(.dark):not(.k9s) .dashboard-workloads-sidebar,
+  html:not(.dark):not(.k9s) .cluster-sticky-shell,
+  html:not(.dark):not(.k9s) .data-mode-card,
+  html:not(.dark):not(.k9s) .namespace-select-trigger {
+    border-color: hsl(214 41% 86%);
+    box-shadow:
+      0 10px 24px hsl(215 54% 74% / 0.14),
+      inset 0 1px 0 hsl(0 0% 100% / 0.75);
+  }
+
+  html:not(.dark):not(.k9s) .dashboard-workloads-sidebar,
+  html:not(.dark):not(.k9s) .cluster-sticky-shell {
+    background: linear-gradient(180deg, hsl(0 0% 100% / 0.96) 0%, hsl(208 100% 98% / 0.92) 100%);
+  }
+
+  html:not(.dark):not(.k9s) .data-mode-card,
+  html:not(.dark):not(.k9s) .namespace-select-trigger {
+    background: linear-gradient(180deg, hsl(0 0% 100% / 0.96) 0%, hsl(208 100% 98% / 0.9) 100%);
+  }
+
+  html:not(.dark):not(.k9s) .menu-desktop.active,
+  html:not(.dark):not(.k9s) .menu-mobile.active,
+  html:not(.dark):not(.k9s) .menu-collapsed.active {
+    background: linear-gradient(90deg, hsl(211 100% 95%) 0%, hsl(210 100% 97%) 100%);
+    box-shadow: inset 0 0 0 1px hsl(214 72% 84%);
+  }
+
+  html:not(.dark):not(.k9s) .menu-desktop:hover,
+  html:not(.dark):not(.k9s) .menu-mobile:hover,
+  html:not(.dark):not(.k9s) .menu-collapsed:hover {
+    background-color: hsl(210 100% 97%);
+  }
+
+  html:not(.dark):not(.k9s) .text-primary {
+    color: hsl(219 75% 55%);
+  }
+
+  html:not(.dark):not(.k9s) .live-usage-callout {
+    background: linear-gradient(180deg, hsl(0 0% 100% / 0.96) 0%, hsl(208 100% 98% / 0.9) 100%);
+  }
+
+  /* ── Cluster cards ─────────────────────────────────────────────── */
+
+  html:not(.dark):not(.k9s) [data-testid="cluster-card"] {
+    background: linear-gradient(180deg, hsl(0 0% 100% / 0.92) 0%, hsl(210 60% 98% / 0.88) 100%);
+    border-color: hsl(214 41% 88%);
+    box-shadow:
+      0 2px 8px hsl(215 54% 74% / 0.12),
+      inset 0 1px 0 hsl(0 0% 100% / 0.8);
+  }
+
+  /* ── Fleet Control Plane panels ────────────────────────────────── */
+
+  html:not(.dark):not(.k9s) section.rounded-xl {
+    background: linear-gradient(180deg, hsl(0 0% 100% / 0.96) 0%, hsl(208 100% 98% / 0.92) 100%);
+    border-color: hsl(214 41% 86%);
+    box-shadow:
+      0 4px 12px hsl(215 54% 74% / 0.1),
+      inset 0 1px 0 hsl(0 0% 100% / 0.75);
+  }
+
+  /* ── Primary Alert card ────────────────────────────────────────── */
+
+  html:not(.dark):not(.k9s) [data-testid="cluster-card"] button.rounded-xl {
+    background: hsl(0 0% 100%);
+    border-color: hsl(214 32% 88%);
+    box-shadow: 0 1px 4px hsl(215 54% 74% / 0.08);
+  }
+
+  html:not(.dark):not(.k9s) [data-testid="cluster-card"] button.rounded-xl:hover {
+    background: hsl(210 60% 98%);
+  }
+}

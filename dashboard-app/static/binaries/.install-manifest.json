@@ -1,0 +1,113 @@
+{
+  "tools": {
+    "kubectl": {
+      "version": "v1.35.3",
+      "file": "kubectl",
+      "sha256": "fd31c7d7129260e608f6faf92d5984c3267ad0b5ead3bced2fe125686e286ad6",
+      "mode": "latest",
+      "updatedAt": "2026-03-20T13:02:31.655Z"
+    },
+    "helm": {
+      "version": "v4.1.3",
+      "file": "helm",
+      "sha256": "495480acb8eac352f544fbbc5dcc4fb945508587f9a97cc0150463608f2ef5d1",
+      "archiveSha256": "02ce9722d541238f81459938b84cf47df2fdf1187493b4bfb2346754d82a4700",
+      "mode": "latest",
+      "updatedAt": "2026-03-20T13:02:35.690Z"
+    },
+    "doctl": {
+      "version": "v1.152.0",
+      "file": "doctl",
+      "sha256": "361eef918339443a39982197f05b0d62c0fe6dc003c770f46085c79b5bc95fec",
+      "archiveSha256": "88de72d41911e3f6bdeb6eaa0ce77789a0e35cf3b37cbb4768556f7c0150082f",
+      "mode": "latest",
+      "updatedAt": "2026-03-20T13:02:40.416Z"
+    },
+    "gcloud": {
+      "version": "552.0.0",
+      "file": "google-cloud-cli-archive",
+      "sha256": "abfde04edc59ab30289588094802e072e264c108e6bb2c6c863022d5eda37b13",
+      "sourceFileName": "google-cloud-cli-linux-x86_64.tar.gz",
+      "mode": "latest",
+      "updatedAt": "2026-03-23T21:46:57.237Z"
+    },
+    "pluto": {
+      "version": "v5.23.5",
+      "file": "pluto",
+      "sha256": "f4b0b53a794b92fd89f0ea2546376e65da6687f298e44e34ed4e527b71578362",
+      "archiveSha256": "c173c87cd7f4fc7ca5c5fb120e10b3e99c204906fb36d188afeaa7c7b70caefa",
+      "mode": "latest",
+      "updatedAt": "2026-03-20T13:02:43.912Z"
+    },
+    "velero": {
+      "version": "v1.18.0",
+      "file": "velero",
+      "sha256": "a424878fd103ed5b7f19ab8383203e7d540d390ec39cbfda5d076b373f0a8edd",
+      "archiveSha256": "f0ebd70e282b3f1a6cddcf081db5540c31a3ee00cb6b164f9ae698deae4640ba",
+      "mode": "latest",
+      "updatedAt": "2026-03-20T13:02:51.077Z"
+    },
+    "aws": {
+      "version": "v2.34.13",
+      "file": "aws-dist/aws",
+      "sha256": "3f926e37950f9421c55d6f51dbd157d8922be2f2988d1e7661a2ef3b5faa2135",
+      "mode": "latest",
+      "updatedAt": "2026-03-20T13:20:51.084Z"
+    },
+    "kustomize": {
+      "version": "kustomize/v5.8.1",
+      "file": "kustomize",
+      "sha256": "f7b1605aa5143e0dcbd754a4d43c47ad7a560c540b1356b064d69fe236164494",
+      "archiveSha256": "029a7f0f4e1932c52a0476cf02a0fd855c0bb85694b82c338fc648dcb53a819d",
+      "mode": "latest",
+      "updatedAt": "2026-03-20T13:25:58.472Z"
+    },
+    "kubeconform": {
+      "version": "v0.7.0",
+      "file": "kubeconform",
+      "sha256": "dd5273bdbf08531bf230f4eba8359984b7beec25a679424ff90911a2591b8b0d",
+      "archiveSha256": "c31518ddd122663b3f3aa874cfe8178cb0988de944f29c74a0b9260920d115d3",
+      "mode": "latest",
+      "updatedAt": "2026-03-20T13:26:00.929Z"
+    },
+    "stern": {
+      "version": "v1.33.1",
+      "file": "stern",
+      "sha256": "147b6b8bc89f8a6980267e3ff66023877a5a7ad2a158d6328bf94a94cd3c0c3f",
+      "archiveSha256": "185be29c6a22bd07c0791ec697900943c0cc27292e5a5640a07a543886f1bfc9",
+      "mode": "latest",
+      "updatedAt": "2026-03-20T13:26:04.473Z"
+    },
+    "yq": {
+      "version": "v4.52.4",
+      "file": "yq",
+      "sha256": "0c4d965ea944b64b8fddaf7f27779ee3034e5693263786506ccd1c120f184e8c",
+      "archiveSha256": null,
+      "mode": "latest",
+      "updatedAt": "2026-03-20T13:28:42.863Z"
+    },
+    "hcloud": {
+      "version": "v1.62.0",
+      "file": "hcloud",
+      "sha256": "65f53c4043a6b843b3f48b2449ac5786e77faf4658b70e50a69db28e680dd3ec",
+      "archiveSha256": "872931daf2cfe0304a5b48343b109c1633decd0d0b5e7a75e68d7c03bcceaeae",
+      "mode": "latest",
+      "updatedAt": "2026-03-23T21:47:02.950Z"
+    },
+    "oc": {
+      "version": "4.21.0-okd-scos.9",
+      "file": "oc",
+      "sha256": "d51a0bab3ea1390b6e29d04cfe9bf02978b8e18dcb47cec48802338b4703da49",
+      "archiveSha256": "5a90b67b5ca292356280b8670add71a770a2bafcf25bdb9237b930fe865ebf49",
+      "mode": "latest",
+      "updatedAt": "2026-03-20T13:42:49.414Z"
+    },
+    "az": {
+      "version": "v2.84.0",
+      "file": "az-dist/bin/az",
+      "sha256": "fa551383cbf8ba3f7fc75d8ae085af5b7c2918a6ca0af79b8e83834d74495d56",
+      "mode": "latest",
+      "updatedAt": "2026-03-20T15:02:00.000Z"
+    }
+  }
+}

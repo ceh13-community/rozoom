@@ -1,0 +1,64 @@
+# ─── Node / pnpm stuff ─────────────────────────────────────
+node_modules/
+.pnpm/
+.pnpm-debug.log
+npm-debug.log*
+
+# ─── SvelteKit / Vite cache & build ───────────────────────
+.svelte-kit/
+.vite/
+dist/
+*.tgz
+
+# ─── Tauri / Rust build artefacts ───────────────────────
+src-tauri/target/
+src-tauri/.cargo/
+src-tauri/binaries/
+!src-tauri/sidecar-wrappers/
+*.rlib
+
+# ─── OS / System / Editor files ───────────────────────-
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+# .vscode/
+*.sublime-workspace
+
+# ─── Build artefacts (desktop / installers) ─────────────
+*.AppImage
+*.deb
+*.rpm
+
+# ─── Logs ───────────────────────────────────────────────
+*.log
+yarn-error.log*
+yarn-debug.log*
+lerna-debug.log*
+
+# ─── Git internal ───────────────────────────────────────
+.git/
+.gitignore
+
+# ─── Other unneeded files / environment config ───────────
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.cache/
+coverage/
+local-copy/
+
+# ─── Docker / Container files ───────────────────────────
+!Dockerfile
+!docker-compose.yml
+.env.docker
+docker-compose.override.yml
+
+# ─── Kubernetes / Infra / Misc ─────────────────────────
+.kube/
+.vagrant/
+build
