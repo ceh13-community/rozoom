@@ -37,6 +37,7 @@ describe("pods data-table", () => {
     onRunDebugDescribe: vi.fn(),
     onCopyDebug: vi.fn(),
     onPreviousLogs: vi.fn(),
+    onPortForward: vi.fn(),
     onEvict: vi.fn(),
     onDelete: vi.fn(),
     isDeleting: vi.fn(() => false),
