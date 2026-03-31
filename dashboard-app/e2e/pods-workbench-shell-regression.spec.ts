@@ -146,11 +146,14 @@ test.describe("pods workbench shell regression", () => {
     await page.getByLabel("Open actions for cached-pod").click();
     await page.getByRole("menuitem", { name: "Investigate", exact: true }).click();
     await expect(page.getByText("Pane 1")).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(`Pod events: ${POD_REF}`)).toBeVisible({ timeout: 10_000 });
+    // Investigate opens logs+yaml in dual workbench, active tab is logs
+    await expect(page.getByText(`Pod logs: ${POD_REF}`)).toBeVisible({ timeout: 10_000 });
 
     await page.getByLabel("Open actions for cached-pod").click();
     await page.getByRole("menuitem", { name: "Edit YAML", exact: true }).click();
     await expect(page.getByText("Pane 1")).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(`Resource YAML: ${POD_REF}`)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(`Resource YAML: ${POD_REF}`).first()).toBeVisible({
+      timeout: 10_000,
+    });
   });
 });
