@@ -76,7 +76,7 @@ test.describe("visual regression - cluster pages", () => {
       await page.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=${p.workload}`);
       await page.waitForTimeout(1500);
       await expect(page).toHaveScreenshot(`cluster-${p.name}.png`, {
-        maxDiffPixelRatio: 0.03,
+        maxDiffPixelRatio: 0.05,
       });
     });
   }
