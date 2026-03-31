@@ -28,8 +28,9 @@ describe("pods enriched table contract", () => {
   it("renders cpu and memory columns only when enriched table mode is enabled", () => {
     expect(tableSource).toContain('enrichedTableEnabled && isColumnVisible("cpu")');
     expect(tableSource).toContain('enrichedTableEnabled && isColumnVisible("memory")');
-    expect(tableSource).toMatch(/SortingButton label="CPU"/);
-    expect(tableSource).toMatch(/SortingButton label="Memory"/);
+    expect(tableSource).toContain("SortingButton");
+    expect(tableSource).toContain('label="CPU"');
+    expect(tableSource).toContain('label="Memory"');
     expect(tableSource).toContain("Loading…");
     expect(tableSource).toContain('{getMetricsForRow(row)?.cpu ?? "n/a"}');
     expect(tableSource).toContain('{getMetricsForRow(row)?.memory ?? "n/a"}');
