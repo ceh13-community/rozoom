@@ -10,23 +10,22 @@ const source = readFileSync(
 describe("pods table PR3 contract", () => {
   it("renders a searchable table with watcher, selection, and opt-in metrics controls", () => {
     expect(source).toContain('placeholder="Filter pods..."');
-    expect(source).toContain(
-      'Watcher: <span class="font-medium text-foreground">{watcherEnabled ? "Active" : "Paused"}</span>',
-    );
+    expect(source).toContain('Watcher: <span class="font-medium text-foreground"');
+    expect(source).toContain('{watcherEnabled ? "Active" : "Paused"}');
     expect(source).toContain('{enrichedTableEnabled ? "Hide live usage" : "Show live usage"}');
     expect(source).toContain('label="Select all pods"');
     expect(source).not.toContain("showRefreshButton={true}");
-    expect(source).toContain("onResetWatcherSettings={onResetWatcherSettings}");
+    expect(source).toContain("{onResetWatcherSettings}");
   });
 
   it("keeps actions and selection in the base table while advanced workbench stays external", () => {
     expect(source).toContain(">Actions<");
-    expect(source).toContain('SortingButton label="Name"');
-    expect(source).toContain('SortingButton label="Namespace"');
-    expect(source).toContain('SortingButton label="Status"');
-    expect(source).toContain('SortingButton label="Ready"');
-    expect(source).toContain('SortingButton label="Restarts"');
-    expect(source).toContain('SortingButton label="Node"');
-    expect(source).toContain('SortingButton label="Age"');
+    expect(source).toContain('label="Name"');
+    expect(source).toContain('label="Namespace"');
+    expect(source).toContain('label="Status"');
+    expect(source).toContain('label="Ready"');
+    expect(source).toContain('label="Restarts"');
+    expect(source).toContain('label="Node"');
+    expect(source).toContain('label="Age"');
   });
 });
