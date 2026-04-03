@@ -11,7 +11,9 @@ test.describe("fleet optimization features", () => {
     ).toBeVisible();
 
     // Fleet Control Plane should be a collapsible details element
-    const controlPlane = page.locator("details:has(summary:has-text('Fleet Control Plane'))");
+    const controlPlane = page
+      .locator("details:has(summary:has-text('Fleet Control Plane'))")
+      .first();
     await expect(controlPlane).toBeVisible();
 
     // Should be collapsed by default - cluster cards should be visible without scrolling
@@ -19,7 +21,7 @@ test.describe("fleet optimization features", () => {
     await expect(searchInput).toBeVisible();
 
     // Expand Fleet Control Plane
-    await controlPlane.locator("summary").click();
+    await controlPlane.locator("summary").first().click();
 
     // Should show Fleet Settings panel
     await expect(page.getByText("Fleet Settings")).toBeVisible();
@@ -40,6 +42,10 @@ test.describe("fleet optimization features", () => {
 
   test("synthetic fleet cards have Infrastructure section with lazy load", async ({ page }) => {
     await page.goto("/dashboard?syntheticFleet=50");
+
+    // Enable Linter and switch to Detailed card mode
+    await page.getByRole("button", { name: "Linter", exact: true }).click();
+    await page.getByText("Detailed", { exact: true }).click();
 
     await expect(page.locator('[data-testid="cluster-card"]').first()).toBeVisible();
 
@@ -62,6 +68,10 @@ test.describe("fleet optimization features", () => {
   }) => {
     await page.goto("/dashboard?syntheticFleet=50");
 
+    // Enable Linter and switch to Detailed card mode
+    await page.getByRole("button", { name: "Linter", exact: true }).click();
+    await page.getByText("Detailed", { exact: true }).click();
+
     const firstCard = page.locator('[data-testid="cluster-card"]').first();
 
     // Open Configuration check details
@@ -75,6 +85,10 @@ test.describe("fleet optimization features", () => {
 
   test("synthetic fleet cards have Health checks section", async ({ page }) => {
     await page.goto("/dashboard?syntheticFleet=50");
+
+    // Enable Linter and switch to Detailed card mode
+    await page.getByRole("button", { name: "Linter", exact: true }).click();
+    await page.getByText("Detailed", { exact: true }).click();
 
     const firstCard = page.locator('[data-testid="cluster-card"]').first();
 
@@ -91,7 +105,12 @@ test.describe("fleet optimization features", () => {
     await page.goto("/dashboard?syntheticFleet=50");
 
     // Expand Fleet Control Plane
-    await page.locator("details:has(summary:has-text('Fleet Control Plane')) summary").click();
+    await page
+      .locator("details:has(summary:has-text('Fleet Control Plane'))")
+      .first()
+      .locator("summary")
+      .first()
+      .click();
 
     const driftPanel = page.locator("section:has-text('Fleet Drift Detector')");
     await expect(driftPanel).toBeVisible();
