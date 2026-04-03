@@ -14,9 +14,23 @@
   import Play from "@lucide/svelte/icons/play";
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import X from "@lucide/svelte/icons/x";
+  import { AnsiUp } from "ansi_up";
   import ResourceMetricsBadge from "../common/resource-metrics-badge.svelte";
   import WorkbenchSheetShell from "../common/workbench-sheet-shell.svelte";
   import LoadingDots from "$shared/ui/loading-dots.svelte";
+
+  const ansiUp = new AnsiUp();
+  ansiUp.use_classes = true;
+
+  // Some runtimes strip the ESC byte (0x1b) but leave CSI sequences like [31m intact.
+  // Re-insert the ESC prefix so ansi_up can parse them.
+  function ensureEscPrefix(text: string): string {
+    return text.replace(/\x1b?\[([0-9;]*m)/g, "\x1b[$1");
+  }
+
+  function renderAnsi(text: string): string {
+    return ansiUp.ansi_to_html(ensureEscPrefix(text));
+  }
 
   type LogBookmark = {
     id: string;
@@ -311,14 +325,15 @@
       variant="outline"
       size="sm"
       onclick={() => onRefresh()}
-      loading={loading}
+      {loading}
       loadingLabel="Loading"
       disabled={!podRef}
     >
       <RotateCw class="mr-1 h-3.5 w-3.5" /> Refresh
     </Button>
     <Button variant="outline" size="sm" onclick={copyLogs} disabled={!logs}>
-      <Copy class="mr-1 h-3.5 w-3.5" /> {copied ? "Copied" : "Copy"}
+      <Copy class="mr-1 h-3.5 w-3.5" />
+      {copied ? "Copied" : "Copy"}
     </Button>
     {#if clusterId && podRef}
       <ResourceMetricsBadge {clusterId} resourceRef={podRef} resourceType="pod" />
@@ -328,15 +343,29 @@
   {#snippet toolbar()}
     <div class="flex items-center gap-1.5">
       <Input class="max-w-[220px]" placeholder="Search in logs..." bind:value={searchQuery} />
-      <Button variant="outline" size="sm" onclick={goToPrevMatch} disabled={matchLineIndices.length === 0} title="Previous match">
+      <Button
+        variant="outline"
+        size="sm"
+        onclick={goToPrevMatch}
+        disabled={matchLineIndices.length === 0}
+        title="Previous match"
+      >
         <ChevronUp class="h-3.5 w-3.5" />
       </Button>
-      <Button variant="outline" size="sm" onclick={goToNextMatch} disabled={matchLineIndices.length === 0} title="Next match">
+      <Button
+        variant="outline"
+        size="sm"
+        onclick={goToNextMatch}
+        disabled={matchLineIndices.length === 0}
+        title="Next match"
+      >
         <ChevronDown class="h-3.5 w-3.5" />
       </Button>
       {#if normalizedSearch}
         <div class="text-xs text-muted-foreground">
-          {matchLineIndices.length > 0 ? `${currentMatchIndex + 1}/${matchLineIndices.length}` : "0"} matches
+          {matchLineIndices.length > 0
+            ? `${currentMatchIndex + 1}/${matchLineIndices.length}`
+            : "0"} matches
         </div>
       {/if}
     </div>
@@ -370,7 +399,12 @@
       {previous ? "Previous: On" : "Previous: Off"}
     </Button>
     <div class="text-xs text-muted-foreground">{allLines.length} lines</div>
-    <Button variant="outline" size="sm" onclick={addBookmarkAtTail} disabled={allLines.length === 0}>
+    <Button
+      variant="outline"
+      size="sm"
+      onclick={addBookmarkAtTail}
+      disabled={allLines.length === 0}
+    >
       <Bookmark class="mr-1 h-3.5 w-3.5" /> Bookmark
     </Button>
     {#if !followTail}
@@ -399,7 +433,8 @@
             title={`Jump to first ${alert.label} (line ${alert.firstLine})`}
           >
             <AlertTriangle class="h-3.5 w-3.5" />
-            {alert.label} {alert.count}
+            {alert.label}
+            {alert.count}
           </button>
         {/each}
       {/if}
@@ -437,22 +472,30 @@
     onscroll={handleLogScroll}
   >
     {#if error}
-      <div class="mx-4 mt-3 mb-2 rounded border border-rose-300/80 bg-rose-50 px-3 py-2 text-xs text-rose-900 dark:border-rose-500/70 dark:bg-rose-500/20 dark:text-rose-100">
+      <div
+        class="mx-4 mt-3 mb-2 rounded border border-rose-300/80 bg-rose-50 px-3 py-2 text-xs text-rose-900 dark:border-rose-500/70 dark:bg-rose-500/20 dark:text-rose-100"
+      >
         {error}
       </div>
     {/if}
     {#if loading && !logs}
       <div class="px-4 py-3">Loading logs<LoadingDots /></div>
     {:else if allLines.length > 0}
-      <div style="height: {totalHeight}px; position: relative;">
+      <div style="height: {totalHeight}px; position: relative; min-width: fit-content;">
         {#each visibleLines as entry (entry.index)}
           {@const lineNo = entry.index + 1}
           {@const isMatch = matchLineSet.has(entry.index)}
-          {@const isCurrentMatch = currentMatchIndex >= 0 && matchLineIndices[currentMatchIndex] === entry.index}
+          {@const isCurrentMatch =
+            currentMatchIndex >= 0 && matchLineIndices[currentMatchIndex] === entry.index}
           <div
             data-log-line={lineNo}
-            class="log-line flex {isCurrentMatch ? 'bg-amber-400/20' : isMatch ? 'bg-amber-200/10' : ''}"
-            style="position: absolute; top: {entry.index * LINE_HEIGHT}px; left: 0; right: 0; height: {LINE_HEIGHT}px;"
+            class="log-line flex {isCurrentMatch
+              ? 'bg-amber-400/20'
+              : isMatch
+                ? 'bg-amber-200/10'
+                : ''}"
+            style="position: absolute; top: {entry.index *
+              LINE_HEIGHT}px; left: 0; min-width: 100%; height: {LINE_HEIGHT}px;"
           >
             <span
               class="log-line-number select-none text-right text-slate-600"
@@ -460,13 +503,17 @@
             >
               {lineNo}
             </span>
-            <span class="flex-1 truncate pl-2">
+            <span class="flex-1 log-line-text pl-2">
               {#if normalizedSearch && entry.line}
                 {#each splitLineByQuery(entry.line, normalizedSearch) as chunk}
-                  <span class={chunk.match ? "rounded bg-amber-300/40 text-amber-100" : ""}>{chunk.text}</span>
+                  {#if chunk.match}
+                    <span class="rounded bg-amber-300/40 text-amber-100">{chunk.text}</span>
+                  {:else}
+                    {@html renderAnsi(chunk.text)}
+                  {/if}
                 {/each}
               {:else}
-                {entry.line || " "}
+                {@html renderAnsi(entry.line || " ")}
               {/if}
             </span>
           </div>
@@ -489,5 +536,99 @@
   }
   .log-line-number {
     font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+  .log-line-text {
+    white-space: pre;
+    overflow: visible;
+  }
+
+  /* ANSI color classes generated by ansi_up */
+  :global(.ansi-black-fg) {
+    color: #555;
+  }
+  :global(.ansi-red-fg) {
+    color: #ef4444;
+  }
+  :global(.ansi-green-fg) {
+    color: #22c55e;
+  }
+  :global(.ansi-yellow-fg) {
+    color: #eab308;
+  }
+  :global(.ansi-blue-fg) {
+    color: #3b82f6;
+  }
+  :global(.ansi-magenta-fg) {
+    color: #a855f7;
+  }
+  :global(.ansi-cyan-fg) {
+    color: #06b6d4;
+  }
+  :global(.ansi-white-fg) {
+    color: #e2e8f0;
+  }
+
+  :global(.ansi-bright-black-fg) {
+    color: #737373;
+  }
+  :global(.ansi-bright-red-fg) {
+    color: #f87171;
+  }
+  :global(.ansi-bright-green-fg) {
+    color: #4ade80;
+  }
+  :global(.ansi-bright-yellow-fg) {
+    color: #facc15;
+  }
+  :global(.ansi-bright-blue-fg) {
+    color: #60a5fa;
+  }
+  :global(.ansi-bright-magenta-fg) {
+    color: #c084fc;
+  }
+  :global(.ansi-bright-cyan-fg) {
+    color: #22d3ee;
+  }
+  :global(.ansi-bright-white-fg) {
+    color: #f8fafc;
+  }
+
+  :global(.ansi-black-bg) {
+    background-color: #1e1e1e;
+  }
+  :global(.ansi-red-bg) {
+    background-color: #7f1d1d;
+  }
+  :global(.ansi-green-bg) {
+    background-color: #14532d;
+  }
+  :global(.ansi-yellow-bg) {
+    background-color: #713f12;
+  }
+  :global(.ansi-blue-bg) {
+    background-color: #1e3a5f;
+  }
+  :global(.ansi-magenta-bg) {
+    background-color: #581c87;
+  }
+  :global(.ansi-cyan-bg) {
+    background-color: #164e63;
+  }
+  :global(.ansi-white-bg) {
+    background-color: #e2e8f0;
+  }
+
+  :global(.ansi-bold) {
+    font-weight: bold;
+  }
+  :global(.ansi-dim) {
+    opacity: 0.7;
+  }
+  :global(.ansi-italic) {
+    font-style: italic;
+  }
+  :global(.ansi-underline) {
+    text-decoration: underline;
   }
 </style>
