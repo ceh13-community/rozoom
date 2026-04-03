@@ -50,8 +50,9 @@ jobs:
 
   e2e_smoke:
     if: github.event_name == 'pull_request'
-    continue-on-error: true
     runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-noble
     timeout-minutes: 30
     permissions:
       contents: read
@@ -66,11 +67,8 @@ jobs:
       - name: Build web app
         run: pnpm run build
 
-      - name: Install Playwright (Chromium)
-        run: pnpm exec playwright install --with-deps chromium
-
       - name: Run e2e smoke
-        run: pnpm run test:e2e
+        run: HOME=/root pnpm run test:e2e
 
       - name: Upload Playwright report
         if: failure()
