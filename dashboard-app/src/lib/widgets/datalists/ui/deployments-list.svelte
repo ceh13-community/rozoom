@@ -61,6 +61,7 @@
   import DataTable from "./deployments-list/data-table.svelte";
   import DeploymentSelectionCheckbox from "./deployments-list/deployment-selection-checkbox.svelte";
   import DeploymentActionsMenu from "./deployments-list/deployment-actions-menu.svelte";
+  import ScaleDialog from "$shared/ui/scale-dialog.svelte";
   import DeploymentBulkActions from "./deployments-list/deployment-bulk-actions.svelte";
   import DeploymentStatusBadge from "./deployments-list/deployment-status-badge.svelte";
   import {
@@ -80,7 +81,11 @@
   import DetailsEventsList from "./common/details-events-list.svelte";
   import WorkloadEventsSheet from "./common/workload-events-sheet.svelte";
   import { loadWorkloadEvents, type WorkloadEvent } from "./common/workload-events";
-  import { buildRolloutCommandArgs, loadRolloutCommandOutput, type RolloutCommandMode } from "./common/workload-rollout";
+  import {
+    buildRolloutCommandArgs,
+    loadRolloutCommandOutput,
+    type RolloutCommandMode,
+  } from "./common/workload-rollout";
   import ResourceLogsSheet from "./common/resource-logs-sheet.svelte";
   import ResourceYamlSheet from "./common/resource-yaml-sheet.svelte";
   import { buildYamlFilename } from "$features/pods-workbench";
@@ -224,7 +229,9 @@
   let watcherEnabled = $state(DEFAULT_WATCHER_SETTINGS.enabled);
   let watcherRefreshSeconds = $state(DEFAULT_WATCHER_SETTINGS.refreshSeconds);
   let watcherError = $state<string | null>(null);
-  let deploymentsTableViewMode = $state<DeploymentsTableViewMode>(DEFAULT_WATCHER_SETTINGS.viewMode);
+  let deploymentsTableViewMode = $state<DeploymentsTableViewMode>(
+    DEFAULT_WATCHER_SETTINGS.viewMode,
+  );
   let watcherInFlight = $state(false);
   let lastWatcherSuccessAt = $state<number | null>(null);
   let runtimeClockNow = $state(Date.now());
@@ -262,9 +269,13 @@
   const detailsActions = createDetailsActionManager();
   let showPodAntiAffinitiesDetails = $state(false);
   let selectedDeploymentIds = $state(new Set<string>());
-  import { notifySuccess, notifyError, type ActionNotification } from "$shared/lib/action-notification";
+  import {
+    notifySuccess,
+    notifyError,
+    type ActionNotification,
+  } from "$shared/lib/action-notification";
   let actionNotification = $state<ActionNotification>(null);
-  
+
   let actionInFlight = $state(false);
   let workbenchOpen = writable(true);
   let logsOpen = writable(false);
@@ -293,13 +304,16 @@
   let yamlCompareSourceTabId = $state<string | null>(null);
   let yamlComparePair = $state<[string, string] | null>(null);
   let yamlCompareTargetTabId = $state<string | null>(null);
-  let pendingWorkbenchState = $state<PersistedDeploymentsWorkbenchState | null | undefined>(undefined);
+  let pendingWorkbenchState = $state<PersistedDeploymentsWorkbenchState | null | undefined>(
+    undefined,
+  );
   let workbenchStateRestored = $state(false);
 
   const logsLivePollMs = 2_000;
   const logsStreamReconnectMs = 1_200;
   const DEPLOYMENTS_ROWS_WORKER_THRESHOLD = 300;
-  const ENABLE_DEPLOYMENTS_ROWS_WORKER = import.meta.env.VITE_ENABLE_DEPLOYMENTS_ROWS_WORKER !== "false";
+  const ENABLE_DEPLOYMENTS_ROWS_WORKER =
+    import.meta.env.VITE_ENABLE_DEPLOYMENTS_ROWS_WORKER !== "false";
 
   const orderedWorkbenchTabs = $derived.by(() => {
     return orderPinnedTabs(workbenchTabs, pinnedTabIds);
@@ -329,7 +343,9 @@
   const paneIndexes = $derived(getPaneIndexes());
 
   const rowsSource = $derived(
-    deploymentsSnapshot.filter((item) => namespaceMatches($selectedNamespace, item.metadata?.namespace)),
+    (deploymentsSnapshot ?? []).filter((item) =>
+      namespaceMatches($selectedNamespace, item.metadata?.namespace),
+    ),
   );
   let deploymentsRowsWorker: Worker | null = null;
   let deploymentsRowsWorkerRequestId = 0;
@@ -393,7 +409,8 @@
         const deployment =
           deploymentsSnapshot.find(
             (item) =>
-              `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? "-"}` === row.original.uid,
+              `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? "-"}` ===
+              row.original.uid,
           ) ?? null;
         return renderComponent(DeploymentActionsMenu, {
           name: row.original.name,
@@ -414,6 +431,9 @@
           },
           onInvestigate: () => {
             if (deployment) void openDeploymentInvestigationWorkspace(deployment);
+          },
+          onScale: () => {
+            if (deployment) openScaleDialog([deployment]);
           },
           onCopyDescribe: () => {
             if (deployment) void copyDescribeCommandForDeployment(deployment);
@@ -512,9 +532,7 @@
     return `${WATCHER_SETTINGS_PREFIX}:${clusterId}`;
   }
 
-  function parseWorkbenchTabId(
-    tabId: string,
-  ): {
+  function parseWorkbenchTabId(tabId: string): {
     kind: "logs" | "yaml" | "events" | "rollout-status" | "rollout-history";
     name: string;
     namespace: string;
@@ -607,7 +625,9 @@
           parsed.refreshSeconds ?? DEFAULT_WATCHER_SETTINGS.refreshSeconds,
         ),
         viewMode:
-          parsed.viewMode === "namespace" || parsed.viewMode === "flat" || parsed.viewMode === "node"
+          parsed.viewMode === "namespace" ||
+          parsed.viewMode === "flat" ||
+          parsed.viewMode === "node"
             ? parsed.viewMode
             : "namespace",
       };
@@ -641,7 +661,8 @@
   function openSheetByRow(row: DeploymentRow) {
     const deployment =
       deploymentsSnapshot.find(
-        (item) => `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? "-"}` === row.uid,
+        (item) =>
+          `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? "-"}` === row.uid,
       ) ?? null;
     if (deployment) openSheet(deployment);
   }
@@ -664,7 +685,8 @@
       selectedDeploymentIds = new Set<string>();
       return;
     }
-    const shouldSelectAll = typeof next === "boolean" ? next : availableIds.some((id) => !selectedDeploymentIds.has(id));
+    const shouldSelectAll =
+      typeof next === "boolean" ? next : availableIds.some((id) => !selectedDeploymentIds.has(id));
     selectedDeploymentIds = shouldSelectAll ? new Set(availableIds) : new Set<string>();
   }
 
@@ -687,7 +709,7 @@
   }
 
   function getSelectedDeployments() {
-    return deploymentsSnapshot.filter((item) => {
+    return (deploymentsSnapshot ?? []).filter((item) => {
       const id = `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? "-"}`;
       return selectedDeploymentIds.has(id);
     });
@@ -1301,11 +1323,11 @@
     workbenchCollapsed = false;
     workbenchFullscreen = false;
     try {
-      const output = await loadRolloutCommandOutput(
-        data.slug,
-        mode,
-        { resource: "deployment", name, namespace },
-      );
+      const output = await loadRolloutCommandOutput(data.slug, mode, {
+        resource: "deployment",
+        name,
+        namespace,
+      });
       updateRolloutTab(nextTabId, (tab) => ({
         ...tab,
         output,
@@ -1369,7 +1391,15 @@
       const current = getYamlTab(tabId);
       if (!current) return;
       const latest = await kubectlRawArgsFront(
-        ["get", "deployment", current.target.name, "--namespace", current.target.namespace, "-o", "yaml"],
+        [
+          "get",
+          "deployment",
+          current.target.name,
+          "--namespace",
+          current.target.namespace,
+          "-o",
+          "yaml",
+        ],
         { clusterId: data.slug },
       );
       if (latest.errors || latest.code !== 0) {
@@ -1399,19 +1429,24 @@
       await writeTextFile(relativePath, fresh.yamlText, { baseDir: BaseDirectory.AppData });
       const appDataPath = await path.appDataDir();
       const absolutePath = await path.join(appDataPath, relativePath);
-      const response = await kubectlRawArgsFront(["apply", "-f", absolutePath], { clusterId: data.slug });
+      const response = await kubectlRawArgsFront(["apply", "-f", absolutePath], {
+        clusterId: data.slug,
+      });
       if (response.errors || response.code !== 0) {
         updateYamlTab(tabId, (value) => ({
           ...value,
           yamlError: formatApplyErrorMessage(
-          response.errors || "Failed to apply YAML.",
-          `${value.target.namespace}/${value.target.name}`,
-        ),
+            response.errors || "Failed to apply YAML.",
+            `${value.target.namespace}/${value.target.name}`,
+          ),
         }));
         return;
       }
       const applied = getYamlTab(tabId);
-      if (applied) actionNotification = notifySuccess(`Applied YAML: ${applied.target.namespace}/${applied.target.name}`);
+      if (applied)
+        actionNotification = notifySuccess(
+          `Applied YAML: ${applied.target.namespace}/${applied.target.name}`,
+        );
       invalidateDeploymentsSnapshotCache();
       mutationReconcile.schedule();
       updateYamlTab(tabId, (value) => ({
@@ -1493,7 +1528,10 @@
     }
   }
 
-  async function rolloutAction(action: "restart" | "pause" | "resume" | "undo", items: DeploymentItem[]) {
+  async function rolloutAction(
+    action: "restart" | "pause" | "resume" | "undo",
+    items: DeploymentItem[],
+  ) {
     if (!data?.slug || items.length === 0) return;
     clearActionFeedback();
     actionInFlight = true;
@@ -1523,20 +1561,97 @@
       }
       const executedCount = items.length - noopCount;
       if (executedCount > 0) {
-        actionNotification = notifySuccess(`Rollout ${action} executed for ${executedCount} deployment${executedCount === 1 ? "" : "s"}.`);
+        actionNotification = notifySuccess(
+          `Rollout ${action} executed for ${executedCount} deployment${executedCount === 1 ? "" : "s"}.`,
+        );
         if (noopCount > 0) {
-          actionNotification = notifySuccess(`Rollout ${action} executed for ${executedCount} deployment${executedCount === 1 ? "" : "s"}. ${noopCount} deployment${noopCount === 1 ? "" : "s"} already matched the requested state.`);
+          actionNotification = notifySuccess(
+            `Rollout ${action} executed for ${executedCount} deployment${executedCount === 1 ? "" : "s"}. ${noopCount} deployment${noopCount === 1 ? "" : "s"} already matched the requested state.`,
+          );
         }
       } else if (noopCount > 0) {
-        actionNotification = notifySuccess(`All selected deployments already matched the requested rollout state.`);
+        actionNotification = notifySuccess(
+          `All selected deployments already matched the requested rollout state.`,
+        );
       }
       invalidateDeploymentsSnapshotCache();
       mutationReconcile.track({
-        ids: items.map((item) => `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? ""}`),
+        ids: items.map(
+          (item) => `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? ""}`,
+        ),
         expectedEventTypes: ["MODIFIED"],
       });
     } catch (error) {
-      actionNotification = notifyError(error instanceof Error ? error.message : `Failed to ${action} deployment rollout.`);
+      actionNotification = notifyError(
+        error instanceof Error ? error.message : `Failed to ${action} deployment rollout.`,
+      );
+    } finally {
+      actionInFlight = false;
+    }
+  }
+
+  function updateDeploymentReplicas(item: DeploymentItem, replicas: number) {
+    const key = `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? ""}`;
+    if (watcherPolicy.mode === "stream" && data?.slug) {
+      applyDeploymentEvent(data.slug, {
+        type: "MODIFIED",
+        object: {
+          ...item,
+          spec: {
+            ...(item.spec ?? {}),
+            replicas,
+          },
+        },
+      });
+      return;
+    }
+    deploymentsSnapshot = deploymentsSnapshot.map((d) => {
+      const dKey = `${d.metadata?.namespace ?? "default"}/${d.metadata?.name ?? ""}`;
+      if (dKey !== key) return d;
+      return { ...d, spec: { ...(d.spec ?? {}), replicas } };
+    });
+  }
+
+  let scaleTarget = $state<{ item: DeploymentItem; currentReplicas: number } | null>(null);
+
+  function openScaleDialog(items: DeploymentItem[]) {
+    if (items.length !== 1) return;
+    const item = items[0];
+    const current = typeof item.spec?.replicas === "number" ? item.spec?.replicas : 1;
+    scaleTarget = { item, currentReplicas: current };
+  }
+
+  async function executeScale(replicas: number) {
+    if (!data?.slug || !scaleTarget) return;
+    const item = scaleTarget.item;
+    scaleTarget = null;
+
+    clearActionFeedback();
+    actionInFlight = true;
+    try {
+      const name = item.metadata?.name;
+      const namespace = item.metadata?.namespace ?? "default";
+      if (!name) return;
+      const response = await kubectlRawArgsFront(
+        ["scale", "deployment", name, "--namespace", namespace, `--replicas=${replicas}`],
+        { clusterId: data.slug },
+      );
+      if (response.errors || response.code !== 0) {
+        throw new Error(response.errors || `Failed to scale ${namespace}/${name}.`);
+      }
+      actionNotification = notifySuccess(
+        `Scaled ${namespace}/${name} to ${replicas} replica${replicas === 1 ? "" : "s"}.`,
+      );
+      updateDeploymentReplicas(item, replicas);
+      invalidateDeploymentsSnapshotCache();
+      mutationReconcile.track({
+        ids: [`${namespace}/${name}`],
+        expectedEventTypes: ["MODIFIED"],
+      });
+    } catch (error) {
+      actionNotification = notifyError(
+        error instanceof Error ? error.message : "Failed to scale deployment.",
+      );
     } finally {
       actionInFlight = false;
     }
@@ -1566,14 +1681,20 @@
       }
       selectedDeploymentIds = new Set<string>();
       removeDeploymentsFromSnapshot(items);
-      actionNotification = notifySuccess(`Deleted ${items.length} deployment${items.length === 1 ? "" : "s"}.`);
+      actionNotification = notifySuccess(
+        `Deleted ${items.length} deployment${items.length === 1 ? "" : "s"}.`,
+      );
       invalidateDeploymentsSnapshotCache();
       mutationReconcile.track({
-        ids: items.map((item) => `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? ""}`),
+        ids: items.map(
+          (item) => `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? ""}`,
+        ),
         expectedEventTypes: ["DELETED"],
       });
     } catch (error) {
-      actionNotification = notifyError(error instanceof Error ? error.message : "Failed to delete deployments.");
+      actionNotification = notifyError(
+        error instanceof Error ? error.message : "Failed to delete deployments.",
+      );
     } finally {
       actionInFlight = false;
     }
@@ -1694,7 +1815,9 @@
     lastWatcherSuccessAt ? Date.now() - lastWatcherSuccessAt : Number.POSITIVE_INFINITY,
   );
   const watcherIsStale = $derived(
-    watcherPolicy.enabled && Number.isFinite(watcherFreshnessAgeMs) && watcherFreshnessAgeMs > watcherStaleThresholdMs,
+    watcherPolicy.enabled &&
+      Number.isFinite(watcherFreshnessAgeMs) &&
+      watcherFreshnessAgeMs > watcherStaleThresholdMs,
   );
   const deploymentsRuntimeProfileLabel = $derived(
     `${getDashboardDataProfileDisplayName($dashboardDataProfile)} profile`,
@@ -1715,12 +1838,14 @@
     return `updated ${getTimeDifference(new Date(lastWatcherSuccessAt))} ago`;
   });
   const deploymentsRuntimeDetail = $derived.by(() => {
-    if (!watcherPolicy.enabled) return "Deployment sync is paused until you refresh or re-enable the watcher.";
+    if (!watcherPolicy.enabled)
+      return "Deployment sync is paused until you refresh or re-enable the watcher.";
     if (watcherError && deploymentsSnapshot.length > 0) {
       return "Showing the last successful deployment snapshot while background refresh is degraded.";
     }
     if (watcherError) return "Deployment sync is degraded and needs operator attention.";
-    if (watcherIsStale) return "Deployment data has exceeded the freshness budget and should be refreshed.";
+    if (watcherIsStale)
+      return "Deployment data has exceeded the freshness budget and should be refreshed.";
     if (watcherInFlight) return "Background deployment refresh is currently in flight.";
     return "Deployment sync is operating within the current runtime budget.";
   });
@@ -1823,11 +1948,7 @@
   }
 
   function setPaneTabIdsIfChanged(next: [string | null, string | null, string | null]) {
-    if (
-      next[0] === paneTabIds[0] &&
-      next[1] === paneTabIds[1] &&
-      next[2] === paneTabIds[2]
-    ) {
+    if (next[0] === paneTabIds[0] && next[1] === paneTabIds[1] && next[2] === paneTabIds[2]) {
       return;
     }
     paneTabIds = next;
@@ -2039,10 +2160,7 @@
     ].slice(0, 30);
   }
 
-  async function closeWorkbenchTab(
-    tabId: string,
-    options: { skipConfirm?: boolean } = {},
-  ) {
+  async function closeWorkbenchTab(tabId: string, options: { skipConfirm?: boolean } = {}) {
     const previousTabs = workbenchTabs;
     const index = previousTabs.findIndex((item) => item.id === tabId);
     if (index === -1) return;
@@ -2076,7 +2194,9 @@
       string | null,
     ];
     setPaneTabIdsIfChanged(nextPaneTabIds);
-    setCollapsedPaneIndexesIfChanged(collapsedPaneIndexes.filter((idx) => nextPaneTabIds[idx] !== null));
+    setCollapsedPaneIndexesIfChanged(
+      collapsedPaneIndexes.filter((idx) => nextPaneTabIds[idx] !== null),
+    );
     if (activeWorkbenchTabId !== tabId) return;
     const remaining = previousTabs.filter((item) => item.id !== tabId);
     if (remaining.length === 0) {
@@ -2109,21 +2229,40 @@
     if (!deployment) return;
     if (entry.kind === "logs") {
       void openLogsForDeployment(deployment);
-      if (entry.pinned) pinnedTabIds = new Set([...pinnedTabIds, `logs:${entry.target.namespace}/${entry.target.name}`]);
+      if (entry.pinned)
+        pinnedTabIds = new Set([
+          ...pinnedTabIds,
+          `logs:${entry.target.namespace}/${entry.target.name}`,
+        ]);
       return;
     }
     if (entry.kind === "events") {
       void openEventsForDeployment(deployment);
-      if (entry.pinned) pinnedTabIds = new Set([...pinnedTabIds, `events:${entry.target.namespace}/${entry.target.name}`]);
+      if (entry.pinned)
+        pinnedTabIds = new Set([
+          ...pinnedTabIds,
+          `events:${entry.target.namespace}/${entry.target.name}`,
+        ]);
       return;
     }
     if (entry.kind === "rollout-status" || entry.kind === "rollout-history") {
-      void openRolloutCommandForDeployment(entry.kind === "rollout-status" ? "status" : "history", deployment);
-      if (entry.pinned) pinnedTabIds = new Set([...pinnedTabIds, `${entry.kind}:${entry.target.namespace}/${entry.target.name}`]);
+      void openRolloutCommandForDeployment(
+        entry.kind === "rollout-status" ? "status" : "history",
+        deployment,
+      );
+      if (entry.pinned)
+        pinnedTabIds = new Set([
+          ...pinnedTabIds,
+          `${entry.kind}:${entry.target.namespace}/${entry.target.name}`,
+        ]);
       return;
     }
     void openYamlForDeployment(deployment);
-    if (entry.pinned) pinnedTabIds = new Set([...pinnedTabIds, `yaml:${entry.target.namespace}/${entry.target.name}`]);
+    if (entry.pinned)
+      pinnedTabIds = new Set([
+        ...pinnedTabIds,
+        `yaml:${entry.target.namespace}/${entry.target.name}`,
+      ]);
   }
 
   function canCompareWithSelected(tabId: string) {
@@ -2235,9 +2374,7 @@
   }
 
   function getLabelEntries() {
-    return Object.entries(
-      ((selectedItem?.metadata?.labels ?? {}) as Record<string, string>) ?? {},
-    );
+    return Object.entries(((selectedItem?.metadata?.labels ?? {}) as Record<string, string>) ?? {});
   }
 
   function getAnnotationEntries() {
@@ -2426,139 +2563,145 @@
       detailsLoading = true;
       detailsError = null;
       try {
-      const selector = (currentSelected.spec?.selector?.matchLabels ?? {}) as Record<string, string>;
-      const selectorQuery = Object.entries(selector)
-        .map(([key, value]) => `${key}=${value}`)
-        .join(",");
+        const selector = (currentSelected.spec?.selector?.matchLabels ?? {}) as Record<
+          string,
+          string
+        >;
+        const selectorQuery = Object.entries(selector)
+          .map(([key, value]) => `${key}=${value}`)
+          .join(",");
 
-      const podsArgs = selectorQuery
-        ? ["get", "pods", "--namespace", namespace, "-l", selectorQuery, "-o", "json"]
-        : ["get", "pods", "--namespace", namespace, "-o", "json"];
+        const podsArgs = selectorQuery
+          ? ["get", "pods", "--namespace", namespace, "-l", selectorQuery, "-o", "json"]
+          : ["get", "pods", "--namespace", namespace, "-o", "json"];
 
-      const [podsResponse, topResponse, eventsResponse, rsResponse] = await Promise.all([
-        kubectlRawArgsFront(podsArgs, { clusterId: data.slug, signal }),
-        kubectlRawArgsFront(
-          [
-            "top",
-            "pods",
-            "--namespace",
-            namespace,
-            ...(selectorQuery ? ["-l", selectorQuery] : []),
-            "--no-headers",
-          ],
-          { clusterId: data.slug, signal },
-        ),
-        kubectlRawArgsFront(
-          [
-            "get",
-            "events",
-            "--namespace",
-            namespace,
-            "--field-selector",
-            `involvedObject.kind=Deployment,involvedObject.name=${name}`,
-            "--sort-by=.lastTimestamp",
-            "-o",
-            "json",
-          ],
-          { clusterId: data.slug, signal },
-        ),
-        kubectlRawArgsFront(["get", "rs", "--namespace", namespace, "-o", "json"], {
-          clusterId: data.slug,
-          signal,
-        }),
-      ]);
+        const [podsResponse, topResponse, eventsResponse, rsResponse] = await Promise.all([
+          kubectlRawArgsFront(podsArgs, { clusterId: data.slug, signal }),
+          kubectlRawArgsFront(
+            [
+              "top",
+              "pods",
+              "--namespace",
+              namespace,
+              ...(selectorQuery ? ["-l", selectorQuery] : []),
+              "--no-headers",
+            ],
+            { clusterId: data.slug, signal },
+          ),
+          kubectlRawArgsFront(
+            [
+              "get",
+              "events",
+              "--namespace",
+              namespace,
+              "--field-selector",
+              `involvedObject.kind=Deployment,involvedObject.name=${name}`,
+              "--sort-by=.lastTimestamp",
+              "-o",
+              "json",
+            ],
+            { clusterId: data.slug, signal },
+          ),
+          kubectlRawArgsFront(["get", "rs", "--namespace", namespace, "-o", "json"], {
+            clusterId: data.slug,
+            signal,
+          }),
+        ]);
 
-      if (!isLatest()) return;
+        if (!isLatest()) return;
 
-      if (podsResponse.errors || podsResponse.code !== 0) {
-        throw new Error(podsResponse.errors || "Failed to load deployment pods.");
-      }
+        if (podsResponse.errors || podsResponse.code !== 0) {
+          throw new Error(podsResponse.errors || "Failed to load deployment pods.");
+        }
 
-      const topByPod = new Map<string, { cpu: string; memory: string }>();
-      for (const line of (topResponse.output || "").split("\n")) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        const [podName, cpu, memory] = trimmed.split(/\s+/);
-        if (podName) topByPod.set(podName, { cpu: cpu || "-", memory: memory || "-" });
-      }
+        const topByPod = new Map<string, { cpu: string; memory: string }>();
+        for (const line of (topResponse.output || "").split("\n")) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          const [podName, cpu, memory] = trimmed.split(/\s+/);
+          if (podName) topByPod.set(podName, { cpu: cpu || "-", memory: memory || "-" });
+        }
 
-      const parsedPods = JSON.parse(podsResponse.output) as {
-        items?: Array<{
-          metadata?: { name?: string; namespace?: string };
-          spec?: { nodeName?: string };
-          status?: { phase?: string; containerStatuses?: Array<{ ready?: boolean }> };
-        }>;
-      };
-      detailsPods = (parsedPods.items ?? []).map((item) => {
-        const statuses = item.status?.containerStatuses ?? [];
-        const ready = statuses.filter((status) => status.ready).length;
-        const total = statuses.length;
-        const podName = item.metadata?.name ?? "-";
-        const top = topByPod.get(podName);
-        return {
-          name: podName,
-          node: item.spec?.nodeName ?? "-",
-          podIp: (item.status as { podIP?: string } | undefined)?.podIP ?? "-",
-          namespace: item.metadata?.namespace ?? namespace,
-          ready: `${ready} / ${total}`,
-          cpu: top?.cpu ?? "-",
-          memory: top?.memory ?? "-",
-          status: item.status?.phase ?? "Unknown",
-        };
-      });
-
-      if (!eventsResponse.errors && eventsResponse.code === 0 && eventsResponse.output) {
-        const parsedEvents = JSON.parse(eventsResponse.output) as {
+        const parsedPods = JSON.parse(podsResponse.output) as {
           items?: Array<{
-            type?: string;
-            reason?: string;
-            message?: string;
-            lastTimestamp?: string;
-            eventTime?: string;
-            firstTimestamp?: string;
+            metadata?: { name?: string; namespace?: string };
+            spec?: { nodeName?: string };
+            status?: { phase?: string; containerStatuses?: Array<{ ready?: boolean }> };
           }>;
         };
-        detailsEvents = (parsedEvents.items ?? []).map((item) => ({
-          type: item.type ?? "-",
-          reason: item.reason ?? "-",
-          message: item.message ?? "-",
-          lastTimestamp: item.lastTimestamp || item.eventTime || item.firstTimestamp || "-",
-        }));
-      } else {
-        detailsEvents = [];
-      }
+        detailsPods = (parsedPods.items ?? []).map((item) => {
+          const statuses = item.status?.containerStatuses ?? [];
+          const ready = statuses.filter((status) => status.ready).length;
+          const total = statuses.length;
+          const podName = item.metadata?.name ?? "-";
+          const top = topByPod.get(podName);
+          return {
+            name: podName,
+            node: item.spec?.nodeName ?? "-",
+            podIp: (item.status as { podIP?: string } | undefined)?.podIP ?? "-",
+            namespace: item.metadata?.namespace ?? namespace,
+            ready: `${ready} / ${total}`,
+            cpu: top?.cpu ?? "-",
+            memory: top?.memory ?? "-",
+            status: item.status?.phase ?? "Unknown",
+          };
+        });
 
-      if (!rsResponse.errors && rsResponse.code === 0 && rsResponse.output) {
-        const parsedRs = JSON.parse(rsResponse.output) as {
-          items?: Array<{
-            metadata?: {
-              creationTimestamp?: string;
-              annotations?: Record<string, string>;
-              ownerReferences?: Array<{ kind?: string; name?: string }>;
-            };
-            status?: { readyReplicas?: number; replicas?: number };
-          }>;
-        };
-        detailsRevisions = (parsedRs.items ?? [])
-          .filter((item) =>
-            (item.metadata?.ownerReferences ?? []).some(
-              (owner) => owner.kind === "Deployment" && owner.name === name,
-            ),
-          )
-          .map((item) => ({
-            revision: Number(item.metadata?.annotations?.["deployment.kubernetes.io/revision"] ?? "0"),
-            pods: `${item.status?.readyReplicas ?? 0}/${item.status?.replicas ?? 0}`,
-            age: getTimeDifference(item.metadata?.creationTimestamp as unknown as Date),
-          }))
-          .sort((a, b) => b.revision - a.revision);
-      } else {
-        detailsRevisions = [];
-      }
+        if (!eventsResponse.errors && eventsResponse.code === 0 && eventsResponse.output) {
+          const parsedEvents = JSON.parse(eventsResponse.output) as {
+            items?: Array<{
+              type?: string;
+              reason?: string;
+              message?: string;
+              lastTimestamp?: string;
+              eventTime?: string;
+              firstTimestamp?: string;
+            }>;
+          };
+          detailsEvents = (parsedEvents.items ?? []).map((item) => ({
+            type: item.type ?? "-",
+            reason: item.reason ?? "-",
+            message: item.message ?? "-",
+            lastTimestamp: item.lastTimestamp || item.eventTime || item.firstTimestamp || "-",
+          }));
+        } else {
+          detailsEvents = [];
+        }
 
-      detailsKeyLoaded = `${namespace}/${name}`;
+        if (!rsResponse.errors && rsResponse.code === 0 && rsResponse.output) {
+          const parsedRs = JSON.parse(rsResponse.output) as {
+            items?: Array<{
+              metadata?: {
+                creationTimestamp?: string;
+                annotations?: Record<string, string>;
+                ownerReferences?: Array<{ kind?: string; name?: string }>;
+              };
+              status?: { readyReplicas?: number; replicas?: number };
+            }>;
+          };
+          detailsRevisions = (parsedRs.items ?? [])
+            .filter((item) =>
+              (item.metadata?.ownerReferences ?? []).some(
+                (owner) => owner.kind === "Deployment" && owner.name === name,
+              ),
+            )
+            .map((item) => ({
+              revision: Number(
+                item.metadata?.annotations?.["deployment.kubernetes.io/revision"] ?? "0",
+              ),
+              pods: `${item.status?.readyReplicas ?? 0}/${item.status?.replicas ?? 0}`,
+              age: getTimeDifference(item.metadata?.creationTimestamp as unknown as Date),
+            }))
+            .sort((a, b) => b.revision - a.revision);
+        } else {
+          detailsRevisions = [];
+        }
+
+        detailsKeyLoaded = `${namespace}/${name}`;
       } catch (error) {
         if (!isLatest()) return;
-        detailsError = error instanceof Error ? error.message : "Failed to load deployment details.";
+        detailsError =
+          error instanceof Error ? error.message : "Failed to load deployment details.";
         detailsPods = [];
         detailsEvents = [];
         detailsRevisions = [];
@@ -2627,20 +2770,25 @@
     if (!ENABLE_DEPLOYMENTS_ROWS_WORKER) return;
     if (deploymentsRowsWorkerDisabled) return;
     if (deploymentsRowsWorker) return;
-    deploymentsRowsWorker = new Worker(new URL("./model/deployments-rows.worker.ts", import.meta.url), {
-      type: "module",
-    });
+    deploymentsRowsWorker = new Worker(
+      new URL("./model/deployments-rows.worker.ts", import.meta.url),
+      {
+        type: "module",
+      },
+    );
     trackWorkloadEvent("workloads.worker_started", {
       worker: "deployments_rows",
       workload: "deployments",
     });
-    deploymentsRowsWorker.onmessage = (event: MessageEvent<{
-      id: number;
-      enqueuedAt: number;
-      startedAt: number;
-      finishedAt: number;
-      rows: DeploymentRow[];
-    }>) => {
+    deploymentsRowsWorker.onmessage = (
+      event: MessageEvent<{
+        id: number;
+        enqueuedAt: number;
+        startedAt: number;
+        finishedAt: number;
+        rows: DeploymentRow[];
+      }>,
+    ) => {
       const payload = event.data;
       if (!payload || payload.id !== deploymentsRowsWorkerRequestId) return;
       deploymentsRowsWorkerFailures = 0;
@@ -2870,10 +3018,7 @@
         })),
         ...rolloutTabs.map((tab) => ({
           id: tab.id,
-          kind:
-            tab.mode === "status"
-              ? ("rollout-status" as const)
-              : ("rollout-history" as const),
+          kind: tab.mode === "status" ? ("rollout-status" as const) : ("rollout-history" as const),
           title: `${tab.mode === "status" ? "Rollout status" : "Rollout history"} ${tab.target.name}`,
           subtitle: tab.target.namespace,
         })),
@@ -2934,117 +3079,130 @@
 <svelte:window onkeydown={handleWindowKeydown} />
 
 <div class="min-w-0 space-y-3">
-  <ActionNotificationBar notification={actionNotification} onDismiss={() => { actionNotification = null; }} />
-    {#if yamlDownloadError}
-      <Alert.Root variant="destructive" class="mb-4">
-        <button
-          type="button"
-          class="absolute right-2 top-2 rounded bg-rose-100/70 p-1.5 text-xs text-rose-700 transition hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:hover:bg-rose-500/30"
-          aria-label="Close notification"
-          title="Close"
-          onclick={() => {
-            yamlDownloadError = null;
-          }}
-        >
-          <X class="h-3.5 w-3.5" />
-        </button>
-        <Alert.Description>{yamlDownloadError}</Alert.Description>
-      </Alert.Root>
-    {/if}
-    {#if yamlDownloadMessage}
-      <Alert.Root class="mb-4 border-emerald-400/40 bg-emerald-100/20 text-emerald-900 dark:text-emerald-200">
-        <button
-          type="button"
-          class="absolute right-2 top-2 rounded bg-rose-100/70 p-1.5 text-xs text-rose-700 transition hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:hover:bg-rose-500/30"
-          aria-label="Close notification"
-          title="Close"
-          onclick={() => {
-            yamlDownloadMessage = null;
-          }}
-        >
-          <X class="h-3.5 w-3.5" />
-        </button>
-        <Alert.Description>{yamlDownloadMessage}</Alert.Description>
-      </Alert.Root>
-    {/if}
-    {#if hasWorkbenchTabs}
-      <MultiPaneWorkbench
-        tabs={orderedWorkbenchTabs}
-        activeTabId={activeWorkbenchTabId}
-        isTabPinned={isTabPinned}
-        onActivateTab={setActiveWorkbenchTab}
-        onTogglePin={togglePinTab}
-        onCloseTab={(tabId) => {
-          void closeWorkbenchTab(tabId, { skipConfirm: true });
+  <ActionNotificationBar
+    notification={actionNotification}
+    onDismiss={() => {
+      actionNotification = null;
+    }}
+  />
+  {#if yamlDownloadError}
+    <Alert.Root variant="destructive" class="mb-4">
+      <button
+        type="button"
+        class="absolute right-2 top-2 rounded bg-rose-100/70 p-1.5 text-xs text-rose-700 transition hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:hover:bg-rose-500/30"
+        aria-label="Close notification"
+        title="Close"
+        onclick={() => {
+          yamlDownloadError = null;
         }}
-        onReopenLastClosedTab={reopenLastClosedTab}
-        reopenDisabled={closedWorkbenchTabs.length === 0}
-        layout={workbenchLayout}
-        onLayoutChange={(nextLayout) => {
-          void requestWorkbenchLayout(nextLayout as WorkbenchLayout);
-        }}
-        fullscreen={workbenchFullscreen}
-        onToggleFullscreen={toggleWorkbenchFullscreen}
-        collapsed={workbenchCollapsed}
-        onToggleCollapse={toggleWorkbenchCollapse}
-        showTimeline={canShowIncidentTimeline && activeIncidentTimeline.length > 0}
-        timelineDensity={incidentTimelineDensity}
-        onTimelineDensityChange={(density) => {
-          incidentTimelineDensity = density;
-        }}
-        timelineMarkers={visibleIncidentTimeline}
-        activeTimelineMarkerId={incidentTimelineCursorId}
-        onTimelineMarkerClick={(marker) => jumpToIncidentMarker(marker as IncidentMarker)}
       >
-        {#snippet tabActions(tab)}
-          {#if tab.kind === "yaml"}
-            <button
-              type="button"
-              class={`rounded p-2 text-xs ${
-                yamlCompareSourceTabId === tab.id
-                  ? "bg-sky-100 text-sky-900"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}
-              onclick={() => selectYamlForCompare(tab.id)}
-              title={yamlCompareSourceTabId === tab.id ? "Selected for compare" : "Select for compare"}
-              aria-label={yamlCompareSourceTabId === tab.id ? "Selected for compare" : "Select for compare"}
-            >
-              <Target class="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              class={`rounded p-2 text-xs ${
-                isYamlCompareTarget(tab.id)
-                  ? "bg-sky-100 text-sky-900"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              } disabled:opacity-50`}
-              disabled={!canCompareWithSelected(tab.id)}
-              onclick={() => compareYamlWithSelected(tab.id)}
-              title={
-                !yamlCompareSourceTabId
-                  ? "Set as compare source"
-                  : yamlCompareSourceTabId === tab.id
-                    ? "Clear compare source"
-                    : isYamlCompareTarget(tab.id)
-                      ? "Disable compare"
-                      : "Compare with selected"
-              }
-              aria-label="Compare with selected"
-            >
-              <GitCompareArrows class="h-4 w-4" />
-            </button>
-          {/if}
-        {/snippet}
-        {#snippet body()}
+        <X class="h-3.5 w-3.5" />
+      </button>
+      <Alert.Description>{yamlDownloadError}</Alert.Description>
+    </Alert.Root>
+  {/if}
+  {#if yamlDownloadMessage}
+    <Alert.Root
+      class="mb-4 border-emerald-400/40 bg-emerald-100/20 text-emerald-900 dark:text-emerald-200"
+    >
+      <button
+        type="button"
+        class="absolute right-2 top-2 rounded bg-rose-100/70 p-1.5 text-xs text-rose-700 transition hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:hover:bg-rose-500/30"
+        aria-label="Close notification"
+        title="Close"
+        onclick={() => {
+          yamlDownloadMessage = null;
+        }}
+      >
+        <X class="h-3.5 w-3.5" />
+      </button>
+      <Alert.Description>{yamlDownloadMessage}</Alert.Description>
+    </Alert.Root>
+  {/if}
+  {#if hasWorkbenchTabs}
+    <MultiPaneWorkbench
+      tabs={orderedWorkbenchTabs}
+      activeTabId={activeWorkbenchTabId}
+      {isTabPinned}
+      onActivateTab={setActiveWorkbenchTab}
+      onTogglePin={togglePinTab}
+      onCloseTab={(tabId) => {
+        void closeWorkbenchTab(tabId, { skipConfirm: true });
+      }}
+      onReopenLastClosedTab={reopenLastClosedTab}
+      reopenDisabled={closedWorkbenchTabs.length === 0}
+      layout={workbenchLayout}
+      onLayoutChange={(nextLayout) => {
+        void requestWorkbenchLayout(nextLayout as WorkbenchLayout);
+      }}
+      fullscreen={workbenchFullscreen}
+      onToggleFullscreen={toggleWorkbenchFullscreen}
+      collapsed={workbenchCollapsed}
+      onToggleCollapse={toggleWorkbenchCollapse}
+      showTimeline={canShowIncidentTimeline && activeIncidentTimeline.length > 0}
+      timelineDensity={incidentTimelineDensity}
+      onTimelineDensityChange={(density) => {
+        incidentTimelineDensity = density;
+      }}
+      timelineMarkers={visibleIncidentTimeline}
+      activeTimelineMarkerId={incidentTimelineCursorId}
+      onTimelineMarkerClick={(marker) => jumpToIncidentMarker(marker as IncidentMarker)}
+    >
+      {#snippet tabActions(tab)}
+        {#if tab.kind === "yaml"}
+          <button
+            type="button"
+            class={`rounded p-2 text-xs ${
+              yamlCompareSourceTabId === tab.id
+                ? "bg-sky-100 text-sky-900"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+            onclick={() => selectYamlForCompare(tab.id)}
+            title={yamlCompareSourceTabId === tab.id
+              ? "Selected for compare"
+              : "Select for compare"}
+            aria-label={yamlCompareSourceTabId === tab.id
+              ? "Selected for compare"
+              : "Select for compare"}
+          >
+            <Target class="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            class={`rounded p-2 text-xs ${
+              isYamlCompareTarget(tab.id)
+                ? "bg-sky-100 text-sky-900"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            } disabled:opacity-50`}
+            disabled={!canCompareWithSelected(tab.id)}
+            onclick={() => compareYamlWithSelected(tab.id)}
+            title={!yamlCompareSourceTabId
+              ? "Set as compare source"
+              : yamlCompareSourceTabId === tab.id
+                ? "Clear compare source"
+                : isYamlCompareTarget(tab.id)
+                  ? "Disable compare"
+                  : "Compare with selected"}
+            aria-label="Compare with selected"
+          >
+            <GitCompareArrows class="h-4 w-4" />
+          </button>
+        {/if}
+      {/snippet}
+      {#snippet body()}
         {#if !workbenchCollapsed && activeWorkbenchTab}
-          <div class={workbenchFullscreen ? "min-h-0 flex-1" : "h-[min(70dvh,760px)] min-h-[430px]"}>
+          <div
+            class={workbenchFullscreen ? "min-h-0 flex-1" : "h-[min(70dvh,760px)] min-h-[430px]"}
+          >
             {#if workbenchLayout === "single"}
               {#if activeWorkbenchTab.kind === "logs"}
                 {@const currentLogsTab = getLogsTab(activeWorkbenchTab.id)}
                 <ResourceLogsSheet
                   embedded={true}
                   isOpen={workbenchOpen}
-                  podRef={currentLogsTab ? `${currentLogsTab.target.namespace}/${currentLogsTab.target.name}` : "-"}
+                  podRef={currentLogsTab
+                    ? `${currentLogsTab.target.namespace}/${currentLogsTab.target.name}`
+                    : "-"}
                   logs={currentLogsTab?.logsText ?? ""}
                   loading={currentLogsTab?.logsLoading ?? false}
                   error={currentLogsTab?.logsError ?? null}
@@ -3064,7 +3222,11 @@
                   }}
                   onSetMode={(mode) => {
                     if (!currentLogsTab || currentLogsTab.logsMode === mode) return;
-                    updateLogsTab(currentLogsTab.id, (tab) => ({ ...tab, logsMode: mode, logsError: null }));
+                    updateLogsTab(currentLogsTab.id, (tab) => ({
+                      ...tab,
+                      logsMode: mode,
+                      logsError: null,
+                    }));
                     if (currentLogsTab.logsLive) startLiveLogsForTab(currentLogsTab.id);
                   }}
                   onTogglePrevious={() => {
@@ -3121,13 +3283,18 @@
                 <ResourceYamlSheet
                   embedded={true}
                   isOpen={workbenchOpen}
-                  podRef={currentYamlTab ? `${currentYamlTab.target.namespace}/${currentYamlTab.target.name}` : "-"}
+                  podRef={currentYamlTab
+                    ? `${currentYamlTab.target.namespace}/${currentYamlTab.target.name}`
+                    : "-"}
                   originalYaml={currentYamlTab?.yamlOriginalText ?? ""}
                   yamlText={currentYamlTab?.yamlText ?? ""}
                   loading={currentYamlTab?.yamlLoading ?? false}
                   saving={currentYamlTab?.yamlSaving ?? false}
-                  hasChanges={(currentYamlTab?.yamlText ?? "") !== (currentYamlTab?.yamlOriginalText ?? "")}
-                  externalDiffLines={currentYamlTab ? getYamlCompareDiffLines(currentYamlTab.id) : []}
+                  hasChanges={(currentYamlTab?.yamlText ?? "") !==
+                    (currentYamlTab?.yamlOriginalText ?? "")}
+                  externalDiffLines={currentYamlTab
+                    ? getYamlCompareDiffLines(currentYamlTab.id)
+                    : []}
                   error={currentYamlTab?.yamlError ?? null}
                   driftDetected={currentYamlTab?.yamlDriftDetected ?? false}
                   driftMessage={currentYamlTab?.yamlDriftMessage ?? null}
@@ -3158,7 +3325,9 @@
                   embedded={true}
                   isOpen={workbenchOpen}
                   title={`Deployment events: ${currentEventsTab ? `${currentEventsTab.target.namespace}/${currentEventsTab.target.name}` : "-"}`}
-                  targetRef={currentEventsTab ? `${currentEventsTab.target.namespace}/${currentEventsTab.target.name}` : "-"}
+                  targetRef={currentEventsTab
+                    ? `${currentEventsTab.target.namespace}/${currentEventsTab.target.name}`
+                    : "-"}
                   events={currentEventsTab?.events ?? []}
                   loading={currentEventsTab?.eventsLoading ?? false}
                   error={currentEventsTab?.eventsError ?? null}
@@ -3170,15 +3339,13 @@
                   isOpen={workbenchOpen}
                   title={`${activeWorkbenchTab.kind === "rollout-status" ? "Rollout status" : "Rollout history"}: ${currentRolloutTab ? `${currentRolloutTab.target.namespace}/${currentRolloutTab.target.name}` : "-"}`}
                   collapsedLabel={currentRolloutTab?.target.name ?? "Rollout"}
-                  commandLabel={
-                    currentRolloutTab
-                      ? buildRolloutCommandArgs(currentRolloutTab.mode, {
-                          resource: "deployment",
-                          name: currentRolloutTab.target.name,
-                          namespace: currentRolloutTab.target.namespace,
-                        }).join(" ")
-                      : null
-                  }
+                  commandLabel={currentRolloutTab
+                    ? buildRolloutCommandArgs(currentRolloutTab.mode, {
+                        resource: "deployment",
+                        name: currentRolloutTab.target.name,
+                        namespace: currentRolloutTab.target.namespace,
+                      }).join(" ")
+                    : null}
                   output={currentRolloutTab?.output ?? ""}
                   loading={currentRolloutTab?.loading ?? false}
                   error={currentRolloutTab?.error ?? null}
@@ -3194,7 +3361,9 @@
               <div class="flex h-full gap-2 p-2">
                 {#each paneIndexes as paneIndex}
                   {@const paneTab = getPaneTab(paneIndex)}
-                  <div class={`${getPaneWrapperClass(paneIndex)} min-h-0 overflow-hidden rounded border`}>
+                  <div
+                    class={`${getPaneWrapperClass(paneIndex)} min-h-0 overflow-hidden rounded border`}
+                  >
                     {#if paneTab && isPaneCollapsed(paneIndex)}
                       {#if paneTab.kind === "yaml"}
                         {@const paneYamlTab = getYamlTab(paneTab.id)}
@@ -3296,13 +3465,20 @@
                             onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
                             onToggleLive={() => {
                               const nextLive = !paneLogsTab.logsLive;
-                              updateLogsTab(paneLogsTab.id, (tab) => ({ ...tab, logsLive: nextLive }));
+                              updateLogsTab(paneLogsTab.id, (tab) => ({
+                                ...tab,
+                                logsLive: nextLive,
+                              }));
                               if (nextLive) startLiveLogsForTab(paneLogsTab.id);
                               else stopLiveLogsForTab(paneLogsTab.id);
                             }}
                             onSetMode={(mode) => {
                               if (paneLogsTab.logsMode === mode) return;
-                              updateLogsTab(paneLogsTab.id, (tab) => ({ ...tab, logsMode: mode, logsError: null }));
+                              updateLogsTab(paneLogsTab.id, (tab) => ({
+                                ...tab,
+                                logsMode: mode,
+                                logsError: null,
+                              }));
                               if (paneLogsTab.logsLive) startLiveLogsForTab(paneLogsTab.id);
                             }}
                             onTogglePrevious={() => {
@@ -3341,7 +3517,9 @@
                             onRemoveBookmark={(bookmarkId) => {
                               updateLogsTab(paneLogsTab.id, (tab) => ({
                                 ...tab,
-                                bookmarks: tab.bookmarks.filter((bookmark) => bookmark.id !== bookmarkId),
+                                bookmarks: tab.bookmarks.filter(
+                                  (bookmark) => bookmark.id !== bookmarkId,
+                                ),
                               }));
                             }}
                             jumpToLine={logsJumpToLine}
@@ -3357,7 +3535,8 @@
                         <select
                           class="h-8 min-w-0 flex-1 rounded border border-input bg-background px-2 text-xs text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           value={paneTabIds[paneIndex] ?? ""}
-                          onchange={(event) => assignTabToPane(paneIndex, event.currentTarget.value || null)}
+                          onchange={(event) =>
+                            assignTabToPane(paneIndex, event.currentTarget.value || null)}
                         >
                           <option value="">Select tab</option>
                           {#each orderedWorkbenchTabs as tab}
@@ -3388,13 +3567,20 @@
                               onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
                               onToggleLive={() => {
                                 const nextLive = !paneLogsTab.logsLive;
-                                updateLogsTab(paneLogsTab.id, (tab) => ({ ...tab, logsLive: nextLive }));
+                                updateLogsTab(paneLogsTab.id, (tab) => ({
+                                  ...tab,
+                                  logsLive: nextLive,
+                                }));
                                 if (nextLive) startLiveLogsForTab(paneLogsTab.id);
                                 else stopLiveLogsForTab(paneLogsTab.id);
                               }}
                               onSetMode={(mode) => {
                                 if (paneLogsTab.logsMode === mode) return;
-                                updateLogsTab(paneLogsTab.id, (tab) => ({ ...tab, logsMode: mode, logsError: null }));
+                                updateLogsTab(paneLogsTab.id, (tab) => ({
+                                  ...tab,
+                                  logsMode: mode,
+                                  logsError: null,
+                                }));
                                 if (paneLogsTab.logsLive) startLiveLogsForTab(paneLogsTab.id);
                               }}
                               onTogglePrevious={() => {
@@ -3433,7 +3619,9 @@
                               onRemoveBookmark={(bookmarkId) => {
                                 updateLogsTab(paneLogsTab.id, (tab) => ({
                                   ...tab,
-                                  bookmarks: tab.bookmarks.filter((bookmark) => bookmark.id !== bookmarkId),
+                                  bookmarks: tab.bookmarks.filter(
+                                    (bookmark) => bookmark.id !== bookmarkId,
+                                  ),
                                 }));
                               }}
                               jumpToLine={logsJumpToLine}
@@ -3462,7 +3650,10 @@
                               isVerticallyCollapsed={false}
                               onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
                               onYamlChange={(value) => {
-                                updateYamlTab(paneYamlTab.id, (tab) => ({ ...tab, yamlText: value }));
+                                updateYamlTab(paneYamlTab.id, (tab) => ({
+                                  ...tab,
+                                  yamlText: value,
+                                }));
                               }}
                               onRefresh={() => {
                                 refreshYamlForTab(paneYamlTab.id);
@@ -3516,13 +3707,18 @@
                               onRefresh={() => {
                                 const deployment = findDeploymentByTarget(paneRolloutTab.target);
                                 if (!deployment) return;
-                                void openRolloutCommandForDeployment(paneRolloutTab.mode, deployment);
+                                void openRolloutCommandForDeployment(
+                                  paneRolloutTab.mode,
+                                  deployment,
+                                );
                               }}
                             />
                           {/if}
                         {/if}
                       {:else}
-                        <div class="flex h-full items-center justify-center p-4 text-sm text-muted-foreground">
+                        <div
+                          class="flex h-full items-center justify-center p-4 text-sm text-muted-foreground"
+                        >
                           Select tab for {getPaneLabel(paneIndex).toLowerCase()}
                         </div>
                       {/if}
@@ -3533,9 +3729,9 @@
             {/if}
           </div>
         {/if}
-        {/snippet}
-      </MultiPaneWorkbench>
-    {/if}
+      {/snippet}
+    </MultiPaneWorkbench>
+  {/if}
   {#if selectedDeploymentIds.size > 0}
     <WorkloadSelectionBar count={selectedDeploymentIds.size}>
       {#snippet children()}
@@ -3566,6 +3762,11 @@
             const selected = getSelectedDeployments();
             if (selected.length !== 1) return;
             void openDeploymentInvestigationWorkspace(selected[0]);
+          }}
+          onScale={() => {
+            const selected = getSelectedDeployments();
+            if (selected.length !== 1) return;
+            openScaleDialog([selected[0]]);
           }}
           onCopyDescribe={() => {
             const selected = getSelectedDeployments();
@@ -3620,392 +3821,438 @@
       {/snippet}
     </WorkloadSelectionBar>
   {/if}
-    <ResourceSummaryStrip
-      items={[
-        { label: "Cluster", value: resolvePageClusterName(data), tone: "foreground" },
-        { label: "Namespace", value: deploymentsNamespaceSummary },
-        { label: "Deployments", value: rows.length },
-        { label: "Sync", value: deploymentsRuntimeSourceState },
-      ]}
-      trailingItem={{
-        label: "View",
-        value: deploymentsSummaryView,
-        valueClass: "text-foreground",
-      }}
-    />
-    <div class="mb-4">
-      <SectionRuntimeStatus
-        sectionLabel="Deployments Runtime Status"
-        profileLabel={deploymentsRuntimeProfileLabel}
-        sourceState={deploymentsRuntimeSourceState}
-        mode={watcherPolicy.mode === "stream" ? "stream" : "poll"}
-        budgetSummary={`sync ${watcherPolicy.refreshSeconds}s`}
-        lastUpdatedLabel={deploymentsRuntimeLastUpdatedLabel}
-        detail={deploymentsRuntimeDetail}
-        secondaryActionLabel="Update"
-        secondaryActionAriaLabel="Refresh deployments runtime section"
-        secondaryActionLoading={watcherInFlight}
-        onSecondaryAction={() => void refreshDeploymentsFromWatcher("manual")}
-        reason={deploymentsRuntimeReason}
-        actionLabel={watcherEnabled ? "Pause section" : "Resume section"}
-        actionAriaLabel={watcherEnabled ? "Pause deployments runtime section" : "Resume deployments runtime section"}
-        onAction={toggleWatcher}
-      />
-    </div>
-    <DataTable
-      data={rows}
-      {columns}
-      {watcherEnabled}
-      {watcherRefreshSeconds}
-      {watcherError}
-      viewMode={deploymentsTableViewMode}
-      onToggleWatcher={toggleWatcher}
-      onWatcherRefreshSecondsChange={setWatcherRefreshSeconds}
-      onResetWatcherSettings={resetWatcherSettings}
-      onCsvDownloaded={({ pathHint, rows: csvRows }) => {
-        actionNotification = null;
-        actionNotification = notifySuccess(`CSV exported: ${pathHint} (${csvRows} rows).`);
-      }}
-      onViewModeChange={(mode) => {
-        deploymentsTableViewMode = mode;
-        persistWatcherSettings();
-      }}
-      isRowSelected={(row) => selectedDeploymentIds.has(row.uid)}
-      onToggleGroupSelection={toggleGroupSelection}
-      onRowClick={(row) => {
-        openSheetByRow(row);
-      }}
+  <ResourceSummaryStrip
+    items={[
+      { label: "Cluster", value: resolvePageClusterName(data), tone: "foreground" },
+      { label: "Namespace", value: deploymentsNamespaceSummary },
+      { label: "Deployments", value: rows.length },
+      { label: "Sync", value: deploymentsRuntimeSourceState },
+    ]}
+    trailingItem={{
+      label: "View",
+      value: deploymentsSummaryView,
+      valueClass: "text-foreground",
+    }}
+  />
+  <div class="mb-4">
+    <SectionRuntimeStatus
+      sectionLabel="Deployments Runtime Status"
+      profileLabel={deploymentsRuntimeProfileLabel}
+      sourceState={deploymentsRuntimeSourceState}
+      mode={watcherPolicy.mode === "stream" ? "stream" : "poll"}
+      budgetSummary={`sync ${watcherPolicy.refreshSeconds}s`}
+      lastUpdatedLabel={deploymentsRuntimeLastUpdatedLabel}
+      detail={deploymentsRuntimeDetail}
+      secondaryActionLabel="Update"
+      secondaryActionAriaLabel="Refresh deployments runtime section"
+      secondaryActionLoading={watcherInFlight}
+      onSecondaryAction={() => void refreshDeploymentsFromWatcher("manual")}
+      reason={deploymentsRuntimeReason}
+      actionLabel={watcherEnabled ? "Pause section" : "Resume section"}
+      actionAriaLabel={watcherEnabled
+        ? "Pause deployments runtime section"
+        : "Resume deployments runtime section"}
+      onAction={toggleWatcher}
     />
   </div>
-  {#if isOpen && selectedItem}
-  <DetailsSheetPortal open={isOpen} onClose={closeDetails} closeAriaLabel="Close deployment details">
-        <div class="flex items-center justify-between gap-2 border-b px-4 py-3">
-          <div class="min-w-0 flex items-center gap-2">
-            <Info class="h-4 w-4 shrink-0 text-muted-foreground" />
-            <div class="truncate text-base font-semibold">
-              Deployment: {selectedItem.metadata?.name ?? "-"}
-            </div>
-          </div>
-          <DetailsHeaderActions
-            actions={[
-              {
-                id: "logs",
-                title: "Logs",
-                ariaLabel: "Open deployment logs",
-                icon: ScrollText,
-                onClick: () => {
-                  const item = selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => openLogsForDeployment(item));
-                },
-              },
-              {
-                id: "events",
-                title: "Events",
-                ariaLabel: "Open deployment events",
-                icon: Clock3,
-                onClick: () => {
-                  const item = selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => openEventsForDeployment(item));
-                },
-              },
-              {
-                id: "edit-yaml",
-                title: "Edit YAML",
-                ariaLabel: "Edit deployment YAML",
-                icon: Pencil,
-                onClick: () => {
-                  const item = selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => openYamlForDeployment(item));
-                },
-              },
-              {
-                id: "investigate",
-                title: "Investigate",
-                ariaLabel: "Investigate deployment",
-                icon: Search,
-                onClick: () => {
-                  const item = selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => openDeploymentInvestigationWorkspace(item));
-                },
-              },
-              {
-                id: "copy-describe",
-                title: "Copy kubectl describe",
-                ariaLabel: "Copy kubectl describe for deployment",
-                icon: ClipboardList,
-                onClick: () => {
-                  const item = selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => copyDescribeCommandForDeployment(item));
-                },
-              },
-              {
-                id: "download-yaml",
-                title: "Download YAML",
-                ariaLabel: "Download deployment YAML",
-                icon: FileDown,
-                onClick: () => {
-                  const item = selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => downloadYamlForDeployments([item]));
-                },
-              },
-              {
-                id: "restart",
-                title: "Rollout restart",
-                ariaLabel: "Rollout restart deployment",
-                icon: RotateCcw,
-                onClick: () => {
-                  const item = selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => rolloutAction("restart", [item]));
-                },
-              },
-              {
-                id: "rollout-status",
-                title: "Rollout status",
-                ariaLabel: "Open rollout status for deployment",
-                icon: Clock3,
-                onClick: () => {
-                  const item = selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => openRolloutCommandForDeployment("status", item));
-                },
-              },
-              {
-                id: "rollout-history",
-                title: "Rollout history",
-                ariaLabel: "Open rollout history for deployment",
-                icon: ListTree,
-                onClick: () => {
-                  const item = selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => openRolloutCommandForDeployment("history", item));
-                },
-              },
-              {
-                id: "pause",
-                title: "Pause rollout",
-                ariaLabel: "Pause rollout",
-                icon: Pause,
-                onClick: () => {
-                  const item = selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => rolloutAction("pause", [item]));
-                },
-              },
-              {
-                id: "resume",
-                title: "Resume rollout",
-                ariaLabel: "Resume rollout",
-                icon: Play,
-                onClick: () => {
-                  const item = selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => rolloutAction("resume", [item]));
-                },
-              },
-              {
-                id: "undo",
-                title: "Undo revision",
-                ariaLabel: "Undo rollout revision",
-                icon: Undo2,
-                onClick: () => {
-                  const item = selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => rolloutAction("undo", [item]));
-                },
-              },
-              {
-                id: "delete",
-                title: "Delete",
-                ariaLabel: "Delete deployment",
-                icon: Trash,
-                destructive: true,
-                onClick: () => {
-                  const item = selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => deleteDeployments([item]));
-                },
-              },
-            ]}
-            closeAriaLabel="Close details"
-            onClose={closeDetails}
-          />
+  <DataTable
+    data={rows}
+    {columns}
+    {watcherEnabled}
+    {watcherRefreshSeconds}
+    {watcherError}
+    viewMode={deploymentsTableViewMode}
+    onToggleWatcher={toggleWatcher}
+    onWatcherRefreshSecondsChange={setWatcherRefreshSeconds}
+    onResetWatcherSettings={resetWatcherSettings}
+    onCsvDownloaded={({ pathHint, rows: csvRows }) => {
+      actionNotification = null;
+      actionNotification = notifySuccess(`CSV exported: ${pathHint} (${csvRows} rows).`);
+    }}
+    onViewModeChange={(mode) => {
+      deploymentsTableViewMode = mode;
+      persistWatcherSettings();
+    }}
+    isRowSelected={(row) => selectedDeploymentIds.has(row.uid)}
+    onToggleGroupSelection={toggleGroupSelection}
+    onRowClick={(row) => {
+      openSheetByRow(row);
+    }}
+  />
+</div>
+{#if isOpen && selectedItem}
+  <DetailsSheetPortal
+    open={isOpen}
+    onClose={closeDetails}
+    closeAriaLabel="Close deployment details"
+  >
+    <div class="flex items-center justify-between gap-2 border-b px-4 py-3">
+      <div class="min-w-0 flex items-center gap-2">
+        <Info class="h-4 w-4 shrink-0 text-muted-foreground" />
+        <div class="truncate text-base font-semibold">
+          Deployment: {selectedItem.metadata?.name ?? "-"}
         </div>
-        <div class="flex-1 overflow-y-auto p-4">
-          <div class="text-xs text-muted-foreground">
-            Namespace: {selectedItem.metadata?.namespace ?? "default"} · Node: {getDetailsHeaderNode()} · Pod IP:
-            {getDetailsHeaderPodIp()}
-          </div>
-          <DetailsExplainState
-            sourceState={deploymentsRuntimeSourceState}
-            profileLabel={deploymentsRuntimeProfileLabel}
-            lastUpdatedLabel={deploymentsRuntimeLastUpdatedLabel}
-            detail={deploymentsRuntimeDetail}
-            reason={deploymentsRuntimeReason}
-            requestPath={watcherPolicy.mode === "stream" ? "kubectl watch stream for deployments" : `poll every ${watcherPolicy.refreshSeconds}s`}
-            describeCommand={getDeploymentDescribeCommand()}
-            syncError={detailsError ?? watcherError}
-          />
-          <ResourceTrafficChain
-            clusterId={data.slug}
-            resourceKind="Deployment"
-            resourceName={selectedItem.metadata?.name ?? ""}
-            resourceNamespace={selectedItem.metadata?.namespace ?? "default"}
-            raw={selectedItem as unknown as Record<string, unknown>}
-          />
+      </div>
+      <DetailsHeaderActions
+        actions={[
+          {
+            id: "logs",
+            title: "Logs",
+            ariaLabel: "Open deployment logs",
+            icon: ScrollText,
+            onClick: () => {
+              const item = selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => openLogsForDeployment(item));
+            },
+          },
+          {
+            id: "events",
+            title: "Events",
+            ariaLabel: "Open deployment events",
+            icon: Clock3,
+            onClick: () => {
+              const item = selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => openEventsForDeployment(item));
+            },
+          },
+          {
+            id: "edit-yaml",
+            title: "Edit YAML",
+            ariaLabel: "Edit deployment YAML",
+            icon: Pencil,
+            onClick: () => {
+              const item = selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => openYamlForDeployment(item));
+            },
+          },
+          {
+            id: "investigate",
+            title: "Investigate",
+            ariaLabel: "Investigate deployment",
+            icon: Search,
+            onClick: () => {
+              const item = selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => openDeploymentInvestigationWorkspace(item));
+            },
+          },
+          {
+            id: "copy-describe",
+            title: "Copy kubectl describe",
+            ariaLabel: "Copy kubectl describe for deployment",
+            icon: ClipboardList,
+            onClick: () => {
+              const item = selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => copyDescribeCommandForDeployment(item));
+            },
+          },
+          {
+            id: "download-yaml",
+            title: "Download YAML",
+            ariaLabel: "Download deployment YAML",
+            icon: FileDown,
+            onClick: () => {
+              const item = selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => downloadYamlForDeployments([item]));
+            },
+          },
+          {
+            id: "restart",
+            title: "Rollout restart",
+            ariaLabel: "Rollout restart deployment",
+            icon: RotateCcw,
+            onClick: () => {
+              const item = selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => rolloutAction("restart", [item]));
+            },
+          },
+          {
+            id: "rollout-status",
+            title: "Rollout status",
+            ariaLabel: "Open rollout status for deployment",
+            icon: Clock3,
+            onClick: () => {
+              const item = selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => openRolloutCommandForDeployment("status", item));
+            },
+          },
+          {
+            id: "rollout-history",
+            title: "Rollout history",
+            ariaLabel: "Open rollout history for deployment",
+            icon: ListTree,
+            onClick: () => {
+              const item = selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => openRolloutCommandForDeployment("history", item));
+            },
+          },
+          {
+            id: "pause",
+            title: "Pause rollout",
+            ariaLabel: "Pause rollout",
+            icon: Pause,
+            onClick: () => {
+              const item = selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => rolloutAction("pause", [item]));
+            },
+          },
+          {
+            id: "resume",
+            title: "Resume rollout",
+            ariaLabel: "Resume rollout",
+            icon: Play,
+            onClick: () => {
+              const item = selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => rolloutAction("resume", [item]));
+            },
+          },
+          {
+            id: "undo",
+            title: "Undo revision",
+            ariaLabel: "Undo rollout revision",
+            icon: Undo2,
+            onClick: () => {
+              const item = selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => rolloutAction("undo", [item]));
+            },
+          },
+          {
+            id: "delete",
+            title: "Delete",
+            ariaLabel: "Delete deployment",
+            icon: Trash,
+            destructive: true,
+            onClick: () => {
+              const item = selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => deleteDeployments([item]));
+            },
+          },
+        ]}
+        closeAriaLabel="Close details"
+        onClose={closeDetails}
+      />
+    </div>
+    <div class="flex-1 overflow-y-auto p-4">
+      <div class="text-xs text-muted-foreground">
+        Namespace: {selectedItem.metadata?.namespace ?? "default"} · Node: {getDetailsHeaderNode()} ·
+        Pod IP:
+        {getDetailsHeaderPodIp()}
+      </div>
+      <DetailsExplainState
+        sourceState={deploymentsRuntimeSourceState}
+        profileLabel={deploymentsRuntimeProfileLabel}
+        lastUpdatedLabel={deploymentsRuntimeLastUpdatedLabel}
+        detail={deploymentsRuntimeDetail}
+        reason={deploymentsRuntimeReason}
+        requestPath={watcherPolicy.mode === "stream"
+          ? "kubectl watch stream for deployments"
+          : `poll every ${watcherPolicy.refreshSeconds}s`}
+        describeCommand={getDeploymentDescribeCommand()}
+        syncError={detailsError ?? watcherError}
+      />
+      <ResourceTrafficChain
+        clusterId={data.slug}
+        resourceKind="Deployment"
+        resourceName={selectedItem.metadata?.name ?? ""}
+        resourceNamespace={selectedItem.metadata?.namespace ?? "default"}
+        raw={selectedItem as unknown as Record<string, unknown>}
+      />
 
-          <h3 class="my-4 font-bold">Properties</h3>
-            <div class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Created</div>
-              <div>{formatCreatedLabel()}</div>
+      <h3 class="my-4 font-bold">Properties</h3>
+      <div class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+        <div class="rounded border p-3">
+          <div class="text-xs text-muted-foreground">Created</div>
+          <div>{formatCreatedLabel()}</div>
+        </div>
+        <div class="rounded border p-3">
+          <div class="text-xs text-muted-foreground">Name</div>
+          <div>{selectedItem.metadata?.name ?? "-"}</div>
+        </div>
+        <div class="rounded border p-3">
+          <div class="text-xs text-muted-foreground">Namespace</div>
+          <div>{selectedItem.metadata?.namespace ?? "default"}</div>
+        </div>
+        <KeyValueExpand
+          title="Labels"
+          entries={getLabelEntries()}
+          emptyText="No labels."
+          contextKey={`${selectedItem.metadata?.namespace ?? "default"}/${selectedItem.metadata?.name ?? "-"}`}
+          variant="card"
+        />
+        <KeyValueExpand
+          title="Annotations"
+          entries={getAnnotationEntries()}
+          emptyText="No annotations."
+          contextKey={`${selectedItem.metadata?.namespace ?? "default"}/${selectedItem.metadata?.name ?? "-"}`}
+          variant="card"
+        />
+        <div class="rounded border p-3">
+          <div class="text-xs text-muted-foreground">Replicas</div>
+          <div>{getReplicasLabel()}</div>
+        </div>
+        <div class="rounded border p-3">
+          <div class="text-xs text-muted-foreground">Selector</div>
+          <div>{getSelectorLabel()}</div>
+        </div>
+        <div class="rounded border p-3">
+          <div class="text-xs text-muted-foreground">Node Selector</div>
+          <div>{getNodeSelectorLabel()}</div>
+        </div>
+        <div class="rounded border p-3">
+          <div class="text-xs text-muted-foreground">Strategy Type</div>
+          <div>
+            {(selectedItem.spec as { strategy?: { type?: string } } | undefined)?.strategy?.type ??
+              "-"}
+          </div>
+        </div>
+        <div class="rounded border p-3">
+          <div class="text-xs text-muted-foreground">Status</div>
+          <div
+            class={`inline-flex items-center gap-2 font-medium ${getStatusToneClasses(getDeploymentStatus(selectedItem)).text}`}
+          >
+            <span
+              class={`inline-block h-2.5 w-2.5 rounded-full ${getStatusToneClasses(getDeploymentStatus(selectedItem)).dot}`}
+            ></span>
+            {getDeploymentStatus(selectedItem)}
+          </div>
+        </div>
+        <div class="rounded border p-3">
+          <div class="text-xs text-muted-foreground">Conditions</div>
+          {#if getConditionTypes().length === 0}
+            <div>-</div>
+          {:else}
+            <div class="mt-1 flex flex-wrap gap-1.5">
+              {#each getConditionTypes() as condition}
+                <span
+                  class="rounded border border-emerald-300/70 bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-800 dark:border-emerald-500/50 dark:bg-emerald-500/10 dark:text-emerald-300"
+                >
+                  {condition}
+                </span>
+              {/each}
             </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Name</div>
-              <div>{selectedItem.metadata?.name ?? "-"}</div>
+          {/if}
+        </div>
+        <div class="rounded border p-3">
+          <div class="text-xs text-muted-foreground">Pod Anti Affinities</div>
+          <button
+            type="button"
+            class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
+              showPodAntiAffinitiesDetails
+                ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+            onclick={() => (showPodAntiAffinitiesDetails = !showPodAntiAffinitiesDetails)}
+          >
+            <span
+              >{getPodAntiAffinityRulesCount()} Rule{getPodAntiAffinityRulesCount() === 1
+                ? ""
+                : "s"}</span
+            >
+            {#if showPodAntiAffinitiesDetails}
+              <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
+            {:else}
+              <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
+            {/if}
+          </button>
+          {#if showPodAntiAffinitiesDetails}
+            <div
+              class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10"
+            >
+              {#if getPodAntiAffinityDetails().length === 0}
+                <div class="text-muted-foreground">No pod anti-affinity rules.</div>
+              {:else}
+                {#each getPodAntiAffinityDetails() as line}
+                  <div class="break-all">{line}</div>
+                {/each}
+              {/if}
             </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Namespace</div>
-              <div>{selectedItem.metadata?.namespace ?? "default"}</div>
+          {/if}
+        </div>
+      </div>
+      <h3 class="my-4 font-bold">Deploy Revisions</h3>
+      <div class="space-y-1 text-sm">
+        {#if detailsRevisions.length === 0}
+          <div class="text-muted-foreground">No revisions found.</div>
+        {:else}
+          {#each detailsRevisions as revision}
+            <div class="grid grid-cols-[80px_90px_1fr] gap-2 rounded border p-2">
+              <div>{revision.revision}</div>
+              <div>{revision.pods}</div>
+              <div>{revision.age}</div>
             </div>
-            <KeyValueExpand
-              title="Labels"
-              entries={getLabelEntries()}
-              emptyText="No labels."
-              contextKey={`${selectedItem.metadata?.namespace ?? "default"}/${selectedItem.metadata?.name ?? "-"}`}
-              variant="card"
-            />
-            <KeyValueExpand
-              title="Annotations"
-              entries={getAnnotationEntries()}
-              emptyText="No annotations."
-              contextKey={`${selectedItem.metadata?.namespace ?? "default"}/${selectedItem.metadata?.name ?? "-"}`}
-              variant="card"
-            />
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Replicas</div>
-              <div>{getReplicasLabel()}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Selector</div>
-              <div>{getSelectorLabel()}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Node Selector</div>
-              <div>{getNodeSelectorLabel()}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Strategy Type</div>
-              <div>{(selectedItem.spec as { strategy?: { type?: string } } | undefined)?.strategy?.type ?? "-"}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Status</div>
-              <div class={`inline-flex items-center gap-2 font-medium ${getStatusToneClasses(getDeploymentStatus(selectedItem)).text}`}>
-                <span class={`inline-block h-2.5 w-2.5 rounded-full ${getStatusToneClasses(getDeploymentStatus(selectedItem)).dot}`}></span>
-                {getDeploymentStatus(selectedItem)}
+          {/each}
+        {/if}
+      </div>
+      <h3 class="my-4 font-bold">Pods</h3>
+      <div class="space-y-1 text-sm">
+        {#if detailsPods.length === 0}
+          <div class="text-muted-foreground">No pods found.</div>
+        {:else}
+          {#each detailsPods as pod}
+            <div
+              class="grid grid-cols-1 gap-2 rounded border p-2 sm:grid-cols-[2fr_2fr_1fr_1fr_1fr_1fr_1fr]"
+            >
+              <div>{pod.name}</div>
+              <div>{pod.node}</div>
+              <div>{pod.namespace}</div>
+              <div>{pod.ready}</div>
+              <div>{pod.cpu}</div>
+              <div>{pod.memory}</div>
+              <div
+                class={`inline-flex items-center gap-2 ${getPodStatusToneClasses(pod.status).text}`}
+              >
+                <span
+                  class={`inline-block h-2 w-2 rounded-full ${getPodStatusToneClasses(pod.status).dot}`}
+                ></span>
+                {pod.status}
               </div>
             </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Conditions</div>
-              {#if getConditionTypes().length === 0}
-                <div>-</div>
-              {:else}
-                <div class="mt-1 flex flex-wrap gap-1.5">
-                  {#each getConditionTypes() as condition}
-                    <span class="rounded border border-emerald-300/70 bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-800 dark:border-emerald-500/50 dark:bg-emerald-500/10 dark:text-emerald-300">
-                      {condition}
-                    </span>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Pod Anti Affinities</div>
-              <button
-                type="button"
-                class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
-                  showPodAntiAffinitiesDetails
-                    ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-                onclick={() => (showPodAntiAffinitiesDetails = !showPodAntiAffinitiesDetails)}
-              >
-                <span>{getPodAntiAffinityRulesCount()} Rule{getPodAntiAffinityRulesCount() === 1 ? "" : "s"}</span>
-                {#if showPodAntiAffinitiesDetails}
-                  <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
-                {:else}
-                  <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
-                {/if}
-              </button>
-              {#if showPodAntiAffinitiesDetails}
-                <div class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10">
-                  {#if getPodAntiAffinityDetails().length === 0}
-                    <div class="text-muted-foreground">No pod anti-affinity rules.</div>
-                  {:else}
-                    {#each getPodAntiAffinityDetails() as line}
-                      <div class="break-all">{line}</div>
-                    {/each}
-                  {/if}
-                </div>
-              {/if}
-            </div>
-            </div>
-          <h3 class="my-4 font-bold">Deploy Revisions</h3>
-            <div class="space-y-1 text-sm">
-            {#if detailsRevisions.length === 0}
-              <div class="text-muted-foreground">No revisions found.</div>
-            {:else}
-              {#each detailsRevisions as revision}
-                <div class="grid grid-cols-[80px_90px_1fr] gap-2 rounded border p-2">
-                  <div>{revision.revision}</div>
-                  <div>{revision.pods}</div>
-                  <div>{revision.age}</div>
-                </div>
-              {/each}
-            {/if}
-            </div>
-          <h3 class="my-4 font-bold">Pods</h3>
-            <div class="space-y-1 text-sm">
-            {#if detailsPods.length === 0}
-              <div class="text-muted-foreground">No pods found.</div>
-            {:else}
-              {#each detailsPods as pod}
-                <div class="grid grid-cols-1 gap-2 rounded border p-2 sm:grid-cols-[2fr_2fr_1fr_1fr_1fr_1fr_1fr]">
-                  <div>{pod.name}</div>
-                  <div>{pod.node}</div>
-                  <div>{pod.namespace}</div>
-                  <div>{pod.ready}</div>
-                  <div>{pod.cpu}</div>
-                  <div>{pod.memory}</div>
-                  <div class={`inline-flex items-center gap-2 ${getPodStatusToneClasses(pod.status).text}`}>
-                    <span class={`inline-block h-2 w-2 rounded-full ${getPodStatusToneClasses(pod.status).dot}`}></span>
-                    {pod.status}
-                  </div>
-                </div>
-              {/each}
-            {/if}
-            </div>
-          <h3 class="my-4 font-bold">Events</h3>
-          <DetailsEventsList
-            events={detailsEvents}
-            loading={detailsLoading}
-            error={detailsError}
-            emptyText="No events found."
-          />
-          {#if detailsLoading}
-            <div class="mt-3 text-sm text-muted-foreground">Loading deployment details...</div>
-          {/if}
-          {#if detailsError}
-            <div class="mt-3 rounded border border-rose-300/80 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-500/70 dark:bg-rose-500/20 dark:text-rose-100">
-              {detailsError}
-            </div>
-          {/if}
+          {/each}
+        {/if}
+      </div>
+      <h3 class="my-4 font-bold">Events</h3>
+      <DetailsEventsList
+        events={detailsEvents}
+        loading={detailsLoading}
+        error={detailsError}
+        emptyText="No events found."
+      />
+      {#if detailsLoading}
+        <div class="mt-3 text-sm text-muted-foreground">Loading deployment details...</div>
+      {/if}
+      {#if detailsError}
+        <div
+          class="mt-3 rounded border border-rose-300/80 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-500/70 dark:bg-rose-500/20 dark:text-rose-100"
+        >
+          {detailsError}
         </div>
+      {/if}
+    </div>
   </DetailsSheetPortal>
-  {/if}
+{/if}
+
+{#if scaleTarget}
+  <ScaleDialog
+    open={true}
+    resourceKind="Deployment"
+    resourceName={scaleTarget.item.metadata?.name ?? ""}
+    namespace={scaleTarget.item.metadata?.namespace ?? "default"}
+    currentReplicas={scaleTarget.currentReplicas}
+    onConfirm={(replicas) => void executeScale(replicas)}
+    onCancel={() => {
+      scaleTarget = null;
+    }}
+  />
+{/if}
