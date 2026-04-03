@@ -79,7 +79,7 @@ test.describe("critical user journeys", () => {
     await expect(page.getByText("Detailed")).toBeVisible();
 
     // Linter toggle visible
-    await expect(page.getByText("Linter")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Linter", exact: true })).toBeVisible();
   });
 
   test("2. navigate into cluster and see overview", async ({ page }) => {
@@ -123,24 +123,24 @@ test.describe("critical user journeys", () => {
     await dualBtn.click();
     await page.waitForTimeout(300);
 
-    // Pane 2 should appear
-    await expect(page.getByText("Pane 2")).toBeVisible();
+    // Pane B should appear
+    await expect(page.getByText("Pane B")).toBeVisible();
 
     // Switch to triple pane
     const tripleBtn = page.getByRole("button", { name: "Triple pane layout" });
     await tripleBtn.click();
     await page.waitForTimeout(300);
 
-    // Pane 3 should appear
-    await expect(page.getByText("Pane 3")).toBeVisible();
+    // Pane C should appear
+    await expect(page.getByText("Pane C")).toBeVisible();
 
     // Switch back to single
     await singleBtn.click();
     await page.waitForTimeout(300);
 
-    // Pane 2/3 should be hidden
-    await expect(page.getByText("Pane 2")).not.toBeVisible();
-    await expect(page.getByText("Pane 3")).not.toBeVisible();
+    // Pane B/C should be hidden
+    await expect(page.getByText("Pane B")).not.toBeVisible();
+    await expect(page.getByText("Pane C")).not.toBeVisible();
   });
 
   test("5. pin and unpin a page", async ({ page }) => {
@@ -157,7 +157,7 @@ test.describe("critical user journeys", () => {
       await page.waitForTimeout(500);
 
       // Should show "Pinned workspace" after pin
-      const pinned = page.getByText("Pinned workspace");
+      const pinned = page.getByText("Pinned workspace").first();
       if (await pinned.isVisible()) {
         // Unpin
         await pinBtn.click();
@@ -172,10 +172,10 @@ test.describe("critical user journeys", () => {
     await page.waitForTimeout(1000);
 
     // Helm Catalog heading
-    await expect(page.getByText("Helm Catalog")).toBeVisible();
+    await expect(page.getByText("Helm Catalog").first()).toBeVisible();
 
     // At least one chart category
-    await expect(page.getByText("Observability")).toBeVisible();
+    await expect(page.getByText("Observability").first()).toBeVisible();
 
     // At least one chart name
     await expect(page.getByText("kube-prometheus-stack")).toBeVisible();
