@@ -5,6 +5,7 @@ import {
   WORKSPACE_WORKLOAD_OPTIONS,
   type WorkspaceWorkloadOption,
 } from "$lib/pages/cluster/model/cluster-page-workload-config";
+import { GOTO_CHORD_MAP } from "./goto-shortcuts";
 
 export type PaletteCommand = {
   id: string;
@@ -16,12 +17,18 @@ export type PaletteCommand = {
 };
 
 /** Build navigation commands for all known workload pages. */
+/** Reverse lookup: workload type -> chord key */
+const chordByWorkload = Object.fromEntries(
+  Object.entries(GOTO_CHORD_MAP).map(([key, workload]) => [workload, `g ${key}`]),
+);
+
 export function buildWorkloadCommands(clusterId: string): PaletteCommand[] {
   return WORKSPACE_WORKLOAD_OPTIONS.map((opt: WorkspaceWorkloadOption) => ({
     id: `nav:${opt.value}`,
     label: opt.label,
     group: opt.group ?? "Navigation",
     keywords: [opt.value, opt.label.toLowerCase()],
+    shortcut: chordByWorkload[opt.value],
     execute: () => {
       void goto(`/dashboard/clusters/${clusterId}?workload=${opt.value}`);
     },
