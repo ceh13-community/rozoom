@@ -116,6 +116,12 @@ jobs:
       - name: Setup rust
         uses: ./.github/actions/setup-rust
 
+      - name: Install AppImage dependencies (libfuse2)
+        if: runner.os == 'Linux' && contains(matrix.args, 'appimage')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2
+
       - name: Download binaries
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
