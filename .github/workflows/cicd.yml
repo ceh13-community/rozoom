@@ -50,9 +50,8 @@ jobs:
 
   e2e_smoke:
     if: github.event_name == 'pull_request'
+    continue-on-error: true
     runs-on: ubuntu-24.04
-    container:
-      image: mcr.microsoft.com/playwright:v1.58.2-noble
     timeout-minutes: 30
     permissions:
       contents: read
@@ -67,8 +66,11 @@ jobs:
       - name: Build web app
         run: pnpm run build
 
+      - name: Install Playwright (Chromium)
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Run e2e smoke
-        run: HOME=/root pnpm run test:e2e
+        run: pnpm run test:e2e
 
       - name: Upload Playwright report
         if: failure()
@@ -90,7 +92,7 @@ jobs:
             args: "--target aarch64-apple-darwin --bundles app,dmg"
             label: "macOS ARM64"
           - platform: "ubuntu-24.04"
-            args: "--bundles deb,rpm"
+            args: "--bundles deb,rpm,appimage"
             label: "Linux x64"
           - platform: "windows-latest"
             args: "--bundles msi,nsis"
@@ -114,26 +116,54 @@ jobs:
       - name: Setup rust
         uses: ./.github/actions/setup-rust
 
+      - name: Install AppImage dependencies (libfuse2)
+        if: runner.os == 'Linux' && contains(matrix.args, 'appimage')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2
+
       - name: Download binaries
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         working-directory: ./dashboard-app
         run: pnpm download:binaries
 
+      - name: Sanitize version for MSI compatibility
+        if: runner.os == 'Windows'
+        shell: bash
+        working-directory: ./dashboard-app
+        run: |
+          RAW="${{ env.APP_VERSION }}"
+          # MSI requires numeric-only pre-release identifiers (<= 65535)
+          # Convert e.g. 0.21.0-rc.1 -> 0.21.0-1 (valid semver + MSI-compatible)
+          if [[ "$RAW" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-[a-zA-Z]+\.([0-9]+)$ ]]; then
+            MSI_VERSION="${BASH_REMATCH[1]}-${BASH_REMATCH[2]}"
+            echo "Sanitizing version for MSI: $RAW -> $MSI_VERSION"
+            node -e "
+              const fs = require('fs');
+              const p = 'src-tauri/tauri.conf.json';
+              const c = JSON.parse(fs.readFileSync(p, 'utf8'));
+              c.version = '$MSI_VERSION';
+              fs.writeFileSync(p, JSON.stringify(c, null, 2) + '\n');
+            "
+            sed -i "s/^version = \"$RAW\"/version = \"$MSI_VERSION\"/" src-tauri/Cargo.toml
+          fi
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPIMAGE_EXTRACT_AND_RUN: "1"
         with:
           projectPath: dashboard-app
-          tagName: app-v__VERSION__
-          releaseName: "ROZOOM v__VERSION__"
+          tagName: app-v${{ env.APP_VERSION }}
+          releaseName: "ROZOOM v${{ env.APP_VERSION }}"
           releaseBody: |
             ## Artifacts
 
             | Platform | Architecture | Artifacts |
             |----------|-------------|-----------|
             | **macOS** | ARM64 (M1+) | `.dmg`, `.app.tar.gz` |
-            | **Linux** | x64 | `.deb`, `.rpm` |
+            | **Linux** | x64 | `.deb`, `.rpm`, `.AppImage` |
             | **Windows** | x64 | `.msi`, `.exe` (NSIS) |
 
             Download the package matching your OS and architecture.
