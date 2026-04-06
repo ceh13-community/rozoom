@@ -14,6 +14,7 @@ describe("DeploymentBulkActions", () => {
         onEvents: vi.fn(),
         onEditYaml: vi.fn(),
         onInvestigate,
+        onScale: vi.fn(),
         onRolloutStatus: vi.fn(),
         onRolloutHistory: vi.fn(),
         onDownloadYaml: vi.fn(),

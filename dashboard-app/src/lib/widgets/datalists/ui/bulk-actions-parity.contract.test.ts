@@ -26,6 +26,19 @@ describe("bulk actions parity contract", () => {
     }
   });
 
+  it("keeps scale action available for scalable workload types", () => {
+    const deployments = read("deployments-list/deployment-bulk-actions.svelte");
+    const statefulSets = read("stateful-sets-list/statefulset-bulk-actions.svelte");
+    const replicaSets = read("replica-sets-list/replicaset-bulk-actions.svelte");
+
+    for (const source of [deployments, statefulSets, replicaSets]) {
+      expect(source).toContain('id: "scale"');
+    }
+
+    const daemonSets = read("daemon-sets-list/daemonset-bulk-actions.svelte");
+    expect(daemonSets).not.toContain('id: "scale"');
+  });
+
   it("keeps workload-specific actions intentional", () => {
     const jobs = read("jobs-list/job-bulk-actions.svelte");
     const cronJobs = read("cron-jobs-list/cronjob-bulk-actions.svelte");
