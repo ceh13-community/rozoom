@@ -17,6 +17,7 @@
   import ScrollText from "@lucide/svelte/icons/scroll-text";
   import Search from "@lucide/svelte/icons/search";
   import Trash from "@lucide/svelte/icons/trash";
+  import ArrowUpDown from "@lucide/svelte/icons/arrow-up-down";
   import Undo2 from "@lucide/svelte/icons/undo-2";
 
   type DeploymentActionsMenuProps = {
@@ -29,6 +30,7 @@
     onEvents: () => void;
     onEditYaml: () => void;
     onInvestigate: () => void;
+    onScale: () => void;
     onCopyDescribe?: () => void;
     onRunDebugDescribe?: () => void;
     onRolloutStatus: () => void;
@@ -51,6 +53,7 @@
     onEvents,
     onEditYaml,
     onInvestigate,
+    onScale,
     onCopyDescribe = () => {},
     onRunDebugDescribe = () => {},
     onRolloutStatus,
@@ -123,6 +126,10 @@
       <Search class="mr-2 h-4 w-4" />
       Investigate
     </DropdownMenu.Item>
+    <DropdownMenu.Item onSelect={() => selectAction(onScale)}>
+      <ArrowUpDown class="mr-2 h-4 w-4" />
+      Scale
+    </DropdownMenu.Item>
     <DropdownMenu.Separator />
     <DropdownMenu.Label>Rollout</DropdownMenu.Label>
     <DropdownMenu.Item onSelect={() => selectAction(onRolloutStatus)}>
@@ -150,7 +157,10 @@
       Undo revision
     </DropdownMenu.Item>
     <DropdownMenu.Separator />
-    <DropdownMenu.Item class="text-destructive focus:text-destructive" onSelect={() => selectAction(onDelete)}>
+    <DropdownMenu.Item
+      class="text-destructive focus:text-destructive"
+      onSelect={() => selectAction(onDelete)}
+    >
       <Trash class="mr-2 h-4 w-4" />
       Delete
     </DropdownMenu.Item>
