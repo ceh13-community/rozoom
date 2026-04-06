@@ -55,7 +55,7 @@ export default defineConfig(async ({ mode }) => {
           }
         : undefined,
       watch: {
-        ignored: ["**/src-tauri/**"],
+        ignored: ["**/src-tauri/**", "**/.pnpm-store/**"],
       },
     },
     test: {
