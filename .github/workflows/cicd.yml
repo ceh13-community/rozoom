@@ -91,9 +91,9 @@ jobs:
           - platform: "macos-latest"
             args: "--target aarch64-apple-darwin --bundles app,dmg"
             label: "macOS ARM64"
-          # ubuntu-22.04: linuxdeploy requires libfuse2 + working FUSE, broken on 24.04
+          # Linux x86_64 (DEB + RPM; AppImage built separately below)
           - platform: "ubuntu-22.04"
-            args: "--bundles deb,rpm,appimage"
+            args: "--bundles deb,rpm"
             label: "Linux x64"
           - platform: "windows-latest"
             args: "--bundles msi,nsis"
@@ -165,3 +165,23 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Build AppImage (best-effort, linuxdeploy plugin can be unstable)
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        working-directory: ./dashboard-app
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          NO_STRIP: "true"
+        run: pnpm tauri build --bundles appimage
+
+      - name: Upload AppImage to draft release
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: app-v${{ env.APP_VERSION }}
+          draft: true
+          files: dashboard-app/src-tauri/target/release/bundle/appimage/*.AppImage
