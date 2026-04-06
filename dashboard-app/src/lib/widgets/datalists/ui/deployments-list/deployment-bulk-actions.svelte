@@ -12,6 +12,7 @@
   import Undo2 from "@lucide/svelte/icons/undo-2";
   import Pause from "@lucide/svelte/icons/pause";
   import Play from "@lucide/svelte/icons/play";
+  import ArrowUpDown from "@lucide/svelte/icons/arrow-up-down";
   import Search from "@lucide/svelte/icons/search";
   import WorkloadBulkActions from "../common/workload-bulk-actions.svelte";
 
@@ -23,6 +24,7 @@
     onEvents: () => void;
     onEditYaml: () => void;
     onInvestigate: () => void;
+    onScale: () => void;
     onCopyDescribe?: () => void;
     onRunDebugDescribe?: () => void;
     onRolloutStatus: () => void;
@@ -43,6 +45,7 @@
     onEvents,
     onEditYaml,
     onInvestigate,
+    onScale,
     onCopyDescribe = () => {},
     onRunDebugDescribe = () => {},
     onRolloutStatus,
@@ -114,6 +117,14 @@
       label: "Run debug describe",
       title: "Run debug describe",
       onClick: onRunDebugDescribe,
+      showInModes: ["single"],
+    },
+    {
+      id: "scale",
+      icon: ArrowUpDown,
+      label: "Scale",
+      title: "Scale deployment",
+      onClick: onScale,
       showInModes: ["single"],
     },
     {
