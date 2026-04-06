@@ -91,7 +91,8 @@ jobs:
           - platform: "macos-latest"
             args: "--target aarch64-apple-darwin --bundles app,dmg"
             label: "macOS ARM64"
-          - platform: "ubuntu-24.04"
+          # ubuntu-22.04: linuxdeploy requires libfuse2 + working FUSE, broken on 24.04
+          - platform: "ubuntu-22.04"
             args: "--bundles deb,rpm,appimage"
             label: "Linux x64"
           - platform: "windows-latest"
@@ -115,12 +116,6 @@ jobs:
 
       - name: Setup rust
         uses: ./.github/actions/setup-rust
-
-      - name: Install AppImage dependencies (libfuse2)
-        if: runner.os == 'Linux' && contains(matrix.args, 'appimage')
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libfuse2
 
       - name: Download binaries
         env:
