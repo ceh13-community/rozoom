@@ -50,7 +50,7 @@ All workload action menus follow a consistent sectioned layout:
 | Action         | Pods | Deploy | DS  | STS | RS  | Jobs | CJ  | Nodes |
 | -------------- | :--: | :----: | :-: | :-: | :-: | :--: | :-: | :---: |
 | Investigate    |  Y   |   Y    |  Y  |  Y  |  Y  |  Y   |  Y  |   Y   |
-| Scale          |  -   |   -    |  -  |  Y  |  Y  |  -   |  -  |   -   |
+| Scale          |  -   |   Y    |  -  |  Y  |  Y  |  -   |  -  |   -   |
 | Trigger now    |  -   |   -    |  -  |  -  |  -  |  -   |  Y  |   -   |
 | Suspend/Resume |  -   |   -    |  -  |  -  |  -  |  -   |  Y  |   -   |
 
