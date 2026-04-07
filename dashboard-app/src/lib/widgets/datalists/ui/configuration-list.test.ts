@@ -1,6 +1,7 @@
 import { fireEvent, render, waitFor } from "@testing-library/svelte";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setSelectedNamespace } from "$features/namespace-management";
+import { showRuntimeDiagnostics } from "$features/check-health/model/runtime-diagnostics-preferences";
 import { setDashboardDataProfile } from "$shared/lib/dashboard-data-profile.svelte";
 import ConfigurationList from "./configuration-list.svelte";
 import * as kubectlProxy from "$shared/api/kubectl-proxy";
@@ -55,8 +56,13 @@ describe("configuration-list", () => {
     vi.clearAllMocks();
     window.localStorage.clear();
     window.history.replaceState(null, "", "/");
+    showRuntimeDiagnostics.set(true);
     setSelectedNamespace("cluster-a", "all");
     setDashboardDataProfile("balanced");
+  });
+
+  afterEach(() => {
+    showRuntimeDiagnostics.set(false);
   });
 
   it("renders resource rows for configuration workload", () => {

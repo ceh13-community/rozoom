@@ -16,6 +16,7 @@
     saveGlobalLinterEnabled,
   } from "$features/check-health";
   import { stopAllWatchers } from "$features/check-health/model/watchers";
+  import { loadShowRuntimeDiagnostics } from "$features/check-health/model/runtime-diagnostics-preferences";
 
   let {
     sidebarOpen,
@@ -39,6 +40,7 @@
 
   onMount(async () => {
     await loadGlobalLinterEnabled();
+    await loadShowRuntimeDiagnostics();
     const manifest = await loadManifest();
     const tools = manifest.tools ?? {};
     const versions: Record<string, string | null> = {};
@@ -52,7 +54,9 @@
     try {
       const resp = await fetch("/binaries/install-manifest.json", { cache: "no-store" });
       if (resp.ok) return (await resp.json()) as InstallManifest;
-    } catch { /* fallback */ }
+    } catch {
+      /* fallback */
+    }
     try {
       const base = await resourceDir();
       const manifestPath = await join(base, "binaries", ".install-manifest.json");
@@ -72,7 +76,12 @@
 >
   <div class="flex h-full flex-col">
     <nav class="flex-1 space-y-0.5 p-1">
-      <Button class="w-full p-2 justify-start" variant="ghost" onclick={() => gotoPage("/cluster-manager")} title="Settings">
+      <Button
+        class="w-full p-2 justify-start"
+        variant="ghost"
+        onclick={() => gotoPage("/cluster-manager")}
+        title="Settings"
+      >
         <Settings class="h-4 w-4" />
         <span class={cn(sidebarOpen ? "block" : "hidden")}>Settings</span>
       </Button>
@@ -117,14 +126,19 @@
         {/each}
       </div>
     </div>
-    <div class={cn(
-      "border-t border-white/10 p-1 flex items-center",
-      sidebarOpen ? "justify-between" : "justify-center",
-    )}>
+    <div
+      class={cn(
+        "border-t border-white/10 p-1 flex items-center",
+        sidebarOpen ? "justify-between" : "justify-center",
+      )}
+    >
       <Button variant="ghost" size="icon" title="Toggle sidebar" onclick={toggleSidebar}>
         <SquareChevronRight class="w-4 h-4" />
       </Button>
-      <span class={cn("font-mono text-[10px] text-slate-500", sidebarOpen ? "pr-2" : "hidden")} title="ROZOOM version">v{appVersion}</span>
+      <span
+        class={cn("font-mono text-[10px] text-slate-500", sidebarOpen ? "pr-2" : "hidden")}
+        title="ROZOOM version">v{appVersion}</span
+      >
     </div>
   </div>
 </aside>
