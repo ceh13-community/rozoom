@@ -1,9 +1,11 @@
+import { get } from "svelte/store";
 import { kubectlRawFront } from "$shared/api/kubectl-proxy";
-import { clusterStates } from "$features/check-health/model/watchers";
+import { clusterStates, restartWatcherForCluster } from "$features/check-health/model/watchers";
 import { getFeatureCapability } from "$features/check-health/model/feature-capability-cache";
 import { writeRuntimeDebugLog } from "$shared/lib/runtime-debug";
 
-const HEARTBEAT_INTERVAL_MS = 60_000;
+const HEARTBEAT_INTERVAL_MS = 30_000;
+const HEARTBEAT_RECOVERY_INTERVAL_MS = 15_000;
 const HEARTBEAT_TIMEOUT = "5s";
 
 let heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
@@ -40,20 +42,40 @@ async function runHeartbeatCycle() {
     if (shouldSkipCluster(clusterId)) continue;
 
     const ok = await probeCluster(clusterId);
-    clusterStates.update((states) => {
-      const current = states[clusterId] as { loading: boolean; error: string | null } | undefined;
-      if (ok && current?.error) {
-        return { ...states, [clusterId]: { ...current, error: null } };
+    const states = get(clusterStates);
+    const current = states[clusterId] as { loading: boolean; error: string | null } | undefined;
+    const wasInError = Boolean(current?.error);
+
+    clusterStates.update((s) => {
+      const cur = s[clusterId] as { loading: boolean; error: string | null } | undefined;
+      if (ok && cur?.error) {
+        return { ...s, [clusterId]: { ...cur, error: null } };
       }
-      if (!ok && current && !current.error) {
-        return { ...states, [clusterId]: { ...current, error: "Unable to connect to the server" } };
+      if (!ok && cur && !cur.error) {
+        return { ...s, [clusterId]: { ...cur, error: "Unable to connect to the server" } };
       }
-      return states;
+      return s;
     });
+
+    // Only restart watcher when cluster actually recovered from error state.
+    // Avoids resetting streaks for clusters failing due to RBAC/data errors
+    // while /healthz still passes.
+    if (ok && wasInError) {
+      restartWatcherForCluster(clusterId);
+    }
   }
 }
 
+function hasErrorClusters(): boolean {
+  const states = get(clusterStates);
+  return activeClusterIds.some((id) => {
+    const state = states[id] as { error: string | null } | undefined;
+    return Boolean(state?.error);
+  });
+}
+
 function scheduleHeartbeat() {
+  const intervalMs = hasErrorClusters() ? HEARTBEAT_RECOVERY_INTERVAL_MS : HEARTBEAT_INTERVAL_MS;
   heartbeatTimer = setTimeout(() => {
     heartbeatTimer = null;
     void runHeartbeatCycle().then(() => {
@@ -61,7 +83,7 @@ function scheduleHeartbeat() {
         scheduleHeartbeat();
       }
     });
-  }, HEARTBEAT_INTERVAL_MS);
+  }, intervalMs);
 }
 
 export function startFleetHeartbeat(clusterIds: string[]) {
