@@ -1,5 +1,12 @@
 # Documentation Index
 
+## Getting Started
+
+| Document                                     | Description                                                              |
+| -------------------------------------------- | ------------------------------------------------------------------------ |
+| [who-is-rozoom-for.md](who-is-rozoom-for.md) | User personas - who benefits from ROZOOM and how                         |
+| [everyday-tasks.md](everyday-tasks.md)       | Step-by-step guides for common tasks (scale, restart, logs, investigate) |
+
 ## Feature Documentation
 
 | Document                                         | Description                                                                                         |
@@ -24,9 +31,10 @@
 
 ## Developer Guides
 
-| Document                                         | Description                                          |
-| ------------------------------------------------ | ---------------------------------------------------- |
-| [THEMING.md](../src/lib/shared/theme/THEMING.md) | Theming guide - adding themes, CSS tokens, overrides |
+| Document                                                       | Description                                                  |
+| -------------------------------------------------------------- | ------------------------------------------------------------ |
+| [THEMING.md](../src/lib/shared/theme/THEMING.md)               | Theming guide - adding themes, CSS tokens, overrides         |
+| [jordan-first-ux-initiative.md](jordan-first-ux-initiative.md) | UX initiative - keyboard nav, command palette, quick actions |
 
 ## QA & Audits
 
