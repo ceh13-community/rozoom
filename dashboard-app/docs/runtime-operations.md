@@ -64,6 +64,23 @@ Without this, a single timeout would flash the UI between states every 30 second
 
 **Override**: Click the **Update** button (visible in degraded/stale states) to force immediate retry.
 
+### VPN Recovery
+
+When VPN disconnects and reconnects, the browser `online` event does not fire
+(the network interface stays up, only routes change). Fleet heartbeat handles
+this by probing `/healthz` every 15-30 seconds. When a cluster recovers from
+error state, the watcher restarts immediately with a fresh data refresh.
+
+### Runtime Diagnostics Toggle
+
+Runtime status messages (recovering banners, adaptive degraded mode details,
+budget summaries, watcher reasons) are hidden by default to reduce UI noise.
+
+- **Default: off** - compact view shows only source badge + timestamp + "Ready"
+- **On** - full verbose panel with profile, mode, budget, detail, reason text
+
+Toggle via: `showRuntimeDiagnostics` preference in `dashboard-preferences.json`.
+
 ---
 
 ## Dashboard Card Sorting
