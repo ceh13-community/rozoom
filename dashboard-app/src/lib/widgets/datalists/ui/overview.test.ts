@@ -2,6 +2,7 @@ import { fireEvent, render, waitFor } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PageData } from "$entities/cluster";
 import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
+import { showRuntimeDiagnostics } from "$features/check-health/model/runtime-diagnostics-preferences";
 
 vi.mock("$features/check-health", async (importOriginal) => {
   const actual = await importOriginal<typeof import("$features/check-health")>();
@@ -93,11 +94,13 @@ describe("overview", () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
     window.localStorage.clear();
+    showRuntimeDiagnostics.set(true);
     clearOverviewRequestDedupeForTests();
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    showRuntimeDiagnostics.set(false);
   });
 
   it("falls back from loading state to timeout error when warning events request hangs", async () => {
