@@ -9,6 +9,7 @@
   import X from "@lucide/svelte/icons/x";
   import { CommandPalette, buildAllCommands } from "$features/command-palette";
   import { handleGlobalKeydown, registerShortcut } from "$shared/lib/keyboard-manager";
+  import { showRuntimeDiagnostics } from "$features/check-health/model/runtime-diagnostics-preferences";
   import { NamespaceSelect } from "$widgets/namespace";
   import { WorkloadDisplay } from "$widgets/workload";
   import * as Alert from "$shared/ui/alert";
@@ -1661,7 +1662,7 @@
           {/if}
         </div>
       </div>
-      {#if clusterTrustBanner}
+      {#if clusterTrustBanner && $showRuntimeDiagnostics}
         <div class={`mt-3 rounded-lg border px-4 py-3 text-sm ${clusterTrustBanner.tone}`}>
           <div class="font-medium">{clusterTrustBanner.title}</div>
           <div class="mt-1 text-xs opacity-90">{clusterTrustBanner.detail}</div>

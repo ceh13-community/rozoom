@@ -153,9 +153,8 @@ test.describe("workload page parity", () => {
     const page = await context.newPage();
     await page.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=replicationcontrollers`);
 
-    await expect(page.getByText(/^(Cached|Stale cache) ·/i).first()).toBeVisible();
-    await expect(page.getByText("Replication Controllers Runtime Status")).toBeVisible();
-    await expect(page.getByText("Route scoped", { exact: true })).toBeVisible();
+    // Runtime status shows in compact mode (default) - verify badge is visible
+    await expect(page.getByText("Cached").first()).toBeVisible();
     await expect(page.getByText("A list of replication controllers.")).toBeVisible();
     await expect(page.getByRole("cell", { name: "cached-rc", exact: true })).toBeVisible();
   });
