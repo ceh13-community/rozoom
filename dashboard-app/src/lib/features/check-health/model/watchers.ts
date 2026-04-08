@@ -597,6 +597,23 @@ export function listGlobalWatcherRuntimeRows(): GlobalWatcherRuntimeRow[] {
     });
 }
 
+export function restartWatcherForCluster(clusterId: string) {
+  const streak = watcherErrorStreaks.get(clusterId) ?? 0;
+  if (streak === 0) return;
+  if (!watchers.has(clusterId)) return;
+  watcherErrorStreaks.set(clusterId, 0);
+  watcherLastSettledAt.delete(clusterId);
+  clusterStates.update((states) => ({
+    ...states,
+    [clusterId]: { loading: false, error: null },
+  }));
+  // Run immediately then resume normal schedule (don't wait base interval)
+  void updateClusterHealthChecks(clusterId).finally(() => {
+    scheduleNextWatcher(clusterId);
+  });
+  void writeRuntimeDebugLog("watchers", "restart_recovered_cluster", { clusterId });
+}
+
 export function restartFailedWatchers() {
   let restarted = 0;
   for (const clusterId of watchers.keys()) {
