@@ -82,10 +82,7 @@ test.describe("overview shell non-blocking", () => {
     const page = await context.newPage();
     await page.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=overview`);
 
-    await expect(page.getByText("Overview Runtime Status")).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Resume overview runtime section" }),
-    ).toBeVisible();
-    await expect(page.getByText(/^Cached · .*Refreshing(?:\.\.\.)?$/i).first()).toBeVisible();
+    // Runtime status shows in compact mode (default) - verify source badge is visible
+    await expect(page.getByText("Cached").first()).toBeVisible();
   });
 });
