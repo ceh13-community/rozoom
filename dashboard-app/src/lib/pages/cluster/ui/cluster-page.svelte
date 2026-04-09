@@ -7,6 +7,8 @@
   import Pin from "@lucide/svelte/icons/pin";
   import PinOff from "@lucide/svelte/icons/pin-off";
   import X from "@lucide/svelte/icons/x";
+  import { CommandPalette, buildAllCommands } from "$features/command-palette";
+  import { handleGlobalKeydown, registerShortcut } from "$shared/lib/keyboard-manager";
   import { showRuntimeDiagnostics } from "$features/check-health/model/runtime-diagnostics-preferences";
   import { NamespaceSelect } from "$widgets/namespace";
   import { WorkloadDisplay } from "$widgets/workload";
@@ -165,6 +167,27 @@
   const SINGLE_PAGE_HINT_SHOWN_KEY = "dashboard.cluster.single-page-hint-shown.v1";
   const WORKSPACE_ROUTE_TRACE_LIMIT = 100;
   const cluster = $derived(data.slug);
+
+  // ── Command Palette ────────────────────────────────────────────
+  let commandPaletteOpen = $state(false);
+  const paletteCommands = $derived(buildAllCommands(cluster));
+
+  $effect(() => {
+    const disposeShortcut = registerShortcut("mod+k", () => {
+      commandPaletteOpen = !commandPaletteOpen;
+    });
+    const disposeGlobalKeydown = (() => {
+      if (typeof window === "undefined") return () => {};
+      const handler = (e: KeyboardEvent) => handleGlobalKeydown(e);
+      window.addEventListener("keydown", handler);
+      return () => window.removeEventListener("keydown", handler);
+    })();
+    return () => {
+      disposeShortcut();
+      disposeGlobalKeydown();
+    };
+  });
+
   const sortField = $derived(data.sort_field || "name");
   const routeWorkloadType = $derived((data.workload as WorkloadType) || "overview");
   const currentWorkload = $derived((data.workload as string) || "overview");
@@ -1508,6 +1531,23 @@
           >
             >_ Terminal
           </Button>
+          <button
+            type="button"
+            class="group inline-flex h-8 items-center gap-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2.5 text-[11px] text-indigo-300 shadow-sm shadow-indigo-500/10 transition-all hover:border-indigo-400/50 hover:bg-indigo-500/20 hover:text-indigo-200 hover:shadow-indigo-500/20 sm:h-9 sm:px-3"
+            title="Open command palette"
+            onclick={() => {
+              commandPaletteOpen = true;
+            }}
+          >
+            <kbd
+              class="rounded border border-indigo-500/40 bg-indigo-950/60 px-1.5 py-0.5 font-mono text-[10px] text-indigo-300 group-hover:border-indigo-400/60 group-hover:bg-indigo-900/60"
+              >Ctrl</kbd
+            >
+            <kbd
+              class="rounded border border-indigo-500/40 bg-indigo-950/60 px-1.5 py-0.5 font-mono text-[10px] text-indigo-300 group-hover:border-indigo-400/60 group-hover:bg-indigo-900/60"
+              >K</kbd
+            >
+          </button>
           <Popover.Root>
             <Popover.Trigger
               class="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-border/60 px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-1 sm:h-9 sm:px-3"
@@ -2133,3 +2173,11 @@
     </div>
   </main>
 </div>
+
+<CommandPalette
+  open={commandPaletteOpen}
+  commands={paletteCommands}
+  onClose={() => {
+    commandPaletteOpen = false;
+  }}
+/>
