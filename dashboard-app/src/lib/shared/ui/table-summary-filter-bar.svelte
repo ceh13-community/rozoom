@@ -23,6 +23,7 @@
     <Input
       {value}
       {placeholder}
+      data-shortcut-target="workload-search"
       oninput={(event) => {
         onInput((event.currentTarget as HTMLInputElement).value);
       }}
