@@ -8,6 +8,7 @@
   import PinOff from "@lucide/svelte/icons/pin-off";
   import X from "@lucide/svelte/icons/x";
   import { CommandPalette, buildAllCommands } from "$features/command-palette";
+  import { getGotoChords } from "$features/command-palette/model/goto-shortcuts";
   import { handleGlobalKeydown, registerShortcut } from "$shared/lib/keyboard-manager";
   import { showRuntimeDiagnostics } from "$features/check-health/model/runtime-diagnostics-preferences";
   import { NamespaceSelect } from "$widgets/namespace";
@@ -173,18 +174,43 @@
   const paletteCommands = $derived(buildAllCommands(cluster));
 
   $effect(() => {
-    const disposeShortcut = registerShortcut("mod+k", () => {
-      commandPaletteOpen = !commandPaletteOpen;
-    });
-    const disposeGlobalKeydown = (() => {
-      if (typeof window === "undefined") return () => {};
+    const disposers: Array<() => void> = [];
+
+    // Global keydown handler
+    if (typeof window !== "undefined") {
       const handler = (e: KeyboardEvent) => handleGlobalKeydown(e);
       window.addEventListener("keydown", handler);
-      return () => window.removeEventListener("keydown", handler);
-    })();
+      disposers.push(() => window.removeEventListener("keydown", handler));
+    }
+
+    // Cmd+K toggles command palette
+    disposers.push(
+      registerShortcut("mod+k", () => {
+        commandPaletteOpen = !commandPaletteOpen;
+      }),
+    );
+
+    // "/" focuses workload search input
+    disposers.push(
+      registerShortcut("/", () => {
+        const searchInput = document.querySelector<HTMLInputElement>(
+          '[data-shortcut-target="workload-search"]',
+        );
+        if (searchInput) searchInput.focus();
+      }),
+    );
+
+    // Vim-style goto chords: g+d, g+p, etc.
+    for (const { chord, workload } of getGotoChords()) {
+      disposers.push(
+        registerShortcut(chord, () => {
+          void goto(`/dashboard/clusters/${cluster}?workload=${workload}`);
+        }),
+      );
+    }
+
     return () => {
-      disposeShortcut();
-      disposeGlobalKeydown();
+      for (const dispose of disposers) dispose();
     };
   });
 
