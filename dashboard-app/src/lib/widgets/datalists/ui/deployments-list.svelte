@@ -61,6 +61,7 @@
   import DataTable from "./deployments-list/data-table.svelte";
   import DeploymentSelectionCheckbox from "./deployments-list/deployment-selection-checkbox.svelte";
   import DeploymentActionsMenu from "./deployments-list/deployment-actions-menu.svelte";
+  import ScaleDialog from "$shared/ui/scale-dialog.svelte";
   import DeploymentBulkActions from "./deployments-list/deployment-bulk-actions.svelte";
   import DeploymentStatusBadge from "./deployments-list/deployment-status-badge.svelte";
   import {
@@ -342,7 +343,7 @@
   const paneIndexes = $derived(getPaneIndexes());
 
   const rowsSource = $derived(
-    deploymentsSnapshot.filter((item) =>
+    (deploymentsSnapshot ?? []).filter((item) =>
       namespaceMatches($selectedNamespace, item.metadata?.namespace),
     ),
   );
@@ -432,7 +433,7 @@
             if (deployment) void openDeploymentInvestigationWorkspace(deployment);
           },
           onScale: () => {
-            if (deployment) void scaleDeployments([deployment]);
+            if (deployment) openScaleDialog([deployment]);
           },
           onCopyDescribe: () => {
             if (deployment) void copyDescribeCommandForDeployment(deployment);
@@ -708,7 +709,7 @@
   }
 
   function getSelectedDeployments() {
-    return deploymentsSnapshot.filter((item) => {
+    return (deploymentsSnapshot ?? []).filter((item) => {
       const id = `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? "-"}`;
       return selectedDeploymentIds.has(id);
     });
@@ -1589,68 +1590,71 @@
     }
   }
 
-  async function scaleDeployments(items: DeploymentItem[], replicas?: number) {
-    if (!data?.slug || items.length === 0) return;
-    let desiredReplicas = replicas;
-    if (desiredReplicas === undefined) {
-      if (items.length !== 1) return;
-      const current = typeof items[0].spec?.replicas === "number" ? items[0].spec?.replicas : 1;
-      const requested = requestReplicaCount(current);
-      if (requested === null) return;
-      desiredReplicas = requested;
+  function updateDeploymentReplicas(item: DeploymentItem, replicas: number) {
+    const key = `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? ""}`;
+    if (watcherPolicy.mode === "stream" && data?.slug) {
+      applyDeploymentEvent(data.slug, {
+        type: "MODIFIED",
+        object: {
+          ...item,
+          spec: {
+            ...(item.spec ?? {}),
+            replicas,
+          },
+        },
+      });
+      return;
     }
+    deploymentsSnapshot = deploymentsSnapshot.map((d) => {
+      const dKey = `${d.metadata?.namespace ?? "default"}/${d.metadata?.name ?? ""}`;
+      if (dKey !== key) return d;
+      return { ...d, spec: { ...(d.spec ?? {}), replicas } };
+    });
+  }
+
+  let scaleTarget = $state<{ item: DeploymentItem; currentReplicas: number } | null>(null);
+
+  function openScaleDialog(items: DeploymentItem[]) {
+    if (items.length !== 1) return;
+    const item = items[0];
+    const current = typeof item.spec?.replicas === "number" ? item.spec?.replicas : 1;
+    scaleTarget = { item, currentReplicas: current };
+  }
+
+  async function executeScale(replicas: number) {
+    if (!data?.slug || !scaleTarget) return;
+    const item = scaleTarget.item;
+    scaleTarget = null;
 
     clearActionFeedback();
     actionInFlight = true;
     try {
-      for (const item of items) {
-        const name = item.metadata?.name;
-        const namespace = item.metadata?.namespace ?? "default";
-        if (!name) continue;
-        const response = await kubectlRawArgsFront(
-          ["scale", "deployment", name, "--namespace", namespace, `--replicas=${desiredReplicas}`],
-          { clusterId: data.slug },
-        );
-        if (response.errors || response.code !== 0) {
-          throw new Error(response.errors || `Failed to scale ${namespace}/${name}.`);
-        }
-      }
-      const ref =
-        items.length === 1
-          ? `${items[0].metadata?.namespace ?? "default"}/${items[0].metadata?.name ?? ""}`
-          : `${items.length} deployments`;
-      actionNotification = notifySuccess(
-        `Scaled ${ref} to ${desiredReplicas} replica${desiredReplicas === 1 ? "" : "s"}.`,
+      const name = item.metadata?.name;
+      const namespace = item.metadata?.namespace ?? "default";
+      if (!name) return;
+      const response = await kubectlRawArgsFront(
+        ["scale", "deployment", name, "--namespace", namespace, `--replicas=${replicas}`],
+        { clusterId: data.slug },
       );
+      if (response.errors || response.code !== 0) {
+        throw new Error(response.errors || `Failed to scale ${namespace}/${name}.`);
+      }
+      actionNotification = notifySuccess(
+        `Scaled ${namespace}/${name} to ${replicas} replica${replicas === 1 ? "" : "s"}.`,
+      );
+      updateDeploymentReplicas(item, replicas);
       invalidateDeploymentsSnapshotCache();
       mutationReconcile.track({
-        ids: items.map(
-          (item) => `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? ""}`,
-        ),
+        ids: [`${namespace}/${name}`],
         expectedEventTypes: ["MODIFIED"],
       });
     } catch (error) {
       actionNotification = notifyError(
-        error instanceof Error ? error.message : "Failed to scale deployments.",
+        error instanceof Error ? error.message : "Failed to scale deployment.",
       );
     } finally {
       actionInFlight = false;
     }
-  }
-
-  function requestReplicaCount(currentReplicas: number) {
-    if (typeof window === "undefined") return null;
-    const raw = window.prompt(
-      "Enter desired replica count (0 or greater):",
-      String(currentReplicas),
-    );
-    if (raw === null) return null;
-    const trimmed = raw.trim();
-    if (!/^\d+$/.test(trimmed)) {
-      actionNotification = notifyError("Replica count must be a non-negative integer.");
-      return null;
-    }
-    return Number.parseInt(trimmed, 10);
   }
 
   async function deleteDeployments(items: DeploymentItem[]) {
@@ -3762,7 +3766,7 @@
           onScale={() => {
             const selected = getSelectedDeployments();
             if (selected.length !== 1) return;
-            void scaleDeployments([selected[0]]);
+            openScaleDialog([selected[0]]);
           }}
           onCopyDescribe={() => {
             const selected = getSelectedDeployments();
@@ -4237,4 +4241,18 @@
       {/if}
     </div>
   </DetailsSheetPortal>
+{/if}
+
+{#if scaleTarget}
+  <ScaleDialog
+    open={true}
+    resourceKind="Deployment"
+    resourceName={scaleTarget.item.metadata?.name ?? ""}
+    namespace={scaleTarget.item.metadata?.namespace ?? "default"}
+    currentReplicas={scaleTarget.currentReplicas}
+    onConfirm={(replicas) => void executeScale(replicas)}
+    onCancel={() => {
+      scaleTarget = null;
+    }}
+  />
 {/if}
