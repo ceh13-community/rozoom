@@ -5,14 +5,14 @@
 
 ## Planned Work
 
-| #   | Feature                        | Branch                     | Depends on |
-| --- | ------------------------------ | -------------------------- | ---------- |
-| 1   | Scale for Deployments          | `feat/quick-actions-scale` | -          |
-| 2   | Keyboard Manager               | `feat/keyboard-manager`    | -          |
-| 3   | ScaleDialog                    | `feat/scale-dialog`        | 1          |
-| 4   | Command Palette (Cmd+K)        | `feat/command-palette`     | 2          |
-| 5   | Keyboard shortcuts + vim goto  | `feat/keyboard-shortcuts`  | 4          |
-| 6   | Table j/k navigation           | `feat/table-keyboard-nav`  | 5          |
+| #   | Feature                       | Branch                     | Depends on |
+| --- | ----------------------------- | -------------------------- | ---------- |
+| 1   | Scale for Deployments         | `feat/quick-actions-scale` | -          |
+| 2   | Keyboard Manager              | `feat/keyboard-manager`    | -          |
+| 3   | ScaleDialog                   | `feat/scale-dialog`        | 1          |
+| 4   | Command Palette (Cmd+K)       | `feat/command-palette`     | 2          |
+| 5   | Keyboard shortcuts + vim goto | `feat/keyboard-shortcuts`  | 4          |
+| 6   | Table j/k navigation          | `feat/table-keyboard-nav`  | 5          |
 
 ## Architecture
 
