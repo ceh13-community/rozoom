@@ -1,3 +1,7 @@
+<p align="center">
+  <img src=".github/rozoom-banner.svg" alt="ROZOOM - K8s Linter IDE" width="100%">
+</p>
+
 # ROZOOM - K8s Linter IDE
 
 > The Swiss Army Knife for Kubernetes. One app, every cluster, zero dependencies.
