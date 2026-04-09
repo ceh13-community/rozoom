@@ -3,7 +3,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${1:-$(node -p "require('${ROOT_DIR}/src-tauri/tauri.conf.json').version")}"
+RAW_VERSION="${1:-$(node -p "require('${ROOT_DIR}/src-tauri/tauri.conf.json').version")}"
+VERSION="${RAW_VERSION//-/\~}"
 RELEASE="${RPM_RELEASE:-1}"
 ARCH="${RPM_ARCH:-x86_64}"
 PACKAGE_NAME="rozoom-k8s-linter-ide"
@@ -18,7 +19,7 @@ resolve_payload_dir() {
   local candidate
 
   for candidate in \
-    "${DEB_BUNDLE_DIR}/${PRODUCT_NAME}_${VERSION}_amd64/data" \
+    "${DEB_BUNDLE_DIR}/${PRODUCT_NAME}_${RAW_VERSION}_amd64/data" \
     "${DEB_BUNDLE_DIR}/${PRODUCT_NAME}_${VERSION}_amd64/data"; do
     if [[ -d "${candidate}" ]]; then
       echo "${candidate}"
@@ -37,7 +38,7 @@ if ! command -v rpmbuild >/dev/null 2>&1; then
 fi
 
 if [[ -z "${PAYLOAD_DIR}" ]]; then
-  echo "Expected DEB payload at ${DEB_BUNDLE_DIR}/${PRODUCT_NAME}_${VERSION}_amd64/data or ${DEB_BUNDLE_DIR}/${PRODUCT_NAME}_${VERSION}_amd64/data." >&2
+  echo "Expected DEB payload at ${DEB_BUNDLE_DIR}/${PRODUCT_NAME}_${RAW_VERSION}_amd64/data." >&2
   echo "Run 'pnpm exec tauri build --bundles deb' first." >&2
   exit 1
 fi
