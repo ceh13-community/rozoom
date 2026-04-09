@@ -3,16 +3,16 @@
 > Target persona: **Jordan Rivera** - DevOps engineer managing 8 clusters, keyboard-first workflow.
 > Goal: reduce clicks-to-action, add keyboard navigation, make ROZOOM feel like a power tool.
 
-## PR Tracker
+## Planned Work
 
-| #   | PR                                                                                                 | Branch                     | Status | Depends on |
-| --- | -------------------------------------------------------------------------------------------------- | -------------------------- | ------ | ---------- |
-| 1   | [#100](https://github.com/ceh13-community/svelte-dashboard/pull/100) Scale for Deployments         | `feat/quick-actions-scale` | Open   | -          |
-| 2   | [#101](https://github.com/ceh13-community/svelte-dashboard/pull/101) Keyboard Manager              | `feat/keyboard-manager`    | Open   | -          |
-| 3   | [#102](https://github.com/ceh13-community/svelte-dashboard/pull/102) ScaleDialog                   | `feat/scale-dialog`        | Open   | #100       |
-| 4   | [#103](https://github.com/ceh13-community/svelte-dashboard/pull/103) Command Palette (Cmd+K)       | `feat/command-palette`     | Open   | #101       |
-| 5   | [#104](https://github.com/ceh13-community/svelte-dashboard/pull/104) Keyboard shortcuts + vim goto | `feat/keyboard-shortcuts`  | Open   | #103       |
-| 6   | [#105](https://github.com/ceh13-community/svelte-dashboard/pull/105) Table j/k navigation          | `feat/table-keyboard-nav`  | Open   | #104       |
+| #   | Feature                       | Branch                     | Depends on |
+| --- | ----------------------------- | -------------------------- | ---------- |
+| 1   | Scale for Deployments         | `feat/quick-actions-scale` | -          |
+| 2   | Keyboard Manager              | `feat/keyboard-manager`    | -          |
+| 3   | ScaleDialog                   | `feat/scale-dialog`        | 1          |
+| 4   | Command Palette (Cmd+K)       | `feat/command-palette`     | 2          |
+| 5   | Keyboard shortcuts + vim goto | `feat/keyboard-shortcuts`  | 4          |
+| 6   | Table j/k navigation          | `feat/table-keyboard-nav`  | 5          |
 
 ## Architecture
 
