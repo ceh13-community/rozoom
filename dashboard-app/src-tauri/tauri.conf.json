@@ -14,8 +14,7 @@
       {
         "title": "ROZOOM - K8s Linter IDE",
         "width": 1024,
-        "height": 768,
-        "devtools": false
+        "height": 768
       }
     ],
     "security": {
