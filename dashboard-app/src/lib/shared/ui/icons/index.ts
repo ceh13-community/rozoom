@@ -38,3 +38,5 @@ export { default as Shield } from "@lucide/svelte/icons/shield";
 export { default as ArrowUpCircle } from "@lucide/svelte/icons/arrow-up-circle";
 export { default as ShieldCheck } from "@lucide/svelte/icons/shield-check";
 export { default as ShieldOff } from "@lucide/svelte/icons/shield-off";
+export { default as Activity } from "@lucide/svelte/icons/activity";
+export { default as EyeOff } from "@lucide/svelte/icons/eye-off";
