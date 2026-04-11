@@ -1,12 +1,17 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   listCloudClusters,
+  listCloudScopes,
+  listCloudClustersAllScopes,
   importCloudCluster,
   getSupportedCloudProviders,
   parseAwsEksList,
   parseAwsRegions,
+  parseAwsProfiles,
   parseGkeList,
+  parseGcpProjects,
   parseAksList,
+  parseAzureSubscriptions,
   parseDoksList,
   type CloudCluster,
 } from "./cloud-import";
@@ -16,13 +21,18 @@ import {
 // ---------------------------------------------------------------------------
 
 const mockExecute = vi.fn();
+const mockExecuteByArgs = vi.fn<(tool: string, args: string[]) => unknown>();
 
 vi.mock("$shared/api/cli", () => ({
-  createCliCommand: vi
-    .fn()
-    .mockImplementation((_tool: string, _args: string[]) =>
-      Promise.resolve({ execute: () => mockExecute() }),
-    ),
+  createCliCommand: vi.fn().mockImplementation((tool: string, args: string[]) =>
+    Promise.resolve({
+      execute: () => {
+        const routed = mockExecuteByArgs(tool, args);
+        if (routed !== undefined) return Promise.resolve(routed);
+        return mockExecute();
+      },
+    }),
+  ),
 }));
 
 vi.mock("@tauri-apps/api/path", () => ({
@@ -36,6 +46,8 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
 
 beforeEach(() => {
   mockExecute.mockReset();
+  mockExecuteByArgs.mockReset();
+  mockExecuteByArgs.mockReturnValue(undefined);
 });
 
 // ---------------------------------------------------------------------------
@@ -150,6 +162,76 @@ describe("parseAksList", () => {
 
   it("returns empty for malformed JSON", () => {
     expect(parseAksList("bad")).toEqual([]);
+  });
+});
+
+describe("parseAwsProfiles", () => {
+  it("parses one profile per line", () => {
+    expect(parseAwsProfiles("default\nprod\nstaging\n")).toEqual([
+      { id: "default", label: "default" },
+      { id: "prod", label: "prod" },
+      { id: "staging", label: "staging" },
+    ]);
+  });
+
+  it("trims whitespace and skips empty lines", () => {
+    expect(parseAwsProfiles("  default  \n\n  prod  \n")).toEqual([
+      { id: "default", label: "default" },
+      { id: "prod", label: "prod" },
+    ]);
+  });
+
+  it("returns empty for empty input", () => {
+    expect(parseAwsProfiles("")).toEqual([]);
+  });
+});
+
+describe("parseGcpProjects", () => {
+  it("extracts projectId from projects list", () => {
+    const stdout = JSON.stringify([
+      { projectId: "prod-project", name: "Production" },
+      { projectId: "dev-project", name: "Development" },
+    ]);
+    expect(parseGcpProjects(stdout)).toEqual([
+      { id: "prod-project", label: "prod-project" },
+      { id: "dev-project", label: "dev-project" },
+    ]);
+  });
+
+  it("skips entries without projectId", () => {
+    const stdout = JSON.stringify([{ projectId: "p1" }, { name: "no-id" }]);
+    expect(parseGcpProjects(stdout)).toEqual([{ id: "p1", label: "p1" }]);
+  });
+
+  it("returns empty for malformed JSON", () => {
+    expect(parseGcpProjects("{invalid")).toEqual([]);
+  });
+});
+
+describe("parseAzureSubscriptions", () => {
+  it("includes subscription name in label when available", () => {
+    const stdout = JSON.stringify([
+      { id: "sub-1-id", name: "Prod Sub" },
+      { id: "sub-2-id", name: "Dev Sub" },
+    ]);
+    expect(parseAzureSubscriptions(stdout)).toEqual([
+      { id: "sub-1-id", label: "Prod Sub (sub-1-id)" },
+      { id: "sub-2-id", label: "Dev Sub (sub-2-id)" },
+    ]);
+  });
+
+  it("falls back to id when name is missing", () => {
+    const stdout = JSON.stringify([{ id: "sub-id-only" }]);
+    expect(parseAzureSubscriptions(stdout)).toEqual([{ id: "sub-id-only", label: "sub-id-only" }]);
+  });
+
+  it("skips entries without id", () => {
+    const stdout = JSON.stringify([{ id: "keep" }, { name: "no-id" }]);
+    expect(parseAzureSubscriptions(stdout)).toEqual([{ id: "keep", label: "keep" }]);
+  });
+
+  it("returns empty for malformed JSON", () => {
+    expect(parseAzureSubscriptions("bad")).toEqual([]);
   });
 });
 
@@ -332,6 +414,185 @@ describe("listCloudClusters", () => {
     const result = await listCloudClusters("AWS EKS", "us-east-1");
     expect(result.clusters).toHaveLength(0);
     expect(result.error).toContain("ExpiredToken");
+  });
+
+  it("passes AWS profile as --profile when scope is provided", async () => {
+    const { createCliCommand } = await import("$shared/api/cli");
+    mockExecute.mockResolvedValue({
+      code: 0,
+      stdout: JSON.stringify({ clusters: ["cluster-a"] }),
+      stderr: "",
+    });
+
+    const result = await listCloudClusters("AWS EKS", "us-east-1", "prod-profile");
+
+    expect(createCliCommand).toHaveBeenCalledWith(
+      "aws",
+      expect.arrayContaining(["--profile", "prod-profile"]),
+    );
+    expect(result.clusters[0].scope).toBe("prod-profile");
+  });
+
+  it("passes GCP project as --project when scope is provided", async () => {
+    const { createCliCommand } = await import("$shared/api/cli");
+    mockExecute.mockResolvedValue({
+      code: 0,
+      stdout: JSON.stringify([{ name: "gke-a", location: "us-central1" }]),
+      stderr: "",
+    });
+
+    const result = await listCloudClusters("GKE", undefined, "my-project");
+
+    expect(createCliCommand).toHaveBeenCalledWith(
+      "gcloud",
+      expect.arrayContaining(["--project=my-project"]),
+    );
+    expect(result.clusters[0].scope).toBe("my-project");
+  });
+
+  it("passes Azure subscription when scope is provided", async () => {
+    const { createCliCommand } = await import("$shared/api/cli");
+    mockExecute.mockResolvedValue({
+      code: 0,
+      stdout: JSON.stringify([{ name: "aks-a", location: "westeurope", resourceGroup: "rg" }]),
+      stderr: "",
+    });
+
+    const result = await listCloudClusters("AKS", undefined, "sub-123");
+
+    expect(createCliCommand).toHaveBeenCalledWith(
+      "az",
+      expect.arrayContaining(["--subscription", "sub-123"]),
+    );
+    expect(result.clusters[0].scope).toBe("sub-123");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// listCloudScopes
+// ---------------------------------------------------------------------------
+
+describe("listCloudScopes", () => {
+  it("returns AWS profiles from `aws configure list-profiles`", async () => {
+    mockExecute.mockResolvedValue({
+      code: 0,
+      stdout: "default\nprod\nstaging",
+      stderr: "",
+    });
+
+    const result = await listCloudScopes("AWS EKS");
+
+    expect(result.label).toBe("Profile");
+    expect(result.scopes).toEqual([
+      { id: "default", label: "default" },
+      { id: "prod", label: "prod" },
+      { id: "staging", label: "staging" },
+    ]);
+  });
+
+  it("returns GCP projects", async () => {
+    mockExecute.mockResolvedValue({
+      code: 0,
+      stdout: JSON.stringify([{ projectId: "prod-p" }, { projectId: "dev-p" }]),
+      stderr: "",
+    });
+
+    const result = await listCloudScopes("GKE");
+
+    expect(result.label).toBe("Project");
+    expect(result.scopes.map((s) => s.id)).toEqual(["prod-p", "dev-p"]);
+  });
+
+  it("returns empty with label for providers without scopes (DigitalOcean)", async () => {
+    const result = await listCloudScopes("DigitalOcean");
+    expect(result.scopes).toEqual([]);
+    expect(result.label).toBe("Scope");
+  });
+
+  it("returns error on CLI failure", async () => {
+    mockExecute.mockResolvedValue({ code: 1, stdout: "", stderr: "AccessDenied" });
+
+    const result = await listCloudScopes("AWS EKS");
+    expect(result.scopes).toEqual([]);
+    expect(result.error).toContain("AccessDenied");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// listCloudClustersAllScopes
+// ---------------------------------------------------------------------------
+
+describe("listCloudClustersAllScopes", () => {
+  it("iterates all AWS profiles and merges clusters", async () => {
+    mockExecuteByArgs.mockImplementation((_tool, args) => {
+      if (args.includes("list-profiles")) {
+        return { code: 0, stdout: "prod\nstaging", stderr: "" };
+      }
+      if (args.includes("describe-regions")) {
+        return { code: 0, stdout: JSON.stringify(["us-east-1"]), stderr: "" };
+      }
+      if (args.includes("list-clusters")) {
+        const profileIdx = args.indexOf("--profile");
+        const profile = profileIdx >= 0 ? args[profileIdx + 1] : "default";
+        return {
+          code: 0,
+          stdout: JSON.stringify({ clusters: [`${profile}-cluster`] }),
+          stderr: "",
+        };
+      }
+      return undefined;
+    });
+
+    const result = await listCloudClustersAllScopes("AWS EKS");
+
+    expect(result.clusters).toHaveLength(2);
+    const names = result.clusters.map((c) => c.name).sort();
+    expect(names).toEqual(["prod-cluster", "staging-cluster"]);
+    const scopes = result.clusters.map((c) => c.scope).sort();
+    expect(scopes).toEqual(["prod", "staging"]);
+    expect(result.errors).toEqual([]);
+  });
+
+  it("reports errors for failed scopes but keeps successful ones", async () => {
+    mockExecuteByArgs.mockImplementation((_tool, args) => {
+      if (args.includes("list-profiles")) {
+        return { code: 0, stdout: "good\nbad", stderr: "" };
+      }
+      const profileIdx = args.indexOf("--profile");
+      const profile = profileIdx >= 0 ? args[profileIdx + 1] : "default";
+      if (profile === "bad") {
+        return { code: 1, stdout: "", stderr: "ExpiredToken" };
+      }
+      if (args.includes("describe-regions")) {
+        return { code: 0, stdout: JSON.stringify(["us-east-1"]), stderr: "" };
+      }
+      if (args.includes("list-clusters")) {
+        return { code: 0, stdout: JSON.stringify({ clusters: ["ok-cluster"] }), stderr: "" };
+      }
+      return undefined;
+    });
+
+    const result = await listCloudClustersAllScopes("AWS EKS");
+
+    expect(result.clusters).toHaveLength(1);
+    expect(result.clusters[0].name).toBe("ok-cluster");
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].scope).toBe("bad");
+    expect(result.errors[0].error).toContain("ExpiredToken");
+  });
+
+  it("falls back to default credentials when provider has no scopes", async () => {
+    // DigitalOcean - no scopes, just a direct list
+    mockExecute.mockResolvedValue({
+      code: 0,
+      stdout: JSON.stringify([{ name: "do-a", region_slug: "nyc1" }]),
+      stderr: "",
+    });
+
+    const result = await listCloudClustersAllScopes("DigitalOcean");
+
+    expect(result.clusters).toHaveLength(1);
+    expect(result.errors).toEqual([]);
   });
 });
 
