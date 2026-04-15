@@ -80,6 +80,36 @@
           "args": true
         },
         {
+          "name": "binaries/rozoom-curl",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-doggo",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-grpcurl",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-websocat",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-tcping",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-trivy",
+          "sidecar": true,
+          "args": true
+        },
+        {
           "name": "aws-bundled",
           "cmd": "$RESOURCE/binaries/aws-dist/aws",
           "args": true
@@ -240,6 +270,36 @@
           "args": true
         },
         {
+          "name": "binaries/rozoom-curl",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-doggo",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-grpcurl",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-websocat",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-tcping",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-trivy",
+          "sidecar": true,
+          "args": true
+        },
+        {
           "name": "aws-bundled",
           "cmd": "$RESOURCE/binaries/aws-dist/aws",
           "args": true
@@ -326,6 +386,36 @@
         },
         {
           "name": "binaries/rozoom-az-cli",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-curl",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-doggo",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-grpcurl",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-websocat",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-tcping",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-trivy",
           "sidecar": true,
           "args": true
         },

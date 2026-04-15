@@ -83,6 +83,26 @@ Toggle via: `showRuntimeDiagnostics` preference in `dashboard-preferences.json`.
 
 ---
 
+## Bundled Network & Debug Tools
+
+The terminal bundles network debugging tools alongside K8s CLI tools.
+All tools are downloaded by `download-binaries.js` and registered as
+Tauri sidecars - no OS dependencies required.
+
+| Tool         | Purpose                                            | Example                                      |
+| ------------ | -------------------------------------------------- | -------------------------------------------- |
+| **curl**     | HTTP/API debugging, test ingress/services          | `curl -k https://svc.ns.svc.cluster.local`   |
+| **doggo**    | DNS resolution, debug CoreDNS/service discovery    | `doggo svc.ns.svc.cluster.local @10.96.0.10` |
+| **grpcurl**  | gRPC service debugging (etcd, K8s-native services) | `grpcurl -plaintext localhost:50051 list`    |
+| **websocat** | WebSocket debugging (K8s API watch, pod attach)    | `websocat ws://localhost:8080/ws`            |
+| **tcping**   | TCP connectivity test (replaces telnet/nc)         | `tcping svc.ns.svc.cluster.local 8080`       |
+| **trivy**    | CVE scanning, image/config security audit          | `trivy image nginx:latest`                   |
+
+These tools are available in the Terminal (Debug Shell mode) and are
+invoked as bundled sidecars, same as kubectl/helm.
+
+---
+
 ## Dashboard Card Sorting
 
 Fleet dashboard sorts cluster cards by health:
