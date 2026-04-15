@@ -111,6 +111,39 @@ async function fetchText(url, headers = UA_HEADERS, maxRedirects = 8) {
 /**
  * Best-effort fetch: returns null on non-200 (after redirects).
  */
+async function fetchLatestGitHubTag(repo) {
+  const json = await fetchText(
+    `https://api.github.com/repos/${repo}/releases/latest`,
+    getGitHubHeaders(),
+  );
+  return JSON.parse(json).tag_name;
+}
+
+/**
+ * Resolve the expected SHA256 for a GitHub release asset by locating a
+ * sibling checksum asset (e.g. `<tool>_<ver>_checksums.txt`) and parsing
+ * the line matching the binary file name.
+ *
+ * Returns `null` when no checksum asset exists in the release (upstream
+ * simply does not publish one). Throws when the checksum asset exists
+ * but fetching or parsing it fails - we never want to silently proceed.
+ */
+async function fetchReleaseChecksum(repo, tag, assetName) {
+  const json = await fetchText(
+    `https://api.github.com/repos/${repo}/releases/tags/${tag}`,
+    getGitHubHeaders(),
+  );
+  const rel = JSON.parse(json);
+  const assets = rel.assets || [];
+  const checksumAsset = assets.find((a) =>
+    /checksums?(\.txt)?$|sha256sums?(\.txt)?$/i.test(String(a?.name || "")),
+  );
+  if (!checksumAsset?.browser_download_url) return null;
+
+  const text = await fetchText(checksumAsset.browser_download_url, UA_HEADERS);
+  return parseShaFromText(text, assetName);
+}
+
 async function fetchTextOptional(url, headers = UA_HEADERS, maxRedirects = 8) {
   let current = url;
 
@@ -1662,6 +1695,402 @@ async function compileSidecarWrappers() {
 }
 
 /* =======================
+   curl (static binary from GitHub stunnel/static-curl)
+======================= */
+
+function extractTarXz(archive, outDir) {
+  execSync(`tar -xJf "${archive}" -C "${outDir}" --no-same-owner`, { stdio: "inherit" });
+}
+
+async function installCurl() {
+  const platform = os.platform();
+  const arch = os.arch() === "x64" ? "x86_64" : "arm64";
+  const ext = platform === "win32" ? ".exe" : "";
+  const osName = platform === "win32" ? "windows" : platform === "darwin" ? "macos" : "linux";
+
+  const pinned = envOrNull("CURL_VERSION");
+  const tag = pinned ? pinned.replace(/^v/, "") : await fetchLatestGitHubTag("stunnel/static-curl");
+
+  const archName = platform === "linux" ? (os.arch() === "x64" ? "x86_64" : "aarch64") : arch;
+  const variant = platform === "linux" ? `-musl` : "";
+  const archiveName = `curl-${osName}-${archName}${variant}-${tag}.tar.xz`;
+  const url = `https://github.com/stunnel/static-curl/releases/download/${tag}/${archiveName}`;
+  const out = path.join(TARGET_DIR, `curl${ext}`);
+
+  const cached = await getManifestEntry("curl");
+  if (cached?.version === tag && (await fileExists(out))) {
+    chmodIfNeeded(out);
+    await ensureTauriExternalBinName(out);
+    console.log(`✓ cached: curl (${tag})`);
+    return;
+  }
+
+  const tmp = path.join(TARGET_DIR, archiveName);
+  const extractDir = path.join(TARGET_DIR, "curl-extract");
+  try {
+    const expected = await fetchReleaseChecksum("stunnel/static-curl", tag, archiveName);
+    await download(url, tmp, UA_HEADERS);
+    if (expected) {
+      const actual = await sha256(tmp);
+      if (actual !== expected) {
+        throw new Error(`curl checksum mismatch\nexpected=${expected}\nactual=${actual}`);
+      }
+    } else {
+      console.warn("⚠ curl: no upstream checksum asset - verification skipped");
+    }
+    await rmForce(extractDir);
+    await fs.mkdir(extractDir, { recursive: true });
+    await extractTarXz(tmp, extractDir);
+
+    const bin = await locateBinaryInExtractDir(extractDir, [`curl${ext}`, "curl"]);
+    if (!bin) throw new Error("curl binary not found in archive");
+    await fs.copyFile(bin, out);
+    chmodIfNeeded(out);
+    await ensureTauriExternalBinName(out);
+
+    await setManifestEntry("curl", {
+      version: tag,
+      file: path.basename(out),
+      sha256: await sha256(out),
+      archiveSha256: expected ?? undefined,
+      mode: pinned ? "pin" : "latest",
+      updatedAt: new Date().toISOString(),
+    });
+    console.log(`✓ curl installed (${tag})${expected ? "" : " [no upstream checksum]"}`);
+  } finally {
+    await rmForce(tmp);
+    await rmForce(extractDir);
+  }
+}
+
+/* =======================
+   doggo - DNS client (GitHub mr-karan/doggo)
+======================= */
+
+async function installDoggo() {
+  const platform = os.platform();
+  const arch = os.arch() === "x64" ? "x86_64" : "arm64";
+  const ext = platform === "win32" ? ".exe" : "";
+  const osName = platform === "win32" ? "Windows" : platform === "darwin" ? "Darwin" : "Linux";
+
+  const pinned = envOrNull("DOGGO_VERSION");
+  const tag = pinned
+    ? `v${pinned.replace(/^v/, "")}`
+    : await fetchLatestGitHubTag("mr-karan/doggo");
+  const ver = tag.replace(/^v/, "");
+  const archiveName =
+    platform === "win32"
+      ? `doggo_${ver}_${osName}_${arch}.zip`
+      : `doggo_${ver}_${osName}_${arch}.tar.gz`;
+
+  const url = `https://github.com/mr-karan/doggo/releases/download/${tag}/${archiveName}`;
+  const out = path.join(TARGET_DIR, `doggo${ext}`);
+
+  const cached = await getManifestEntry("doggo");
+  if (cached?.version === tag && (await fileExists(out))) {
+    chmodIfNeeded(out);
+    await ensureTauriExternalBinName(out);
+    console.log(`✓ cached: doggo (${tag})`);
+    return;
+  }
+
+  const tmp = path.join(TARGET_DIR, archiveName);
+  const extractDir = path.join(TARGET_DIR, "doggo-extract");
+  try {
+    const expected = await fetchReleaseChecksum("mr-karan/doggo", tag, archiveName);
+    await download(url, tmp, UA_HEADERS);
+    if (expected) {
+      const actual = await sha256(tmp);
+      if (actual !== expected) {
+        throw new Error(`doggo checksum mismatch\nexpected=${expected}\nactual=${actual}`);
+      }
+    }
+    await rmForce(extractDir);
+    await fs.mkdir(extractDir, { recursive: true });
+    if (tmp.endsWith(".zip")) await extractZip(tmp, { dir: extractDir });
+    else await extractTarGz(tmp, extractDir);
+
+    const bin = await locateBinaryInExtractDir(extractDir, [`doggo${ext}`, "doggo"]);
+    if (!bin) throw new Error("doggo binary not found in archive");
+    await fs.copyFile(bin, out);
+    chmodIfNeeded(out);
+    await ensureTauriExternalBinName(out);
+
+    await setManifestEntry("doggo", {
+      version: tag,
+      file: path.basename(out),
+      sha256: await sha256(out),
+      archiveSha256: expected ?? undefined,
+      mode: pinned ? "pin" : "latest",
+      updatedAt: new Date().toISOString(),
+    });
+    console.log(`✓ doggo installed (${tag})${expected ? "" : " [no upstream checksum]"}`);
+  } finally {
+    await rmForce(tmp);
+    await rmForce(extractDir);
+  }
+}
+
+/* =======================
+   grpcurl (GitHub fullstorydev/grpcurl)
+======================= */
+
+async function installGrpcurl() {
+  const platform = os.platform();
+  const arch = os.arch() === "x64" ? "x86_64" : "arm64";
+  const ext = platform === "win32" ? ".exe" : "";
+  const osName = platform === "win32" ? "windows" : platform === "darwin" ? "osx" : "linux";
+
+  const pinned = envOrNull("GRPCURL_VERSION");
+  const tag = pinned
+    ? `v${pinned.replace(/^v/, "")}`
+    : await fetchLatestGitHubTag("fullstorydev/grpcurl");
+  const ver = tag.replace(/^v/, "");
+  const archiveName =
+    platform === "win32"
+      ? `grpcurl_${ver}_${osName}_${arch}.zip`
+      : `grpcurl_${ver}_${osName}_${arch}.tar.gz`;
+
+  const url = `https://github.com/fullstorydev/grpcurl/releases/download/${tag}/${archiveName}`;
+  const out = path.join(TARGET_DIR, `grpcurl${ext}`);
+
+  const cached = await getManifestEntry("grpcurl");
+  if (cached?.version === tag && (await fileExists(out))) {
+    chmodIfNeeded(out);
+    await ensureTauriExternalBinName(out);
+    console.log(`✓ cached: grpcurl (${tag})`);
+    return;
+  }
+
+  const tmp = path.join(TARGET_DIR, archiveName);
+  const extractDir = path.join(TARGET_DIR, "grpcurl-extract");
+  try {
+    const expected = await fetchReleaseChecksum("fullstorydev/grpcurl", tag, archiveName);
+    await download(url, tmp, UA_HEADERS);
+    if (expected) {
+      const actual = await sha256(tmp);
+      if (actual !== expected) {
+        throw new Error(`grpcurl checksum mismatch\nexpected=${expected}\nactual=${actual}`);
+      }
+    }
+    await rmForce(extractDir);
+    await fs.mkdir(extractDir, { recursive: true });
+    if (tmp.endsWith(".zip")) await extractZip(tmp, { dir: extractDir });
+    else await extractTarGz(tmp, extractDir);
+
+    const bin = await locateBinaryInExtractDir(extractDir, [`grpcurl${ext}`, "grpcurl"]);
+    if (!bin) throw new Error("grpcurl binary not found in archive");
+    await fs.copyFile(bin, out);
+    chmodIfNeeded(out);
+    await ensureTauriExternalBinName(out);
+
+    await setManifestEntry("grpcurl", {
+      version: tag,
+      file: path.basename(out),
+      sha256: await sha256(out),
+      archiveSha256: expected ?? undefined,
+      mode: pinned ? "pin" : "latest",
+      updatedAt: new Date().toISOString(),
+    });
+    console.log(`✓ grpcurl installed (${tag})${expected ? "" : " [no upstream checksum]"}`);
+  } finally {
+    await rmForce(tmp);
+    await rmForce(extractDir);
+  }
+}
+
+/* =======================
+   websocat (GitHub vi/websocat)
+======================= */
+
+async function installWebsocat() {
+  const platform = os.platform();
+  const arch = os.arch();
+  const ext = platform === "win32" ? ".exe" : "";
+
+  const pinned = envOrNull("WEBSOCAT_VERSION");
+  const tag = pinned ? `v${pinned.replace(/^v/, "")}` : await fetchLatestGitHubTag("vi/websocat");
+
+  let assetName;
+  if (platform === "win32") {
+    assetName = "websocat.x86_64-pc-windows-gnu.exe";
+  } else if (platform === "darwin") {
+    assetName = arch === "arm64" ? "websocat.aarch64-apple-darwin" : "websocat.x86_64-apple-darwin";
+  } else {
+    assetName =
+      arch === "arm64"
+        ? "websocat.aarch64-unknown-linux-musl"
+        : "websocat.x86_64-unknown-linux-musl";
+  }
+
+  const url = `https://github.com/vi/websocat/releases/download/${tag}/${assetName}`;
+  const out = path.join(TARGET_DIR, `websocat${ext}`);
+
+  const cached = await getManifestEntry("websocat");
+  if (cached?.version === tag && (await fileExists(out))) {
+    chmodIfNeeded(out);
+    await ensureTauriExternalBinName(out);
+    console.log(`✓ cached: websocat (${tag})`);
+    return;
+  }
+
+  const expected = await fetchReleaseChecksum("vi/websocat", tag, assetName);
+  await download(url, out, UA_HEADERS);
+  const actual = await sha256(out);
+  if (expected && actual !== expected) {
+    throw new Error(`websocat checksum mismatch\nexpected=${expected}\nactual=${actual}`);
+  }
+  if (!expected) {
+    console.warn("⚠ websocat: no upstream checksum asset - verification skipped");
+  }
+  chmodIfNeeded(out);
+  await ensureTauriExternalBinName(out);
+
+  await setManifestEntry("websocat", {
+    version: tag,
+    file: path.basename(out),
+    sha256: actual,
+    archiveSha256: expected ?? undefined,
+    mode: pinned ? "pin" : "latest",
+    updatedAt: new Date().toISOString(),
+  });
+  console.log(`✓ websocat installed (${tag})${expected ? "" : " [no upstream checksum]"}`);
+}
+
+/* =======================
+   tcping (GitHub cloverstd/tcping)
+======================= */
+
+async function installTcping() {
+  const platform = os.platform();
+  const arch = os.arch() === "x64" ? "amd64" : "arm64";
+  const ext = platform === "win32" ? ".exe" : "";
+  const osName = platform === "win32" ? "windows" : platform === "darwin" ? "darwin" : "linux";
+
+  const pinned = envOrNull("TCPING_VERSION");
+  const tag = pinned
+    ? `v${pinned.replace(/^v/, "")}`
+    : await fetchLatestGitHubTag("cloverstd/tcping");
+
+  const archiveName = `tcping-${osName}-${arch}-${tag}.tar.gz`;
+  const url = `https://github.com/cloverstd/tcping/releases/download/${tag}/${archiveName}`;
+  const out = path.join(TARGET_DIR, `tcping${ext}`);
+
+  const cached = await getManifestEntry("tcping");
+  if (cached?.version === tag && (await fileExists(out))) {
+    chmodIfNeeded(out);
+    await ensureTauriExternalBinName(out);
+    console.log(`✓ cached: tcping (${tag})`);
+    return;
+  }
+
+  const tmp = path.join(TARGET_DIR, archiveName);
+  const extractDir = path.join(TARGET_DIR, "tcping-extract");
+  try {
+    const expected = await fetchReleaseChecksum("cloverstd/tcping", tag, archiveName);
+    await download(url, tmp, UA_HEADERS);
+    if (expected) {
+      const actual = await sha256(tmp);
+      if (actual !== expected) {
+        throw new Error(`tcping checksum mismatch\nexpected=${expected}\nactual=${actual}`);
+      }
+    } else {
+      console.warn("⚠ tcping: no upstream checksum asset - verification skipped");
+    }
+    await rmForce(extractDir);
+    await fs.mkdir(extractDir, { recursive: true });
+    await extractTarGz(tmp, extractDir);
+
+    const bin = await locateBinaryInExtractDir(extractDir, [`tcping${ext}`, "tcping"]);
+    if (!bin) throw new Error("tcping binary not found in archive");
+    await fs.copyFile(bin, out);
+    chmodIfNeeded(out);
+    await ensureTauriExternalBinName(out);
+
+    await setManifestEntry("tcping", {
+      version: tag,
+      file: path.basename(out),
+      sha256: await sha256(out),
+      archiveSha256: expected ?? undefined,
+      mode: pinned ? "pin" : "latest",
+      updatedAt: new Date().toISOString(),
+    });
+    console.log(`✓ tcping installed (${tag})${expected ? "" : " [no upstream checksum]"}`);
+  } finally {
+    await rmForce(tmp);
+    await rmForce(extractDir);
+  }
+}
+
+/* =======================
+   trivy (GitHub aquasecurity/trivy)
+======================= */
+
+async function installTrivy() {
+  const platform = os.platform();
+  const arch = os.arch() === "x64" ? "64bit" : "ARM64";
+  const ext = platform === "win32" ? ".exe" : "";
+  const osName = platform === "win32" ? "Windows" : platform === "darwin" ? "macOS" : "Linux";
+
+  const pinned = envOrNull("TRIVY_VERSION");
+  const tag = pinned
+    ? `v${pinned.replace(/^v/, "")}`
+    : await fetchLatestGitHubTag("aquasecurity/trivy");
+  const ver = tag.replace(/^v/, "");
+  const archiveName =
+    platform === "win32"
+      ? `trivy_${ver}_${osName}-${arch}.zip`
+      : `trivy_${ver}_${osName}-${arch}.tar.gz`;
+
+  const url = `https://github.com/aquasecurity/trivy/releases/download/${tag}/${archiveName}`;
+  const out = path.join(TARGET_DIR, `trivy${ext}`);
+
+  const cached = await getManifestEntry("trivy");
+  if (cached?.version === tag && (await fileExists(out))) {
+    chmodIfNeeded(out);
+    await ensureTauriExternalBinName(out);
+    console.log(`✓ cached: trivy (${tag})`);
+    return;
+  }
+
+  const tmp = path.join(TARGET_DIR, archiveName);
+  const extractDir = path.join(TARGET_DIR, "trivy-extract");
+  try {
+    const expected = await fetchReleaseChecksum("aquasecurity/trivy", tag, archiveName);
+    await download(url, tmp, UA_HEADERS);
+    if (expected) {
+      const actual = await sha256(tmp);
+      if (actual !== expected) {
+        throw new Error(`trivy checksum mismatch\nexpected=${expected}\nactual=${actual}`);
+      }
+    }
+    await rmForce(extractDir);
+    await fs.mkdir(extractDir, { recursive: true });
+    if (tmp.endsWith(".zip")) await extractZip(tmp, { dir: extractDir });
+    else await extractTarGz(tmp, extractDir);
+
+    const bin = await locateBinaryInExtractDir(extractDir, [`trivy${ext}`, "trivy"]);
+    if (!bin) throw new Error("trivy binary not found in archive");
+    await fs.copyFile(bin, out);
+    chmodIfNeeded(out);
+    await ensureTauriExternalBinName(out);
+
+    await setManifestEntry("trivy", {
+      version: tag,
+      file: path.basename(out),
+      sha256: await sha256(out),
+      archiveSha256: expected ?? undefined,
+      mode: pinned ? "pin" : "latest",
+      updatedAt: new Date().toISOString(),
+    });
+    console.log(`✓ trivy installed (${tag})${expected ? "" : " [no upstream checksum]"}`);
+  } finally {
+    await rmForce(tmp);
+    await rmForce(extractDir);
+  }
+}
+
+/* =======================
    Prefix sidecar binaries with "rozoom-" to avoid /usr/bin conflicts
 ======================= */
 
@@ -1677,6 +2106,12 @@ const SIDECAR_TOOLS = [
   "yq",
   "hcloud",
   "oc",
+  "curl",
+  "doggo",
+  "grpcurl",
+  "websocat",
+  "tcping",
+  "trivy",
 ];
 
 async function prefixSidecarBinaries() {
@@ -1740,6 +2175,12 @@ async function prefixSidecarBinaries() {
   await run("oc", installOc);
 
   await run("az", installAzCli);
+  await run("curl", installCurl);
+  await run("doggo", installDoggo);
+  await run("grpcurl", installGrpcurl);
+  await run("websocat", installWebsocat);
+  await run("tcping", installTcping);
+  await run("trivy", installTrivy);
 
   // Compile sidecar wrappers (gcloud-cli, az-cli) for the current platform
   if (isToolEnabled("gcloud") || isToolEnabled("az")) {

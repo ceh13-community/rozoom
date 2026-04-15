@@ -86,6 +86,14 @@ const FULL_TOOL_REGISTRY: readonly ToolEntry[] = [
   { tool: "stern", provider: null, status: "bundled", probeArgs: ["--version"] },
   { tool: "velero", provider: null, status: "bundled", probeArgs: ["version", "--client-only"] },
   { tool: "yq", provider: null, status: "bundled", probeArgs: ["--version"] },
+  // Network & debug
+  { tool: "curl", provider: null, status: "bundled", probeArgs: ["--version"] },
+  { tool: "doggo", provider: null, status: "bundled", probeArgs: ["--version"] },
+  { tool: "grpcurl", provider: null, status: "bundled", probeArgs: ["--version"] },
+  { tool: "websocat", provider: null, status: "bundled", probeArgs: ["--version"] },
+  { tool: "tcping", provider: null, status: "bundled", probeArgs: ["--version"] },
+  // Security
+  { tool: "trivy", provider: null, status: "bundled", probeArgs: ["version"] },
   // Cloud providers
   { tool: "aws", provider: "AWS EKS", status: "bundled", probeArgs: ["--version"] },
   { tool: "gcloud", provider: "GKE", status: "planned", probeArgs: ["version"] },
