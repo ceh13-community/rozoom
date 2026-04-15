@@ -16,7 +16,13 @@ export type CliTool =
   | "yq"
   | "hcloud"
   | "oc"
-  | "az";
+  | "az"
+  | "curl"
+  | "doggo"
+  | "grpcurl"
+  | "websocat"
+  | "tcping"
+  | "trivy";
 
 type SpawnResult = {
   command: Command<IOPayload>;
