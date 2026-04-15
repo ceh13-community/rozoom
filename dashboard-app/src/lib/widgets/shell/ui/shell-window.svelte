@@ -62,14 +62,21 @@
       if (!raw) return [];
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed) ? parsed.slice(-MAX_COMMAND_HISTORY) : [];
-    } catch { return []; }
+    } catch {
+      return [];
+    }
   }
 
   function saveShellHistory(history: string[]) {
     if (typeof window === "undefined") return;
     try {
-      window.localStorage.setItem(SHELL_HISTORY_KEY, JSON.stringify(history.slice(-MAX_COMMAND_HISTORY)));
-    } catch { /* quota exceeded - ignore */ }
+      window.localStorage.setItem(
+        SHELL_HISTORY_KEY,
+        JSON.stringify(history.slice(-MAX_COMMAND_HISTORY)),
+      );
+    } catch {
+      /* quota exceeded - ignore */
+    }
   }
 
   const COLLAPSED_HEIGHT = 72;
@@ -115,7 +122,12 @@
   });
 
   onDestroy(() => {
-    if (!podDebugCleanupHandled && shellSessionKind === "pod-debug" && shellCleanupPod && sessionClusterId) {
+    if (
+      !podDebugCleanupHandled &&
+      shellSessionKind === "pod-debug" &&
+      shellCleanupPod &&
+      sessionClusterId
+    ) {
       void deletePodDebugCleanup(shellCleanupPod, sessionClusterId).catch(() => undefined);
     }
     stopDragging();
@@ -403,14 +415,15 @@
       : "debug";
     shellSessionKind = state.sessionKind ?? "debug-shell";
     shellTargetNamespace = targetPod?.metadata?.namespace ?? state.targetNamespace ?? "default";
-    shellTargetLabel =
-      state.sessionLabel ?? targetPod?.metadata?.name ?? clusterId;
+    shellTargetLabel = state.sessionLabel ?? targetPod?.metadata?.name ?? clusterId;
     shellPresetCommand = state.initialCommand?.trim() ?? "";
     shellOpenedAt = state.openedAt ?? Date.now();
     shellLastRunAt = null;
     shellCleanupPod = state.cleanupPod ?? null;
     sessionClusterId = clusterId;
-    shellCommand = state.initialCommand ? state.initialCommand : getPodSessionInitialCommand(shellMode);
+    shellCommand = state.initialCommand
+      ? state.initialCommand
+      : getPodSessionInitialCommand(shellMode);
     resetHistoryNavigation();
     collapsed = false;
     maximized = false;
@@ -424,11 +437,7 @@
     }
     appendShellOutput(
       `Preparing ${
-        shellMode === "debug"
-          ? "terminal"
-          : shellMode === "pod-attach"
-            ? "pod attach"
-            : "pod shell"
+        shellMode === "debug" ? "terminal" : shellMode === "pod-attach" ? "pod attach" : "pod shell"
       } for ${shellMode === "debug" ? shellTargetLabel : `${shellTargetNamespace}/${shellTargetLabel}`}...`,
     );
 
@@ -447,7 +456,9 @@
         const podPhase = shellTargetPod?.status as { phase?: string } | undefined;
         const phase = (podPhase?.phase || "").toLowerCase();
         if (phase && phase !== "running") {
-          throw new Error(`Pod is not running (phase: ${podPhase?.phase}). Cannot open ${shellMode === "pod-attach" ? "attach" : "shell"} session.`);
+          throw new Error(
+            `Pod is not running (phase: ${podPhase?.phase}). Cannot open ${shellMode === "pod-attach" ? "attach" : "shell"} session.`,
+          );
         }
         shellReady = true;
         const mainContainer = shellTargetPod ? pickMainContainer(shellTargetPod) : undefined;
@@ -467,7 +478,6 @@
     }
   }
 
-
   const SUPPORTED_CLI_TOOLS: Record<string, CliTool> = {
     kubectl: "kubectl",
     helm: "helm",
@@ -483,6 +493,12 @@
     hcloud: "hcloud",
     oc: "oc",
     az: "az",
+    curl: "curl",
+    doggo: "doggo",
+    grpcurl: "grpcurl",
+    websocat: "websocat",
+    tcping: "tcping",
+    trivy: "trivy",
   };
 
   function parseCliCommand(command: string): { tool: CliTool; args: string[] } | null {

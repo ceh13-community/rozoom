@@ -78,7 +78,7 @@ Visible on all workload pages (Pods, Deployments, etc.):
 
 ### Terminal
 
-The Terminal executes commands **locally** via Tauri sidecar binaries - no containers or pods created on the cluster. Available tools: kubectl, helm, stern, velero, pluto, kubeconform, kustomize, yq, aws, gcloud, doctl, hcloud, oc, az.
+The Terminal executes commands **locally** via Tauri sidecar binaries - no containers or pods created on the cluster. Available tools: kubectl, helm, stern, velero, pluto, kubeconform, kustomize, yq, aws, gcloud, doctl, hcloud, oc, az, curl, doggo, grpcurl, websocat, tcping, trivy.
 
 Commands auto-inject `--kubeconfig` for the active cluster context. User's OS credentials (AWS, GCP, Azure keys) are used directly.
 
