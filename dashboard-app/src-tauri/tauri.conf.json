@@ -35,7 +35,13 @@
       "binaries/rozoom-yq",
       "binaries/rozoom-hcloud",
       "binaries/rozoom-oc",
-      "binaries/rozoom-az-cli"
+      "binaries/rozoom-az-cli",
+      "binaries/rozoom-curl",
+      "binaries/rozoom-doggo",
+      "binaries/rozoom-grpcurl",
+      "binaries/rozoom-websocat",
+      "binaries/rozoom-tcping",
+      "binaries/rozoom-trivy"
     ],
     "resources": [
       "binaries/aws-dist",

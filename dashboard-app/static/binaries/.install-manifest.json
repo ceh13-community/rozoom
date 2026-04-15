@@ -5,7 +5,7 @@
       "file": "kubectl",
       "sha256": "fd31c7d7129260e608f6faf92d5984c3267ad0b5ead3bced2fe125686e286ad6",
       "mode": "latest",
-      "updatedAt": "2026-03-20T13:02:31.655Z"
+      "updatedAt": "2026-04-06T20:46:01.131Z"
     },
     "helm": {
       "version": "v4.1.3",
@@ -13,15 +13,15 @@
       "sha256": "495480acb8eac352f544fbbc5dcc4fb945508587f9a97cc0150463608f2ef5d1",
       "archiveSha256": "02ce9722d541238f81459938b84cf47df2fdf1187493b4bfb2346754d82a4700",
       "mode": "latest",
-      "updatedAt": "2026-03-20T13:02:35.690Z"
+      "updatedAt": "2026-04-06T20:42:56.516Z"
     },
     "doctl": {
-      "version": "v1.152.0",
+      "version": "v1.154.0",
       "file": "doctl",
-      "sha256": "361eef918339443a39982197f05b0d62c0fe6dc003c770f46085c79b5bc95fec",
-      "archiveSha256": "88de72d41911e3f6bdeb6eaa0ce77789a0e35cf3b37cbb4768556f7c0150082f",
+      "sha256": "a717ebbbfb873f81c9f7c1b928ec4ae7fddddde822377295516029be51282792",
+      "archiveSha256": "c9f6bd24c28566ecb9e60d8b2f49d19a8c4859183f50469e6ed8ae49b25207d4",
       "mode": "latest",
-      "updatedAt": "2026-03-20T13:02:40.416Z"
+      "updatedAt": "2026-04-06T20:43:01.105Z"
     },
     "gcloud": {
       "version": "552.0.0",
@@ -37,7 +37,7 @@
       "sha256": "f4b0b53a794b92fd89f0ea2546376e65da6687f298e44e34ed4e527b71578362",
       "archiveSha256": "c173c87cd7f4fc7ca5c5fb120e10b3e99c204906fb36d188afeaa7c7b70caefa",
       "mode": "latest",
-      "updatedAt": "2026-03-20T13:02:43.912Z"
+      "updatedAt": "2026-04-06T20:43:04.537Z"
     },
     "velero": {
       "version": "v1.18.0",
@@ -45,7 +45,7 @@
       "sha256": "a424878fd103ed5b7f19ab8383203e7d540d390ec39cbfda5d076b373f0a8edd",
       "archiveSha256": "f0ebd70e282b3f1a6cddcf081db5540c31a3ee00cb6b164f9ae698deae4640ba",
       "mode": "latest",
-      "updatedAt": "2026-03-20T13:02:51.077Z"
+      "updatedAt": "2026-04-06T20:43:11.771Z"
     },
     "aws": {
       "version": "v2.34.13",
@@ -60,7 +60,7 @@
       "sha256": "f7b1605aa5143e0dcbd754a4d43c47ad7a560c540b1356b064d69fe236164494",
       "archiveSha256": "029a7f0f4e1932c52a0476cf02a0fd855c0bb85694b82c338fc648dcb53a819d",
       "mode": "latest",
-      "updatedAt": "2026-03-20T13:25:58.472Z"
+      "updatedAt": "2026-04-06T20:44:58.661Z"
     },
     "kubeconform": {
       "version": "v0.7.0",
@@ -68,7 +68,7 @@
       "sha256": "dd5273bdbf08531bf230f4eba8359984b7beec25a679424ff90911a2591b8b0d",
       "archiveSha256": "c31518ddd122663b3f3aa874cfe8178cb0988de944f29c74a0b9260920d115d3",
       "mode": "latest",
-      "updatedAt": "2026-03-20T13:26:00.929Z"
+      "updatedAt": "2026-04-06T20:45:01.541Z"
     },
     "stern": {
       "version": "v1.33.1",
@@ -76,15 +76,15 @@
       "sha256": "147b6b8bc89f8a6980267e3ff66023877a5a7ad2a158d6328bf94a94cd3c0c3f",
       "archiveSha256": "185be29c6a22bd07c0791ec697900943c0cc27292e5a5640a07a543886f1bfc9",
       "mode": "latest",
-      "updatedAt": "2026-03-20T13:26:04.473Z"
+      "updatedAt": "2026-04-06T20:45:05.393Z"
     },
     "yq": {
-      "version": "v4.52.4",
+      "version": "v4.52.5",
       "file": "yq",
-      "sha256": "0c4d965ea944b64b8fddaf7f27779ee3034e5693263786506ccd1c120f184e8c",
+      "sha256": "75d893a0d5940d1019cb7cdc60001d9e876623852c31cfc6267047bc31149fa9",
       "archiveSha256": null,
       "mode": "latest",
-      "updatedAt": "2026-03-20T13:28:42.863Z"
+      "updatedAt": "2026-04-06T20:45:08.535Z"
     },
     "hcloud": {
       "version": "v1.62.0",
@@ -92,15 +92,15 @@
       "sha256": "65f53c4043a6b843b3f48b2449ac5786e77faf4658b70e50a69db28e680dd3ec",
       "archiveSha256": "872931daf2cfe0304a5b48343b109c1633decd0d0b5e7a75e68d7c03bcceaeae",
       "mode": "latest",
-      "updatedAt": "2026-03-23T21:47:02.950Z"
+      "updatedAt": "2026-04-06T20:45:11.396Z"
     },
     "oc": {
       "version": "4.21.0-okd-scos.9",
       "file": "oc",
-      "sha256": "d51a0bab3ea1390b6e29d04cfe9bf02978b8e18dcb47cec48802338b4703da49",
-      "archiveSha256": "5a90b67b5ca292356280b8670add71a770a2bafcf25bdb9237b930fe865ebf49",
+      "sha256": "5c9aaa5f72484f28fd32ad16c36342f805af300332323f75b4fe353114e4304d",
+      "archiveSha256": "47576ec68c3ea50cd545e4c447da1e3a5e3cefd4f0acdc265e0a65ee8fd45e66",
       "mode": "latest",
-      "updatedAt": "2026-03-20T13:42:49.414Z"
+      "updatedAt": "2026-04-06T20:45:19.916Z"
     },
     "az": {
       "version": "v2.84.0",
@@ -108,6 +108,51 @@
       "sha256": "fa551383cbf8ba3f7fc75d8ae085af5b7c2918a6ca0af79b8e83834d74495d56",
       "mode": "latest",
       "updatedAt": "2026-03-20T15:02:00.000Z"
+    },
+    "curl": {
+      "version": "8.19.0",
+      "file": "curl",
+      "sha256": "3c5c62815d4a12bebd10c2884038d68102c81e5c058eaad1b3c3e66343634152",
+      "mode": "latest",
+      "updatedAt": "2026-04-06T20:45:23.114Z"
+    },
+    "doggo": {
+      "version": "v1.1.5",
+      "file": "doggo",
+      "sha256": "d8909a898b6bcb3164998f5306de4f4488f7cff392b31b196124e2fef0ee49c8",
+      "archiveSha256": "fe29a6c856ee9ba4eda5a551eb9aab7cd81db92773a58200c9734b672ad38146",
+      "mode": "latest",
+      "updatedAt": "2026-04-09T20:39:05.032Z"
+    },
+    "grpcurl": {
+      "version": "v1.9.3",
+      "file": "grpcurl",
+      "sha256": "62e2e4315bb70fab2e27f86c1f7738d09076a097a2dc8e0f701e386251172e40",
+      "archiveSha256": "a926b62a85787ccf73ef8736b3ae554f1242e39d92bb8767a79d6dd23b11d1d5",
+      "mode": "latest",
+      "updatedAt": "2026-04-09T20:39:08.114Z"
+    },
+    "websocat": {
+      "version": "v1.14.1",
+      "file": "websocat",
+      "sha256": "66f8dd3a0394761556339117f8bb5123bddefd44e087af2a72ec22b0bd08d514",
+      "mode": "latest",
+      "updatedAt": "2026-04-06T20:45:29.089Z"
+    },
+    "tcping": {
+      "version": "v0.1.1",
+      "file": "tcping",
+      "sha256": "9773d180ab03f9dbc1d762fb90a5bf9fd0fc675b72e44957983ba720f68cd656",
+      "mode": "latest",
+      "updatedAt": "2026-04-06T20:45:30.441Z"
+    },
+    "trivy": {
+      "version": "v0.69.3",
+      "file": "trivy",
+      "sha256": "8266084a71d2e6a2333bc2c69b91c93c26dee9ef39ac2587ace2df54cc9b746b",
+      "archiveSha256": "1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75",
+      "mode": "latest",
+      "updatedAt": "2026-04-09T20:39:15.709Z"
     }
   }
 }
