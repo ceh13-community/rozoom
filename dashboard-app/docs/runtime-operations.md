@@ -73,13 +73,20 @@ error state, the watcher restarts immediately with a fresh data refresh.
 
 ### Runtime Diagnostics Toggle
 
-Runtime status messages (recovering banners, adaptive degraded mode details,
-budget summaries, watcher reasons) are hidden by default to reduce UI noise.
+Runtime status messages and developer-facing telemetry are hidden by default
+to keep the UI clean for day-to-day cluster management.
 
-- **Default: off** - compact view shows only source badge + timestamp + "Ready"
-- **On** - full verbose panel with profile, mode, budget, detail, reason text
+**Toggle location:** sidebar button "Runtime on/off" (Activity / EyeOff icon).
 
-Toggle via: `showRuntimeDiagnostics` preference in `dashboard-preferences.json`.
+- **Default: off** - hides verbose runtime diagnostics:
+  - Section runtime status shows only source badge (e.g. "Cached", "Live")
+  - Runtime popover in cluster header hidden (connection/heavy budget summary)
+  - Inspector popover hidden (degraded event count)
+  - Cluster trust/recovery banners hidden
+  - Workload cache banner always visible (useful data freshness indicator)
+- **On** - full verbose panels with profile, mode, budget, detail, reason text
+
+State persists in `dashboard-preferences.json` (`showRuntimeDiagnostics` key).
 
 ---
 
