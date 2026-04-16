@@ -1090,16 +1090,19 @@
   }
 
   function paneWorkloadData(paneId: WorkspacePaneId): unknown {
+    if (paneId === "pane-1") return workloads.data;
     if (paneId === "pane-2") return pane2Data;
     return pane3Data;
   }
 
   function paneLoading(paneId: WorkspacePaneId): boolean {
+    if (paneId === "pane-1") return isLoading;
     if (paneId === "pane-2") return pane2Loading;
     return pane3Loading;
   }
 
   function paneError(paneId: WorkspacePaneId): string | null {
+    if (paneId === "pane-1") return workloads.error;
     if (paneId === "pane-2") return pane2Error;
     return pane3Error;
   }
