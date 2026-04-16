@@ -5,7 +5,15 @@
   // Note: readTextFile + resourceDir kept for loadManifest resource fallback
   import { cn } from "$shared";
   import { Button } from "$shared/ui/button";
-  import { Bell, Settings, ShieldCheck, ShieldOff, SquareChevronRight } from "$shared/ui/icons";
+  import {
+    Activity,
+    Bell,
+    EyeOff,
+    Settings,
+    ShieldCheck,
+    ShieldOff,
+    SquareChevronRight,
+  } from "$shared/ui/icons";
   import { LightSwitch } from "$shared/ui/light-switch";
   import { BUNDLED_TOOLS } from "$shared/config/tooling";
   const appVersion: string = __APP_VERSION__;
@@ -16,7 +24,11 @@
     saveGlobalLinterEnabled,
   } from "$features/check-health";
   import { stopAllWatchers } from "$features/check-health/model/watchers";
-  import { loadShowRuntimeDiagnostics } from "$features/check-health/model/runtime-diagnostics-preferences";
+  import {
+    showRuntimeDiagnostics,
+    loadShowRuntimeDiagnostics,
+    saveShowRuntimeDiagnostics,
+  } from "$features/check-health/model/runtime-diagnostics-preferences";
 
   let {
     sidebarOpen,
@@ -30,12 +42,18 @@
 
   let toolVersions = $state<Record<string, string | null>>({});
   let linterEnabled = $state(true);
+  let diagnosticsEnabled = $state(false);
   globalLinterEnabled.subscribe((v) => (linterEnabled = v));
+  showRuntimeDiagnostics.subscribe((v) => (diagnosticsEnabled = v));
 
   function toggleLinter() {
     const next = !linterEnabled;
     void saveGlobalLinterEnabled(next);
     if (!next) stopAllWatchers();
+  }
+
+  function toggleDiagnostics() {
+    void saveShowRuntimeDiagnostics(!diagnosticsEnabled);
   }
 
   onMount(async () => {
@@ -107,6 +125,27 @@
         {/if}
         <span class={cn(sidebarOpen ? "block" : "hidden")}>
           Linter {linterEnabled ? "on" : "off"}
+        </span>
+      </button>
+      <button
+        class={cn(
+          "flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium",
+          diagnosticsEnabled
+            ? "bg-sky-600/20 text-sky-400 hover:bg-sky-600/30"
+            : "bg-slate-600/20 text-slate-400 hover:bg-slate-600/30",
+        )}
+        onclick={toggleDiagnostics}
+        title={diagnosticsEnabled
+          ? "Runtime info shown - click to hide"
+          : "Runtime info hidden - click to show"}
+      >
+        {#if diagnosticsEnabled}
+          <Activity class="h-4 w-4" />
+        {:else}
+          <EyeOff class="h-4 w-4" />
+        {/if}
+        <span class={cn(sidebarOpen ? "block" : "hidden")}>
+          Runtime {diagnosticsEnabled ? "on" : "off"}
         </span>
       </button>
     </nav>
