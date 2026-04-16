@@ -1577,73 +1577,77 @@
               >K</kbd
             >
           </button>
-          <Popover.Root>
-            <Popover.Trigger
-              class="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-border/60 px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-1 sm:h-9 sm:px-3"
-              type="button"
-              title="Open cluster runtime controls"
-            >
-              <span class="font-medium text-foreground">Runtime</span>
-              <Badge class={runtimeStateTone(clusterRuntimeState)}>{clusterRuntimeState}</Badge>
-              <span class="hidden text-[11px] text-muted-foreground xl:inline">
-                {clusterRuntimeBudgetSummary}
-              </span>
-            </Popover.Trigger>
-            <Popover.Content class="w-[392px]" sideOffset={8} align="end">
-              <div class="mb-3 flex items-start justify-between gap-3">
-                <div class="space-y-1">
-                  <div class="text-sm font-medium">Cluster runtime</div>
-                  <div class="text-xs text-muted-foreground">
-                    {clusterRuntimeProfileSummary} · {clusterRuntimeBudget.networkSensitivity} network
+          {#if $showRuntimeDiagnostics}
+            <Popover.Root>
+              <Popover.Trigger
+                class="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-border/60 px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-1 sm:h-9 sm:px-3"
+                type="button"
+                title="Open cluster runtime controls"
+              >
+                <span class="font-medium text-foreground">Runtime</span>
+                <Badge class={runtimeStateTone(clusterRuntimeState)}>{clusterRuntimeState}</Badge>
+                <span class="hidden text-[11px] text-muted-foreground xl:inline">
+                  {clusterRuntimeBudgetSummary}
+                </span>
+              </Popover.Trigger>
+              <Popover.Content class="w-[392px]" sideOffset={8} align="end">
+                <div class="mb-3 flex items-start justify-between gap-3">
+                  <div class="space-y-1">
+                    <div class="text-sm font-medium">Cluster runtime</div>
+                    <div class="text-xs text-muted-foreground">
+                      {clusterRuntimeProfileSummary} · {clusterRuntimeBudget.networkSensitivity} network
+                    </div>
+                    <div class="text-xs text-muted-foreground">
+                      Effective budget: {clusterRuntimeBudgetSummary}
+                    </div>
+                    <div class="text-xs text-muted-foreground">
+                      Adaptive connectivity:
+                      {#if adaptiveConnectivityState.active}
+                        degraded · {adaptiveConnectivityState.recommendedSensitivity} lane
+                      {:else}
+                        healthy
+                      {/if}
+                    </div>
                   </div>
-                  <div class="text-xs text-muted-foreground">
-                    Effective budget: {clusterRuntimeBudgetSummary}
-                  </div>
-                  <div class="text-xs text-muted-foreground">
-                    Adaptive connectivity:
-                    {#if adaptiveConnectivityState.active}
-                      degraded · {adaptiveConnectivityState.recommendedSensitivity} lane
-                    {:else}
-                      healthy
-                    {/if}
+                  <div class="flex flex-col items-end gap-1">
+                    <Badge class={runtimeStateTone(clusterRuntimeState)}
+                      >{clusterRuntimeState}</Badge
+                    >
+                    <span class="text-[11px] text-muted-foreground">
+                      {#if clusterRuntimeOverride}
+                        Override active
+                      {:else}
+                        Inheriting shared profile
+                      {/if}
+                    </span>
                   </div>
                 </div>
-                <div class="flex flex-col items-end gap-1">
-                  <Badge class={runtimeStateTone(clusterRuntimeState)}>{clusterRuntimeState}</Badge>
-                  <span class="text-[11px] text-muted-foreground">
-                    {#if clusterRuntimeOverride}
-                      Override active
-                    {:else}
-                      Inheriting shared profile
-                    {/if}
-                  </span>
+                <div class="mb-3 text-xs text-muted-foreground">
+                  {adaptiveConnectivityState.reason}
                 </div>
-              </div>
-              <div class="mb-3 text-xs text-muted-foreground">
-                {adaptiveConnectivityState.reason}
-              </div>
-              <ClusterRuntimeTuningPanel clusterId={cluster} />
-            </Popover.Content>
-          </Popover.Root>
-          <Popover.Root>
-            <Popover.Trigger
-              class="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-border/60 px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-1 sm:h-9 sm:px-3"
-              type="button"
-              title="Open request and debug inspector"
-            >
-              <span class="font-medium text-foreground">Inspector</span>
-              <span class="hidden text-[11px] text-muted-foreground xl:inline">
-                {clusterRequestInspector.summary.degradedEvents} degraded
-              </span>
-            </Popover.Trigger>
-            <Popover.Content class="w-[472px]" sideOffset={8} align="end">
-              <ClusterRequestDebugInspector
-                summary={clusterRequestInspector.summary}
-                rows={clusterRequestInspector.rows}
-                formatAt={(value) => (value ? formatSyncUpdatedAt(value, true) : "n/a")}
-              />
-            </Popover.Content>
-          </Popover.Root>
+                <ClusterRuntimeTuningPanel clusterId={cluster} />
+              </Popover.Content>
+            </Popover.Root>
+            <Popover.Root>
+              <Popover.Trigger
+                class="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-border/60 px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-1 sm:h-9 sm:px-3"
+                type="button"
+                title="Open request and debug inspector"
+              >
+                <span class="font-medium text-foreground">Inspector</span>
+                <span class="hidden text-[11px] text-muted-foreground xl:inline">
+                  {clusterRequestInspector.summary.degradedEvents} degraded
+                </span>
+              </Popover.Trigger>
+              <Popover.Content class="w-[472px]" sideOffset={8} align="end">
+                <ClusterRequestDebugInspector
+                  summary={clusterRequestInspector.summary}
+                  rows={clusterRequestInspector.rows}
+                  formatAt={(value) => (value ? formatSyncUpdatedAt(value, true) : "n/a")}
+                />
+              </Popover.Content>
+            </Popover.Root>
+          {/if}
           {#if shouldShowHeaderSyncBadge && (headerSyncStatus || headerSyncDisplayUpdatedAt)}
             <div
               class="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs tabular-nums text-gray-500 dark:text-gray-400"

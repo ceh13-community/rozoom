@@ -118,25 +118,7 @@
     {/if}
   </div>
 {:else}
-  <div class="flex flex-wrap items-center gap-2 px-1 py-1 text-xs text-muted-foreground">
+  <div class="flex items-center gap-2 px-1 py-1">
     <Badge class={sourceTone(sourceState)}>{sourceLabel(sourceState)}</Badge>
-    {#if lastUpdatedLabel}
-      <span class="text-[10px] tabular-nums">· {lastUpdatedLabel}</span>
-    {/if}
-    {#if sourceState === "live" || sourceState === "cached"}
-      <span>· Ready</span>
-    {/if}
-    {#if onSecondaryAction && secondaryActionLabel && sourceState !== "live" && sourceState !== "idle"}
-      <Button
-        variant="ghost"
-        size="sm"
-        class="h-6 px-2 text-[10px]"
-        aria-label={secondaryActionAriaLabel ?? secondaryActionLabel}
-        disabled={secondaryActionLoading}
-        onclick={() => onSecondaryAction?.()}
-      >
-        {secondaryActionLoading ? "..." : secondaryActionLabel}
-      </Button>
-    {/if}
   </div>
 {/if}
