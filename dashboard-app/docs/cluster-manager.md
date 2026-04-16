@@ -90,16 +90,16 @@ Both "Connect Cluster" and "Cloud Providers" panels are collapsed by default.
 
 ### New in v0.17
 
-| Feature                           | Description                                                                                                                                                                                                                               |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Real connection probe**         | Each detected cluster gets a real `kubectl cluster-info` ping with latency (ms) instead of name-based heuristic. Status updates asynchronously after page load. (`probe-connection.ts`)                                                   |
-| **Cloud import one-click**        | List and import clusters from AWS EKS, GKE, AKS, DigitalOcean using bundled CLIs. AWS EKS supports cross-region discovery (all enabled regions scanned in parallel). AKS returns clusters across all resource groups. (`cloud-import.ts`) |
-| **Soft-delete with restore**      | Removed clusters move to a trash list instead of permanent deletion. Restore or purge from trash. (`removedClustersList` store)                                                                                                           |
-| **Default namespace per context** | Set a default namespace that auto-applies on cluster switch (before user overrides). Stored in `AppClusterConfig.defaultNamespace`.                                                                                                       |
-| **Rename context**                | Rename cluster context in the stored kubeconfig file and update the app store. Rewrites context/cluster names in YAML. (`renameClusterContext()`)                                                                                         |
-| **Kubeconfig merge/dedupe**       | Merge multiple kubeconfig files with automatic duplicate detection and conflict resolution. Reports all conflicts with source file tracking. (`kubeconfig-merge.ts`)                                                                      |
-| **Catalog export/import**         | Export groups, tags, display names as JSON without secrets. Import on another machine. Versioned format with validation. (`catalog-export.ts`)                                                                                            |
-| **Audit trail**                   | Records cluster management actions (add, remove, restore, rename, group changes) with timestamps. Capped at 500 entries. (`audit-trail.ts`)                                                                                               |
+| Feature                           | Description                                                                                                                                                                                                                                   |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Real connection probe**         | Each detected cluster gets a real `kubectl cluster-info` ping with latency (ms) instead of name-based heuristic. Status updates asynchronously after page load. (`probe-connection.ts`)                                                       |
+| **Cloud import one-click**        | List and import clusters from AWS EKS, GKE, AKS, DigitalOcean using bundled CLIs. AWS EKS supports cross-region discovery. Multi-scope scan across AWS profiles, GCP projects, Azure subscriptions via "Scan all" button. (`cloud-import.ts`) |
+| **Soft-delete with restore**      | Removed clusters move to a trash list instead of permanent deletion. Restore or purge from trash. (`removedClustersList` store)                                                                                                               |
+| **Default namespace per context** | Set a default namespace that auto-applies on cluster switch (before user overrides). Stored in `AppClusterConfig.defaultNamespace`.                                                                                                           |
+| **Rename context**                | Rename cluster context in the stored kubeconfig file and update the app store. Rewrites context/cluster names in YAML. (`renameClusterContext()`)                                                                                             |
+| **Kubeconfig merge/dedupe**       | Merge multiple kubeconfig files with automatic duplicate detection and conflict resolution. Reports all conflicts with source file tracking. (`kubeconfig-merge.ts`)                                                                          |
+| **Catalog export/import**         | Export groups, tags, display names as JSON without secrets. Import on another machine. Versioned format with validation. (`catalog-export.ts`)                                                                                                |
+| **Audit trail**                   | Records cluster management actions (add, remove, restore, rename, group changes) with timestamps. Capped at 500 entries. (`audit-trail.ts`)                                                                                                   |
 
 ### Cloud Import
 
@@ -126,6 +126,31 @@ If a specific region is provided (via Connect Cluster Wizard), only that region 
 `az aks list` returns `location` (region) and `resourceGroup` separately.
 The import uses `az aks get-credentials --name X --resource-group Y` with the correct
 resource group, not the location.
+
+**Multi-scope discovery (v0.21+):**
+
+Each provider supports scoped credentials beyond the default:
+
+| Provider     | Scope        | List command                  | Applied as                |
+| ------------ | ------------ | ----------------------------- | ------------------------- |
+| AWS EKS      | Profile      | `aws configure list-profiles` | `--profile <name>`        |
+| GKE          | Project      | `gcloud projects list`        | `--project=<id>`          |
+| AKS          | Subscription | `az account list`             | `--subscription <id>`     |
+| DigitalOcean | (none)       | -                             | single token from `doctl` |
+
+The Connect Cluster Wizard exposes a **Scope dropdown** populated from the list
+commands above plus a **"Scan all" button** that iterates every scope × every
+region in parallel via `listCloudClustersAllScopes()`. Failed scopes are
+collected and reported separately so partial results are still shown.
+
+Functions:
+
+- `listCloudClusters(provider, region?, scope?)` - single scan
+- `listCloudScopes(provider)` - list available profiles/projects/subscriptions
+- `listCloudClustersAllScopes(provider)` - full iteration with error collection
+
+Each imported `CloudCluster` keeps the `scope` it came from so `importCloudCluster`
+can call `get-credentials` with the correct profile/project/subscription.
 
 ---
 

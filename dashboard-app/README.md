@@ -311,7 +311,7 @@ User -> Cluster Page -> Workload Store -> kubectl (bundled) -> K8s API
 
 ### Key Design Decisions
 
-- **Zero OS dependencies**: all 13 CLI tools bundled as Tauri sidecars/resources
+- **Zero OS dependencies**: all 20 CLI tools bundled as Tauri sidecars/resources
 - **Offline-first**: health check data cached locally, works without network
 - **Plugin architecture**: features isolated as toggleable plugins with tiers
 - **Concurrent budget**: kubectl operations limited by configurable concurrency pool
