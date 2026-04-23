@@ -3,6 +3,10 @@
 Runtime security monitoring, compliance benchmarking, and vulnerability
 scanning for Kubernetes clusters.
 
+> **Looking for the app's own security posture** (how ROZOOM stores
+> credentials, what it sends to Sentry, enterprise compliance status)?
+> See [enterprise-readiness.md](enterprise-readiness.md).
+
 ---
 
 ## Pages
