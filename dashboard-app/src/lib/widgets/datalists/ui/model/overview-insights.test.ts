@@ -309,7 +309,7 @@ describe("overview-insights", () => {
     });
   });
 
-  it("marks self-managed scheduler and controller manager as unavailable when neither probes nor pods are visible", () => {
+  it("marks self-managed scheduler and controller manager as ok when API server is healthy but pods are not visible", () => {
     const controlPlaneChecks = buildControlPlaneChecks({
       checks: makeChecks({
         apiServerHealth: {
@@ -324,10 +324,12 @@ describe("overview-insights", () => {
     });
 
     expect(controlPlaneChecks.find((item) => item.id === "scheduler")).toMatchObject({
-      severity: "unavailable",
+      severity: "ok",
+      detail: "Not visible as pods (may run as system containers). API server is healthy.",
     });
     expect(controlPlaneChecks.find((item) => item.id === "controller-manager")).toMatchObject({
-      severity: "unavailable",
+      severity: "ok",
+      detail: "Not visible as pods (may run as system containers). API server is healthy.",
     });
   });
 
