@@ -2,6 +2,25 @@
 
 All notable changes to ROZOOM - K8s Linter IDE.
 
+## [0.21.0-rc.2] - 2026-04-23
+
+### Added
+- Resource pressure fallback for clusters without metrics-server: CPU and memory usage cards are computed from pod requests vs node allocatable when `kubectl top` and kubelet `/proxy/stats/summary` are unavailable. Effective per-pod requests follow the Kubernetes scheduler rule `max(max(initContainer.requests), sum(container.requests))`. Failed pod-list fetches surface as "metrics unavailable" rather than a misleading healthy 0%.
+- Per-cluster metrics-server availability cache (10-minute cooldown) skips the cluster-wide pod listing when `kubectl top` was observed working, dramatically reducing refresh cost on large fleets.
+- Cards show "CPU requested" / "Memory requested" labels with an explanatory banner when running in fallback mode; mode persists in the overview snapshot cache.
+- Phase 8 enterprise security hardening roadmap in `ROADMAP.md` and a new `docs/enterprise-readiness.md` page documenting the path from internal dev-team posture to regulated-environment readiness (SOC 2 Type II, ISO 27001, PCI-DSS 4.0, HIPAA, FedRAMP).
+- Sentry credential scrubbing (Phase 8.2): `beforeSend` / `beforeBreadcrumb` strip kubeconfig YAML fields, OIDC client secrets, Authorization headers (Bearer/Basic/custom, case-insensitive per RFC 7235), password fields, bare JWTs, and absolute kubeconfig paths (POSIX and Windows) from every event path - message, exception values, stacktrace frames, breadcrumbs, request, extra, contexts, tags.
+- Sentry HMR noise filter: Vite module-swap artefacts (`Importing a module script failed`, Safari/Chrome `module.default` undefined, Svelte lifecycle getter errors) are dropped via `ignoreErrors`; Vite HMR client and cache URLs via `denyUrls`. Prod visibility is preserved because the filters never match production traffic.
+- Global sidebar toggle (MessageSquareCode icon) to suppress CLI command toast notifications app-wide; defaults to off; persisted in `dashboard-preferences.json`.
+
+### Fixed
+- Pod issues on Overview show "ok" when no crash loops or pending pods are detected, instead of "unknown" when the `podIssues` record is undefined.
+- API server health falls back to `/healthz` on RKE and older Kubernetes clusters where `/livez` / `/readyz` return 404. NotFound detection is strict - only transport-layer 404 sentinels trigger the fallback, so verbose `/readyz` output with a 404 in a sub-probe detail line is not treated as endpoint-missing.
+- Scheduler and controller-manager on self-managed clusters where these components run as Docker containers (RKE, kubeadm with Docker runtime) show "ok" with an explanation when the API server is healthy, instead of "unavailable".
+
+### Changed
+- Sentry guarantee in `SECURITY.md` reworded so the data-storage bullet and the compliance gap table are consistent: the SDK is configured to exclude cluster data and credentials by design, and automated scrubbing enforcement is tracked as Phase 8.2 rather than claimed as already in place.
+
 ## [0.20.0] - 2026-03-30
 
 ### Added
