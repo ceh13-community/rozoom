@@ -139,6 +139,7 @@ function normalizeHelmVersion(value: string): string {
 
 async function resolveLatestChartVersion(chartName: string): Promise<{
   latest: string | null;
+  chartPath?: string;
   error?: string;
 }> {
   try {
@@ -150,19 +151,25 @@ async function resolveLatestChartVersion(chartName: string): Promise<{
     const payload = JSON.parse(result.stdout || "[]") as Array<{ name?: string; version?: string }>;
     const candidates = payload
       .filter(
-        (entry) =>
-          entry.version && entry.name?.toLowerCase().endsWith(`/${chartName.toLowerCase()}`),
+        (entry): entry is { name: string; version: string } =>
+          Boolean(entry.version) &&
+          typeof entry.name === "string" &&
+          entry.name.toLowerCase().endsWith(`/${chartName.toLowerCase()}`),
       )
-      .map((entry) => entry.version as string);
+      .map((entry) => ({ chartPath: entry.name, version: entry.version }));
 
     if (candidates.length === 0) {
       return { latest: null, error: "Chart was not found in configured Helm repositories" };
     }
 
-    const latest = [...candidates].sort((a, b) =>
-      compareSemver(normalizeHelmVersion(b), normalizeHelmVersion(a)),
-    )[0];
-    return { latest };
+    const [best] = [...candidates].sort((a, b) =>
+      compareSemver(normalizeHelmVersion(b.version), normalizeHelmVersion(a.version)),
+    );
+    // `candidates.length === 0` guard above means `best` is always defined, but the
+    // TS narrowing does not follow the array destructuring fully - re-check anyway.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (!best) return { latest: null };
+    return { latest: best.version, chartPath: best.chartPath };
   } catch (error) {
     return {
       latest: null,
@@ -197,7 +204,10 @@ async function buildRun(
     return { release, chartName, versionValue };
   });
 
-  const latestByChartName = new Map<string, { latest: string | null; error?: string }>();
+  const latestByChartName = new Map<
+    string,
+    { latest: string | null; chartPath?: string; error?: string }
+  >();
   for (const chartName of chartNames) {
     const latest = await resolveLatestChartVersion(chartName);
     latestByChartName.set(chartName, latest);
@@ -221,12 +231,18 @@ async function buildRun(
         ? `Release status: ${release.status}`
         : undefined;
 
+    const chartPath = latestMeta?.chartPath;
+    const repoName = chartPath ? chartPath.split("/")[0] : undefined;
+
     return {
       name: release.name,
       namespace: release.namespace,
       version: versionValue,
       latest: latestMeta?.latest ?? null,
       status,
+      chartPath,
+      repoName,
+      chartName,
       error: latestMeta?.error ?? releaseStateError,
     };
   });

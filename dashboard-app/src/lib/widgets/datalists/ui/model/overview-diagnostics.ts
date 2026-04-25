@@ -264,6 +264,54 @@ function isCheckError(v: unknown): v is ClusterCheckError {
   return v != null && typeof v === "object" && "errors" in v && !("pods" in v);
 }
 
+// Substring-based patterns that are already unique enough not to false-match.
+const AUTH_SUBSTRING_PATTERNS = [
+  // Generic kube API responses
+  "unauthorized",
+  "forbidden",
+  "system:unauthenticated",
+  "token has expired",
+  "invalid bearer token",
+  "expired credentials",
+  // AWS EKS exec-plugin (aws-iam-authenticator / aws eks get-token)
+  "aws-iam-authenticator",
+  "unable to locate credentials",
+  "expiredtoken",
+  "expired token",
+  "could not load credentials",
+  "sso session has expired",
+  "security token included in the request is expired",
+  // GKE exec-plugin (gke-gcloud-auth-plugin, gcloud auth)
+  "gke-gcloud-auth-plugin",
+  "gcloud credentials have been invalidated",
+  "reauthentication is needed",
+  "application default credentials are not available",
+  // Azure exec-plugin (kubelogin, azure-cli)
+  "aadsts",
+  "kubelogin:",
+  "no subscription found",
+  // Generic kubectl exec-plugin envelope
+  "exec plugin",
+  "getting credentials: exec",
+  // OIDC / token-based
+  "could not find client credentials",
+  "oidc: token is expired",
+  "refresh token: invalid",
+] as const;
+
+// Patterns that would false-positive as bare substrings (`"401"` matches log
+// line numbers and byte counts; `"exit status 255"` matches generic ssh
+// failures). Require a word boundary so we only fire on the real token.
+const AUTH_WORD_BOUNDARY_PATTERNS = [/\b401\b/, /\b403\b/, /\bexit status 255\b/] as const;
+
+export function isAuthError(raw: string): boolean {
+  const lower = raw.toLowerCase();
+  if (AUTH_SUBSTRING_PATTERNS.some((pattern) => lower.includes(pattern))) {
+    return true;
+  }
+  return AUTH_WORD_BOUNDARY_PATTERNS.some((pattern) => pattern.test(lower));
+}
+
 export function isConnectionError(raw: string): boolean {
   const lower = raw.toLowerCase();
   return (
@@ -274,12 +322,10 @@ export function isConnectionError(raw: string): boolean {
     lower.includes("certificate") ||
     lower.includes("tls") ||
     lower.includes("x509") ||
-    lower.includes("unauthorized") ||
-    lower.includes("403") ||
-    lower.includes("forbidden") ||
     lower.includes("etimedout") ||
     lower.includes("enotfound") ||
-    lower.includes("getaddrinfo")
+    lower.includes("getaddrinfo") ||
+    isAuthError(raw)
   );
 }
 
@@ -304,10 +350,11 @@ export function humanizeClusterError(raw: string): { title: string; detail: stri
         "The cluster API server rejected the connection due to a certificate issue. Check your kubeconfig certificates.",
     };
   }
-  if (lower.includes("unauthorized") || lower.includes("403") || lower.includes("forbidden")) {
+  if (isAuthError(raw)) {
     return {
       title: "Authentication failed",
-      detail: "Access to the cluster was denied. Verify your credentials and RBAC permissions.",
+      detail:
+        "Access to the cluster was denied. Refresh the kubeconfig token or verify your credentials and RBAC permissions.",
     };
   }
   if (lower.includes("timeout") || lower.includes("etimedout") || lower.includes("deadline")) {
@@ -315,6 +362,34 @@ export function humanizeClusterError(raw: string): { title: string; detail: stri
       title: "Connection timed out",
       detail:
         "The cluster API server did not respond in time. The cluster may be overloaded or unreachable.",
+    };
+  }
+  if (lower.includes("429") || lower.includes("too many requests") || lower.includes("throttled")) {
+    return {
+      title: "API server rate-limited",
+      detail:
+        "The cluster is throttling requests (HTTP 429). Reduce refresh frequency or wait for the rate limit to reset.",
+    };
+  }
+  if (lower.includes("503") || lower.includes("service unavailable")) {
+    return {
+      title: "API server unavailable",
+      detail:
+        "The Kubernetes API responded with 503. The control plane may be starting, restarting, or behind a failing load balancer.",
+    };
+  }
+  if (lower.includes("502") || lower.includes("bad gateway")) {
+    return {
+      title: "API gateway error",
+      detail:
+        "The reverse proxy in front of the API server returned 502. Common on managed clusters during maintenance.",
+    };
+  }
+  if (/\b5\d{2}\b/.test(lower) || lower.includes("internal server error")) {
+    return {
+      title: "API server error",
+      detail:
+        "The cluster API returned a server error. Check control-plane logs or retry; the issue is on the cluster side.",
     };
   }
   if (lower.includes("not found") || lower.includes("enotfound") || lower.includes("getaddrinfo")) {
@@ -332,8 +407,20 @@ export function humanizeClusterError(raw: string): { title: string; detail: stri
 
 export function buildPrimaryAlert(
   checks: ClusterHealthChecks | ClusterCheckError | null,
+  options?: { loading?: boolean },
 ): OverviewPrimaryAlert {
   if (!checks) {
+    // Loading = auto-initial or user-triggered refresh is in flight.
+    // Show what we're doing instead of a static "no data" message so the
+    // card isn't blank for the 5-10s window between cluster add and the
+    // first collect settling.
+    if (options?.loading) {
+      return {
+        severity: "info",
+        title: "Collecting diagnostics...",
+        detail: "Scanning pods, nodes, and control-plane health. This takes a few seconds.",
+      };
+    }
     return {
       severity: "info",
       title: "No diagnostics yet",

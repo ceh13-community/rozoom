@@ -7,6 +7,21 @@ const dev = process.env.NODE_ENV === "development";
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
   preprocess: vitePreprocess(),
+  compilerOptions: {
+    // Inline each component's CSS into its compiled JS and inject at runtime
+    // via document.head.appendChild, instead of emitting a separate virtual
+    // `?svelte&type=style&lang.css` URL. This eliminates a long-standing
+    // race between the WebKitGTK cache and the Svelte Vite plugin on HMR
+    // reloads (documented in README.md > Troubleshooting dev builds), where
+    // the browser requested the style URL before the parent .svelte file
+    // finished transforming and Vite served the raw source to PostCSS.
+    //
+    // For a Tauri desktop app with adapter-static and local assets the
+    // tradeoffs favour `injected`: no network caching benefit is lost,
+    // there is no FOUC because JS loads before first paint, and the dev
+    // experience becomes deterministic.
+    css: "injected",
+  },
   kit: {
     adapter: dev
       ? undefined

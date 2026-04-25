@@ -35,11 +35,13 @@
   } from "$features/check-health/";
   import {
     dashboardDataProfile,
+    setDashboardDataProfile,
     shouldAutoRunDiagnostics,
   } from "$shared/lib/dashboard-data-profile.svelte";
-  import { getClusterPlatformLabel } from "$shared/ui/cluster-platform";
+  import { getClusterPlatformLabel, resolveClusterDisplayName } from "$shared/ui/cluster-platform";
   import {
     humanizeClusterError,
+    isAuthError,
     isConnectionError,
   } from "$widgets/datalists/ui/model/overview-diagnostics";
   import { onMount, onDestroy, type Component } from "svelte";
@@ -89,6 +91,14 @@
         text: "Pending",
         tooltip: "Waiting for initial health check. Click the refresh button to start.",
       };
+    if (checkState.error && isAuthError(checkState.error))
+      return {
+        color: "bg-amber-600",
+        text: "Auth expired",
+        tooltip:
+          "Kubeconfig credentials were rejected by the API server (Unauthorized/Forbidden). " +
+          "Refresh the token via the Cluster Manager or re-import the kubeconfig.",
+      };
     if (checkState.error && isConnectionError(checkState.error))
       return {
         color: "bg-slate-600",
@@ -107,6 +117,7 @@
     return { ...base, tooltip };
   });
   const platformLabel = $derived(getClusterPlatformLabel(cluster.name));
+  const displayName = $derived(resolveClusterDisplayName(cluster));
   const isRefreshLoading = $derived(checkState.loading);
   const showInitialRefreshHint = $derived(
     Boolean(cluster.needsInitialRefreshHint) && !isRefreshLoading && isClustersListRoute,
@@ -120,7 +131,7 @@
     if (cluster.needsInitialRefreshHint) {
       return { severity: "info" as const, title: "Initial refresh required" };
     }
-    return buildPrimaryAlert(lastCheck);
+    return buildPrimaryAlert(lastCheck, { loading: isRefreshLoading });
   });
 
   // ── Goal blocks ────────────────────────────────────────────────
@@ -323,6 +334,68 @@
   let healthCheckHydrated = $state(false);
   const refreshIntervalMs = $derived(Number(refreshInterval) * 60_000);
 
+  // `now` ticks every 30s so the "N ago" label stays fresh without a full
+  // reactive dependency chain. 30s is coarse enough to be cheap and still
+  // feels live at the minute-granularity the cards display.
+  let now = $state(Date.now());
+  $effect(() => {
+    const id = setInterval(() => (now = Date.now()), 30_000);
+    return () => clearInterval(id);
+  });
+
+  // ClusterHealthChecks is only written on a successful collect. When the
+  // cluster returns 403 / context-deadline on every tick, lastCheck stays
+  // null and the "Last refresh" label would be stuck at "never" even
+  // though the watcher is ticking on schedule. Track the attempt time
+  // locally by watching the loading transition - every time isRefreshLoading
+  // drops from true to false, that's an attempted finish whether it
+  // succeeded or failed.
+  let localLastAttemptAt = $state<number | null>(null);
+  let prevRefreshLoading = false;
+  $effect(() => {
+    const loading = isRefreshLoading;
+    if (prevRefreshLoading && !loading) {
+      localLastAttemptAt = Date.now();
+    }
+    prevRefreshLoading = loading;
+  });
+
+  const lastRefreshedAt = $derived.by(() => {
+    const ts = lastCheck ? ((lastCheck as { timestamp?: number }).timestamp ?? null) : null;
+    // Prefer the freshest between the store timestamp and the local
+    // attempt stamp so failed ticks still advance the label.
+    if (typeof ts === "number" && localLastAttemptAt !== null) {
+      return Math.max(ts, localLastAttemptAt);
+    }
+    return typeof ts === "number" ? ts : localLastAttemptAt;
+  });
+  const lastRefreshHadError = $derived(
+    Boolean((lastCheck && "errors" in lastCheck) || checkState.error),
+  );
+  const lastRefreshedLabel = $derived.by(() => {
+    void now; // keep the label live
+    if (!lastRefreshedAt) return "never";
+    const deltaSec = Math.max(0, Math.round((Date.now() - lastRefreshedAt) / 1000));
+    if (deltaSec < 45) return "just now";
+    if (deltaSec < 90) return "1m ago";
+    const mins = Math.round(deltaSec / 60);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.round(hours / 24);
+    return `${days}d ago`;
+  });
+  const refreshStale = $derived.by(() => {
+    if (!lastRefreshedAt) return false;
+    const budget = refreshIntervalMs * 3;
+    return Date.now() - lastRefreshedAt > budget;
+  });
+
+  const autoRefreshProfile = $derived($dashboardDataProfile);
+  function enableAutoDiagnostics() {
+    setDashboardDataProfile("balanced");
+  }
+
   function goToCluster() {
     if (!cluster.name) return;
     stopAllBackgroundPollers();
@@ -462,9 +535,10 @@
         type="button"
         class="truncate font-semibold bg-transparent border-0 text-white text-left cursor-pointer"
         title={cluster.name}
+        aria-label={cluster.name}
         onclick={goToCluster}
       >
-        {cluster.name}
+        {displayName}
       </button>
       <Button class="hover:bg-transparent ml-auto" variant="ghost" onclick={goToCluster}>
         <SquareChevronRight class="w-4 h-4" />
@@ -544,8 +618,66 @@
       </div>
     </div>
 
-    <!-- Connection error (from checkState, may appear before primaryAlert updates) -->
-    {#if checkState.error && isConnectionError(checkState.error) && primaryAlert.severity === "ok"}
+    <div class="mx-3 flex flex-wrap items-center gap-1.5 pb-1 text-[10px] text-white/70">
+      {#if isRefreshLoading}
+        <span class="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-sky-300"></span>
+        <span>Refreshing now</span>
+      {:else if cluster.needsInitialRefreshHint}
+        <span class="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-sky-300"></span>
+        <span title="Auto-refresh starts after the first manual refresh.">
+          Press ↻ to start auto-refresh
+        </span>
+      {:else if !autoDiagnosticsEnabled}
+        <span class="inline-flex h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+        <span title="Data profile '{autoRefreshProfile.label}' disables scheduled health checks.">
+          Auto-refresh off ({autoRefreshProfile.label})
+        </span>
+        <button
+          type="button"
+          class="rounded border border-amber-400/60 bg-amber-400/10 px-1.5 py-[1px] text-[9px] font-medium text-amber-200 hover:bg-amber-400/20"
+          onclick={enableAutoDiagnostics}
+          title="Switch the global dashboard profile to Balanced so cards refresh on schedule"
+        >
+          Enable
+        </button>
+      {:else if !autoRefreshActive}
+        <span class="inline-flex h-1.5 w-1.5 rounded-full bg-slate-400"></span>
+        <span
+          title="This card is outside the current auto-refresh rotation window. Profile limits the number of cards polling in parallel; scroll / reorder or switch profile to change the window."
+        >
+          Auto-refresh queued (rotation)
+        </span>
+      {:else}
+        <span
+          class="inline-flex h-1.5 w-1.5 rounded-full {lastRefreshHadError
+            ? 'bg-rose-400'
+            : refreshStale
+              ? 'bg-amber-400'
+              : 'bg-emerald-400'}"
+          title={lastRefreshHadError
+            ? "Last refresh attempt failed - see the alert above for details"
+            : refreshStale
+              ? "Last refresh is older than 3x the interval"
+              : "Up-to-date"}
+        ></span>
+        <span>Last refresh: {lastRefreshedLabel}{lastRefreshHadError ? " (failed)" : ""}</span>
+      {/if}
+    </div>
+
+    <!-- Auth expired (kubeconfig token/credentials rejected) -->
+    {#if checkState.error && isAuthError(checkState.error)}
+      <a
+        href="/cluster-manager"
+        class="mx-3 mb-2 block w-[calc(100%-1.5rem)] rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-1.5 text-left text-xs shadow-sm transition hover:opacity-80 dark:border-amber-800/40 dark:bg-amber-950/30"
+        title="Open Cluster Manager to refresh credentials"
+      >
+        <div class="flex items-center justify-between gap-2">
+          <span class="truncate font-medium">Credentials expired - refresh in Cluster Manager</span>
+          <Badge class="h-4 shrink-0 bg-amber-600 px-1 text-[9px] text-white">Auth</Badge>
+        </div>
+      </a>
+      <!-- Connection error (from checkState, may appear before primaryAlert updates) -->
+    {:else if checkState.error && isConnectionError(checkState.error) && primaryAlert.severity === "ok"}
       {@const friendly = humanizeClusterError(checkState.error)}
       <button
         type="button"

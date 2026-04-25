@@ -29,7 +29,7 @@ describe("workloads menu", () => {
 
     await fireEvent.click(first.getByRole("button", { name: "Cluster Ops" }));
     expect(first.getByRole("link", { name: "API Deprecation Scan" })).toBeInTheDocument();
-    expect(first.getByRole("link", { name: "Helm" })).toBeInTheDocument();
+    expect(first.getByRole("link", { name: "Helm Releases" })).toBeInTheDocument();
     first.unmount();
 
     const second = render(WorkloadsMenu, {
@@ -62,11 +62,11 @@ describe("workloads menu", () => {
       props: { searchParams: { workload: "versionaudit" }, collapsed: false },
     });
 
-    expect(getByRole("link", { name: "Cluster Version & Helm Audit" })).toBeInTheDocument();
+    expect(getByRole("link", { name: "Version Audit" })).toBeInTheDocument();
 
     await fireEvent.click(getByRole("button", { name: "Cluster Ops" }));
 
-    expect(queryByRole("link", { name: "Cluster Version & Helm Audit" })).not.toBeInTheDocument();
+    expect(queryByRole("link", { name: "Version Audit" })).not.toBeInTheDocument();
   });
 
   it("renders Network and Storage sections with expected entries", async () => {

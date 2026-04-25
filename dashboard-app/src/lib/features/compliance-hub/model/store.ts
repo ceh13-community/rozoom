@@ -736,9 +736,10 @@ export async function runComplianceHubScan(
 export async function installComplianceProvider(
   clusterId: string,
   providerId: ComplianceProviderId,
+  onOutput?: (chunk: string) => void,
 ): Promise<{ success: boolean; error?: string }> {
   if (providerId === "kubescape") {
-    return installKubescape(clusterId);
+    return installKubescape(clusterId, undefined, onOutput);
   }
   return {
     success: false,

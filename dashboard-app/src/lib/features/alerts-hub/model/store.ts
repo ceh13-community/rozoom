@@ -74,14 +74,25 @@ function parseAlertmanagerAlerts(raw: string): AlertmanagerApiAlert[] {
 }
 
 function mapAlertmanagerAlerts(clusterId: string, items: AlertmanagerApiAlert[]): AlertItem[] {
+  // Alertmanager can legitimately return the same fingerprint twice when a
+  // rule fires for the same series through two receivers, or when our caller
+  // concatenates alerts from two sources. A Svelte keyed #each crashes with
+  // each_key_duplicate on collisions, which freezes the whole panel, so we
+  // disambiguate collisions here with an occurrence counter while keeping
+  // the first occurrence's id stable.
+  const seen = new Map<string, number>();
   return items.map((item, index) => {
     const labels = item.labels ?? {};
     const annotations = item.annotations ?? {};
     const alertname = labels.alertname || annotations.summary || `alert-${index + 1}`;
     const since = item.startsAt || item.updatedAt || new Date().toISOString();
     const receiver = item.receivers?.[0]?.name;
+    const baseId = item.fingerprint || `${clusterId}-${alertname}-${since}-${index}`;
+    const occurrence = seen.get(baseId) ?? 0;
+    seen.set(baseId, occurrence + 1);
+    const id = occurrence === 0 ? baseId : `${baseId}#${occurrence}`;
     return {
-      id: item.fingerprint || `${clusterId}-${alertname}-${since}-${index}`,
+      id,
       state: stateFromAlertmanagerStatus(item.status),
       severity: severityFromAlertmanagerLabels(labels),
       alertname,
@@ -113,12 +124,26 @@ async function fetchAlertmanagerAlerts(clusterId: string): Promise<{
 
   const namespace = release.release?.namespace || "monitoring";
   const releaseName = release.release?.name || "kube-prometheus-stack";
-  const paths = [
-    `/api/v1/namespaces/${namespace}/services/http:alertmanager-operated:9093/proxy/api/v2/alerts`,
-    `/api/v1/namespaces/${namespace}/services/http:alertmanager-operated/proxy/api/v2/alerts`,
-    `/api/v1/namespaces/${namespace}/services/http:alertmanager-${releaseName}-kube-prometheus-alertmanager:9093/proxy/api/v2/alerts`,
-    `/api/v1/namespaces/${namespace}/services/http:alertmanager-${releaseName}-kube-prometheus-alertmanager/proxy/api/v2/alerts`,
+
+  // Kubernetes API service-proxy path syntax:
+  //   /api/v1/namespaces/<ns>/services/[<scheme>:]<name>[:<port>]/proxy/<path>
+  // Chart service names, in priority order:
+  //   1. <release>-kube-prometheus-alertmanager  - default kps release
+  //   2. alertmanager-operated                   - operator headless service
+  //   3. alertmanager-<release>-kube-prometheus-alertmanager - older chart ver
+  // We try each with the explicit :9093 port first (works even when named
+  // ports change) and a no-port fallback for clusters where the svc exposes
+  // a single port. The `http:` scheme prefix is kept because the alertmanager
+  // web port is TLS-terminated only when the user explicitly configures it.
+  const candidates = [
+    `${releaseName}-kube-prometheus-alertmanager`,
+    "alertmanager-operated",
+    `alertmanager-${releaseName}-kube-prometheus-alertmanager`,
   ];
+  const paths = candidates.flatMap((svc) => [
+    `/api/v1/namespaces/${namespace}/services/http:${svc}:9093/proxy/api/v2/alerts`,
+    `/api/v1/namespaces/${namespace}/services/${svc}/proxy/api/v2/alerts`,
+  ]);
 
   const errors: string[] = [];
   for (const path of paths) {

@@ -3434,7 +3434,7 @@ dependencies = [
 
 [[package]]
 name = "rozoom-k8s-linter-ide"
-version = "0.19.0"
+version = "0.21.0-rc.2"
 dependencies = [
  "dirs",
  "log",
@@ -3451,6 +3451,8 @@ dependencies = [
  "tauri-plugin-store",
  "tauri-plugin-window-state",
  "tokio",
+ "url",
+ "webkit2gtk",
 ]
 
 [[package]]

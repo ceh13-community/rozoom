@@ -125,7 +125,10 @@
 
     if (offline) {
       if (pollingActive) {
-        void writeRuntimeDebugLog("runtime", "version_summary_poll_stopped", { clusterId, reason: "offline" });
+        void writeRuntimeDebugLog("runtime", "version_summary_poll_stopped", {
+          clusterId,
+          reason: "offline",
+        });
         stopVersionAuditPolling(clusterId);
         pollingActive = false;
       }
@@ -191,17 +194,28 @@
   <div>
     {statusEmoji[summary.k8sStatus]}
   </div>
-{:else if lazyLoad && !manuallyActivated}
+{:else if (lazyLoad && !manuallyActivated) || bootstrapInFlight}
   <button
     type="button"
-    class="rounded-md border border-slate-400 bg-slate-700 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-slate-600"
-    onclick={(e) => { e.stopPropagation(); handleManualLoad(); }}
+    class="inline-flex items-center gap-1 rounded-md border border-slate-400 bg-slate-700 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-slate-600 disabled:cursor-wait disabled:opacity-70"
+    onclick={(e) => {
+      e.stopPropagation();
+      handleManualLoad();
+    }}
+    disabled={Boolean(bootstrapInFlight)}
+    title={bootstrapInFlight
+      ? "Querying helm releases, comparing installed versus latest chart versions..."
+      : "Lists installed helm releases and compares each against the latest available version in the chart repo (helm list + helm search). Takes a few seconds."}
   >
-    Load
+    {#if bootstrapInFlight}
+      <span
+        class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-transparent"
+      ></span>
+      <span>Checking<LoadingDots /></span>
+    {:else}
+      Load
+    {/if}
   </button>
-{:else if bootstrapInFlight}
-  <div class="truncate text-gray-500 text-xs">Loading<LoadingDots /></div>
-  <div class="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-transparent"></div>
 {:else}
   <div class="truncate text-gray-500 text-xs">Unreachable</div>
   <div>{statusEmoji.unreachable}</div>

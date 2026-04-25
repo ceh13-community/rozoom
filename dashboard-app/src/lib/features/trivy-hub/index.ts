@@ -16,3 +16,12 @@ export type {
   TrivyProviderId,
   TrivyProviderStatus,
 } from "./model/types";
+
+export { runLocalTrivyK8sScan } from "./model/local-scan";
+export type {
+  LocalScanResult,
+  LocalVulnItem,
+  LocalMisconfigItem,
+  LocalSecretItem,
+  ScanSource,
+} from "./model/local-scan";

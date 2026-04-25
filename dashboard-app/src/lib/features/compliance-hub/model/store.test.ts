@@ -242,7 +242,7 @@ describe("compliance hub store", () => {
     expect(kubescape.success).toBe(true);
     expect(kubeBench.success).toBe(false);
     expect(kubeBench.error).toContain("not supported");
-    expect(installKubescape).toHaveBeenCalledWith("cluster-a");
+    expect(installKubescape).toHaveBeenCalledWith("cluster-a", undefined, undefined);
     expect(get(complianceHubState)).toEqual({});
   });
 

@@ -32,6 +32,7 @@
   import {
     buildPrimaryAlert,
     humanizeClusterError,
+    isAuthError,
     isConnectionError,
   } from "$widgets/datalists/ui/model/overview-diagnostics";
   import MetricsStatus from "./metrics-status.svelte";
@@ -85,12 +86,13 @@
   import { Button } from "$shared/ui/button";
   import { Checkbox } from "$shared/ui/checkbox";
   import type { AppClusterConfig } from "$entities/config/";
-  import { getClusterPlatformLabel } from "$shared/ui/cluster-platform";
+  import { getClusterPlatformLabel, resolveClusterDisplayName } from "$shared/ui/cluster-platform";
   import * as Popover from "$shared/ui/popover";
   import { markClusterRefreshHintSeen } from "$features/cluster-manager";
   import { stopAllBackgroundPollers } from "$shared/lib/background-pollers";
   import {
     dashboardDataProfile,
+    setDashboardDataProfile,
     shouldAutoRunDiagnostics,
   } from "$shared/lib/dashboard-data-profile.svelte";
   import { resolveClusterRuntimeBudgetForCluster } from "$shared/lib/cluster-runtime-manager";
@@ -126,6 +128,7 @@
     return lastCheck;
   });
   const platformLabel = $derived.by(() => getClusterPlatformLabel(cluster.name));
+  const displayName = $derived(resolveClusterDisplayName(cluster));
   const checkState = $derived($clusterStates[cluster.uuid] || { loading: false, error: null });
   const isClustersListRoute = $derived($page.url.pathname === "/dashboard");
   const nameSpaacesList = $derived(
@@ -289,6 +292,14 @@
         text: "Pending",
         tooltip: "Waiting for initial health check. Click the refresh button to start.",
       };
+    if (checkState.error && isAuthError(checkState.error))
+      return {
+        color: "bg-amber-600",
+        text: "Auth expired",
+        tooltip:
+          "Kubeconfig credentials were rejected by the API server (Unauthorized/Forbidden). " +
+          "Refresh the token via the Cluster Manager or re-import the kubeconfig.",
+      };
     if (checkState.error && isConnectionError(checkState.error))
       return {
         color: "bg-slate-600",
@@ -315,8 +326,25 @@
           "Use refresh once to load the first cluster state. Scheduled updates start after that.",
       };
     }
-    return buildPrimaryAlert(lastCheck);
+    // Auth failures need the user's direct action - surface them in the
+    // same slot as other alerts rather than as a floating banner above
+    // General status, so the card layout stays uniform across clusters.
+    if (checkState.error && isAuthError(checkState.error)) {
+      return {
+        severity: "critical" as const,
+        title: "Credentials expired",
+        detail:
+          "The kubeconfig token or credentials were rejected by the API server. Open Cluster Manager to refresh.",
+      };
+    }
+    return buildPrimaryAlert(lastCheck, { loading: isRefreshLoading });
   });
+  // When the primary alert is an auth error, the card's main CTA should
+  // take the user to the place that fixes it instead of opening the
+  // cluster detail view (which will just fail to load).
+  const primaryAlertIsAuthError = $derived(
+    Boolean(checkState.error && isAuthError(checkState.error)),
+  );
   const globalLinter = $derived($globalLinterEnabled);
   const deprecationSummary = $derived(
     globalLinter ? ($deprecationScanState[cluster.uuid]?.summary ?? null) : null,
@@ -498,6 +526,60 @@
   const refreshIntervalMs = $derived.by(() => Number(refreshInterval) * 60_000);
   const isRefreshLoading = $derived(checkState.loading || refreshUiLoading);
   const autoDiagnosticsEnabled = $derived(shouldAutoRunDiagnostics($dashboardDataProfile));
+  const autoRefreshProfile = $derived($dashboardDataProfile);
+
+  // Keep the "Nm ago" label live without tying every tick to a full
+  // reactivity chain; 30s resolution is plenty at minute granularity.
+  let nowTick = $state(Date.now());
+  $effect(() => {
+    const id = setInterval(() => (nowTick = Date.now()), 30_000);
+    return () => clearInterval(id);
+  });
+
+  // Errored ticks never land a ClusterHealthChecks record, so fall back
+  // to a local attempt stamp captured from isRefreshLoading transitions -
+  // that way the label ticks on every attempt, successful or not.
+  let localLastAttemptAt = $state<number | null>(null);
+  let prevRefreshLoading = false;
+  $effect(() => {
+    const loading = isRefreshLoading;
+    if (prevRefreshLoading && !loading) {
+      localLastAttemptAt = Date.now();
+    }
+    prevRefreshLoading = loading;
+  });
+
+  const lastRefreshedAt = $derived.by(() => {
+    const ts = lastCheck ? ((lastCheck as { timestamp?: number }).timestamp ?? null) : null;
+    if (typeof ts === "number" && localLastAttemptAt !== null) {
+      return Math.max(ts, localLastAttemptAt);
+    }
+    return typeof ts === "number" ? ts : localLastAttemptAt;
+  });
+  const lastRefreshHadError = $derived(
+    Boolean((lastCheck && "errors" in lastCheck) || checkState.error),
+  );
+  const lastRefreshedLabel = $derived.by(() => {
+    void nowTick;
+    if (!lastRefreshedAt) return "never";
+    const deltaSec = Math.max(0, Math.round((Date.now() - lastRefreshedAt) / 1000));
+    if (deltaSec < 45) return "just now";
+    if (deltaSec < 90) return "1m ago";
+    const mins = Math.round(deltaSec / 60);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.round(hours / 24);
+    return `${days}d ago`;
+  });
+  const refreshStale = $derived.by(() => {
+    if (!lastRefreshedAt) return false;
+    return Date.now() - lastRefreshedAt > refreshIntervalMs * 3;
+  });
+
+  function enableAutoDiagnostics() {
+    setDashboardDataProfile("balanced");
+  }
   const effectiveLinter = $derived(globalLinter && linterEnabled);
   const effectiveDiagnosticsEnabled = $derived(autoDiagnosticsEnabled && effectiveLinter);
   const effectiveRuntimeBudget = $derived(resolveClusterRuntimeBudgetForCluster(cluster.uuid));
@@ -550,6 +632,18 @@
       stopAllBackgroundPollers();
       goto(`/dashboard/clusters/${encodeURIComponent(cluster.uuid)}?workload=overview`);
     }
+  }
+
+  function goToClusterOrFixCreds() {
+    // When the cluster can't even authenticate, the primary CTA should
+    // open Cluster Manager (where the user refreshes the token) instead
+    // of the cluster detail view, which would just fail to load.
+    if (primaryAlertIsAuthError) {
+      stopAllBackgroundPollers();
+      goto("/cluster-manager");
+      return;
+    }
+    goToCluster();
   }
 
   function goToWorkloads(workload: string, sortField?: string) {
@@ -818,9 +912,10 @@
         role="button"
         class="truncate"
         title={cluster.name}
+        aria-label={cluster.name}
         onclick={goToCluster}
         onkeydown={(e) => handleKeypress(e, goToCluster)}
-        tabindex="0">{cluster.name}</span
+        tabindex="0">{displayName}</span
       >
       {#if cluster.status !== "error" && !isRefreshLoading && !lastCheck?.errors}
         <Button class="hover:bg-transparent ml-auto" variant="ghost" onclick={goToCluster}>
@@ -848,7 +943,10 @@
     <button
       type="button"
       class="mx-6 mb-3 block w-[calc(100%-3rem)] rounded-xl border border-slate-300/90 bg-white px-3.5 py-3.5 text-left text-sm text-slate-900 shadow-sm transition hover:bg-slate-50"
-      onclick={goToCluster}
+      onclick={goToClusterOrFixCreds}
+      title={primaryAlertIsAuthError
+        ? "Open Cluster Manager to refresh credentials"
+        : "Open cluster details"}
     >
       <div class="flex items-center justify-between gap-3">
         <div class="text-[13px] font-semibold tracking-[0.01em] text-slate-950">Primary Alert</div>
@@ -875,9 +973,9 @@
       <div class="mt-2 text-sm font-semibold leading-5 text-slate-950">{primaryAlert.title}</div>
       <div class="mt-1.5 text-xs font-medium leading-5 text-slate-700">{primaryAlert.detail}</div>
     </button>
-    <div class="px-6 flex justify-between items-center gap-2 mb-3">
-      Refresh:
-      <div class="flex items-center gap-2">
+    <div class="px-6 flex flex-wrap justify-between items-center gap-y-1.5 gap-x-2 mb-3">
+      <span class="shrink-0">Refresh:</span>
+      <div class="flex flex-wrap items-center gap-2">
         <label class="sr-only" for={`cluster-refresh-${cluster.uuid}`}>Refresh interval</label>
         <select
           id={`cluster-refresh-${cluster.uuid}`}
@@ -932,6 +1030,51 @@
             <p class="text-xs text-slate-300 mt-1">{friendly.detail}</p>
           </Popover.Content>
         </Popover.Root>
+      {/if}
+    </div>
+    <div class="px-6 mb-2 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
+      {#if isRefreshLoading}
+        <span class="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-sky-400"></span>
+        <span>Refreshing now</span>
+      {:else if cluster.needsInitialRefreshHint}
+        <span class="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-sky-400"></span>
+        <span title="Auto-refresh starts after the first manual refresh.">
+          Press ↻ to start auto-refresh
+        </span>
+      {:else if !autoDiagnosticsEnabled}
+        <span class="inline-flex h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+        <span title="Data profile '{autoRefreshProfile.label}' disables scheduled health checks.">
+          Auto-refresh off ({autoRefreshProfile.label})
+        </span>
+        <button
+          type="button"
+          class="rounded border border-amber-400/60 bg-amber-400/10 px-1.5 py-[1px] text-[10px] font-medium text-amber-300 hover:bg-amber-400/20"
+          onclick={enableAutoDiagnostics}
+          title="Switch the global dashboard profile to Balanced so cards refresh on schedule"
+        >
+          Enable
+        </button>
+      {:else if !autoRefreshActive}
+        <span class="inline-flex h-1.5 w-1.5 rounded-full bg-slate-400"></span>
+        <span
+          title="This card is outside the current auto-refresh rotation window. Profile limits the number of cards polling in parallel; scroll / reorder or switch profile to change the window."
+        >
+          Auto-refresh queued (rotation)
+        </span>
+      {:else}
+        <span
+          class="inline-flex h-1.5 w-1.5 rounded-full {lastRefreshHadError
+            ? 'bg-rose-400'
+            : refreshStale
+              ? 'bg-amber-400'
+              : 'bg-emerald-400'}"
+          title={lastRefreshHadError
+            ? "Last refresh attempt failed - see the alert above for details"
+            : refreshStale
+              ? "Last refresh is older than 3x the interval"
+              : "Up-to-date"}
+        ></span>
+        <span>Last refresh: {lastRefreshedLabel}{lastRefreshHadError ? " (failed)" : ""}</span>
       {/if}
     </div>
     {#if !cluster.needsInitialRefreshHint && !syntheticMode}
@@ -1161,30 +1304,69 @@
           <ChevronDown class="w-4 h-4 transition-transform group-open:rotate-180" />
         </summary>
         {#if !canShowConfigDiagnostics}
+          {@const diagnosticErrorRaw = checkState.error ?? lastCheck?.errors ?? ""}
+          {@const diagnosticError = diagnosticErrorRaw
+            ? humanizeClusterError(diagnosticErrorRaw)
+            : null}
+          {@const isAuthBlocking = Boolean(diagnosticErrorRaw && isAuthError(diagnosticErrorRaw))}
           <div
-            class="mt-2 flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-100/95 px-3 py-2.5 text-sm font-medium leading-5 text-amber-950 shadow-sm"
+            class="mt-2 flex flex-col gap-2 rounded-lg border {diagnosticError
+              ? 'border-rose-300 bg-rose-100/95 text-rose-950'
+              : 'border-amber-300 bg-amber-100/95 text-amber-950'} px-3 py-2.5 text-sm font-medium leading-5 shadow-sm"
           >
-            <div class="pr-2">
-              <div>Configuration diagnostics are not loaded yet.</div>
-              <div class="text-[11px] font-normal text-amber-900/80">
-                Fleet policy allows up to {effectiveRuntimeBudget.maxConcurrentDiagnostics} diagnostics
-                at once.
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0 pr-2">
+                {#if diagnosticError}
+                  <div class="font-semibold">{diagnosticError.title}</div>
+                  <div class="text-[11px] font-normal opacity-80 mt-0.5">
+                    {diagnosticError.detail}
+                  </div>
+                  {#if isAuthBlocking}
+                    <a
+                      href="/cluster-manager"
+                      class="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold underline decoration-dotted underline-offset-2 hover:opacity-80"
+                    >
+                      Open Cluster Manager to refresh credentials →
+                    </a>
+                  {/if}
+                {:else}
+                  <div>Configuration diagnostics are not loaded yet.</div>
+                  <div class="text-[11px] font-normal opacity-80">
+                    Fleet policy allows up to {effectiveRuntimeBudget.maxConcurrentDiagnostics} diagnostics
+                    at once.
+                  </div>
+                {/if}
               </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                class="h-8 shrink-0 border-current bg-white px-2.5 text-xs font-semibold {diagnosticError
+                  ? 'text-rose-950'
+                  : 'text-amber-950'} hover:bg-slate-50"
+                disabled={isAuthBlocking}
+                onclick={() => requestCardDiagnostics("config")}
+                title={isAuthBlocking
+                  ? "Fix credentials first - the API server is rejecting this kubeconfig"
+                  : "Run kubectl + helm scans needed for Configuration checks"}
+              >
+                {#if activeCardDiagnosticsScope === "config"}
+                  Loading<LoadingDots />
+                {:else if isDiagnosticsScopeQueued("config")}
+                  Queued by policy
+                {:else if diagnosticError}
+                  Retry
+                {:else}
+                  Load diagnostics
+                {/if}
+              </Button>
             </div>
-            <Button
-              size="sm"
-              variant="secondary"
-              class="h-8 shrink-0 border-amber-400 bg-white px-2.5 text-xs font-semibold text-amber-950 hover:bg-amber-50"
-              onclick={() => requestCardDiagnostics("config")}
-            >
-              {#if activeCardDiagnosticsScope === "config"}
-                Loading<LoadingDots />
-              {:else if isDiagnosticsScopeQueued("config")}
-                Queued by policy
-              {:else}
-                Load diagnostics
-              {/if}
-            </Button>
+            {#if diagnosticErrorRaw && !isAuthBlocking}
+              <details class="text-[11px] font-normal opacity-80">
+                <summary class="cursor-pointer">Show raw error</summary>
+                <pre
+                  class="mt-1 max-h-24 overflow-auto whitespace-pre-wrap rounded bg-white/60 p-1.5 text-[10px] leading-snug">{diagnosticErrorRaw}</pre>
+              </details>
+            {/if}
           </div>
         {/if}
         <div>

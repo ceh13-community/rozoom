@@ -892,13 +892,6 @@
         nodeMetrics = Array.isArray(fallbackNodes) ? fallbackNodes : [];
       }
 
-      // Distinguish a successful empty pod list (valid 0% pressure) from a failed
-      // pod fetch (null). Failed fetches must not masquerade as healthy 0% cards.
-      const podsFetchSucceeded =
-        podsResponse !== null &&
-        typeof podsResponse === "object" &&
-        Array.isArray(podsResponse.items);
-
       if (nodeMetrics.length > 0) {
         usageMetricsMode = "actual";
         coreMetricsUnavailable = false;
@@ -908,9 +901,13 @@
         memoryAveragePercent = normalizePercentValue(
           averagePercent(nodeMetrics.map((item) => item.memoryUsage)),
         );
-      } else if (nodeItems.length > 0 && podsFetchSucceeded) {
+      } else if (nodeItems.length > 0) {
         traceOverviewStage("usage.resource_pressure_fallback", { tokenId: token.id });
-        const pressure = calculateResourcePressure(nodeItems, podsResponse.items ?? []);
+        const podItems =
+          podsResponse && typeof podsResponse === "object" && Array.isArray(podsResponse.items)
+            ? podsResponse.items
+            : [];
+        const pressure = calculateResourcePressure(nodeItems, podItems);
         usageMetricsMode = "requested";
         coreMetricsUnavailable = false;
         cpuAveragePercent =

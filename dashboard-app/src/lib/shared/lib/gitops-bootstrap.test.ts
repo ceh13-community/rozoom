@@ -4,6 +4,7 @@ import {
   generateArgoCDAppYaml,
   generateFluxGitRepositoryYaml,
   generateFluxKustomizationYaml,
+  sanitizeResourceYamlForEdit,
 } from "./gitops-bootstrap";
 
 describe("gitops-bootstrap", () => {
@@ -22,24 +23,21 @@ describe("gitops-bootstrap", () => {
   };
 
   describe("getBootstrapSteps", () => {
-    it("returns 2 steps for ArgoCD", () => {
+    it("returns 1 install step for ArgoCD", () => {
       const steps = getBootstrapSteps(argoConfig);
-      expect(steps).toHaveLength(2);
+      expect(steps).toHaveLength(1);
       expect(steps[0]?.id).toBe("argocd-install");
-      expect(steps[1]?.id).toBe("argocd-app");
     });
 
-    it("returns 3 steps for Flux", () => {
+    it("returns 1 install step for Flux", () => {
       const steps = getBootstrapSteps(fluxConfig);
-      expect(steps).toHaveLength(3);
+      expect(steps).toHaveLength(1);
       expect(steps[0]?.id).toBe("flux-install");
-      expect(steps[1]?.id).toBe("flux-source");
-      expect(steps[2]?.id).toBe("flux-kustomization");
     });
 
     it("uses default branch and path", () => {
       const steps = getBootstrapSteps({ provider: "argocd", repoUrl: "https://example.com/repo" });
-      expect(steps).toHaveLength(2);
+      expect(steps).toHaveLength(1);
     });
   });
 
@@ -78,6 +76,82 @@ describe("gitops-bootstrap", () => {
       expect(yaml).toContain("prune: true");
       expect(yaml).toContain("sourceRef:");
       expect(yaml).toContain("kind: GitRepository");
+    });
+  });
+
+  describe("sanitizeResourceYamlForEdit", () => {
+    const fullYaml = `apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    argocd-image-updater.argoproj.io/image-list: backend=example/backend
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"spec":{}}
+  creationTimestamp: "2025-05-06T10:14:18Z"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io/projects
+  generation: 3292264
+  name: env-back-test
+  namespace: argocd
+  resourceVersion: "208287676"
+  uid: 88cdf56b-3747-4e0d-9d27-c3117ff93bba
+  managedFields:
+    - manager: argocd-server
+spec:
+  project: backend-test
+  source:
+    repoURL: git@bitbucket.org:kcsys/acteria-helm-charts.git
+    targetRevision: dev
+status:
+  health:
+    status: Healthy
+  sync:
+    status: Unknown
+`;
+
+    it("removes status and cluster-managed metadata", () => {
+      const cleaned = sanitizeResourceYamlForEdit(fullYaml);
+      expect(cleaned).not.toContain("status:");
+      expect(cleaned).not.toContain("managedFields");
+      expect(cleaned).not.toContain("creationTimestamp");
+      expect(cleaned).not.toContain("resourceVersion");
+      expect(cleaned).not.toContain("generation:");
+      expect(cleaned).not.toContain("uid:");
+      expect(cleaned).not.toContain("last-applied-configuration");
+    });
+
+    it("preserves spec, name, namespace, finalizers, and user annotations", () => {
+      const cleaned = sanitizeResourceYamlForEdit(fullYaml);
+      expect(cleaned).toContain("name: env-back-test");
+      expect(cleaned).toContain("namespace: argocd");
+      expect(cleaned).toContain("resources-finalizer.argocd.argoproj.io/projects");
+      expect(cleaned).toContain("argocd-image-updater.argoproj.io/image-list");
+      expect(cleaned).toContain("repoURL: git@bitbucket.org:kcsys/acteria-helm-charts.git");
+    });
+
+    it("drops empty annotations block when only noise remained", () => {
+      const yaml = `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo
+  namespace: default
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: '{}'
+data:
+  key: value
+`;
+      const cleaned = sanitizeResourceYamlForEdit(yaml);
+      expect(cleaned).not.toContain("annotations:");
+      expect(cleaned).toContain("data:");
+    });
+
+    it("returns input unchanged when YAML is invalid", () => {
+      const invalid = "::::not-yaml";
+      expect(sanitizeResourceYamlForEdit(invalid)).toBe(invalid);
+    });
+
+    it("returns input unchanged for empty input", () => {
+      expect(sanitizeResourceYamlForEdit("")).toBe("");
     });
   });
 });

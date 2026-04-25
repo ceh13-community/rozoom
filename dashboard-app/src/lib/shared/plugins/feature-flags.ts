@@ -16,17 +16,87 @@ import { BUILTIN_PLUGINS } from "./registry";
 const STORE_NAME = "dashboard-preferences.json";
 const LICENSES_KEY = "pluginLicenses";
 const DISABLED_KEY = "disabledPlugins";
+const PREFS_VERSION_KEY = "pluginPrefsVersion";
+
+/**
+ * Schema version for the plugin preferences block. Bump when the set of
+ * `defaultDisabled` plugins changes in a way that should affect existing
+ * users, not just fresh installs. On load, if the stored version is lower,
+ * loadPluginState merges the current manifest defaults into the user's
+ * disabled set once, then writes the new version. Explicit user enables
+ * are not reverted because we only ADD to the set, never remove.
+ *
+ * v1 (implicit): first-run seed only. Existing users kept whatever they had.
+ * v2 (current): default-disable plugins whose pages are not linked from the
+ *   Fleet Dashboard cluster card (security-suite, capacity-intelligence,
+ *   performance-suite, gitops-integration, workload-visualizer,
+ *   cert-rotation). Existing users get these hidden on next launch so the
+ *   narrower default reaches them without requiring a manual reset.
+ */
+const CURRENT_PREFS_VERSION = 2;
 
 export const pluginLicenses = writable<Record<string, PluginLicense>>({});
 export const disabledPlugins = writable<Set<string>>(new Set());
+
+/**
+ * Plugins that should be off on the first launch of the app. The intent is
+ * to keep the default experience focused on what the Fleet Dashboard
+ * cluster cards surface; deeper audits (Security, Capacity, Performance,
+ * Workload Map, GitOps Bootstrap, Rotate Certificates) are opt-in via the
+ * Marketplace. Drawn from the manifest `defaultDisabled` flag so plugin
+ * authors control their own default.
+ */
+function getDefaultDisabledPluginIds(): string[] {
+  return BUILTIN_PLUGINS.filter((p) => p.defaultDisabled && p.tier !== "core").map((p) => p.id);
+}
 
 export async function loadPluginState(): Promise<void> {
   try {
     const store = await storeManager.getStore(STORE_NAME);
     const licenses = (await store.get(LICENSES_KEY)) as Record<string, PluginLicense> | null;
-    const disabled = (await store.get(DISABLED_KEY)) as string[] | null;
+    const stored = (await store.get(DISABLED_KEY)) as string[] | null | undefined;
+    const storedVersion = ((await store.get(PREFS_VERSION_KEY)) as number | null) ?? 1;
     if (licenses) pluginLicenses.set(licenses);
-    if (disabled) disabledPlugins.set(new Set(disabled));
+
+    // Missing key = first run. Seed from manifest defaults so the user
+    // starts with a focused sidebar. Persist immediately so subsequent
+    // loads treat this as the user's baseline and future toggles take
+    // precedence.
+    if (stored === null || stored === undefined) {
+      const defaults = getDefaultDisabledPluginIds();
+      disabledPlugins.set(new Set(defaults));
+      try {
+        await store.set(DISABLED_KEY, defaults);
+        await store.set(PREFS_VERSION_KEY, CURRENT_PREFS_VERSION);
+        await store.save();
+      } catch {
+        // persistence best-effort
+      }
+      return;
+    }
+
+    // Upgrade path: schema version bumped and this install is still on an
+    // older one. Merge (union) current defaults with stored disabled so the
+    // narrower policy reaches existing users without reverting their
+    // explicit enables - we only add, never remove. Example: user had
+    // {security-suite: enabled, gitops-integration: enabled}; after v2
+    // migration both become disabled because v2 marks them defaultDisabled.
+    // A user who had explicitly disabled other plugins keeps those too.
+    if (storedVersion < CURRENT_PREFS_VERSION) {
+      const merged = new Set<string>(stored);
+      for (const id of getDefaultDisabledPluginIds()) merged.add(id);
+      disabledPlugins.set(merged);
+      try {
+        await store.set(DISABLED_KEY, [...merged]);
+        await store.set(PREFS_VERSION_KEY, CURRENT_PREFS_VERSION);
+        await store.save();
+      } catch {
+        // persistence best-effort
+      }
+      return;
+    }
+
+    disabledPlugins.set(new Set(stored));
   } catch {
     // best-effort
   }

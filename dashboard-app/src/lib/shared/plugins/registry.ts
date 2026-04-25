@@ -224,6 +224,7 @@ export const BUILTIN_PLUGINS: PluginManifest[] = [
         "credential-hygiene",
       ],
     },
+    defaultDisabled: true,
   },
   {
     id: "capacity-intelligence",
@@ -253,6 +254,7 @@ export const BUILTIN_PLUGINS: PluginManifest[] = [
         "cost-efficiency",
       ],
     },
+    defaultDisabled: true,
   },
   {
     id: "performance-suite",
@@ -276,6 +278,7 @@ export const BUILTIN_PLUGINS: PluginManifest[] = [
       ],
       analysisModules: ["red-metrics", "cpu-throttling", "slo-tracking"],
     },
+    defaultDisabled: true,
   },
   {
     id: "enterprise-auth",
@@ -314,15 +317,15 @@ export const BUILTIN_PLUGINS: PluginManifest[] = [
       ],
       analysisModules: ["gitops-bootstrap"],
     },
+    defaultDisabled: true,
   },
 
-  // ── Community example plugin ──
   {
     id: "workload-visualizer",
     name: "Workload Visualizer",
     version: "0.17.0",
     description:
-      "Visual dependency map: Ingress -> Service -> Deployment -> Pod -> ConfigMap/Secret/PVC/RBAC. Click any node to see connections.",
+      "Visual dependency map and per-service chain view: Ingress -> Service -> Workload -> Pod -> ConfigMap/Secret/PVC/RBAC.",
     author: "ROZOOM Community",
     tier: "free",
     category: "developer-tools",
@@ -336,8 +339,168 @@ export const BUILTIN_PLUGINS: PluginManifest[] = [
           section: "cluster-ops",
           description: "Resource dependency graph",
         },
+        {
+          id: "resourcemap",
+          label: "Service Chains",
+          section: "cluster-ops",
+          description: "Per-service linear chains grouped by namespace",
+        },
       ],
       analysisModules: ["workload-visualizer"],
+    },
+    defaultDisabled: true,
+  },
+
+  // ── New togglable plugins: audit + compliance + observability add-ons ──
+  {
+    id: "backup-audit",
+    name: "Backup Audit",
+    version: "0.17.0",
+    description:
+      "Velero backup recency and coverage plus local YAML backup integration. Surfaces stale backups and helps restore.",
+    author: "ROZOOM",
+    tier: "free",
+    category: "developer-tools",
+    license: "Apache-2.0",
+    provides: {
+      workloadPages: [
+        {
+          id: "backupaudit",
+          label: "Backup Status",
+          section: "cluster-ops",
+          description: "Backup recency + restore",
+        },
+      ],
+      analysisModules: ["backup-audit", "yaml-backup"],
+    },
+  },
+  {
+    id: "cert-rotation",
+    name: "Certificate Rotation",
+    version: "0.17.0",
+    description:
+      "Control-plane and kubelet TLS certificate inventory with guided rotation wizards for kubeadm, k3s, RKE2, OpenShift.",
+    author: "ROZOOM",
+    tier: "free",
+    category: "security",
+    license: "Apache-2.0",
+    provides: {
+      workloadPages: [
+        {
+          id: "rotatecerts",
+          label: "Rotate Certificates",
+          section: "cluster-ops",
+          description: "TLS cert inventory + rotation",
+        },
+      ],
+      analysisModules: ["cert-rotation", "cert-manager-integration"],
+    },
+    defaultDisabled: true,
+  },
+  {
+    id: "deprecation-audit",
+    name: "Version & Deprecation Audit",
+    version: "0.17.0",
+    description:
+      "Detect deprecated or removed Kubernetes API versions, compare cluster + Helm chart versions against policy.",
+    author: "ROZOOM",
+    tier: "free",
+    category: "developer-tools",
+    license: "Apache-2.0",
+    provides: {
+      workloadPages: [
+        {
+          id: "deprecationscan",
+          label: "API Deprecation Scan",
+          section: "cluster-ops",
+          description: "Deprecated API detection via pluto",
+        },
+        {
+          id: "versionaudit",
+          label: "Version Audit",
+          section: "cluster-ops",
+          description: "Cluster + chart version policy",
+        },
+      ],
+      analysisModules: ["pluto-scan", "version-audit"],
+    },
+  },
+  {
+    id: "compliance-integrations",
+    name: "Compliance Integrations",
+    version: "0.17.0",
+    description:
+      "Hubs for third-party security tools: Kubescape + kube-bench (compliance), Trivy Operator (vulns), KubeArmor (runtime).",
+    author: "ROZOOM",
+    tier: "free",
+    category: "compliance",
+    license: "Apache-2.0",
+    provides: {
+      workloadPages: [
+        {
+          id: "compliancehub",
+          label: "Compliance Hub",
+          section: "security",
+          description: "Kubescape + kube-bench reports",
+        },
+        {
+          id: "trivyhub",
+          label: "Trivy",
+          section: "security",
+          description: "Trivy Operator vulnerability snapshot",
+        },
+        {
+          id: "armorhub",
+          label: "KubeArmor",
+          section: "security",
+          description: "KubeArmor runtime protection",
+        },
+      ],
+      analysisModules: ["kubescape-integration", "trivy-integration", "kubearmor-integration"],
+    },
+  },
+  {
+    id: "alerts-hub",
+    name: "Cluster Alerts Hub",
+    version: "0.17.0",
+    description:
+      "Unified alerts feed from Alertmanager, Prometheus rules, and Warning Events. Falls back to Events when Prometheus is absent.",
+    author: "ROZOOM",
+    tier: "free",
+    category: "observability",
+    license: "Apache-2.0",
+    provides: {
+      workloadPages: [
+        {
+          id: "alertshub",
+          label: "Cluster Alerts",
+          section: "observability",
+          description: "Alertmanager + Events unified feed",
+        },
+      ],
+      analysisModules: ["alertmanager-client", "events-feed"],
+    },
+  },
+  {
+    id: "cron-monitoring",
+    name: "CronJobs Monitoring",
+    version: "0.17.0",
+    description:
+      "Detect missed schedules, repeated failures, and long-running Jobs spawned by CronJobs.",
+    author: "ROZOOM",
+    tier: "free",
+    category: "observability",
+    license: "Apache-2.0",
+    provides: {
+      workloadPages: [
+        {
+          id: "cronjobshealth",
+          label: "CronJobs Monitoring",
+          section: "observability",
+          description: "Missed schedules + failure tracking",
+        },
+      ],
+      analysisModules: ["cronjob-monitor"],
     },
   },
 ];

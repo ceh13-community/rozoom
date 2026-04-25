@@ -84,26 +84,181 @@ const parseManagedBy = (
   };
 };
 
+/**
+ * Discover every TCP port a node-exporter container claims and return the
+ * likely metrics port first. 9100 is the default for the standalone chart
+ * and for the node-exporter subchart in kube-prometheus-stack, but custom
+ * installs and hardened variants (e.g. behind kube-rbac-proxy on 9091) do
+ * vary, so we pull ports directly from the pod spec and add 9100 as a
+ * conventional fallback.
+ */
+const nodeExporterProbePorts = (pod: PodItem): number[] => {
+  const candidates: number[] = [];
+  const containers = (
+    pod.spec as { containers?: Array<{ ports?: Array<{ containerPort?: number }> }> }
+  ).containers;
+  for (const container of containers ?? []) {
+    for (const port of container.ports ?? []) {
+      if (typeof port.containerPort === "number" && port.containerPort > 0) {
+        candidates.push(port.containerPort);
+      }
+    }
+  }
+  if (!candidates.includes(9100)) candidates.push(9100);
+  // Dedupe while preserving priority (pod-declared ports first, 9100 last).
+  return [...new Set(candidates)];
+};
+
 const checkPodMetrics = async (pod: PodItem, clusterId: string): Promise<NodeStatus> => {
   const podName = pod.metadata.name;
   const namespace = pod.metadata.namespace || "default";
+  const nodeName = pod.spec.nodeName || podName;
   if (!isPodReady(pod)) {
-    return createNodeStatusByResult(pod.spec.nodeName || podName, 0);
+    return createNodeStatusByResult(nodeName, 0);
   }
   // node-exporter does not expose /healthz in most versions, so probe /metrics
   // directly to avoid noisy "NotFound" errors in logs.
-  const metricsUrl = `/api/v1/namespaces/${namespace}/pods/${podName}/proxy/metrics`;
+  //
+  // We try every declared container port and the conventional 9100 as a
+  // fallback. kube-prometheus-stack exposes the metrics on 9100 by default,
+  // but hardened installs bind node-exporter behind kube-rbac-proxy on a
+  // different port; the API server's pod-proxy without an explicit port
+  // picks the first declared port, which may be that proxy (and refuse
+  // unauthenticated traffic). Enumerating ports makes the probe work in
+  // both topologies without guessing.
+  const ports = nodeExporterProbePorts(pod);
+  const basePath = `/api/v1/namespaces/${namespace}/pods/${podName}`;
 
-  try {
-    const metricsProbe = await kubectlRawFront(`get --raw ${metricsUrl}`, { clusterId });
-    if (metricsProbe.errors.length > 0) {
-      return createNodeStatusByResult(pod.spec.nodeName || podName, 0);
+  let lastProbeFailed = false;
+  for (const port of ports) {
+    const metricsUrl = `${basePath}:${port}/proxy/metrics`;
+    try {
+      const metricsProbe = await kubectlRawFront(`get --raw ${metricsUrl}`, { clusterId });
+      if (metricsProbe.errors.length > 0) {
+        lastProbeFailed = true;
+        continue;
+      }
+      if (hasMetrics(metricsProbe.output)) {
+        return createNodeStatusByResult(nodeName, 1);
+      }
+      lastProbeFailed = true;
+    } catch {
+      lastProbeFailed = true;
     }
-    const success = hasMetrics(metricsProbe.output);
-    return createNodeStatusByResult(pod.spec.nodeName || podName, success ? 1 : 0);
-  } catch {
-    return createNodeStatusByResult(pod.spec.nodeName || podName, 0);
   }
+
+  // One last attempt without a port - lets the API server default to the
+  // pod's first container port. Covers exotic pods that declare no port
+  // explicitly but still serve metrics (rare but seen in custom builds).
+  if (lastProbeFailed) {
+    try {
+      const fallback = await kubectlRawFront(`get --raw ${basePath}/proxy/metrics`, { clusterId });
+      if (fallback.errors.length === 0 && hasMetrics(fallback.output)) {
+        return createNodeStatusByResult(nodeName, 1);
+      }
+    } catch {
+      // fall through to unreachable result below
+    }
+  }
+
+  return createNodeStatusByResult(nodeName, 0);
+};
+
+/**
+ * Probe the node-exporter Service (if one exists) via the K8s service proxy.
+ *
+ * On EKS (and other managed distros with restrictive CNI policies) the API
+ * server cannot open a direct pod-proxy to host-network pods, which is
+ * exactly how kube-prometheus-stack runs node-exporter by default. The
+ * Service proxy goes through normal ClusterIP routing, which always works
+ * as long as the headless / ClusterIP service is wired up and at least one
+ * backend pod is ready.
+ *
+ * If the service responds with valid metrics once, we trust that every
+ * Ready pod from the matching DaemonSet is serving metrics too, and avoid
+ * N direct pod-proxy hits that would fail deterministically on EKS.
+ */
+const tryServiceProxy = async (
+  pods: PodItem[],
+  clusterId: string,
+): Promise<NodeExporterResult | null> => {
+  // Every API-server hop here is best-effort: a failure must yield null so
+  // the caller can try pod-proxy next instead of dragging the whole check
+  // into the outer catch-all error path.
+  let svcResponse: Awaited<ReturnType<typeof kubectlRawFront>>;
+  try {
+    svcResponse = await kubectlRawFront(
+      `get services -A -l app.kubernetes.io/name in (node-exporter,prometheus-node-exporter) -o json`,
+      { clusterId },
+    );
+  } catch {
+    return null;
+  }
+  if (svcResponse.errors.length > 0 || !svcResponse.output) return null;
+
+  type SvcPort = { name?: string; port?: number };
+  type SvcItem = {
+    metadata?: { name?: string; namespace?: string; labels?: Record<string, string> };
+    spec?: { ports?: SvcPort[] };
+  };
+  let parsed: { items?: SvcItem[] };
+  try {
+    parsed = JSON.parse(svcResponse.output) as { items?: SvcItem[] };
+  } catch {
+    return null;
+  }
+  const services = parsed.items ?? [];
+  if (services.length === 0) return null;
+
+  const service = services[0];
+  const namespace = service.metadata?.namespace;
+  const name = service.metadata?.name;
+  if (!namespace || !name) return null;
+
+  // Prefer a named "metrics" / "http-metrics" port, else first numeric port,
+  // else fall back to conventional 9100.
+  const ports = service.spec?.ports ?? [];
+  const named = ports.find((p) => p.name === "metrics" || p.name === "http-metrics");
+  const first = ports.find((p) => typeof p.port === "number" && p.port > 0);
+  const targetPort = named?.port ?? first?.port ?? 9100;
+
+  let probe: Awaited<ReturnType<typeof kubectlRawFront>>;
+  try {
+    probe = await kubectlRawFront(
+      `get --raw /api/v1/namespaces/${namespace}/services/${name}:${targetPort}/proxy/metrics`,
+      { clusterId },
+    );
+  } catch {
+    return null;
+  }
+  if (probe.errors.length > 0 || !hasMetrics(probe.output)) return null;
+
+  // Service answered. Derive per-node status from the DaemonSet pods matching
+  // the exporter labels so the UI can still show "available on every node"
+  // coverage. Pods we identified as Ready are trusted to be serving.
+  const exporterPods = pods.filter(
+    (pod) =>
+      pod.metadata.labels &&
+      Object.values(pod.metadata.labels).some(
+        (value) => value.includes("node-exporter") || value.includes("prometheus-node-exporter"),
+      ),
+  );
+  const statuses: NodeStatus[] = exporterPods.length
+    ? exporterPods.map((pod) =>
+        createNodeStatusByResult(pod.spec.nodeName || pod.metadata.name, isPodReady(pod) ? 1 : 0),
+      )
+    : [{ nodeName: name, result: 1 }];
+  const metadata = parseManagedBy(service.metadata?.labels);
+
+  return {
+    installed: true,
+    ...metadata,
+    namespace,
+    lastSync: createTimestamp(),
+    status: statuses,
+    title: "Node Exporter",
+    url: `svc/${namespace}/${name}:${targetPort}`,
+  };
 };
 
 // 1. Check across all namespaces by pod labels (per-node results)
@@ -202,19 +357,26 @@ export const checkNodeExporter = async (clusterId: string): Promise<NodeExporter
   try {
     const pods = ensurePods(await getAllPods(clusterId));
 
-    // 1. Per-node check via pod labels across all namespaces (most accurate)
+    // 1. Service proxy - works in EKS/GKE/AKS where pod proxy to hostNetwork
+    //    pods is blocked by the managed CNI. Fastest + most reliable path.
+    const svcResult = await tryServiceProxy(pods, clusterId);
+    if (svcResult && svcResult.status.length > 0) {
+      return svcResult;
+    }
+
+    // 2. Per-node check via pod labels (most accurate when pod proxy works).
     const podLabelResult = await checkByPodLabels(pods, clusterId);
     if (podLabelResult && podLabelResult.status.length > 0) {
       return podLabelResult;
     }
 
-    // 2. Per-node check via DaemonSet owner reference matching
+    // 3. Per-node check via DaemonSet owner reference matching
     const daemonSetResult = await checkViaDaemonSetPods(clusterId);
     if (daemonSetResult && daemonSetResult.status.length > 0) {
       return daemonSetResult;
     }
 
-    // 3. DaemonSet-level fallback (no per-node detail)
+    // 4. DaemonSet-level fallback (no per-node detail)
     const kubePrometheusResult = await checkKubePrometheusStack(clusterId);
     if (kubePrometheusResult && kubePrometheusResult.status.length > 0) {
       return kubePrometheusResult;

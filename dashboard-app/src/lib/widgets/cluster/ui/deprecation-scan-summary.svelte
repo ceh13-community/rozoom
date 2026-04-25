@@ -191,23 +191,38 @@
 <div class="text-nowrap">Deprecation scan:</div>
 {#if summary}
   <div
-    class="truncate text-xs {summary.status === 'unavailable' || summary.status === 'critical' ? 'text-red-400' : 'text-gray-500'}"
+    class="truncate text-xs {summary.status === 'unavailable' || summary.status === 'critical'
+      ? 'text-red-400'
+      : 'text-gray-500'}"
     title={summary.message}
   >
     {summary.message}
   </div>
-  <div class="rounded-full h-3.5 w-3.5 shrink-0 {statusStyles[summary.status] ?? 'bg-slate-500'}"></div>
-{:else if lazyLoad && !manuallyActivated}
+  <div
+    class="rounded-full h-3.5 w-3.5 shrink-0 {statusStyles[summary.status] ?? 'bg-slate-500'}"
+  ></div>
+{:else if (lazyLoad && !manuallyActivated) || bootstrapInFlight}
   <button
     type="button"
-    class="rounded-md border border-slate-400 bg-slate-700 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-slate-600"
-    onclick={(e) => { e.stopPropagation(); handleManualLoad(); }}
+    class="inline-flex items-center gap-1 rounded-md border border-slate-400 bg-slate-700 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-slate-600 disabled:cursor-wait disabled:opacity-70"
+    onclick={(e) => {
+      e.stopPropagation();
+      handleManualLoad();
+    }}
+    disabled={Boolean(bootstrapInFlight)}
+    title={bootstrapInFlight
+      ? "Running kubectl + helm history lookups across all namespaces..."
+      : "Scans helm releases and API resources for deprecated Kubernetes APIs (kubectl api-resources + helm history). Takes a few seconds."}
   >
-    Load
+    {#if bootstrapInFlight}
+      <span
+        class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-transparent"
+      ></span>
+      <span>Scanning<LoadingDots /></span>
+    {:else}
+      Load
+    {/if}
   </button>
-{:else if bootstrapInFlight}
-  <div class="truncate text-gray-500 text-xs">Loading<LoadingDots /></div>
-  <div class="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-transparent"></div>
 {:else}
   <div class="truncate text-gray-500 text-xs">Scan unavailable</div>
   <div class="rounded-full h-3.5 w-3.5 shrink-0 bg-slate-500"></div>

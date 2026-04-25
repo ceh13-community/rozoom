@@ -33,6 +33,7 @@
     isVerticallyCollapsed?: boolean;
     onToggleVerticalCollapse?: () => void;
     externalDiffLines?: number[];
+    showBreadcrumb?: boolean;
   }
 
   const {
@@ -57,6 +58,7 @@
     isVerticallyCollapsed = false,
     onToggleVerticalCollapse = () => {},
     externalDiffLines = [],
+    showBreadcrumb = true,
   }: ResourceYamlSheetProps = $props();
 
   let isFullscreen = $state(false);
@@ -128,9 +130,31 @@
   }
 
   function handleCopyPath() {
+    if (editorRef?.copyPathAtCursor()) return;
     if (pathSegments.length === 0) return;
     const dotPath = formatYamlPathDot(pathSegments);
     navigator.clipboard.writeText(dotPath);
+  }
+
+  function handleToggleLintPanel() {
+    editorRef?.toggleLintPanel();
+  }
+
+  let yamlCopied = $state(false);
+  let yamlCopyTimer: ReturnType<typeof setTimeout> | null = null;
+
+  async function handleCopyYaml() {
+    if (!yamlText.trim()) return;
+    try {
+      await navigator.clipboard.writeText(yamlText);
+      yamlCopied = true;
+      if (yamlCopyTimer) clearTimeout(yamlCopyTimer);
+      yamlCopyTimer = setTimeout(() => {
+        yamlCopied = false;
+      }, 1500);
+    } catch {
+      // clipboard may be unavailable (e.g. insecure context) — silently ignore
+    }
   }
 </script>
 
@@ -153,7 +177,7 @@
       variant="outline"
       size="sm"
       onclick={() => onRefresh()}
-      loading={loading}
+      {loading}
       loadingLabel="Loading"
       disabled={saving || !podRef}
     >
@@ -166,7 +190,11 @@
       onclick={() => onSave()}
       loading={saving}
       loadingLabel="Applying"
-      disabled={loading || !yamlText.trim() || !hasChanges || hasSyntaxError || (embedded && driftDetected)}
+      disabled={loading ||
+        !yamlText.trim() ||
+        !hasChanges ||
+        hasSyntaxError ||
+        (embedded && driftDetected)}
     >
       Apply
     </Button>
@@ -185,18 +213,40 @@
     >
       Dirty diff: {dirtySummary.changedCount}
     </Button>
-    <div class="text-xs text-muted-foreground">
-      Ctrl+Shift+C - copy path | Ctrl+Shift+M - lint panel
-    </div>
+    <Button
+      variant="outline"
+      size="sm"
+      onclick={handleCopyPath}
+      disabled={pathSegments.length === 0}
+      title="Copy YAML path at cursor"
+    >
+      Copy path <span class="ml-1.5 text-[10px] text-muted-foreground">Ctrl+Shift+C</span>
+    </Button>
+    <Button variant="outline" size="sm" onclick={handleToggleLintPanel} title="Toggle lint panel">
+      Lint panel <span class="ml-1.5 text-[10px] text-muted-foreground">Ctrl+Shift+M</span>
+    </Button>
+    <Button
+      variant="outline"
+      size="sm"
+      onclick={handleCopyYaml}
+      disabled={!yamlText.trim()}
+      title="Copy full YAML (cleaned, ready to commit)"
+    >
+      {yamlCopied ? "Copied" : "Copy YAML"}
+    </Button>
   {/snippet}
 
   {#if error}
-    <div class="mx-4 mt-3 rounded border border-rose-300/80 bg-rose-50 px-3 py-2 text-xs text-rose-900 dark:border-rose-500/70 dark:bg-rose-500/20 dark:text-rose-100">
+    <div
+      class="mx-4 mt-3 rounded border border-rose-300/80 bg-rose-50 px-3 py-2 text-xs text-rose-900 dark:border-rose-500/70 dark:bg-rose-500/20 dark:text-rose-100"
+    >
       {error}
     </div>
   {/if}
   {#if driftDetected}
-    <div class="mx-4 mt-3 rounded border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-200">
+    <div
+      class="mx-4 mt-3 rounded border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-200"
+    >
       <div>{driftMessage || "Resource changed in cluster since this tab was opened."}</div>
       <div class="mt-2 flex items-center gap-2">
         <Button
@@ -220,16 +270,18 @@
   {/if}
 
   <!-- Breadcrumb bar with YAML path + multi-doc navigator -->
-  <div class="mx-4 mt-3">
-    <YamlBreadcrumb
-      {pathSegments}
-      {documents}
-      {activeDocIndex}
-      onNavigateToLine={handleNavigateToLine}
-      onNavigateToDoc={handleNavigateToDoc}
-      onCopyPath={handleCopyPath}
-    />
-  </div>
+  {#if showBreadcrumb}
+    <div class="mx-4 mt-3">
+      <YamlBreadcrumb
+        {pathSegments}
+        {documents}
+        {activeDocIndex}
+        onNavigateToLine={handleNavigateToLine}
+        onNavigateToDoc={handleNavigateToDoc}
+        onCopyPath={handleCopyPath}
+      />
+    </div>
+  {/if}
 
   <div class="min-h-0 flex flex-1 overflow-hidden p-4 pt-2">
     {#if showDirtyDiff && dirtySummary.changedCount > 0}

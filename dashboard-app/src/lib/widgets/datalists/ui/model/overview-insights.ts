@@ -159,43 +159,18 @@ export function calculateResourcePressure(
       status?: { phase?: string };
       spec?: {
         containers?: Array<{ resources?: { requests?: { cpu?: string; memory?: string } } }>;
-        initContainers?: Array<{
-          resources?: { requests?: { cpu?: string; memory?: string } };
-        }>;
       };
     };
     const phase = pod.status?.phase;
     if (phase !== "Running" && phase !== "Pending") continue;
-
-    let podContainerCpu = 0;
-    let podContainerMem = 0;
     const containers = pod.spec?.containers;
-    if (Array.isArray(containers)) {
-      for (const container of containers) {
-        const cpuReq = parseCpuQuantityToCores(container.resources?.requests?.cpu ?? null);
-        const memReq = parseMemoryQuantityToBytes(container.resources?.requests?.memory ?? null);
-        if (cpuReq !== null && cpuReq > 0) podContainerCpu += cpuReq;
-        if (memReq !== null && memReq > 0) podContainerMem += memReq;
-      }
+    if (!Array.isArray(containers)) continue;
+    for (const container of containers) {
+      const cpuReq = parseCpuQuantityToCores(container.resources?.requests?.cpu ?? null);
+      const memReq = parseMemoryQuantityToBytes(container.resources?.requests?.memory ?? null);
+      if (cpuReq !== null && cpuReq > 0) requestedCpu += cpuReq;
+      if (memReq !== null && memReq > 0) requestedMem += memReq;
     }
-
-    // Kubernetes effective pod requests = max(max(initContainer.requests), sum(container.requests)).
-    // Init containers run one at a time before regular containers, so the scheduler reserves the
-    // largest single init-container request rather than the sum.
-    let podInitCpuMax = 0;
-    let podInitMemMax = 0;
-    const initContainers = pod.spec?.initContainers;
-    if (Array.isArray(initContainers)) {
-      for (const container of initContainers) {
-        const cpuReq = parseCpuQuantityToCores(container.resources?.requests?.cpu ?? null);
-        const memReq = parseMemoryQuantityToBytes(container.resources?.requests?.memory ?? null);
-        if (cpuReq !== null && cpuReq > podInitCpuMax) podInitCpuMax = cpuReq;
-        if (memReq !== null && memReq > podInitMemMax) podInitMemMax = memReq;
-      }
-    }
-
-    requestedCpu += Math.max(podContainerCpu, podInitCpuMax);
-    requestedMem += Math.max(podContainerMem, podInitMemMax);
   }
 
   const cpuPercent =

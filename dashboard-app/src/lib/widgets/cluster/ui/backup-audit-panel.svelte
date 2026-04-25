@@ -22,12 +22,15 @@
     type BackupScopeMode,
     writeVeleroInstallProfile,
   } from "$features/backup-audit";
+  import { humanizeVeleroError } from "$features/backup-audit/model/humanize";
   import {
     getVeleroRelease,
     installVelero,
     type HelmListedRelease,
     type VeleroCloudProvider,
   } from "$shared/api/helm";
+  import { execCliForCluster } from "$shared/api/cli";
+  import { confirmAction } from "$shared/lib/confirm-action";
   import * as Card from "$shared/ui/card";
   import { Badge } from "$shared/ui/badge";
   import { Button } from "$shared/ui/button";
@@ -40,6 +43,7 @@
   import TableSurface from "$shared/ui/table-surface.svelte";
   import TableEmptyState from "$shared/ui/table-empty-state.svelte";
   import DiagnosticSummaryCard from "$shared/ui/diagnostic-summary-card.svelte";
+  import { CommandConsole, createConsoleSession } from "$shared/ui/command-console";
 
   interface Props {
     clusterId: string;
@@ -57,6 +61,7 @@
   let actionError = $state<string | null>(null);
   let helmActionError = $state<string | null>(null);
   let helmActionMessage = $state<string | null>(null);
+  const veleroInstallSession = createConsoleSession();
   let checking = $state(false);
   let creating = $state(false);
   let veleroLoading = $state(false);
@@ -106,7 +111,35 @@
   let availableNamespaces = $state<string[]>([]);
   let selectedNamespace = $state("");
   let selectedNamespaces = $state<string[]>([]);
+  let credentialsTestResult = $state<{ ok: boolean; message: string } | null>(null);
+  let credentialsTesting = $state(false);
+  let restorePreview = $state<{
+    backupName: string;
+    sourceNs: string;
+    targetNs: string;
+    describe: string;
+    loading: boolean;
+    error: string | null;
+  } | null>(null);
   const autoDiagnosticsEnabled = $derived(shouldAutoRunDiagnostics($dashboardDataProfile));
+
+  const backupFreshness = $derived.by<{
+    ageHours: number | null;
+    percent: number;
+    severity: "ok" | "warning" | "critical";
+  }>(() => {
+    const lastIso = summary?.lastBackupAt;
+    if (!lastIso) return { ageHours: null, percent: 0, severity: "critical" };
+    const last = Date.parse(lastIso);
+    if (Number.isNaN(last)) return { ageHours: null, percent: 0, severity: "critical" };
+    const ageHours = (Date.now() - last) / 3_600_000;
+    const maxAge = Math.max(1, policyMaxAgeHours);
+    const percent = Math.min(1, ageHours / maxAge);
+    let sev: "ok" | "warning" | "critical" = "ok";
+    if (percent >= 1) sev = "critical";
+    else if (percent >= 0.75) sev = "warning";
+    return { ageHours, percent, severity: sev };
+  });
 
   const statusStyles: Record<string, string> = {
     ok: "bg-emerald-500",
@@ -130,7 +163,8 @@
       "Azure Blob + Azure snapshots. Current flow uses service principal credentials (client id/secret/tenant/subscription).",
     gcp: "GCS + GCE snapshots. For GKE use workload identity service account or service-account JSON.",
     do: "DigitalOcean Spaces in S3-compatible mode (object backups). Volume snapshots are disabled.",
-    hetzner: "Hetzner Object Storage (S3-compatible). Uses AWS Velero plugin with custom endpoint. Volume snapshots are disabled.",
+    hetzner:
+      "Hetzner Object Storage (S3-compatible). Uses AWS Velero plugin with custom endpoint. Volume snapshots are disabled.",
   };
 
   const showS3Inputs = $derived(provider === "aws" || provider === "do" || provider === "hetzner");
@@ -147,6 +181,28 @@
 
   function formatDuration(hours: number) {
     return `${hours}h`;
+  }
+
+  function formatRelativeAge(iso: string | null): string {
+    if (!iso) return "-";
+    const ts = Date.parse(iso);
+    if (Number.isNaN(ts)) return "-";
+    const diffMs = Date.now() - ts;
+    const min = Math.round(diffMs / 60_000);
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.round(min / 60);
+    if (hr < 48) return `${hr}h ago`;
+    return `${Math.round(hr / 24)}d ago`;
+  }
+
+  function formatRunDuration(run: BackupRun): string {
+    const start = run.metadata?.createdAt ?? run.runAt;
+    const end = run.metadata?.completedAt ?? null;
+    if (!start || !end) return "-";
+    const diffMs = Date.parse(end) - Date.parse(start);
+    if (!Number.isFinite(diffMs) || diffMs <= 0) return "-";
+    if (diffMs < 60_000) return `${Math.round(diffMs / 1000)}s`;
+    return `${Math.round(diffMs / 60_000)}m`;
   }
 
   function normalizePositiveInt(value: number, fallback: number): number {
@@ -273,6 +329,7 @@
     helmActionError = null;
     helmActionMessage = null;
     veleroError = null;
+    veleroInstallSession.start();
     try {
       const profile = await writeVeleroInstallProfile(clusterId, {
         namespace: veleroNamespaceDraft,
@@ -303,11 +360,10 @@
         }
       }
       if (provider === "do" || provider === "hetzner") {
-        const providerLabel = provider === "hetzner" ? "Hetzner Object Storage" : "DigitalOcean Spaces";
+        const providerLabel =
+          provider === "hetzner" ? "Hetzner Object Storage" : "DigitalOcean Spaces";
         if (!bucket.trim() || !region.trim() || !s3Url.trim()) {
-          throw new Error(
-            `For ${providerLabel}, provide bucket, region, and endpoint URL.`,
-          );
+          throw new Error(`For ${providerLabel}, provide bucket, region, and endpoint URL.`);
         }
         const hasDoKeys = Boolean(doAccessKey.trim() && doSecretKey.trim());
         if (!hasDoKeys) {
@@ -336,27 +392,34 @@
         throw new Error("For CKE/GKE install, provide GCS bucket.");
       }
 
-      const result = await installVelero(clusterId, profile.namespace, {
-        provider,
-        bucket,
-        region,
-        s3Url,
-        forcePathStyle,
-        awsIamRoleArn,
-        awsAccessKeyId: provider === "do" || provider === "hetzner" ? doAccessKey : awsAccessKeyId,
-        awsSecretAccessKey: provider === "do" || provider === "hetzner" ? doSecretKey : awsSecretAccessKey,
-        azureResourceGroup,
-        azureStorageAccount,
-        azureSubscriptionId,
-        azureStorageAccountUri,
-        azureCloudName,
-        azureClientId,
-        azureClientSecret,
-        azureTenantId,
-        gcpProject,
-        gcpServiceAccount,
-        gcpCredentialsJson,
-      });
+      const result = await installVelero(
+        clusterId,
+        profile.namespace,
+        {
+          provider,
+          bucket,
+          region,
+          s3Url,
+          forcePathStyle,
+          awsIamRoleArn,
+          awsAccessKeyId:
+            provider === "do" || provider === "hetzner" ? doAccessKey : awsAccessKeyId,
+          awsSecretAccessKey:
+            provider === "do" || provider === "hetzner" ? doSecretKey : awsSecretAccessKey,
+          azureResourceGroup,
+          azureStorageAccount,
+          azureSubscriptionId,
+          azureStorageAccountUri,
+          azureCloudName,
+          azureClientId,
+          azureClientSecret,
+          azureTenantId,
+          gcpProject,
+          gcpServiceAccount,
+          gcpCredentialsJson,
+        },
+        (chunk) => veleroInstallSession.append(chunk),
+      );
       if (!result.success) {
         const message = result.error ?? "Failed to install Velero with Helm";
         if (
@@ -372,8 +435,11 @@
       await refreshVeleroStatus();
       await runBackupAudit(clusterId, { force: true, source: "manual" });
       helmActionMessage = `Velero Helm release is installed in namespace ${profile.namespace}.`;
+      veleroInstallSession.succeed();
     } catch (error) {
-      helmActionError = error instanceof Error ? error.message : "Failed to install Velero with Helm";
+      helmActionError =
+        error instanceof Error ? error.message : "Failed to install Velero with Helm";
+      veleroInstallSession.fail();
     } finally {
       veleroInstalling = false;
     }
@@ -471,29 +537,150 @@
 
   async function restoreNamespace() {
     if (restoring) return;
+    if (!restoreBackupName) {
+      actionError = "Select backup for restore.";
+      return;
+    }
+    if (!restoreSourceNamespace) {
+      actionError = "Select source namespace.";
+      return;
+    }
+    if (!restoreTargetNamespace.trim()) {
+      actionError = "Target namespace is required.";
+      return;
+    }
+    const overwriting = availableNamespaces.includes(restoreTargetNamespace.trim());
+    const confirmed = await confirmAction(
+      `Restore namespace "${restoreSourceNamespace}" from backup "${restoreBackupName}"\n` +
+        `into "${restoreTargetNamespace}"?\n\n` +
+        (overwriting
+          ? `"${restoreTargetNamespace}" already exists in this cluster. Velero will merge / overwrite ` +
+            `existing resources there. Running workloads may restart.`
+          : `"${restoreTargetNamespace}" will be created if it does not exist.`) +
+        "\n\nThis cannot be undone from here (you would need another backup to revert).",
+      "Confirm restore",
+    );
+    if (!confirmed) return;
+
     restoring = true;
     actionError = null;
     actionMessage = null;
     try {
-      if (!restoreBackupName) {
-        throw new Error("Select backup for restore.");
-      }
-      if (!restoreSourceNamespace) {
-        throw new Error("Select source namespace.");
-      }
-      if (!restoreTargetNamespace.trim()) {
-        throw new Error("Target namespace is required.");
-      }
       await restoreNamespaceFromBackup(clusterId, {
         backupName: restoreBackupName,
         sourceNamespace: restoreSourceNamespace,
         targetNamespace: restoreTargetNamespace,
       });
       actionMessage = `Restore created from backup "${restoreBackupName}" (${restoreSourceNamespace} -> ${restoreTargetNamespace}).`;
+      restorePreview = null;
     } catch (error) {
       actionError = error instanceof Error ? error.message : "Namespace restore failed";
     } finally {
       restoring = false;
+    }
+  }
+
+  async function previewRestore() {
+    if (!restoreBackupName) {
+      actionError = "Select a backup first.";
+      return;
+    }
+    restorePreview = {
+      backupName: restoreBackupName,
+      sourceNs: restoreSourceNamespace,
+      targetNs: restoreTargetNamespace,
+      describe: "",
+      loading: true,
+      error: null,
+    };
+    const veleroNs = veleroRelease?.namespace ?? (veleroNamespaceDraft.trim() || "velero");
+    const result = await execCliForCluster(
+      "kubectl",
+      ["get", "backup", restoreBackupName, "-n", veleroNs, "-o", "yaml", "--request-timeout=10s"],
+      clusterId,
+    );
+    if (result.code !== 0) {
+      restorePreview = {
+        ...restorePreview,
+        loading: false,
+        error: result.stderr.trim() || `kubectl exited with code ${result.code}`,
+      };
+      return;
+    }
+    restorePreview = {
+      ...restorePreview,
+      loading: false,
+      describe: result.stdout.trim() || "(empty backup resource)",
+    };
+  }
+
+  async function testCredentialsConnection() {
+    if (credentialsTesting) return;
+    credentialsTesting = true;
+    credentialsTestResult = null;
+    try {
+      const bucketName = bucket.trim();
+      if (!bucketName) {
+        credentialsTestResult = { ok: false, message: "Enter a bucket name first." };
+        return;
+      }
+      if (provider === "aws" || provider === "do" || provider === "hetzner") {
+        const endpoint =
+          s3Url.trim() ||
+          (provider === "aws" && region.trim() ? `https://s3.${region.trim()}.amazonaws.com` : "");
+        if (!endpoint) {
+          credentialsTestResult = {
+            ok: false,
+            message: "Enter S3 endpoint URL or AWS region.",
+          };
+          return;
+        }
+        const accessKey = awsAccessKeyId.trim() || doAccessKey.trim();
+        const secretKey = awsSecretAccessKey.trim() || doSecretKey.trim();
+        if (!accessKey || !secretKey) {
+          credentialsTestResult = {
+            ok: false,
+            message: "Enter an access key and secret key before testing.",
+          };
+          return;
+        }
+        const probeUrl = `${endpoint.replace(/\/$/, "")}/${encodeURIComponent(bucketName)}/?list-type=2&max-keys=1`;
+        const result = await execCliForCluster(
+          "curl",
+          ["-sI", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "8", probeUrl],
+          clusterId,
+        );
+        const code = result.stdout.trim();
+        if (code === "200" || code === "403") {
+          credentialsTestResult = {
+            ok: true,
+            message:
+              code === "200"
+                ? `Bucket reachable (HTTP 200). Credentials will be validated by Velero on install.`
+                : `Endpoint reachable (HTTP 403). Anonymous probe rejected; Velero will still attempt signed requests.`,
+          };
+        } else if (code === "404") {
+          credentialsTestResult = {
+            ok: false,
+            message: "Bucket not found (HTTP 404). Check name, region, and endpoint.",
+          };
+        } else if (!code) {
+          credentialsTestResult = {
+            ok: false,
+            message: `Endpoint unreachable: ${result.stderr.trim().slice(0, 160)}`,
+          };
+        } else {
+          credentialsTestResult = { ok: false, message: `Unexpected HTTP ${code}.` };
+        }
+      } else {
+        credentialsTestResult = {
+          ok: true,
+          message:
+            "Pre-install connectivity test is only available for S3-compatible providers (AWS, DO, Hetzner). For Azure/GCP the credentials will be validated by Velero on install.",
+        };
+      }
+    } finally {
+      credentialsTesting = false;
     }
   }
 
@@ -682,7 +869,10 @@
           {:else if veleroRelease}
             <p class="text-sm text-foreground">
               Installed: <span class="font-semibold">{veleroRelease.name}</span>
-              <span class="text-xs text-muted-foreground"> v{veleroChartVersion(veleroRelease.chart)}</span> in
+              <span class="text-xs text-muted-foreground">
+                v{veleroChartVersion(veleroRelease.chart)}</span
+              >
+              in
               <span class="font-semibold">{veleroRelease.namespace}</span> namespace
             </p>
           {:else}
@@ -709,6 +899,18 @@
           </Button>
           {#if !veleroRelease}
             <Button
+              variant="outline"
+              onclick={() => void testCredentialsConnection()}
+              disabled={credentialsTesting || veleroInstalling}
+              title="Probe the configured bucket endpoint for reachability before running helm install"
+            >
+              {#if credentialsTesting}
+                <span>Testing</span><LoadingDots />
+              {:else}
+                <span>Test connection</span>
+              {/if}
+            </Button>
+            <Button
               onclick={installVeleroWithHelm}
               loading={veleroInstalling}
               loadingLabel="Installing"
@@ -719,14 +921,30 @@
           {/if}
         </div>
       </div>
+      {#if credentialsTestResult}
+        <div
+          class={`mt-2 rounded border px-2 py-1.5 text-[11px] ${
+            credentialsTestResult.ok
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+              : "border-rose-500/40 bg-rose-500/10 text-rose-300"
+          }`}
+        >
+          <span class="font-semibold">{credentialsTestResult.ok ? "✓" : "✗"}</span>
+          {credentialsTestResult.message}
+        </div>
+      {/if}
       {#if !veleroRelease}
         <p class="mt-2 text-xs text-muted-foreground">
-          Namespace and non-secret fields are saved locally. Secrets/keys are used only during install and are not persisted.
+          Namespace and non-secret fields are saved locally. Secrets/keys are used only during
+          install and are not persisted.
         </p>
         <div class="mt-3">
           <p class="mb-1 block text-xs text-muted-foreground">Cloud provider</p>
           <Select.Root type="single" bind:value={provider}>
-            <Select.Trigger class="h-9 w-full max-w-[320px]">{providerOptions.find((item) => item.value === provider)?.label ?? "AWS"}</Select.Trigger>
+            <Select.Trigger class="h-9 w-full max-w-[320px]"
+              >{providerOptions.find((item) => item.value === provider)?.label ??
+                "AWS"}</Select.Trigger
+            >
             <Select.Content>
               <Select.Group>
                 {#each providerOptions as option}
@@ -739,43 +957,148 @@
         </div>
         <div class="mt-3 grid gap-2 md:grid-cols-2">
           {#if showS3Inputs}
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm" bind:value={bucket} placeholder={provider === "do" ? "Space name, e.g. cluster-backups" : provider === "hetzner" ? "Bucket name, e.g. velero-backups" : "S3 bucket, e.g. velero-prod-backups"} />
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm" bind:value={region} placeholder={provider === "do" ? "Region, e.g. nyc3" : provider === "hetzner" ? "Region (datacenter), e.g. fsn1, nbg1, hel1" : "Region, e.g. us-east-2"} />
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2" bind:value={s3Url} placeholder={provider === "do" ? "Endpoint (required), e.g. https://nyc3.digitaloceanspaces.com" : provider === "hetzner" ? "Endpoint (required), e.g. https://fsn1.your-objectstorage.com" : "S3 URL (optional), e.g. https://s3.us-east-2.amazonaws.com"} />
-            <label class="inline-flex items-center gap-2 text-xs text-muted-foreground md:col-span-2">
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              bind:value={bucket}
+              placeholder={provider === "do"
+                ? "Space name, e.g. cluster-backups"
+                : provider === "hetzner"
+                  ? "Bucket name, e.g. velero-backups"
+                  : "S3 bucket, e.g. velero-prod-backups"}
+            />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              bind:value={region}
+              placeholder={provider === "do"
+                ? "Region, e.g. nyc3"
+                : provider === "hetzner"
+                  ? "Region (datacenter), e.g. fsn1, nbg1, hel1"
+                  : "Region, e.g. us-east-2"}
+            />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2"
+              bind:value={s3Url}
+              placeholder={provider === "do"
+                ? "Endpoint (required), e.g. https://nyc3.digitaloceanspaces.com"
+                : provider === "hetzner"
+                  ? "Endpoint (required), e.g. https://fsn1.your-objectstorage.com"
+                  : "S3 URL (optional), e.g. https://s3.us-east-2.amazonaws.com"}
+            />
+            <label
+              class="inline-flex items-center gap-2 text-xs text-muted-foreground md:col-span-2"
+            >
               <input type="checkbox" bind:checked={forcePathStyle} />
               Force path-style S3 (for MinIO/compat endpoints)
             </label>
           {/if}
 
           {#if showAwsAuth}
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2" bind:value={awsIamRoleArn} placeholder="IRSA role ARN, e.g. arn:aws:iam::123456789012:role/velero-irsa" />
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm" bind:value={awsAccessKeyId} placeholder="Access key id, e.g. AKIA..." />
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm" bind:value={awsSecretAccessKey} placeholder="Secret key (not saved)" type="password" />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2"
+              bind:value={awsIamRoleArn}
+              placeholder="IRSA role ARN, e.g. arn:aws:iam::123456789012:role/velero-irsa"
+            />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              bind:value={awsAccessKeyId}
+              placeholder="Access key id, e.g. AKIA..."
+            />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              bind:value={awsSecretAccessKey}
+              placeholder="Secret key (not saved)"
+              type="password"
+            />
           {/if}
 
           {#if showDoAuth}
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm" bind:value={doAccessKey} placeholder={provider === "hetzner" ? "S3 access key (not saved)" : "DO Spaces access key (not saved)"} />
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm" bind:value={doSecretKey} placeholder={provider === "hetzner" ? "S3 secret key (not saved)" : "DO Spaces secret key (not saved)"} type="password" />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              bind:value={doAccessKey}
+              placeholder={provider === "hetzner"
+                ? "S3 access key (not saved)"
+                : "DO Spaces access key (not saved)"}
+            />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              bind:value={doSecretKey}
+              placeholder={provider === "hetzner"
+                ? "S3 secret key (not saved)"
+                : "DO Spaces secret key (not saved)"}
+              type="password"
+            />
           {/if}
 
           {#if showAzureInputs}
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm" bind:value={bucket} placeholder="Blob container, e.g. velero" />
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm" bind:value={azureResourceGroup} placeholder="Resource group, e.g. rg-backup-prod" />
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm" bind:value={azureStorageAccount} placeholder="Storage account, e.g. velerostore01" />
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm" bind:value={azureSubscriptionId} placeholder="Subscription ID, e.g. 11111111-2222-3333-4444-555555555555" />
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2" bind:value={azureStorageAccountUri} placeholder="Storage account URI (optional), e.g. https://velerostore01.blob.core.windows.net" />
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2" bind:value={azureCloudName} placeholder="Cloud name, e.g. AzurePublicCloud" />
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm" bind:value={azureClientId} placeholder="Client ID (optional, not saved)" />
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm" bind:value={azureTenantId} placeholder="Tenant ID (optional, not saved)" />
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2" bind:value={azureClientSecret} placeholder="Client secret (optional, not saved)" type="password" />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              bind:value={bucket}
+              placeholder="Blob container, e.g. velero"
+            />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              bind:value={azureResourceGroup}
+              placeholder="Resource group, e.g. rg-backup-prod"
+            />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              bind:value={azureStorageAccount}
+              placeholder="Storage account, e.g. velerostore01"
+            />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              bind:value={azureSubscriptionId}
+              placeholder="Subscription ID, e.g. 11111111-2222-3333-4444-555555555555"
+            />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2"
+              bind:value={azureStorageAccountUri}
+              placeholder="Storage account URI (optional), e.g. https://velerostore01.blob.core.windows.net"
+            />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2"
+              bind:value={azureCloudName}
+              placeholder="Cloud name, e.g. AzurePublicCloud"
+            />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              bind:value={azureClientId}
+              placeholder="Client ID (optional, not saved)"
+            />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              bind:value={azureTenantId}
+              placeholder="Tenant ID (optional, not saved)"
+            />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2"
+              bind:value={azureClientSecret}
+              placeholder="Client secret (optional, not saved)"
+              type="password"
+            />
           {/if}
 
           {#if showGcpInputs}
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm" bind:value={bucket} placeholder="GCS bucket, e.g. velero-cluster-backups" />
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm" bind:value={gcpProject} placeholder="Project ID (optional), e.g. my-prod-project" />
-            <input class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2" bind:value={gcpServiceAccount} placeholder="Workload identity service account (optional), e.g. velero@my-prod-project.iam.gserviceaccount.com" />
-            <textarea class="min-h-[96px] rounded-md border border-input bg-background px-3 py-2 text-sm md:col-span-2" bind:value={gcpCredentialsJson} placeholder="Service account JSON (optional, not saved), e.g. type=service_account, project_id=my-prod-project"></textarea>
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              bind:value={bucket}
+              placeholder="GCS bucket, e.g. velero-cluster-backups"
+            />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              bind:value={gcpProject}
+              placeholder="Project ID (optional), e.g. my-prod-project"
+            />
+            <input
+              class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2"
+              bind:value={gcpServiceAccount}
+              placeholder="Workload identity service account (optional), e.g. velero@my-prod-project.iam.gserviceaccount.com"
+            />
+            <textarea
+              class="min-h-[96px] rounded-md border border-input bg-background px-3 py-2 text-sm md:col-span-2"
+              bind:value={gcpCredentialsJson}
+              placeholder="Service account JSON (optional, not saved), e.g. type=service_account, project_id=my-prod-project"
+            ></textarea>
           {/if}
         </div>
       {/if}
@@ -788,13 +1111,21 @@
       {#if helmActionError}
         <p class="mt-2 text-xs text-rose-600">{helmActionError}</p>
       {/if}
+      <div class="mt-2">
+        <CommandConsole session={veleroInstallSession} label="Velero" />
+      </div>
     </div>
 
     {#if hasVeleroInstalled}
       <div class="rounded-lg border border-border p-4 space-y-3">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <h3 class="text-sm font-semibold text-foreground">Backup scope</h3>
-          <Button variant="outline" onclick={loadNamespaces} loading={namespaceLoading} disabled={creating}>
+          <Button
+            variant="outline"
+            onclick={loadNamespaces}
+            loading={namespaceLoading}
+            disabled={creating}
+          >
             {#if namespaceLoading}
               <span>Loading namespaces</span><LoadingDots />
             {:else}
@@ -821,6 +1152,33 @@
             {#if availableNamespaces.length === 0}
               <p class="text-xs text-muted-foreground">No namespaces loaded.</p>
             {:else}
+              <div class="mb-2 flex items-center justify-between border-b border-border/60 pb-2">
+                <span class="text-[11px] text-muted-foreground">
+                  {selectedNamespaces.length}/{availableNamespaces.length} selected
+                </span>
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    class="text-[11px] text-sky-400 hover:underline"
+                    onclick={() => {
+                      selectedNamespaces = [...availableNamespaces];
+                    }}
+                    disabled={selectedNamespaces.length === availableNamespaces.length}
+                  >
+                    Select all
+                  </button>
+                  <button
+                    type="button"
+                    class="text-[11px] text-muted-foreground hover:text-foreground"
+                    onclick={() => {
+                      selectedNamespaces = [];
+                    }}
+                    disabled={selectedNamespaces.length === 0}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
               <div class="grid gap-1 md:grid-cols-2">
                 {#each availableNamespaces as ns}
                   <label class="inline-flex items-center gap-2 text-sm">
@@ -875,9 +1233,15 @@
       </Alert.Root>
     {/if}
     {#if actionError}
+      {@const humanized = humanizeVeleroError(actionError)}
       <Alert.Root variant="destructive">
-        <Alert.Title>Backup action error</Alert.Title>
-        <Alert.Description>{actionError}</Alert.Description>
+        <Alert.Title>{humanized.title}</Alert.Title>
+        <Alert.Description>
+          {#if humanized.hint}
+            <p class="mb-1">{humanized.hint}</p>
+          {/if}
+          <pre class="whitespace-pre-wrap text-[11px] opacity-80">{actionError}</pre>
+        </Alert.Description>
       </Alert.Root>
     {/if}
     {#if summary?.warnings?.length}
@@ -905,12 +1269,61 @@
       </Alert.Root>
     {/if}
 
+    {#if backupFreshness.ageHours !== null && backupFreshness.severity !== "ok"}
+      <div
+        class={`rounded-md border px-3 py-2 text-xs ${
+          backupFreshness.severity === "critical"
+            ? "border-rose-500/40 bg-rose-500/10 text-rose-300"
+            : "border-amber-500/40 bg-amber-500/10 text-amber-300"
+        }`}
+      >
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <span class="font-semibold">
+              {backupFreshness.severity === "critical"
+                ? "Backup is past its max-age policy"
+                : "Backup is approaching max-age"}:
+            </span>
+            {Math.round(backupFreshness.ageHours)}h old of {policyMaxAgeHours}h limit ({Math.round(
+              backupFreshness.percent * 100,
+            )}%).
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-6 text-[11px]"
+            onclick={createBackup}
+            disabled={creating || !hasVeleroInstalled}
+          >
+            {creating ? "Creating…" : "Create backup now"}
+          </Button>
+        </div>
+      </div>
+    {/if}
+
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <DiagnosticSummaryCard title="Last backup">
-        <p class="text-sm font-semibold text-foreground">{formatDate(summary?.lastBackupAt ?? null)}</p>
+        <p class="text-sm font-semibold text-foreground">
+          {formatDate(summary?.lastBackupAt ?? null)}
+        </p>
+        {#if backupFreshness.ageHours !== null}
+          <p
+            class={`text-xs ${
+              backupFreshness.severity === "critical"
+                ? "text-rose-400"
+                : backupFreshness.severity === "warning"
+                  ? "text-amber-400"
+                  : "text-muted-foreground"
+            }`}
+          >
+            {Math.round(backupFreshness.ageHours)}h ago / policy {policyMaxAgeHours}h
+          </p>
+        {/if}
       </DiagnosticSummaryCard>
       <DiagnosticSummaryCard title="Next due">
-        <p class="text-sm font-semibold text-foreground">{formatDate(summary?.nextDueAt ?? null)}</p>
+        <p class="text-sm font-semibold text-foreground">
+          {formatDate(summary?.nextDueAt ?? null)}
+        </p>
       </DiagnosticSummaryCard>
       <DiagnosticSummaryCard title="Storage location">
         <p class="text-sm font-semibold text-foreground">{summary?.storage ?? "-"}</p>
@@ -928,30 +1341,52 @@
         </div>
         <div class="mt-2 grid gap-2">
           <div class="grid grid-cols-3 gap-2">
-            <input
-              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-              type="number"
-              min="1"
-              bind:value={policyMaxAgeHours}
-              placeholder="Max age (h)"
-            />
-            <input
-              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-              type="number"
-              min="1"
-              bind:value={policyRetentionDays}
-              placeholder="Retention (days)"
-            />
-            <input
-              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-              type="number"
-              min="1"
-              bind:value={policyCacheTtlMinutes}
-              placeholder="Cache TTL (min)"
-            />
+            <div class="space-y-1">
+              <label for="policy-max-age" class="block text-[11px] text-muted-foreground">
+                Max age (hours)
+              </label>
+              <input
+                id="policy-max-age"
+                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                type="number"
+                min="1"
+                bind:value={policyMaxAgeHours}
+                title="Warn / auto-create a new backup when the latest one is older than this. Example: 24 = tolerate up to 1-day RPO."
+              />
+            </div>
+            <div class="space-y-1">
+              <label for="policy-retention" class="block text-[11px] text-muted-foreground">
+                Retention (days)
+              </label>
+              <input
+                id="policy-retention"
+                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                type="number"
+                min="1"
+                bind:value={policyRetentionDays}
+                title="Velero TTL: backups older than this are deleted by the Velero GC controller. Backup objects remain in the cluster until the TTL elapses."
+              />
+            </div>
+            <div class="space-y-1">
+              <label for="policy-cache-ttl" class="block text-[11px] text-muted-foreground">
+                Audit cache (min)
+              </label>
+              <input
+                id="policy-cache-ttl"
+                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                type="number"
+                min="1"
+                bind:value={policyCacheTtlMinutes}
+                title="How often ROZOOM re-reads Velero state. Larger value = less API pressure; smaller value = fresher status on this page."
+              />
+            </div>
           </div>
           <label class="inline-flex items-center gap-2 text-xs text-muted-foreground">
-            <input type="checkbox" bind:checked={policyAutoCreateEnabled} disabled={!hasVeleroInstalled} />
+            <input
+              type="checkbox"
+              bind:checked={policyAutoCreateEnabled}
+              disabled={!hasVeleroInstalled}
+            />
             Auto-create backup when current status is not OK (while app is running)
           </label>
           {#if !hasVeleroInstalled}
@@ -992,6 +1427,8 @@
           <Table.TableHeader>
             <Table.TableRow>
               <Table.TableHead>Run time</Table.TableHead>
+              <Table.TableHead>Age</Table.TableHead>
+              <Table.TableHead>Duration</Table.TableHead>
               <Table.TableHead>Status</Table.TableHead>
               <Table.TableHead>Name</Table.TableHead>
               <Table.TableHead>Scope</Table.TableHead>
@@ -1004,25 +1441,62 @@
           <Table.TableBody>
             {#if history.length === 0}
               <Table.TableRow>
-                <Table.TableCell colspan={8} class="text-center">
-                  <TableEmptyState message="No backups recorded yet." />
+                <Table.TableCell colspan={10} class="text-center">
+                  <TableEmptyState
+                    message={hasVeleroInstalled
+                      ? "No backups recorded yet. Click Create backup now to run the first one."
+                      : "Install Velero above to enable automated cluster backups."}
+                  />
                 </Table.TableCell>
               </Table.TableRow>
             {:else}
               {#each history as run}
+                {@const details =
+                  run.metadata?.failureReason ||
+                  run.metadata?.validationErrors?.[0] ||
+                  run.reason ||
+                  ""}
+                {@const humanized = details ? humanizeVeleroError(details) : null}
+                {@const ageHours =
+                  run.runAt && !Number.isNaN(Date.parse(run.runAt))
+                    ? (Date.now() - Date.parse(run.runAt)) / 3_600_000
+                    : null}
+                {@const ageOverRetention = ageHours !== null && ageHours > policyRetentionDays * 24}
                 <Table.TableRow>
                   <Table.TableCell>{formatDate(run.runAt)}</Table.TableCell>
+                  <Table.TableCell
+                    class={ageOverRetention ? "text-rose-400" : ""}
+                    title={ageOverRetention
+                      ? `Older than retention (${policyRetentionDays}d). Velero may have already GC'd this object.`
+                      : ""}
+                  >
+                    {formatRelativeAge(run.runAt)}
+                  </Table.TableCell>
+                  <Table.TableCell class="font-mono text-xs"
+                    >{formatRunDuration(run)}</Table.TableCell
+                  >
                   <Table.TableCell>
                     <Badge class="text-white {statusStyles[run.status]}">
                       {run.status}
                     </Badge>
                   </Table.TableCell>
-                  <Table.TableCell>{run.metadata?.name ?? "-"}</Table.TableCell>
+                  <Table.TableCell class="max-w-[180px] truncate" title={run.metadata?.name ?? ""}>
+                    {run.metadata?.name ?? "-"}
+                  </Table.TableCell>
                   <Table.TableCell>{run.metadata ? formatRunScope(run) : "-"}</Table.TableCell>
                   <Table.TableCell>{run.metadata?.storage ?? "-"}</Table.TableCell>
                   <Table.TableCell>{run.metadata?.phase ?? "-"}</Table.TableCell>
-                  <Table.TableCell class="max-w-[360px] truncate" title={run.metadata?.failureReason || run.metadata?.validationErrors?.[0] || run.reason || "-"}>
-                    {run.metadata?.failureReason || run.metadata?.validationErrors?.[0] || run.reason || "-"}
+                  <Table.TableCell class="max-w-[360px]" title={details || "-"}>
+                    {#if humanized && humanized.title !== "Backup action failed"}
+                      <div class="text-xs font-medium text-rose-300">{humanized.title}</div>
+                      {#if humanized.hint}
+                        <div class="truncate text-[11px] text-muted-foreground">
+                          {humanized.hint}
+                        </div>
+                      {/if}
+                    {:else}
+                      <span class="block truncate text-xs">{details || "-"}</span>
+                    {/if}
                   </Table.TableCell>
                   <Table.TableCell>{run.source}</Table.TableCell>
                 </Table.TableRow>
@@ -1036,7 +1510,12 @@
     <div class="rounded-lg border border-border p-4 space-y-3">
       <h3 class="text-sm font-semibold text-foreground">Restore Namespace From Backup</h3>
       <div class="flex flex-wrap items-center gap-2">
-        <Button variant="outline" onclick={scanBackupsForRestore} loading={restoreScanLoading} disabled={!hasVeleroInstalled}>
+        <Button
+          variant="outline"
+          onclick={scanBackupsForRestore}
+          loading={restoreScanLoading}
+          disabled={!hasVeleroInstalled}
+        >
           {#if restoreScanLoading}
             <span>Scanning backups</span><LoadingDots />
           {:else}
@@ -1097,7 +1576,19 @@
       {/if}
 
       <div class="flex items-center gap-2">
-        <Button variant="outline" onclick={restoreNamespace} disabled={restoring || !restoreBackupName}>
+        <Button
+          variant="outline"
+          onclick={() => void previewRestore()}
+          disabled={!restoreBackupName || restoring}
+          title="Show the backup manifest that will be used as the source"
+        >
+          Preview backup
+        </Button>
+        <Button
+          variant="outline"
+          onclick={restoreNamespace}
+          disabled={restoring || !restoreBackupName}
+        >
           {#if restoring}
             <span>Starting restore</span><LoadingDots />
           {:else}
@@ -1105,6 +1596,34 @@
           {/if}
         </Button>
       </div>
+      {#if restorePreview}
+        <div class="mt-2 rounded-md border border-border bg-muted/30 p-3">
+          <div class="mb-1 flex items-center justify-between gap-2">
+            <p class="text-xs font-semibold text-foreground">
+              Backup: {restorePreview.backupName} · {restorePreview.sourceNs} →
+              {restorePreview.targetNs}
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              class="h-6 text-[11px]"
+              onclick={() => (restorePreview = null)}
+            >
+              Dismiss
+            </Button>
+          </div>
+          {#if restorePreview.loading}
+            <div class="flex items-center gap-2 text-xs text-muted-foreground">
+              <LoadingDots /> Loading backup manifest…
+            </div>
+          {:else if restorePreview.error}
+            <div class="text-xs text-rose-400">{restorePreview.error}</div>
+          {:else}
+            <pre
+              class="max-h-60 overflow-auto whitespace-pre-wrap rounded bg-slate-950/70 p-2 text-[11px] font-mono text-slate-300">{restorePreview.describe}</pre>
+          {/if}
+        </div>
+      {/if}
     </div>
   </Card.Content>
 </Card.Root>
