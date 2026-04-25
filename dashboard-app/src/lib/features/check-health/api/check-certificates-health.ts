@@ -188,21 +188,36 @@ function isNodeList(value: unknown): value is NodeList {
   return Array.isArray(list.items);
 }
 
-async function findControlPlanePod(clusterId: string): Promise<string | null> {
+async function findControlPlanePod(
+  clusterId: string,
+): Promise<{ podName: string | null; probeError: boolean }> {
+  let hadProbeError = false;
   for (const label of CONTROL_PLANE_LABELS) {
-    const response = await kubectlWithTimeout(
-      `get pods -n ${CONTROL_PLANE_NAMESPACE} -l ${label} -o json`,
-      clusterId,
-      KUBECTL_CALL_TIMEOUT_MS,
-      "find-control-plane-pod kubectl call",
-      "check-certificates-health:find-control-plane-pod",
-    );
+    let response: Awaited<ReturnType<typeof kubectlWithTimeout>>;
+    try {
+      response = await kubectlWithTimeout(
+        `get pods -n ${CONTROL_PLANE_NAMESPACE} -l ${label} -o json`,
+        clusterId,
+        KUBECTL_CALL_TIMEOUT_MS,
+        "find-control-plane-pod kubectl call",
+        "check-certificates-health:find-control-plane-pod",
+      );
+    } catch {
+      // Timeout or transport failure — keep trying other labels but note the error.
+      hadProbeError = true;
+      continue;
+    }
+    if (response.code !== 0) {
+      // RBAC denial or other API error — not the same as "no control-plane pods".
+      hadProbeError = true;
+      continue;
+    }
     const parsed = parseJson(response.output);
     if (!parsed || !isPodList(parsed)) continue;
     const pod = parsed.items?.find((item) => item.status?.phase === "Running");
-    if (pod?.metadata?.name) return pod.metadata.name;
+    if (pod?.metadata?.name) return { podName: pod.metadata.name, probeError: false };
   }
-  return null;
+  return { podName: null, probeError: hadProbeError };
 }
 
 function parseResidualDays(value?: string): number | undefined {
@@ -394,7 +409,15 @@ async function checkKubeletRotation(clusterId: string): Promise<KubeletRotationI
 async function checkControlPlaneCerts(
   clusterId: string,
 ): Promise<{ certificates: CertificateItem[]; controlPlaneDetected: boolean }> {
-  const podName = await findControlPlanePod(clusterId);
+  const { podName, probeError } = await findControlPlanePod(clusterId);
+  if (probeError && !podName) {
+    // RBAC denial or timeout — we couldn't confirm whether a control plane exists.
+    // Treat as detected so the caller surfaces an error rather than silently skipping.
+    await logCertificateProbeErrorIfUnexpected(
+      "findControlPlanePod: probe error (RBAC denial or timeout)",
+    );
+    return { certificates: [], controlPlaneDetected: true };
+  }
   if (!podName) {
     // Managed control plane (Rancher, RKE2, EKS, GKE, AKS): no
     // kube-apiserver static pod exposed in kube-system. Not an error -

@@ -10,6 +10,7 @@ export interface TlsCertInfo {
   status: "ok" | "warning" | "critical" | "unknown";
   issuer: string | null;
   renewAction: string | null;
+  secretName?: string;
 }
 
 export interface TlsCertScanResult {
@@ -205,7 +206,7 @@ async function scanCertManagerCerts(clusterId: string): Promise<{
   const result = await kubectlJson<{
     items?: Array<{
       metadata?: { name?: string; namespace?: string };
-      spec?: { dnsNames?: string[]; issuerRef?: { name?: string; kind?: string } };
+      spec?: { dnsNames?: string[]; issuerRef?: { name?: string; kind?: string }; secretName?: string };
       status?: {
         notAfter?: string;
         conditions?: Array<{ type?: string; status?: string; message?: string }>;
@@ -248,6 +249,7 @@ async function scanCertManagerCerts(clusterId: string): Promise<{
       status,
       issuer: item.spec?.issuerRef?.name ?? null,
       renewAction: `kubectl cert-manager renew ${name} -n ${namespace}`,
+      secretName: item.spec?.secretName,
     });
   }
 
@@ -268,9 +270,16 @@ export async function scanTlsCertificates(
     scanCertManagerCerts(clusterId),
   ]);
 
-  const certManagerNames = new Set(cmResult.certs.map((c) => `${c.namespace}/${c.name}`));
+  // Use spec.secretName as the dedup key: cert-manager Certificate resources create
+  // a TLS Secret with that name, so the TLS Secret and the Certificate row refer to
+  // the same underlying credential and must not both appear in the table.
+  const certManagerSecretKeys = new Set(
+    cmResult.certs
+      .filter((c) => c.secretName)
+      .map((c) => `${c.namespace}/${c.secretName}`),
+  );
   const dedupedTls = tlsResult.certs.filter(
-    (c) => !certManagerNames.has(`${c.namespace}/${c.name}`),
+    (c) => !certManagerSecretKeys.has(`${c.namespace}/${c.name}`),
   );
 
   const result: TlsCertScanResult = {
