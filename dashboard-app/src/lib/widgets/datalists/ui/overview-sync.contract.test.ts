@@ -22,7 +22,7 @@ describe("overview sync controls contract", () => {
     expect(source).toContain(
       "function scheduleNextOverviewSync(token: RefreshRunToken, clusterId: string)",
     );
-    expect(source).toContain("overviewSyncTimeout = setTimeout(async () => {");
+    expect(source).toContain("overviewSyncTimeout = setTimeout(");
     expect(source).toContain("scheduleNextOverviewSync(token, clusterId);");
     // Sync loop must use recursive setTimeout, not setInterval
     // (staleTimer setInterval for UI counter is OK - not a sync loop)
