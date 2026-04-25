@@ -116,6 +116,101 @@ export function parseMemoryQuantityToBytes(value: string | null | undefined): nu
   return amount * factor;
 }
 
+export function calculateResourcePressure(
+  nodeItems: unknown[],
+  podItems: unknown[],
+): {
+  cpuPercent: number | null;
+  memoryPercent: number | null;
+  cpuRequestedCores: number;
+  memoryRequestedBytes: number;
+} {
+  let allocatableCpu = 0;
+  let allocatableMem = 0;
+  let hasNodes = false;
+
+  for (const item of nodeItems) {
+    if (!item || typeof item !== "object") continue;
+    const node = item as { status?: { allocatable?: { cpu?: string; memory?: string } } };
+    const cpuRaw = node.status?.allocatable?.cpu;
+    const memRaw = node.status?.allocatable?.memory;
+    const cpu = parseCpuQuantityToCores(cpuRaw ?? null);
+    const mem = parseMemoryQuantityToBytes(memRaw ?? null);
+    if (cpu !== null && cpu > 0) {
+      allocatableCpu += cpu;
+      hasNodes = true;
+    }
+    if (mem !== null && mem > 0) {
+      allocatableMem += mem;
+      hasNodes = true;
+    }
+  }
+
+  if (!hasNodes) {
+    return { cpuPercent: null, memoryPercent: null, cpuRequestedCores: 0, memoryRequestedBytes: 0 };
+  }
+
+  let requestedCpu = 0;
+  let requestedMem = 0;
+
+  for (const item of podItems) {
+    if (!item || typeof item !== "object") continue;
+    const pod = item as {
+      status?: { phase?: string };
+      spec?: {
+        containers?: Array<{ resources?: { requests?: { cpu?: string; memory?: string } } }>;
+        initContainers?: Array<{
+          resources?: { requests?: { cpu?: string; memory?: string } };
+        }>;
+      };
+    };
+    const phase = pod.status?.phase;
+    if (phase !== "Running" && phase !== "Pending") continue;
+
+    let podContainerCpu = 0;
+    let podContainerMem = 0;
+    const containers = pod.spec?.containers;
+    if (Array.isArray(containers)) {
+      for (const container of containers) {
+        const cpuReq = parseCpuQuantityToCores(container.resources?.requests?.cpu ?? null);
+        const memReq = parseMemoryQuantityToBytes(container.resources?.requests?.memory ?? null);
+        if (cpuReq !== null && cpuReq > 0) podContainerCpu += cpuReq;
+        if (memReq !== null && memReq > 0) podContainerMem += memReq;
+      }
+    }
+
+    // Kubernetes effective pod requests = max(max(initContainer.requests), sum(container.requests)).
+    // Init containers run one at a time before regular containers, so the scheduler reserves the
+    // largest single init-container request rather than the sum.
+    let podInitCpuMax = 0;
+    let podInitMemMax = 0;
+    const initContainers = pod.spec?.initContainers;
+    if (Array.isArray(initContainers)) {
+      for (const container of initContainers) {
+        const cpuReq = parseCpuQuantityToCores(container.resources?.requests?.cpu ?? null);
+        const memReq = parseMemoryQuantityToBytes(container.resources?.requests?.memory ?? null);
+        if (cpuReq !== null && cpuReq > podInitCpuMax) podInitCpuMax = cpuReq;
+        if (memReq !== null && memReq > podInitMemMax) podInitMemMax = memReq;
+      }
+    }
+
+    requestedCpu += Math.max(podContainerCpu, podInitCpuMax);
+    requestedMem += Math.max(podContainerMem, podInitMemMax);
+  }
+
+  const cpuPercent =
+    allocatableCpu > 0 ? Math.max(0, Math.min(100, (requestedCpu / allocatableCpu) * 100)) : null;
+  const memoryPercent =
+    allocatableMem > 0 ? Math.max(0, Math.min(100, (requestedMem / allocatableMem) * 100)) : null;
+
+  return {
+    cpuPercent,
+    memoryPercent,
+    cpuRequestedCores: requestedCpu,
+    memoryRequestedBytes: requestedMem,
+  };
+}
+
 function formatCpuCores(value: number): string {
   return `${value.toFixed(2)} cores`;
 }
@@ -330,6 +425,8 @@ export function buildOverviewResourceInsights(
   });
 }
 
+export type UsageMetricsMode = "actual" | "requested";
+
 export function buildUsageCards(params: {
   cpuAveragePercent: number | null;
   memoryAveragePercent: number | null;
@@ -337,9 +434,11 @@ export function buildUsageCards(params: {
   podCapacity: number | null;
   cpuReservedCores?: number | null;
   memoryReservedBytes?: number | null;
+  mode?: UsageMetricsMode;
 }): OverviewUsageCard[] {
   const cpu = params.cpuAveragePercent;
   const memory = params.memoryAveragePercent;
+  const isRequested = params.mode === "requested";
   const cpuUsed =
     cpu !== null &&
     params.cpuReservedCores !== null &&
@@ -359,29 +458,37 @@ export function buildUsageCards(params: {
       ? (params.podCount / params.podCapacity) * 100
       : null;
 
+  const cpuLabel = isRequested ? "CPU requested" : "CPU usage";
+  const memLabel = isRequested ? "Memory requested" : "Memory usage";
+  const cpuHintAvailable = isRequested
+    ? "Sum of pod CPU requests vs allocatable. Install metrics-server for actual usage."
+    : "Average usage across nodes.";
+  const memHintAvailable = isRequested
+    ? "Sum of pod memory requests vs allocatable. Install metrics-server for actual usage."
+    : "Average usage across nodes.";
   return [
     {
       id: "cpu",
-      title: "CPU usage",
+      title: cpuLabel,
       percent: cpu,
       value: cpu === null ? "N/A" : `${cpu.toFixed(1)}%`,
       usedReserved:
         cpuUsed !== null && params.cpuReservedCores && params.cpuReservedCores > 0
           ? `${formatCpuCores(cpuUsed)} / ${formatCpuCores(params.cpuReservedCores)}`
           : "N/A / N/A",
-      hint: cpu === null ? "CPU metrics unavailable." : "Average usage across nodes.",
+      hint: cpu === null ? "CPU metrics unavailable." : cpuHintAvailable,
       severity: severityFromPercent(cpu),
     },
     {
       id: "memory",
-      title: "Memory usage",
+      title: memLabel,
       percent: memory,
       value: memory === null ? "N/A" : `${memory.toFixed(1)}%`,
       usedReserved:
         memoryUsed !== null && params.memoryReservedBytes && params.memoryReservedBytes > 0
           ? `${formatMemoryGiB(memoryUsed)} / ${formatMemoryGiB(params.memoryReservedBytes)}`
           : "N/A / N/A",
-      hint: memory === null ? "Memory metrics unavailable." : "Average usage across nodes.",
+      hint: memory === null ? "Memory metrics unavailable." : memHintAvailable,
       severity: severityFromPercent(memory),
     },
     {
