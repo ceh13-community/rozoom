@@ -2,6 +2,49 @@
 
 All notable changes to ROZOOM - K8s Linter IDE.
 
+## [0.21.0-rc.3] - 2026-04-25
+
+### Added
+- Exec-plugin connect method with credential risk chip on cluster cards
+- Preview kubeconfig + live Test Connection in Connect wizard
+- Connect wizard auto-detect, paste kubeconfig, recency restore
+- Fleet Health Overview at top of Manage Clusters
+- Keyboard shortcuts on Manage Clusters (j/k navigation)
+- Danger Zone with typed confirmation in Cluster Manager
+- CM bulk operations: refresh, set namespace, add tag
+- Certificates tab: TLS Secrets + cert-manager integration
+- CSR-based fallback for kubelet rotation status
+- Graceful fallback for managed control plane cert health
+- Shell: multi-line terminal input + proper command tokenizer
+- Actionable Investigate buttons on Top Risks (Overview)
+- Namespace filter context indicator on Overview
+- Resource Insights promoted above the fold
+
+### Fixed
+- Cert panel: populate Domain column + hide noisy kubelet rotation on managed clusters
+- Per-cell tooltips explaining Unknown kubelet rotation status
+- Pulsing dots on certificate loading indicators
+- Cluster-card: sync refresh-interval dropdown between compact and detailed views
+- Cluster-score: do not penalize absence of optional observability addons
+- Shell: normalise CRLF line endings in tokenizer
+- Shell: tolerate whitespace between backslash and newline
+
+### Changed
+- Dashboard card scores, cluster manager hierarchy, empty state polish
+
+## [0.21.0-rc.2] - 2026-04-23
+
+### Added
+- Resource pressure fallback for clusters without metrics-server
+- Sentry credential scrubbing (Phase 8.2)
+- Phase 8 enterprise security hardening roadmap
+
+### Fixed
+- Control plane checks show ok instead of unknown for RKE/kubeadm clusters
+- Sentry HMR artefacts and Vite client URLs dropped before upload
+
+---
+
 ## [0.20.0] - 2026-03-30
 
 ### Added
