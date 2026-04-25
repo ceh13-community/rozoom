@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { loadClusterRefreshInterval, saveClusterRefreshInterval } from "./refresh-preferences";
+import {
+  DEFAULT_REFRESH_INTERVAL_MINUTES,
+  REFRESH_INTERVAL_OPTIONS,
+  isValidRefreshInterval,
+  loadClusterRefreshInterval,
+  saveClusterRefreshInterval,
+} from "./refresh-preferences";
 import { storeManager } from "$shared/store";
 
 const mockStore = {
@@ -54,5 +60,37 @@ describe("refresh-preferences", () => {
       "cluster-2": 15,
     });
     expect(mockStore.save).toHaveBeenCalled();
+  });
+
+  describe("canonical interval options", () => {
+    it("exposes the same list of minutes for compact and detailed cards", () => {
+      const minutes = REFRESH_INTERVAL_OPTIONS.map((option) => option.minutes);
+      expect(minutes).toEqual([1, 5, 10, 15, 30]);
+    });
+
+    it("keeps value/label/short in sync for each option", () => {
+      for (const option of REFRESH_INTERVAL_OPTIONS) {
+        expect(option.value).toBe(String(option.minutes));
+        expect(option.label).toBe(`${option.minutes} min`);
+        expect(option.short).toBe(`${option.minutes}m`);
+      }
+    });
+
+    it("default interval is one of the canonical options", () => {
+      const minutes = REFRESH_INTERVAL_OPTIONS.map((option) => option.minutes);
+      expect(minutes).toContain(DEFAULT_REFRESH_INTERVAL_MINUTES);
+    });
+
+    it("isValidRefreshInterval accepts every canonical minute and rejects others", () => {
+      for (const option of REFRESH_INTERVAL_OPTIONS) {
+        expect(isValidRefreshInterval(option.minutes)).toBe(true);
+      }
+      expect(isValidRefreshInterval(0)).toBe(false);
+      expect(isValidRefreshInterval(7)).toBe(false);
+      expect(isValidRefreshInterval(60)).toBe(false);
+      expect(isValidRefreshInterval(null)).toBe(false);
+      expect(isValidRefreshInterval(undefined)).toBe(false);
+      expect(isValidRefreshInterval(Number.NaN)).toBe(false);
+    });
   });
 });
