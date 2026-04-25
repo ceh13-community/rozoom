@@ -38,3 +38,17 @@ export function shouldInitSentry(dev: boolean) {
   const hasDsn = getSentryDsn() !== null;
   return hasDsn && (!dev || shouldEnableSentryInDev());
 }
+
+export function shouldScrubSentry(dev: boolean) {
+  const force = isTruthy(
+    typeof env.PUBLIC_SENTRY_FORCE_SCRUB === "string" ? env.PUBLIC_SENTRY_FORCE_SCRUB : undefined,
+  );
+  const disable = isTruthy(
+    typeof env.PUBLIC_SENTRY_DISABLE_SCRUB === "string"
+      ? env.PUBLIC_SENTRY_DISABLE_SCRUB
+      : undefined,
+  );
+  if (disable) return false;
+  if (force) return true;
+  return !dev;
+}
