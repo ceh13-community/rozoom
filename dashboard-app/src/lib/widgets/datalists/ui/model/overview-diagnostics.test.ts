@@ -117,6 +117,37 @@ describe("overview-diagnostics", () => {
     });
   });
 
+  it("attaches investigate routes for workload-scoped risks", () => {
+    const checks = makeChecks();
+    const risks = buildOverviewTopRisks(checks);
+    for (const risk of risks) {
+      // Every risk carries the new fields, even if the route is null.
+      expect("investigateRoute" in risk).toBe(true);
+      expect("investigateLabel" in risk).toBe(true);
+    }
+    const podRisks = risks.filter((r) =>
+      ["crashloops", "pending-pods", "pod-restarts"].includes(r.id),
+    );
+    for (const r of podRisks) {
+      expect(r.investigateRoute).not.toBeNull();
+      expect(r.investigateLabel).toMatch(/pod|restart/i);
+    }
+    const nodeRisks = risks.filter((r) =>
+      [
+        "nodes-not-ready",
+        "node-disk-pressure",
+        "node-memory-pressure",
+        "node-pid-pressure",
+        "node-network-unavailable",
+      ].includes(r.id),
+    );
+    for (const r of nodeRisks) {
+      // route is the workload slug, the Overview template prepends
+      // `/dashboard/clusters/<slug>?workload=`.
+      expect(r.investigateRoute).toBe("nodes");
+    }
+  });
+
   it("captures history entries and reports changes since last check", () => {
     const previous = captureOverviewHealthHistoryEntry({
       checks: makeChecks({
