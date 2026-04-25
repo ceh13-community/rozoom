@@ -493,10 +493,14 @@
                 : healthScore.score >= 65
                   ? 'text-amber-500'
                   : 'text-rose-500'}"
-              title="Health Score: {healthScore.score}/100">{healthScore.score}</span
+              title="Health Score: {healthScore.score}/100"
+              ><span class="text-[9px] font-normal opacity-70 mr-0.5">H</span
+              >{healthScore.score}</span
             >
           {:else}
-            <span class="text-xs text-muted-foreground" title="Health Score">-</span>
+            <span class="text-xs text-muted-foreground" title="Health Score"
+              ><span class="text-[9px] font-normal opacity-70 mr-0.5">H</span>-</span
+            >
           {/if}
           {#if clusterScore.score != null}
             <span
@@ -507,10 +511,14 @@
                   : 'text-rose-500'}"
               title="Cluster Score: {clusterScore.score}/100{clusterScore.topRisks.length > 0
                 ? `\nTop risks:\n${clusterScore.topRisks.map((r) => `- ${r.title}`).join('\n')}`
-                : ''}">{clusterScore.score}</span
+                : ''}"
+              ><span class="text-[9px] font-normal opacity-70 mr-0.5">C</span
+              >{clusterScore.score}</span
             >
           {:else}
-            <span class="text-xs text-muted-foreground" title="Cluster Score">-</span>
+            <span class="text-xs text-muted-foreground" title="Cluster Score"
+              ><span class="text-[9px] font-normal opacity-70 mr-0.5">C</span>-</span
+            >
           {/if}
         {/if}
         <button
@@ -527,20 +535,29 @@
         >
           <Gauge class="w-3 h-3" />
         </button>
-        <select
-          class="h-6 appearance-auto rounded border border-slate-500 bg-slate-700 px-1 text-[10px] font-semibold text-white"
-          bind:value={refreshInterval}
-          onchange={(e) => {
-            const v = (e.currentTarget as HTMLSelectElement).value;
-            refreshInterval = v;
-            void saveClusterRefreshInterval(cluster.uuid, Number(v));
-          }}
+        <label
+          class="relative inline-flex h-5 items-center gap-1 rounded border border-slate-500 bg-slate-700 pl-1.5 pr-4 text-[10px] font-semibold text-white cursor-pointer"
           title="Auto-refresh interval for health diagnostics"
         >
-          {#each [{ l: "1m", v: "1" }, { l: "5m", v: "5" }, { l: "10m", v: "10" }] as o (o.v)}
-            <option value={o.v}>{o.l}</option>
-          {/each}
-        </select>
+          <span class="opacity-70">every</span>
+          <select
+            class="appearance-none bg-transparent outline-none leading-none text-[10px] font-semibold py-0 m-0 pr-0 border-0"
+            bind:value={refreshInterval}
+            onchange={(e) => {
+              const v = (e.currentTarget as HTMLSelectElement).value;
+              refreshInterval = v;
+              void saveClusterRefreshInterval(cluster.uuid, Number(v));
+            }}
+          >
+            {#each [{ l: "1m", v: "1" }, { l: "5m", v: "5" }, { l: "10m", v: "10" }] as o (o.v)}
+              <option value={o.v}>{o.l}</option>
+            {/each}
+          </select>
+          <span
+            class="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-[8px] opacity-70"
+            aria-hidden="true">▾</span
+          >
+        </label>
       </div>
     </div>
 

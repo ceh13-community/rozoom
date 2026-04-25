@@ -20,6 +20,9 @@ export type EventRow = {
 export type CertificateRow = {
   uid: string;
   name: string;
+  namespace: string;
+  source: "kubeadm" | "tls-secret" | "cert-manager";
+  domain: string;
   expiresIn: string;
   expiresOn: string;
   status: string;
@@ -122,13 +125,53 @@ export function formatEvent(item: WarningEventItem): EventRow {
   };
 }
 
+function humanizeDaysLeft(days: number | null | undefined): string {
+  if (days == null) return "-";
+  if (days < 0) return `expired ${-days}d ago`;
+  if (days === 0) return "today";
+  if (days < 30) return `${days}d`;
+  if (days < 365) return `${Math.floor(days / 30)}mo`;
+  return `${Math.floor(days / 365)}y ${Math.floor((days % 365) / 30)}mo`;
+}
+
 export function formatCertificate(item: CertificateItem): CertificateRow {
-  const expiresIn = item.daysLeft != null ? `${item.daysLeft} days` : (item.residual ?? "-");
+  const expiresIn =
+    item.daysLeft != null ? humanizeDaysLeft(item.daysLeft) : (item.residual ?? "-");
   return {
-    uid: item.name,
+    uid: `kubeadm:${item.name}`,
     name: item.name,
+    namespace: "kube-system",
+    source: "kubeadm",
+    domain: "-",
     expiresIn,
     expiresOn: item.expiresAt ?? "-",
+    status: item.status,
+  };
+}
+
+export function formatTlsCertificate(item: {
+  name: string;
+  namespace: string;
+  type: "tls-secret" | "cert-manager";
+  dnsNames: string[];
+  notAfter: string | null;
+  daysLeft: number | null;
+  status: "ok" | "warning" | "critical" | "unknown";
+}): CertificateRow {
+  const domain =
+    item.dnsNames.length === 0
+      ? "-"
+      : item.dnsNames.length === 1
+        ? item.dnsNames[0]
+        : `${item.dnsNames[0]} +${item.dnsNames.length - 1}`;
+  return {
+    uid: `${item.type}:${item.namespace}/${item.name}`,
+    name: item.name,
+    namespace: item.namespace || "-",
+    source: item.type,
+    domain,
+    expiresIn: humanizeDaysLeft(item.daysLeft),
+    expiresOn: item.notAfter ?? "-",
     status: item.status,
   };
 }
