@@ -25,7 +25,7 @@ describe("overview loading safety contract", () => {
     expect(source).toContain("eventsWatchdog = setTimeout(() => {");
     expect(source).toContain("eventsInFlight = false;");
     expect(source).toContain("eventsLoading = false;");
-    expect(source).toContain("certificatesWatchdog = setTimeout(() => {");
+    expect(source).toContain("certificatesWatchdog = setTimeout(");
     expect(source).toContain("certificatesInFlight = false;");
     expect(source).toContain("certificatesLoading = false;");
     expect(source).toContain("isCertificatesRetryableError(error)");

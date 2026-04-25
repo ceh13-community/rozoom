@@ -130,4 +130,68 @@ describe("checkApiServerHealth", () => {
     expect(result.live.ok).toBe(false);
     expect(result.ready.ok).toBe(false);
   });
+
+  it("falls back to /healthz when /livez and /readyz return 404", async () => {
+    mockedKubectl.mockImplementation(async (args: string) => {
+      if (args.includes("/livez") || args.includes("/readyz")) {
+        return {
+          output: "",
+          errors: "Error from server (NotFound): the server could not find the requested resource",
+          code: 1,
+        };
+      }
+      return { output: "ok", errors: "", code: 0 };
+    });
+
+    const result = await checkApiServerHealth(clusterId);
+
+    expect(result.status).toBe("ok");
+    expect(result.live.ok).toBe(true);
+    expect(result.live.output).toContain("/healthz fallback");
+    expect(result.ready.ok).toBe(true);
+    expect(result.ready.output).toContain("/healthz fallback");
+  });
+
+  it("returns critical when /livez 404 and /healthz also fails", async () => {
+    mockedKubectl.mockImplementation(async () => {
+      return { output: "", errors: "Error from server (NotFound)", code: 1 };
+    });
+
+    const result = await checkApiServerHealth(clusterId);
+
+    expect(result.status).toBe("critical");
+    expect(result.live.ok).toBe(false);
+  });
+
+  it("does not trigger /healthz fallback on verbose readyz with a 404 subline", async () => {
+    // /readyz?verbose emits one line per checker. A checker named 'ping' may
+    // include a 404 in its failure message without the endpoint itself being
+    // missing. Previously the bare "includes(\"404\")" match falsely routed
+    // this to the /healthz fallback, masking the real problem.
+    mockedKubectl.mockImplementation(async (args: string) => {
+      if (args.includes("/readyz")) {
+        return {
+          output: [
+            "[+]ping ok",
+            "[+]log ok",
+            "[-]poststarthook/ping failed: reason withheld (err: 404 Not Found on http://external-probe)",
+            "readyz check failed",
+          ].join("\n"),
+          errors: "",
+          code: 1,
+        };
+      }
+      if (args.includes("/livez")) {
+        return { output: "ok", errors: "", code: 0 };
+      }
+      // /healthz fallback should NOT be hit here
+      throw new Error("Unexpected /healthz fallback for verbose 404 subline");
+    });
+
+    const result = await checkApiServerHealth(clusterId);
+    expect(result.live.ok).toBe(true);
+    expect(result.ready.ok).toBe(false);
+    // Critically: readyz error must not claim /healthz fallback
+    expect(result.ready.output).not.toContain("/healthz fallback");
+  });
 });
