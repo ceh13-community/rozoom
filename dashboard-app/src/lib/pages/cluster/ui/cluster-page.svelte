@@ -1663,7 +1663,7 @@
                   )}
                 </span>
               {:else if headerSyncDisplayText === "loading"}
-                <span class="flex items-center gap-1">
+                <span class="flex items-center gap-1 text-foreground">
                   <span
                     class="inline-block h-2 w-2 animate-spin rounded-full border-2 border-current border-t-transparent"
                     aria-hidden="true"
