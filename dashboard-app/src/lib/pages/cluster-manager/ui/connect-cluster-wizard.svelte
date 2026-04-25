@@ -26,8 +26,21 @@
   } from "$features/cluster-manager/api/cloud-import";
   import { addClustersFromText } from "$features/cluster-manager";
   import { detectedCloudConfigs } from "$features/cluster-finder/model/cli-store";
+  import {
+    testKubeconfig,
+    type TestConnectionResult,
+  } from "$features/cluster-manager/api/test-connection";
   import { Button } from "$shared/ui/button";
-  import { KeyRound, Cloud, Vault, FileText, Ticket, TerminalSquare } from "$shared/ui/icons";
+  import {
+    KeyRound,
+    Cloud,
+    Vault,
+    FileText,
+    Ticket,
+    TerminalSquare,
+    Check,
+    ShieldQuestion,
+  } from "$shared/ui/icons";
 
   type ConnectMethod = "exec" | "oidc" | "cloud" | "vault" | "certificate" | "token" | null;
 
@@ -101,6 +114,157 @@
 
   const oidcPreset = $derived(OIDC_PRESETS.find((p) => p.provider === oidcProvider)!);
   const execPreset = $derived(getExecPluginPreset(execKind));
+
+  // ── Preview + test state ──
+  let showPreview = $state(false);
+  let testing = $state(false);
+  let testResult = $state<TestConnectionResult | null>(null);
+  let previewCopied = $state(false);
+
+  function buildCertificateYaml(): string {
+    const caLine = certCaData.trim()
+      ? `    certificate-authority-data: ${certCaData.trim()}`
+      : `    insecure-skip-tls-verify: true`;
+    return `apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: ${certServerUrl.trim()}
+${caLine}
+  name: ${certClusterName.trim()}
+contexts:
+- context:
+    cluster: ${certClusterName.trim()}
+    user: cert-user
+  name: ${certClusterName.trim()}
+current-context: ${certClusterName.trim()}
+users:
+- name: cert-user
+  user:
+    client-certificate-data: ${certClientCert.trim()}
+    client-key-data: ${certClientKey.trim()}
+`;
+  }
+
+  function buildTokenYaml(): string {
+    const caLine = tokenCaData.trim()
+      ? `    certificate-authority-data: ${tokenCaData.trim()}`
+      : `    insecure-skip-tls-verify: true`;
+    return `apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: ${tokenServerUrl.trim()}
+${caLine}
+  name: ${tokenClusterName.trim()}
+contexts:
+- context:
+    cluster: ${tokenClusterName.trim()}
+    user: token-user
+  name: ${tokenClusterName.trim()}
+current-context: ${tokenClusterName.trim()}
+users:
+- name: token-user
+  user:
+    token: ${tokenValue.trim()}
+`;
+  }
+
+  function buildPreviewYaml(): string | null {
+    try {
+      if (method === "oidc") {
+        if (
+          !oidcClusterName.trim() ||
+          !oidcServerUrl.trim() ||
+          !oidcIssuerUrl.trim() ||
+          !oidcClientId.trim()
+        )
+          return null;
+        return generateOidcKubeconfig(
+          oidcClusterName.trim(),
+          oidcServerUrl.trim(),
+          oidcCaData.trim() || null,
+          {
+            provider: oidcProvider,
+            issuerUrl: oidcIssuerUrl.trim(),
+            clientId: oidcClientId.trim(),
+            clientSecret: oidcClientSecret.trim() || undefined,
+          },
+        );
+      }
+      if (method === "exec") {
+        if (!execClusterName.trim() || !execServerUrl.trim()) return null;
+        return generateExecKubeconfig({
+          kind: execKind,
+          clusterName: execClusterName.trim(),
+          serverUrl: execServerUrl.trim(),
+          caData: execCaData.trim() || undefined,
+          primary: execPrimary.trim() || undefined,
+          secondary: execSecondary.trim() || undefined,
+          tertiary: execTertiary.trim() || undefined,
+          extra: execExtra.trim() || undefined,
+          command: execCommand.trim() || undefined,
+        });
+      }
+      if (method === "certificate") {
+        if (
+          !certClusterName.trim() ||
+          !certServerUrl.trim() ||
+          !certClientCert.trim() ||
+          !certClientKey.trim()
+        )
+          return null;
+        return buildCertificateYaml();
+      }
+      if (method === "token") {
+        if (!tokenClusterName.trim() || !tokenServerUrl.trim() || !tokenValue.trim()) return null;
+        return buildTokenYaml();
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  const previewYaml = $derived(buildPreviewYaml());
+  const previewSupported = $derived(
+    method === "oidc" || method === "exec" || method === "certificate" || method === "token",
+  );
+
+  /** Mask tokens / client-key so the preview never shows raw secrets. */
+  function maskPreview(yaml: string): string {
+    return yaml
+      .replace(/(token:\s*)(\S+)/g, (_m, p: string) => `${p}***redacted***`)
+      .replace(/(--oidc-client-secret=)([^"\s]+)/g, (_m, p: string) => `${p}***redacted***`)
+      .replace(/(client-key-data:\s*)(\S+)/g, (_m, p: string) => `${p}***redacted***`);
+  }
+
+  async function copyPreview() {
+    if (!previewYaml) return;
+    try {
+      await navigator.clipboard.writeText(previewYaml);
+      previewCopied = true;
+      setTimeout(() => (previewCopied = false), 2000);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function runTestConnection() {
+    const yaml = previewYaml;
+    if (!yaml) {
+      testResult = {
+        success: false,
+        error: "Fill in required fields first.",
+        durationMs: 0,
+      };
+      return;
+    }
+    testing = true;
+    testResult = null;
+    testResult = await testKubeconfig(yaml);
+    testing = false;
+  }
 
   // Method catalog (shared for UI + recency restore).
   const METHODS: Array<{
@@ -219,6 +383,8 @@
     method = next;
     persistMethod(next);
     clearMessages();
+    testResult = null;
+    showPreview = false;
     if (next === "cloud") void loadScopesForProvider();
   }
 
@@ -427,28 +593,7 @@
     }
     loading = true;
     try {
-      const caLine = certCaData.trim()
-        ? `    certificate-authority-data: ${certCaData.trim()}`
-        : `    insecure-skip-tls-verify: true`;
-      const yaml = `apiVersion: v1
-kind: Config
-clusters:
-- cluster:
-    server: ${certServerUrl.trim()}
-${caLine}
-  name: ${certClusterName.trim()}
-contexts:
-- context:
-    cluster: ${certClusterName.trim()}
-    user: cert-user
-  name: ${certClusterName.trim()}
-current-context: ${certClusterName.trim()}
-users:
-- name: cert-user
-  user:
-    client-certificate-data: ${certClientCert.trim()}
-    client-key-data: ${certClientKey.trim()}`;
-      await addClustersFromText(yaml);
+      await addClustersFromText(buildCertificateYaml());
       success = `Cluster "${certClusterName}" added with X.509 certificate auth.`;
       certClusterName = "";
       certServerUrl = "";
@@ -470,27 +615,7 @@ users:
     }
     loading = true;
     try {
-      const caLine = tokenCaData.trim()
-        ? `    certificate-authority-data: ${tokenCaData.trim()}`
-        : `    insecure-skip-tls-verify: true`;
-      const yaml = `apiVersion: v1
-kind: Config
-clusters:
-- cluster:
-    server: ${tokenServerUrl.trim()}
-${caLine}
-  name: ${tokenClusterName.trim()}
-contexts:
-- context:
-    cluster: ${tokenClusterName.trim()}
-    user: token-user
-  name: ${tokenClusterName.trim()}
-current-context: ${tokenClusterName.trim()}
-users:
-- name: token-user
-  user:
-    token: ${tokenValue.trim()}`;
-      await addClustersFromText(yaml);
+      await addClustersFromText(buildTokenYaml());
       success = `Cluster "${tokenClusterName}" added with bearer token.`;
       tokenClusterName = "";
       tokenServerUrl = "";
@@ -1288,6 +1413,84 @@ users:
         >
           {loading ? "Importing" : "Connect via exec plugin"}
         </Button>
+      </div>
+    {/if}
+
+    <!-- ────────── Shared preview + test strip ────────── -->
+    {#if previewSupported}
+      <div class="rounded border border-slate-700 bg-slate-900/40 p-2 space-y-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            class="text-[11px] px-2 py-1 rounded border border-slate-600 text-slate-300 hover:border-slate-400 transition flex items-center gap-1"
+            onclick={() => (showPreview = !showPreview)}
+            disabled={!previewYaml}
+            title={previewYaml ? "Preview YAML" : "Fill required fields first"}
+          >
+            <FileText class="w-3 h-3" />
+            {showPreview ? "Hide" : "Preview"} kubeconfig
+          </button>
+          <button
+            class="text-[11px] px-2 py-1 rounded border border-emerald-600/50 text-emerald-400 hover:bg-emerald-500/10 transition flex items-center gap-1 disabled:opacity-50"
+            onclick={runTestConnection}
+            disabled={testing || !previewYaml}
+            title={previewYaml
+              ? "Write temp kubeconfig, run kubectl version"
+              : "Fill required fields first"}
+          >
+            {#if testing}
+              <span
+                class="inline-block w-3 h-3 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin"
+              ></span>
+              Testing
+            {:else}
+              <ShieldQuestion class="w-3 h-3" />
+              Test connection
+            {/if}
+          </button>
+          {#if testResult}
+            {#if testResult.success}
+              <span
+                class="text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded px-2 py-0.5 flex items-center gap-1"
+                title={`${testResult.durationMs}ms · ${testResult.serverPlatform ?? ""}`}
+              >
+                <Check class="w-3 h-3" />
+                Reachable
+                {#if testResult.serverVersion}
+                  <span class="text-slate-400 ml-1">{testResult.serverVersion}</span>
+                {/if}
+              </span>
+            {:else}
+              <span
+                class="text-[11px] text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded px-2 py-0.5 truncate max-w-[360px]"
+                title={testResult.error ?? ""}
+              >
+                {testResult.error?.split("\n")[0] ?? "Connection failed"}
+              </span>
+            {/if}
+          {/if}
+          {#if !previewYaml}
+            <span class="text-[10px] text-slate-500">Fill required fields to enable</span>
+          {/if}
+        </div>
+        {#if showPreview && previewYaml}
+          <div class="rounded border border-slate-700 bg-slate-950/60 p-2">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[10px] text-slate-500">
+                Generated kubeconfig (secrets redacted)
+              </span>
+              <button
+                class="text-[10px] px-1.5 py-0.5 rounded border border-slate-600 text-slate-400 hover:text-white transition"
+                onclick={copyPreview}
+              >
+                {previewCopied ? "Copied" : "Copy raw"}
+              </button>
+            </div>
+            <pre
+              class="text-[10px] font-mono text-emerald-300/80 whitespace-pre-wrap overflow-x-auto max-h-56">{maskPreview(
+                previewYaml,
+              )}</pre>
+          </div>
+        {/if}
       </div>
     {/if}
   </div>
