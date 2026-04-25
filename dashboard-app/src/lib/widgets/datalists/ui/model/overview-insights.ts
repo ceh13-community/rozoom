@@ -292,6 +292,7 @@ function buildComponentCheck(params: {
   podFallback?: { status: "ok" | "warning" | "critical"; message: string };
   isManagedCluster: boolean;
   managedDetail?: string;
+  apiServerOk?: boolean;
 }): ControlPlaneCheck {
   const readyzEvidence = parseReadyzEvidence(params.readyOutput, params.probes);
 
@@ -316,13 +317,29 @@ function buildComponentCheck(params: {
     };
   }
 
+  if (readyzEvidence) {
+    return {
+      id: params.id,
+      title: params.title,
+      severity: "unavailable",
+      detail: `No visible kube-system control-plane pods. ${readyzEvidence}`,
+    };
+  }
+
+  if (params.apiServerOk) {
+    return {
+      id: params.id,
+      title: params.title,
+      severity: "ok",
+      detail: "Not visible as pods (may run as system containers). API server is healthy.",
+    };
+  }
+
   return {
     id: params.id,
     title: params.title,
     severity: "unavailable",
-    detail: readyzEvidence
-      ? `No visible kube-system control-plane pods. ${readyzEvidence}`
-      : "No visible kube-system control-plane pods and no provider-managed fallback.",
+    detail: "No visible kube-system control-plane pods and no provider-managed fallback.",
   };
 }
 
@@ -362,12 +379,15 @@ export function buildOverviewResourceInsights(
       const podIssues = checks?.podIssues;
       const crashLoop = podIssues?.crashLoopCount ?? 0;
       const pending = podIssues?.pendingCount ?? 0;
+      const podStatus = podIssues?.status;
       const severity =
         crashLoop > 0
           ? "critical"
           : pending > 0
             ? "warning"
-            : severityFromGlobalStatus(podIssues?.status);
+            : podStatus === "ok" || (crashLoop === 0 && pending === 0 && checks !== null)
+              ? "ok"
+              : severityFromGlobalStatus(podStatus);
       const reason =
         crashLoop > 0
           ? `${crashLoop} CrashLoopBackOff pod(s).`
@@ -704,6 +724,7 @@ export function buildControlPlaneChecks(params: {
         podFallback: controlPlaneComponents?.scheduler,
         isManagedCluster: params.isManagedCluster,
         managedDetail,
+        apiServerOk: apiStatus === "ok",
       }),
     },
     {
@@ -715,6 +736,7 @@ export function buildControlPlaneChecks(params: {
         podFallback: controlPlaneComponents?.controllerManager,
         isManagedCluster: params.isManagedCluster,
         managedDetail,
+        apiServerOk: apiStatus === "ok",
       }),
     },
     etcdCheck,
