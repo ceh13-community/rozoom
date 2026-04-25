@@ -41,3 +41,9 @@ export { default as ShieldCheck } from "@lucide/svelte/icons/shield-check";
 export { default as ShieldOff } from "@lucide/svelte/icons/shield-off";
 export { default as Activity } from "@lucide/svelte/icons/activity";
 export { default as EyeOff } from "@lucide/svelte/icons/eye-off";
+
+export { default as KeyRound } from "@lucide/svelte/icons/key-round";
+export { default as Cloud } from "@lucide/svelte/icons/cloud";
+export { default as Vault } from "@lucide/svelte/icons/vault";
+export { default as FileText } from "@lucide/svelte/icons/file-text";
+export { default as Ticket } from "@lucide/svelte/icons/ticket";

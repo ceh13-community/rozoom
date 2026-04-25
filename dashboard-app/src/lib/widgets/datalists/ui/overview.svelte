@@ -2,11 +2,13 @@
   import { onDestroy, onMount } from "svelte";
   import { readable, type Readable } from "svelte/store";
   import { goto } from "$app/navigation";
+  import { selectedNamespace } from "$features/namespace-management";
   import { type PageData } from "$entities/cluster";
   import * as Alert from "$shared/ui/alert";
   import type { WorkloadOverview } from "$shared";
   import { kubectlJson } from "$shared/api/kubectl-proxy";
   import { getNodeMetrics } from "$shared/api/tauri";
+  import { scanTlsCertificates } from "$features/check-health/api/check-tls-certificates";
   import {
     checkCertificatesHealth,
     checkWarningEvents,
@@ -44,6 +46,7 @@
   import DataTable from "./workloads-table.svelte";
   import OverviewEventsPanel from "./overview-events-panel.svelte";
   import OverviewCertificatesPanel from "./overview-certificates-panel.svelte";
+  import RotationCell from "./common/rotation-cell.svelte";
   import { buildMetricsSourcesHref, METRICS_BANNER_CTA } from "./common/metrics-banner-copy";
   import { createSerialRefresh } from "$shared/lib/serial-refresh";
   import {
@@ -84,6 +87,7 @@
     captureOverviewSnapshot as buildOverviewSnapshot,
     createOverviewScopeKey,
     formatCertificate as mapCertificateRow,
+    formatTlsCertificate as mapTlsCertificateRow,
     formatEvent as mapEventRow,
     formatRelativeTime,
     formatRotation as mapRotationRow,
@@ -97,6 +101,8 @@
     shouldKeepStaleSection as shouldKeepOverviewSection,
     sleep,
     withTimeout,
+    type CertificateRow,
+    type RotationRow,
   } from "./model/overview-runtime";
   import SectionRuntimeStatus from "./common/section-runtime-status.svelte";
   import { writeRuntimeDebugLog } from "$shared/lib/runtime-debug";
@@ -120,22 +126,9 @@
     date: string;
   };
 
-  type CertificateRow = {
-    uid: string;
-    name: string;
-    expiresIn: string;
-    expiresOn: string;
-    status: string;
-  };
-
-  type RotationRow = {
-    uid: string;
-    node: string;
-    rotateClient: string;
-    rotateServer: string;
-    status: string;
-    message: string;
-  };
+  // CertificateRow + RotationRow now imported from model/overview-runtime
+  // so they stay in sync with formatCertificate / formatTlsCertificate /
+  // formatRotation and the snapshot round-trip code.
   type OverviewSnapshot = {
     schemaVersion: 1;
     scopeKey: string;
@@ -202,7 +195,17 @@
           onclick: column.getToggleSortingHandler(),
         }),
     },
-    { accessorKey: "expiresIn", header: "Expires In" },
+    { accessorKey: "namespace", header: "Namespace" },
+    { accessorKey: "domain", header: "Domain" },
+    { accessorKey: "source", header: "Source" },
+    {
+      accessorKey: "expiresIn",
+      header: ({ column }) =>
+        renderComponent(SortingButton, {
+          label: "Expires In",
+          onclick: column.getToggleSortingHandler(),
+        }),
+    },
     { accessorKey: "expiresOn", header: "Expires On" },
     { accessorKey: "status", header: "Status" },
   ];
@@ -216,8 +219,24 @@
           onclick: column.getToggleSortingHandler(),
         }),
     },
-    { accessorKey: "rotateClient", header: "Client Rotation" },
-    { accessorKey: "rotateServer", header: "Server Rotation" },
+    {
+      accessorKey: "rotateClient",
+      header: "Client Rotation",
+      cell: ({ row }) =>
+        renderComponent(RotationCell, {
+          value: row.original.rotateClient,
+          scope: "client",
+        }),
+    },
+    {
+      accessorKey: "rotateServer",
+      header: "Server Rotation",
+      cell: ({ row }) =>
+        renderComponent(RotationCell, {
+          value: row.original.rotateServer,
+          scope: "server",
+        }),
+    },
     { accessorKey: "status", header: "Status" },
     { accessorKey: "message", header: "Message" },
   ];
@@ -277,6 +296,7 @@
   let overviewLastUpdatedAt = $state<number | null>(null);
   let eventsHydrated = $state(false);
   let certificatesHydrated = $state(false);
+  let controlPlaneDetectedForPanel = $state<boolean | undefined>(undefined);
   let lastEventsSuccessAt = $state(0);
   let lastCertificatesSuccessAt = $state(0);
   let overviewWatchedEventsStore: Readable<WarningEventItem[]> = readable([]);
@@ -1069,6 +1089,7 @@
     let report: {
       certificates: CertificateItem[];
       kubeletRotation: KubeletRotationItem[];
+      controlPlaneDetected?: boolean;
       errors?: string;
     } | null = null;
     try {
@@ -1101,21 +1122,51 @@
         return;
       if (!report && lastError) throw lastError;
       if (!report) throw new Error("Failed to load certificates.");
-      const mappedCertificates = await mapWithMainThreadYield(
+
+      // In parallel: also scan Kubernetes TLS Secrets + cert-manager
+      // Certificate resources. This surfaces application certs (e.g.
+      // cattle-webhook-ca, serving-cert) that the kubeadm check does
+      // not see. On Rancher/RKE2 clusters where the kubeadm path
+      // returns nothing, this is the entire picture.
+      let tlsScan: Awaited<ReturnType<typeof scanTlsCertificates>> | null = null;
+      try {
+        tlsScan = await scanTlsCertificates(clusterId, { force: forceRefresh });
+      } catch {
+        // Best effort; kubeadm-only result still useful.
+      }
+
+      const mappedKubeadm = await mapWithMainThreadYield(
         report.certificates.slice(0, OVERVIEW_CERTIFICATES_ROWS_MAX),
         formatCertificate,
       );
+      const tlsList = tlsScan?.certs ?? [];
+      const mappedTls = await mapWithMainThreadYield(
+        tlsList.slice(0, OVERVIEW_CERTIFICATES_ROWS_MAX),
+        mapTlsCertificateRow,
+      );
+      const combined = [...mappedKubeadm, ...mappedTls].slice(0, OVERVIEW_CERTIFICATES_ROWS_MAX);
+      combined.sort((a, b) => {
+        // Critical first, then warnings, then the rest; within each
+        // bucket keep insertion order (kubeadm first, TLS after).
+        const rank = { critical: 0, warning: 1, unknown: 2, ok: 3 } as Record<string, number>;
+        return (rank[a.status] ?? 4) - (rank[b.status] ?? 4);
+      });
+
       const mappedRotation = await mapWithMainThreadYield(
         report.kubeletRotation.slice(0, OVERVIEW_ROTATION_ROWS_MAX),
         formatRotation,
       );
       if (!isRefreshTokenActive(token, clusterId) || certificatesInFlightTokenId !== token.id)
         return;
-      certificatesRows = mappedCertificates;
+      certificatesRows = combined;
       rotationRows = mappedRotation;
+      controlPlaneDetectedForPanel = report.controlPlaneDetected;
       certificatesHydrated = true;
       lastCertificatesSuccessAt = Date.now();
-      certificatesError = report.errors ?? null;
+      const kubeadmError = report.errors ?? null;
+      const tlsErrors = tlsScan?.errors?.join("; ") ?? null;
+      certificatesError =
+        kubeadmError && tlsErrors ? `${kubeadmError} | ${tlsErrors}` : (kubeadmError ?? tlsErrors);
     } catch (error) {
       if (!isRefreshTokenActive(token, clusterId) || certificatesInFlightTokenId !== token.id)
         return;
@@ -1692,6 +1743,21 @@
       onAction={toggleOverviewRuntime}
     />
   </div>
+  {#if $selectedNamespace && $selectedNamespace !== "all"}
+    <div
+      class="mb-3 rounded border border-sky-300/40 bg-sky-50/80 dark:border-sky-700/40 dark:bg-sky-950/30 px-3 py-1.5 text-[11px] text-sky-800 dark:text-sky-200 flex items-center gap-2"
+      role="status"
+    >
+      <span class="font-semibold">Namespace filter:</span>
+      <code class="font-mono text-[11px] bg-sky-100 dark:bg-sky-900/50 rounded px-1.5 py-0.5"
+        >{$selectedNamespace}</code
+      >
+      <span class="text-sky-700/80 dark:text-sky-300/80">
+        Cluster overview is cluster-wide; the filter applies to Pods, Deployments, and other
+        workload pages.
+      </span>
+    </div>
+  {/if}
   <div
     class="mb-3 flex flex-wrap items-center justify-end gap-2 text-xs text-gray-500 dark:text-gray-400"
   >
@@ -1741,6 +1807,50 @@
         <ClusterScore checks={clusterHealth} />
       </div>
     {/if}
+  </div>
+
+  <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+    {#each resourceInsights as insight (insight.key)}
+      <button
+        type="button"
+        class="rounded-lg border border-border bg-card p-4 text-left text-card-foreground transition hover:bg-muted/40"
+        onclick={() => {
+          goto(`${path}${insight.route}`);
+        }}
+        title={insight.kubectlHint}
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              {insight.title}
+            </div>
+            <div class="mt-2 text-3xl font-semibold">{insight.quantity}</div>
+          </div>
+          <span
+            class={`rounded px-2 py-0.5 text-[11px] font-medium ${
+              insight.severity === "critical"
+                ? "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
+                : insight.severity === "warning"
+                  ? "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
+                  : insight.severity === "ok"
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                    : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+            }`}
+          >
+            {insight.severity === "critical"
+              ? "Critical"
+              : insight.severity === "warning"
+                ? "Warn"
+                : insight.severity === "ok"
+                  ? "OK"
+                  : insight.severity === "not_applicable"
+                    ? "N/A"
+                    : "Unknown"}
+          </span>
+        </div>
+        <div class="mt-2 truncate text-xs text-muted-foreground">{insight.reason}</div>
+      </button>
+    {/each}
   </div>
   {#if metricsUnavailableMessage}
     <div
@@ -2028,12 +2138,24 @@
                 </span>
               </div>
               <div class="mt-3 flex flex-wrap items-center gap-2">
+                {#if risk.investigateRoute && risk.investigateLabel}
+                  <Button
+                    size="sm"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    onclick={() => {
+                      goto(`${path}${risk.investigateRoute}`);
+                    }}
+                  >
+                    {risk.investigateLabel}
+                  </Button>
+                {/if}
                 <Button
                   size="sm"
                   variant="outline"
                   onclick={() => {
                     void copyToClipboard(risk.command, "Risk command copied");
                   }}
+                  title="Copy the diagnostic kubectl command to clipboard"
                 >
                   {risk.actionLabel}
                 </Button>
@@ -2238,51 +2360,7 @@
     </section>
   </div>
 
-  <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-    {#each resourceInsights as insight (insight.key)}
-      <button
-        type="button"
-        class="rounded-lg border border-border bg-card p-4 text-left text-card-foreground transition hover:bg-muted/40"
-        onclick={() => {
-          goto(`${path}${insight.route}`);
-        }}
-        title={insight.kubectlHint}
-      >
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <div class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-              {insight.title}
-            </div>
-            <div class="mt-2 text-3xl font-semibold">{insight.quantity}</div>
-          </div>
-          <span
-            class={`rounded px-2 py-0.5 text-[11px] font-medium ${
-              insight.severity === "critical"
-                ? "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
-                : insight.severity === "warning"
-                  ? "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
-                  : insight.severity === "ok"
-                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
-                    : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-            }`}
-          >
-            {insight.severity === "critical"
-              ? "Critical"
-              : insight.severity === "warning"
-                ? "Warn"
-                : insight.severity === "ok"
-                  ? "OK"
-                  : insight.severity === "not_applicable"
-                    ? "N/A"
-                    : "Unknown"}
-          </span>
-        </div>
-        <div class="mt-2 truncate text-xs text-muted-foreground">{insight.reason}</div>
-      </button>
-    {/each}
-  </div>
-
-  <div class="mt-6 rounded-lg border border-border bg-card p-4 text-card-foreground">
+  <div class="rounded-lg border border-border bg-card p-4 text-card-foreground">
     <div class="mb-3 flex items-center justify-between gap-3">
       <h3 class="text-sm font-semibold">Control Plane Checks</h3>
       <div class="text-xs text-muted-foreground">
@@ -2406,6 +2484,7 @@
           error={certificatesError}
           {certificateColumns}
           {rotationColumns}
+          controlPlaneDetected={controlPlaneDetectedForPanel}
         />
       {:else}
         <div

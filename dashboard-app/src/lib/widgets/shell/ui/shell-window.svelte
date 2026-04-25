@@ -13,6 +13,7 @@
     getPodSessionInitialCommand,
     pickMainContainer,
   } from "$widgets/datalists/ui/pods-list/pod-shell";
+  import { tokenizeCommand } from "$widgets/shell/lib/tokenize-command";
 
   export let windowState: ShellWindowState;
   export let windowIndex = 0;
@@ -330,18 +331,53 @@
     }
   }
 
+  function isCaretAtFirstLine(target: HTMLTextAreaElement | null): boolean {
+    if (!target) return true;
+    const { selectionStart, value } = target;
+    const before = value.slice(0, selectionStart);
+    return !before.includes("\n");
+  }
+
+  function isCaretAtLastLine(target: HTMLTextAreaElement | null): boolean {
+    if (!target) return true;
+    const { selectionStart, value } = target;
+    const after = value.slice(selectionStart);
+    return !after.includes("\n");
+  }
+
   function handleCommandKeydown(event: KeyboardEvent) {
+    // Submit:
+    //   Enter (no modifier) on a single-line command  →  submit
+    //   Ctrl/Cmd/Meta + Enter at any time              →  submit
+    //   Shift + Enter or Alt + Enter                   →  newline
+    // Rationale: preserves the familiar Enter-to-run flow for simple
+    // commands, but allows multi-line paste and shift-enter composition.
+    const target = event.currentTarget as HTMLTextAreaElement | null;
     if (event.key === "Enter") {
-      event.preventDefault();
-      void executeShellCommand();
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+        void executeShellCommand();
+        return;
+      }
+      if (event.shiftKey || event.altKey) {
+        // Let the textarea insert the newline naturally.
+        return;
+      }
+      // Plain Enter: only submit when the command is a single line.
+      if (!shellCommand.includes("\n")) {
+        event.preventDefault();
+        void executeShellCommand();
+      }
       return;
     }
-    if (event.key === "ArrowUp") {
+    // History navigation only when the caret is at the very top/bottom,
+    // so multi-line editing with arrow keys still works normally.
+    if (event.key === "ArrowUp" && isCaretAtFirstLine(target)) {
       event.preventDefault();
       navigateHistory(-1);
       return;
     }
-    if (event.key === "ArrowDown") {
+    if (event.key === "ArrowDown" && isCaretAtLastLine(target)) {
       event.preventDefault();
       navigateHistory(1);
     }
@@ -502,11 +538,12 @@
   };
 
   function parseCliCommand(command: string): { tool: CliTool; args: string[] } | null {
-    const parts = command.trim().split(/\s+/);
-    if (parts.length === 0) return null;
-    const tool = SUPPORTED_CLI_TOOLS[parts[0]];
+    const result = tokenizeCommand(command);
+    if (!result.ok || result.tokens.length === 0) return null;
+    const [head, ...rest] = result.tokens;
+    const tool = SUPPORTED_CLI_TOOLS[head];
     if (!tool) return null;
-    return { tool, args: parts.slice(1) };
+    return { tool, args: rest };
   }
 
   async function runLocalCommand(command: string) {
@@ -935,20 +972,26 @@
           </Button>
         </div>
       {:else}
-        <div class="flex flex-wrap gap-2">
-          <input
-            class="flex-1 rounded border border-slate-700 bg-slate-900/80 px-3 py-2 text-[13px] text-slate-100 outline-none transition focus:border-slate-500"
-            placeholder={shellMode === "pod-exec" || shellMode === "pod-attach"
-              ? "Run command inside the selected pod"
-              : "Type command to run inside debug pod (for example: kubectl get ns)"}
-            bind:value={shellCommand}
-            disabled={!shellReady || shellBusy || shellCommandBusy}
-            on:input={handleCommandInput}
-            on:keydown={handleCommandKeydown}
-          />
+        <div class="flex flex-wrap items-start gap-2">
+          <div class="flex-1 min-w-0">
+            <textarea
+              class="w-full resize-none rounded border border-slate-700 bg-slate-900/80 px-3 py-2 text-[13px] font-mono text-slate-100 outline-none transition focus:border-slate-500"
+              placeholder={shellMode === "pod-exec" || shellMode === "pod-attach"
+                ? "Run command inside the selected pod  (Enter = run, Shift+Enter = newline, Ctrl+Enter = run multi-line)"
+                : "Type command (for example: kubectl get ns)\nMulti-line paste OK. Enter = run, Shift+Enter = newline, Ctrl+Enter = run multi-line."}
+              bind:value={shellCommand}
+              rows={Math.min(Math.max(2, shellCommand.split("\n").length), 12)}
+              disabled={!shellReady || shellBusy || shellCommandBusy}
+              on:input={handleCommandInput}
+              on:keydown={handleCommandKeydown}
+              spellcheck="false"
+              autocapitalize="off"
+              autocomplete="off"
+            ></textarea>
+          </div>
           <Button
             variant="outline"
-            class="whitespace-nowrap"
+            class="whitespace-nowrap shrink-0"
             disabled={!shellReady || shellBusy || shellCommandBusy || !shellCommand.trim()}
             onclick={executeShellCommand}
           >
