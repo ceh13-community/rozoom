@@ -60,6 +60,7 @@
     buildMetricsUnavailableMessage,
     buildOverviewResourceInsights,
     buildUsageCards,
+    calculateResourcePressure,
     detectManagedProviderInfo,
     parseCpuQuantityToCores,
     parseMemoryQuantityToBytes,
@@ -72,11 +73,13 @@
     captureOverviewHealthHistoryEntry,
     type OverviewHealthHistoryEntry,
   } from "./model/overview-diagnostics";
-  import {
-    fetchOverviewAccessProfile,
-    type OverviewAccessProfile,
-  } from "./model/overview-access";
+  import { fetchOverviewAccessProfile, type OverviewAccessProfile } from "./model/overview-access";
   import { dedupeOverviewRequest } from "./model/overview-request-dedupe";
+  import {
+    isMetricsServerKnownAvailable,
+    recordMetricsServerAvailable,
+    recordMetricsServerUnavailable,
+  } from "./model/metrics-server-availability";
   import {
     captureOverviewSnapshot as buildOverviewSnapshot,
     createOverviewScopeKey,
@@ -155,6 +158,7 @@
     cpuReservedCores: number | null;
     memoryReservedBytes: number | null;
     coreMetricsUnavailable: boolean | null;
+    usageMetricsMode: "actual" | "requested" | null;
     podCapacity: number | null;
     providerIds: string[];
     usageMetricsLastLoadedAt: number;
@@ -246,6 +250,7 @@
   let cpuReservedCores = $state<number | null>(null);
   let memoryReservedBytes = $state<number | null>(null);
   let coreMetricsUnavailable = $state<boolean | null>(null);
+  let usageMetricsMode = $state<"actual" | "requested" | null>(null);
   let podCapacity = $state<number | null>(null);
   let providerIds = $state<string[]>([]);
   let usageMetricsLastLoadedAt = $state<number>(0);
@@ -311,10 +316,7 @@
   let overviewRefreshStartedAt = $state(0);
   let overviewRefreshSettledAt = $state(0);
 
-  function traceOverviewStage(
-    stage: string,
-    details: Record<string, unknown> = {},
-  ) {
+  function traceOverviewStage(stage: string, details: Record<string, unknown> = {}) {
     const clusterId = data?.slug ?? "unknown";
     void writeRuntimeDebugLog("overview", stage, {
       clusterId,
@@ -339,6 +341,7 @@
       podCapacity,
       cpuReservedCores,
       memoryReservedBytes,
+      mode: usageMetricsMode ?? "actual",
     }),
   );
   const metricsUnavailableMessage = $derived.by(() =>
@@ -374,7 +377,10 @@
     buildChangeSinceLastCheck(currentHealthHistoryEntry, previousHealthHistoryEntry),
   );
   const timelineSeries = $derived.by(() =>
-    buildHealthTimeline(overviewHistory, timelineWindow === "1h" ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000),
+    buildHealthTimeline(
+      overviewHistory,
+      timelineWindow === "1h" ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000,
+    ),
   );
   const safeActions = $derived.by(() =>
     buildOverviewSafeActions({
@@ -388,7 +394,8 @@
     return `Partial data: certificates check is unavailable (${certificatesError}).`;
   });
   function isCertificatesRetryableError(error: unknown): boolean {
-    const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+    const message =
+      error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
     return message.includes("timeout") || message.includes("temporar") || message.includes("econn");
   }
 
@@ -452,6 +459,7 @@
       cpuReservedCores,
       memoryReservedBytes,
       coreMetricsUnavailable,
+      usageMetricsMode,
       podCapacity,
       providerIds,
       usageMetricsLastLoadedAt,
@@ -530,6 +538,7 @@
     cpuReservedCores = snapshot.cpuReservedCores;
     memoryReservedBytes = snapshot.memoryReservedBytes;
     coreMetricsUnavailable = snapshot.coreMetricsUnavailable;
+    usageMetricsMode = snapshot.usageMetricsMode ?? null;
     podCapacity = snapshot.podCapacity;
     providerIds = snapshot.providerIds;
     usageMetricsLastLoadedAt = snapshot.usageMetricsLastLoadedAt;
@@ -628,7 +637,8 @@
     let hasAny = false;
     for (const item of items) {
       if (!item || typeof item !== "object") continue;
-      const cpuRaw = (item as { status?: { allocatable?: { cpu?: string } } }).status?.allocatable?.cpu;
+      const cpuRaw = (item as { status?: { allocatable?: { cpu?: string } } }).status?.allocatable
+        ?.cpu;
       const parsed = parseCpuQuantityToCores(cpuRaw ?? null);
       if (parsed !== null && parsed > 0) {
         total += parsed;
@@ -643,8 +653,8 @@
     let hasAny = false;
     for (const item of items) {
       if (!item || typeof item !== "object") continue;
-      const memoryRaw = (item as { status?: { allocatable?: { memory?: string } } }).status?.allocatable
-        ?.memory;
+      const memoryRaw = (item as { status?: { allocatable?: { memory?: string } } }).status
+        ?.allocatable?.memory;
       const parsed = parseMemoryQuantityToBytes(memoryRaw ?? null);
       if (parsed !== null && parsed > 0) {
         total += parsed;
@@ -666,7 +676,9 @@
     return values;
   }
 
-  function mapUsageRowsFromTopNodes(rows: Array<{ name?: string; cpu?: string; memory?: string }>): NodeHealth[] {
+  function mapUsageRowsFromTopNodes(
+    rows: Array<{ name?: string; cpu?: string; memory?: string }>,
+  ): NodeHealth[] {
     return rows.map((row, index) => ({
       name: typeof row.name === "string" ? row.name : `node-${index + 1}`,
       cpuUsage: typeof row.cpu === "string" ? row.cpu : "N/A",
@@ -678,10 +690,7 @@
   async function yieldToMainThread() {
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
       await new Promise<void>((resolve) => {
-        window.requestIdleCallback(
-          () => resolve(),
-          { timeout: 16 },
-        );
+        window.requestIdleCallback(() => resolve(), { timeout: 16 });
       });
       return;
     }
@@ -774,15 +783,18 @@
     }
     const token = rotateRefreshToken();
     stopOverviewActivationTimer();
-    overviewActivationTimeout = setTimeout(() => {
-      overviewActivationTimeout = null;
-      traceOverviewStage("activate.timer_fired", { tokenId: token.id, force: true });
-      void refreshOverviewSnapshot({ force: true, token }).finally(() => {
-        if (isRefreshTokenActive(token, clusterId)) {
-          startOverviewSyncTimer(token);
-        }
-      });
-    }, hydrated ? OVERVIEW_CACHED_ACTIVATION_DELAY_MS : 0);
+    overviewActivationTimeout = setTimeout(
+      () => {
+        overviewActivationTimeout = null;
+        traceOverviewStage("activate.timer_fired", { tokenId: token.id, force: true });
+        void refreshOverviewSnapshot({ force: true, token }).finally(() => {
+          if (isRefreshTokenActive(token, clusterId)) {
+            startOverviewSyncTimer(token);
+          }
+        });
+      },
+      hydrated ? OVERVIEW_CACHED_ACTIVATION_DELAY_MS : 0,
+    );
   }
 
   function enableDiagnostics() {
@@ -814,7 +826,10 @@
     enableDiagnostics();
   }
 
-  async function loadUsageMetrics(options?: { force?: boolean }, token: RefreshRunToken = activeRefreshToken) {
+  async function loadUsageMetrics(
+    options?: { force?: boolean },
+    token: RefreshRunToken = activeRefreshToken,
+  ) {
     if (!data?.slug || !usageEnabled) return;
     const clusterId = data.slug;
     if (!shouldRefreshUsageMetrics(options)) {
@@ -826,23 +841,44 @@
     usageMetricsError = null;
     try {
       const dedupeScope = `${clusterId}:${options?.force ? "force" : "normal"}`;
-      const [topNodesResult, nodesResponse] = await dedupeOverviewRequest(
+      // Skip the cluster-wide pod listing when a previous probe saw
+      // metrics-server working for this cluster - the pod fetch is only
+      // used for the requests-based fallback when `kubectl top` is empty.
+      // On large clusters the pod listing is the most expensive call here.
+      const skipPodsFallback = isMetricsServerKnownAvailable(clusterId);
+      const [topNodesResult, nodesResponse, podsResponse] = await dedupeOverviewRequest(
         "overview.usage",
         dedupeScope,
         () =>
           withTimeout(
             Promise.all([
-              getNodeMetrics(clusterId),
-              kubectlJson<{ items?: unknown[] }>("get nodes -o json", { clusterId }),
+              getNodeMetrics(clusterId).catch(
+                () => [] as { name: string; cpu: string; memory: string }[],
+              ),
+              kubectlJson<{ items?: unknown[] }>("get nodes", { clusterId }).catch(() => null),
+              skipPodsFallback
+                ? Promise.resolve(null as { items?: unknown[] } | null)
+                : kubectlJson<{ items?: unknown[] }>("get pods --all-namespaces", {
+                    clusterId,
+                  }).catch(() => null),
             ]),
             USAGE_METRICS_TIMEOUT_MS,
             "Usage metrics",
           ),
       );
       if (!isRefreshTokenActive(token, clusterId)) return;
+      const nodeItems =
+        nodesResponse && typeof nodesResponse === "object" && Array.isArray(nodesResponse.items)
+          ? nodesResponse.items
+          : [];
       let nodeMetrics = mapUsageRowsFromTopNodes(
         Array.isArray(topNodesResult) ? topNodesResult : [],
       );
+      if (nodeMetrics.length > 0) {
+        recordMetricsServerAvailable(clusterId);
+      } else {
+        recordMetricsServerUnavailable(clusterId);
+      }
       if (nodeMetrics.length === 0) {
         const fallbackNodes = await withTimeout(
           checkNodesHealth(clusterId, undefined, {
@@ -855,21 +891,48 @@
         if (!isRefreshTokenActive(token, clusterId)) return;
         nodeMetrics = Array.isArray(fallbackNodes) ? fallbackNodes : [];
       }
-      coreMetricsUnavailable = nodeMetrics.length === 0;
-      cpuAveragePercent = normalizePercentValue(averagePercent(nodeMetrics.map((item) => item.cpuUsage)));
-      memoryAveragePercent = normalizePercentValue(
-        averagePercent(nodeMetrics.map((item) => item.memoryUsage)),
-      );
 
-      const nodeItems =
-        nodesResponse && typeof nodesResponse === "object" && Array.isArray(nodesResponse.items)
-          ? nodesResponse.items
-          : [];
+      // Distinguish a successful empty pod list (valid 0% pressure) from a failed
+      // pod fetch (null). Failed fetches must not masquerade as healthy 0% cards.
+      const podsFetchSucceeded =
+        podsResponse !== null &&
+        typeof podsResponse === "object" &&
+        Array.isArray(podsResponse.items);
+
+      if (nodeMetrics.length > 0) {
+        usageMetricsMode = "actual";
+        coreMetricsUnavailable = false;
+        cpuAveragePercent = normalizePercentValue(
+          averagePercent(nodeMetrics.map((item) => item.cpuUsage)),
+        );
+        memoryAveragePercent = normalizePercentValue(
+          averagePercent(nodeMetrics.map((item) => item.memoryUsage)),
+        );
+      } else if (nodeItems.length > 0 && podsFetchSucceeded) {
+        traceOverviewStage("usage.resource_pressure_fallback", { tokenId: token.id });
+        const pressure = calculateResourcePressure(nodeItems, podsResponse.items ?? []);
+        usageMetricsMode = "requested";
+        coreMetricsUnavailable = false;
+        cpuAveragePercent =
+          pressure.cpuPercent !== null ? normalizePercentValue(pressure.cpuPercent) : null;
+        memoryAveragePercent =
+          pressure.memoryPercent !== null ? normalizePercentValue(pressure.memoryPercent) : null;
+      } else {
+        usageMetricsMode = null;
+        coreMetricsUnavailable = true;
+        cpuAveragePercent = null;
+        memoryAveragePercent = null;
+      }
+
       podCapacity = parsePodCapacity(nodeItems);
       cpuReservedCores = parseCpuReservedCores(nodeItems);
       memoryReservedBytes = parseMemoryReservedBytes(nodeItems);
       providerIds = parseProviderIds(nodeItems);
-      traceOverviewStage("usage.success", { tokenId: token.id, durationMs: Date.now() - startedAt });
+      traceOverviewStage("usage.success", {
+        tokenId: token.id,
+        durationMs: Date.now() - startedAt,
+        mode: usageMetricsMode,
+      });
     } catch (error) {
       if (!isRefreshTokenActive(token, clusterId)) return;
       cpuAveragePercent = null;
@@ -877,6 +940,7 @@
       cpuReservedCores = null;
       memoryReservedBytes = null;
       coreMetricsUnavailable = null;
+      usageMetricsMode = null;
       podCapacity = null;
       providerIds = [];
       usageMetricsError = error instanceof Error ? error.message : "Failed to load usage metrics.";
@@ -893,7 +957,10 @@
     }
   }
 
-  async function loadEvents(options?: { force?: boolean }, token: RefreshRunToken = activeRefreshToken) {
+  async function loadEvents(
+    options?: { force?: boolean },
+    token: RefreshRunToken = activeRefreshToken,
+  ) {
     if (!data?.slug || !diagnosticsEnabled) return;
     const clusterId = data.slug;
     if (eventsInFlight && eventsInFlightTokenId === token.id) return;
@@ -935,7 +1002,11 @@
           "overview.events",
           `${clusterId}:${options?.force ? "force" : "normal"}`,
           () =>
-            withTimeout(checkWarningEvents(clusterId, options), EVENTS_TIMEOUT_MS, "Warning events"),
+            withTimeout(
+              checkWarningEvents(clusterId, options),
+              EVENTS_TIMEOUT_MS,
+              "Warning events",
+            ),
         );
         if (!isRefreshTokenActive(token, clusterId) || eventsInFlightTokenId !== token.id) return;
         warningItems = report.items;
@@ -982,23 +1053,24 @@
     certificatesInFlightTokenId = token.id;
     certificatesLoading = true;
     if (certificatesWatchdog) clearTimeout(certificatesWatchdog);
-    certificatesWatchdog = setTimeout(() => {
-      if (!certificatesInFlight || certificatesInFlightTokenId !== token.id) return;
-      certificatesInFlight = false;
-      certificatesInFlightTokenId = null;
-      certificatesLoading = false;
-      certificatesError = `Certificates timeout after retries (${CERTIFICATES_TIMEOUT_MS}ms/${CERTIFICATES_RETRY_TIMEOUT_MS}ms).`;
-    }, CERTIFICATES_TIMEOUT_MS + CERTIFICATES_RETRY_TIMEOUT_MS + 3000);
+    certificatesWatchdog = setTimeout(
+      () => {
+        if (!certificatesInFlight || certificatesInFlightTokenId !== token.id) return;
+        certificatesInFlight = false;
+        certificatesInFlightTokenId = null;
+        certificatesLoading = false;
+        certificatesError = `Certificates timeout after retries (${CERTIFICATES_TIMEOUT_MS}ms/${CERTIFICATES_RETRY_TIMEOUT_MS}ms).`;
+      },
+      CERTIFICATES_TIMEOUT_MS + CERTIFICATES_RETRY_TIMEOUT_MS + 3000,
+    );
     const forceRefresh = options?.force ?? false;
     const timeouts = [CERTIFICATES_TIMEOUT_MS, CERTIFICATES_RETRY_TIMEOUT_MS];
     let lastError: unknown = null;
-    let report:
-      | {
-          certificates: CertificateItem[];
-          kubeletRotation: KubeletRotationItem[];
-          errors?: string;
-        }
-      | null = null;
+    let report: {
+      certificates: CertificateItem[];
+      kubeletRotation: KubeletRotationItem[];
+      errors?: string;
+    } | null = null;
     try {
       report = await dedupeOverviewRequest(
         "overview.certificates",
@@ -1025,7 +1097,8 @@
           return null as never;
         },
       );
-      if (!isRefreshTokenActive(token, clusterId) || certificatesInFlightTokenId !== token.id) return;
+      if (!isRefreshTokenActive(token, clusterId) || certificatesInFlightTokenId !== token.id)
+        return;
       if (!report && lastError) throw lastError;
       if (!report) throw new Error("Failed to load certificates.");
       const mappedCertificates = await mapWithMainThreadYield(
@@ -1036,16 +1109,23 @@
         report.kubeletRotation.slice(0, OVERVIEW_ROTATION_ROWS_MAX),
         formatRotation,
       );
-      if (!isRefreshTokenActive(token, clusterId) || certificatesInFlightTokenId !== token.id) return;
+      if (!isRefreshTokenActive(token, clusterId) || certificatesInFlightTokenId !== token.id)
+        return;
       certificatesRows = mappedCertificates;
       rotationRows = mappedRotation;
       certificatesHydrated = true;
       lastCertificatesSuccessAt = Date.now();
       certificatesError = report.errors ?? null;
     } catch (error) {
-      if (!isRefreshTokenActive(token, clusterId) || certificatesInFlightTokenId !== token.id) return;
+      if (!isRefreshTokenActive(token, clusterId) || certificatesInFlightTokenId !== token.id)
+        return;
       certificatesError = error instanceof Error ? error.message : "Failed to load certificates.";
-      if (!shouldKeepStaleSection(lastCertificatesSuccessAt, certificatesRows.length + rotationRows.length)) {
+      if (
+        !shouldKeepStaleSection(
+          lastCertificatesSuccessAt,
+          certificatesRows.length + rotationRows.length,
+        )
+      ) {
         certificatesRows = [];
         rotationRows = [];
       }
@@ -1083,32 +1163,31 @@
         if (clusterHealth) {
           const needsConfig = !clusterHealth.resourcesHygiene;
           const needsHealth =
-            !clusterHealth.apiServerHealth ||
-            clusterHealth.apiServerHealth.status === "unknown";
+            !clusterHealth.apiServerHealth || clusterHealth.apiServerHealth.status === "unknown";
           if (needsConfig || needsHealth) {
-          const scopes: Array<"config" | "health"> = [];
-          if (needsConfig) scopes.push("config");
-          if (needsHealth) scopes.push("health");
-          let chain: Promise<unknown> = Promise.resolve();
-          for (const scope of scopes) {
-            chain = chain.then(() =>
-              updateClusterHealthChecks(clusterId, {
-                force: true,
-                diagnostics: true,
-                diagnosticsScope: scope,
-              }),
-            );
-          }
-          void chain
-            .then(() => getLastHealthCheck(clusterId))
-            .then((refreshed) => {
-              if (refreshed && !("errors" in refreshed)) {
-                clusterHealth = refreshed as ClusterHealthChecks;
-              }
-            })
-            .catch(() => {
-              /* best effort */
-            });
+            const scopes: Array<"config" | "health"> = [];
+            if (needsConfig) scopes.push("config");
+            if (needsHealth) scopes.push("health");
+            let chain: Promise<unknown> = Promise.resolve();
+            for (const scope of scopes) {
+              chain = chain.then(() =>
+                updateClusterHealthChecks(clusterId, {
+                  force: true,
+                  diagnostics: true,
+                  diagnosticsScope: scope,
+                }),
+              );
+            }
+            void chain
+              .then(() => getLastHealthCheck(clusterId))
+              .then((refreshed) => {
+                if (refreshed && !("errors" in refreshed)) {
+                  clusterHealth = refreshed as ClusterHealthChecks;
+                }
+              })
+              .catch(() => {
+                /* best effort */
+              });
           }
         }
       }
@@ -1120,7 +1199,8 @@
     } catch (error) {
       if (!isRefreshTokenActive(token, clusterId)) return;
       clusterHealth = null;
-      clusterHealthError = error instanceof Error ? error.message : "Failed to load cluster health.";
+      clusterHealthError =
+        error instanceof Error ? error.message : "Failed to load cluster health.";
       traceOverviewStage("health.error", {
         tokenId: token.id,
         durationMs: Date.now() - startedAt,
@@ -1164,7 +1244,10 @@
 
   function normalizeOverviewSyncSeconds(value: number) {
     if (!Number.isFinite(value)) return OVERVIEW_SYNC_SECONDS_DEFAULT;
-    return Math.max(OVERVIEW_SYNC_SECONDS_MIN, Math.min(OVERVIEW_SYNC_SECONDS_MAX, Math.round(value)));
+    return Math.max(
+      OVERVIEW_SYNC_SECONDS_MIN,
+      Math.min(OVERVIEW_SYNC_SECONDS_MAX, Math.round(value)),
+    );
   }
 
   function loadOverviewSyncSettings(scopeKey: string) {
@@ -1173,7 +1256,9 @@
       const raw = window.localStorage.getItem(getOverviewSyncSettingsKey(scopeKey));
       if (!raw) return;
       const parsed = JSON.parse(raw) as { refreshSeconds?: number };
-      overviewSyncSeconds = normalizeOverviewSyncSeconds(parsed.refreshSeconds ?? OVERVIEW_SYNC_SECONDS_DEFAULT);
+      overviewSyncSeconds = normalizeOverviewSyncSeconds(
+        parsed.refreshSeconds ?? OVERVIEW_SYNC_SECONDS_DEFAULT,
+      );
     } catch {
       overviewSyncSeconds = OVERVIEW_SYNC_SECONDS_DEFAULT;
     }
@@ -1206,11 +1291,14 @@
 
   function scheduleNextOverviewSync(token: RefreshRunToken, clusterId: string) {
     if (!isRefreshTokenActive(token, clusterId)) return;
-    overviewSyncTimeout = setTimeout(async () => {
-      overviewSyncTimeout = null;
-      await refreshOverviewSnapshot({ token });
-      scheduleNextOverviewSync(token, clusterId);
-    }, normalizeOverviewSyncSeconds(overviewSyncSeconds) * 1000);
+    overviewSyncTimeout = setTimeout(
+      async () => {
+        overviewSyncTimeout = null;
+        await refreshOverviewSnapshot({ token });
+        scheduleNextOverviewSync(token, clusterId);
+      },
+      normalizeOverviewSyncSeconds(overviewSyncSeconds) * 1000,
+    );
   }
 
   function startOverviewSyncTimer(token: RefreshRunToken = activeRefreshToken) {
@@ -1219,95 +1307,92 @@
     scheduleNextOverviewSync(token, data.slug);
   }
 
-  const overviewSerialRefresh = createSerialRefresh(async (options?: {
-    force?: boolean;
-    token?: RefreshRunToken;
-  }) => {
-    if (!data?.slug) return;
-    const clusterId = data.slug;
-    const scopeKey = getOverviewScopeKey();
-    const token = options?.token ?? activeRefreshToken;
-    if (!isRefreshTokenActive(token, clusterId)) return;
-    traceOverviewStage("refresh.start", {
-      tokenId: token.id,
-      force: options?.force ?? false,
-      scopeKey,
-    });
-    markOverviewSyncLoading(clusterId);
-    const refreshStartedAt = Date.now();
-    const runRefreshTask = async (name: string, task: () => Promise<void>) => {
-      const startedAt = Date.now();
-      traceOverviewStage("refresh.section_start", { tokenId: token.id, section: name });
-      await task();
+  const overviewSerialRefresh = createSerialRefresh(
+    async (options?: { force?: boolean; token?: RefreshRunToken }) => {
+      if (!data?.slug) return;
+      const clusterId = data.slug;
+      const scopeKey = getOverviewScopeKey();
+      const token = options?.token ?? activeRefreshToken;
       if (!isRefreshTokenActive(token, clusterId)) return;
-      persistOverviewSnapshot(scopeKey);
-      traceOverviewStage("refresh.section_end", {
+      traceOverviewStage("refresh.start", {
         tokenId: token.id,
-        section: name,
-        durationMs: Date.now() - startedAt,
+        force: options?.force ?? false,
+        scopeKey,
       });
-      trackWorkloadEvent("overview.refresh.section_duration", {
+      markOverviewSyncLoading(clusterId);
+      const refreshStartedAt = Date.now();
+      const runRefreshTask = async (name: string, task: () => Promise<void>) => {
+        const startedAt = Date.now();
+        traceOverviewStage("refresh.section_start", { tokenId: token.id, section: name });
+        await task();
+        if (!isRefreshTokenActive(token, clusterId)) return;
+        persistOverviewSnapshot(scopeKey);
+        traceOverviewStage("refresh.section_end", {
+          tokenId: token.id,
+          section: name,
+          durationMs: Date.now() - startedAt,
+        });
+        trackWorkloadEvent("overview.refresh.section_duration", {
+          clusterId,
+          scopeKey,
+          section: name,
+          durationMs: Date.now() - startedAt,
+        });
+      };
+      await runRefreshTask("health", () => loadClusterHealthScore(token));
+      if (!isRefreshTokenActive(token, clusterId)) return;
+      await Promise.resolve();
+
+      await runRefreshTask("access", () => loadAccessProfile(options, token));
+      if (!isRefreshTokenActive(token, clusterId)) return;
+      await Promise.resolve();
+
+      if (activeTab === "events") {
+        await runRefreshTask("events", () => loadEvents(options, token));
+      }
+      if (!isRefreshTokenActive(token, clusterId)) return;
+      const summaryError =
+        clusterHealthError || accessProfileError || (activeTab === "events" ? eventsError : null);
+      persistOverviewSnapshot(scopeKey);
+      showingCachedOverview = false;
+      cachedOverviewAt = null;
+      trackWorkloadEvent("overview.refresh.duration", {
         clusterId,
         scopeKey,
-        section: name,
-        durationMs: Date.now() - startedAt,
+        durationMs: Date.now() - refreshStartedAt,
+        hasError: Boolean(summaryError),
+        partial: Boolean(certificatesError),
       });
-    };
-    await runRefreshTask("health", () => loadClusterHealthScore(token));
-    if (!isRefreshTokenActive(token, clusterId)) return;
-    await Promise.resolve();
-
-    await runRefreshTask("access", () => loadAccessProfile(options, token));
-    if (!isRefreshTokenActive(token, clusterId)) return;
-    await Promise.resolve();
-
-    if (activeTab === "events") {
-      await runRefreshTask("events", () => loadEvents(options, token));
-    }
-    if (!isRefreshTokenActive(token, clusterId)) return;
-    const summaryError =
-      clusterHealthError ||
-      accessProfileError ||
-      (activeTab === "events" ? eventsError : null);
-    persistOverviewSnapshot(scopeKey);
-    showingCachedOverview = false;
-    cachedOverviewAt = null;
-    trackWorkloadEvent("overview.refresh.duration", {
-      clusterId,
-      scopeKey,
-      durationMs: Date.now() - refreshStartedAt,
-      hasError: Boolean(summaryError),
-      partial: Boolean(certificatesError),
-    });
-    evaluateWorkloadPerfBudgets();
-    if (!summaryError) {
-      overviewLastUpdatedAt = Date.now();
-      persistOverviewHistory(scopeKey);
-    }
-    if (summaryError) {
-      traceOverviewStage("refresh.error", {
+      evaluateWorkloadPerfBudgets();
+      if (!summaryError) {
+        overviewLastUpdatedAt = Date.now();
+        persistOverviewHistory(scopeKey);
+      }
+      if (summaryError) {
+        traceOverviewStage("refresh.error", {
+          tokenId: token.id,
+          durationMs: Date.now() - refreshStartedAt,
+          message: summaryError,
+        });
+        markOverviewSyncError(clusterId, summaryError);
+        return;
+      }
+      if (activeTab === "certificates" && certificatesError) {
+        traceOverviewStage("refresh.partial", {
+          tokenId: token.id,
+          durationMs: Date.now() - refreshStartedAt,
+          message: certificatesError,
+        });
+        markOverviewSyncPartial(clusterId, `Certificates: ${certificatesError}`);
+        return;
+      }
+      traceOverviewStage("refresh.success", {
         tokenId: token.id,
         durationMs: Date.now() - refreshStartedAt,
-        message: summaryError,
       });
-      markOverviewSyncError(clusterId, summaryError);
-      return;
-    }
-    if (activeTab === "certificates" && certificatesError) {
-      traceOverviewStage("refresh.partial", {
-        tokenId: token.id,
-        durationMs: Date.now() - refreshStartedAt,
-        message: certificatesError,
-      });
-      markOverviewSyncPartial(clusterId, `Certificates: ${certificatesError}`);
-      return;
-    }
-    traceOverviewStage("refresh.success", {
-      tokenId: token.id,
-      durationMs: Date.now() - refreshStartedAt,
-    });
-    markOverviewSyncSuccess(clusterId);
-  });
+      markOverviewSyncSuccess(clusterId);
+    },
+  );
 
   async function refreshOverviewSnapshot(options?: { force?: boolean; token?: RefreshRunToken }) {
     const clusterId = data?.slug;
@@ -1417,7 +1502,9 @@
   onMount(() => {
     overviewMounted = true;
     // Update stale indicator every 10s
-    staleTimer = setInterval(() => { staleTickCounter += 1; }, 10_000);
+    staleTimer = setInterval(() => {
+      staleTickCounter += 1;
+    }, 10_000);
     if (data?.slug) {
       activeOverviewClusterId = data.slug;
       activeOverviewScopeKey = getOverviewScopeKey();
@@ -1483,12 +1570,14 @@
     const watched = $overviewWatchedEventsStore;
     if (watched.length === 0 && !eventsHydrated) return;
     warningItems = watched;
-    void mapWithMainThreadYield(watched.slice(0, OVERVIEW_EVENTS_ROWS_MAX), formatEvent).then((rows) => {
-      if (!overviewMounted || activeTab !== "events") return;
-      eventsRows = rows;
-      eventsHydrated = true;
-      lastEventsSuccessAt = Date.now();
-    });
+    void mapWithMainThreadYield(watched.slice(0, OVERVIEW_EVENTS_ROWS_MAX), formatEvent).then(
+      (rows) => {
+        if (!overviewMounted || activeTab !== "events") return;
+        eventsRows = rows;
+        eventsHydrated = true;
+        lastEventsSuccessAt = Date.now();
+      },
+    );
   });
 
   $effect(() => {
@@ -1557,7 +1646,13 @@
     if (showingCachedOverview) {
       return "Cached overview hydrated first while live checks continue in the background.";
     }
-    if (clusterHealthError || eventsError || certificatesError || usageMetricsError || accessProfileError) {
+    if (
+      clusterHealthError ||
+      eventsError ||
+      certificatesError ||
+      usageMetricsError ||
+      accessProfileError
+    ) {
       return "One or more overview checks degraded; partial data remains visible.";
     }
     return "Overview diagnostics and control-plane checks are current.";
@@ -1575,70 +1670,82 @@
   });
 </script>
 
-  {#if data.overview || showingCachedOverview}
-    <div class="mb-3">
-      <SectionRuntimeStatus
-        sectionLabel="Overview Runtime Status"
-        profileLabel={overviewRuntimeProfileLabel}
-        sourceState={overviewRuntimeSourceState}
-        mode={diagnosticsEnabled || usageEnabled ? "poll" : "manual"}
-        budgetSummary={`sync ${overviewSyncSeconds}s`}
-        lastUpdatedLabel={overviewRuntimeLastUpdatedLabel}
-        detail={overviewRuntimeDetail}
-        secondaryActionLabel="Update"
-        secondaryActionAriaLabel="Refresh overview runtime section"
-        secondaryActionLoading={runtimeSectionRefreshing}
-        onSecondaryAction={() => void refreshOverviewRuntimeSection()}
-        reason={overviewRuntimeReason}
-        actionLabel={diagnosticsEnabled || usageEnabled ? "Pause section" : "Resume section"}
-        actionAriaLabel={diagnosticsEnabled || usageEnabled ? "Pause overview runtime section" : "Resume overview runtime section"}
-        onAction={toggleOverviewRuntime}
-      />
+{#if data.overview || showingCachedOverview}
+  <div class="mb-3">
+    <SectionRuntimeStatus
+      sectionLabel="Overview Runtime Status"
+      profileLabel={overviewRuntimeProfileLabel}
+      sourceState={overviewRuntimeSourceState}
+      mode={diagnosticsEnabled || usageEnabled ? "poll" : "manual"}
+      budgetSummary={`sync ${overviewSyncSeconds}s`}
+      lastUpdatedLabel={overviewRuntimeLastUpdatedLabel}
+      detail={overviewRuntimeDetail}
+      secondaryActionLabel="Update"
+      secondaryActionAriaLabel="Refresh overview runtime section"
+      secondaryActionLoading={runtimeSectionRefreshing}
+      onSecondaryAction={() => void refreshOverviewRuntimeSection()}
+      reason={overviewRuntimeReason}
+      actionLabel={diagnosticsEnabled || usageEnabled ? "Pause section" : "Resume section"}
+      actionAriaLabel={diagnosticsEnabled || usageEnabled
+        ? "Pause overview runtime section"
+        : "Resume overview runtime section"}
+      onAction={toggleOverviewRuntime}
+    />
+  </div>
+  <div
+    class="mb-3 flex flex-wrap items-center justify-end gap-2 text-xs text-gray-500 dark:text-gray-400"
+  >
+    {#if showingCachedOverview}
+      <span
+        class="rounded border border-amber-300/70 bg-amber-50 px-2 py-1 text-[11px] text-amber-800"
+      >
+        Cached · {formatRelativeTime(cachedOverviewAt) ?? "just now"} · Refreshing<LoadingDots />
+      </span>
+    {:else if overviewLastUpdatedAt}
+      <span
+        class="rounded border border-emerald-300/70 bg-emerald-50 px-2 py-1 text-[11px] text-emerald-800"
+      >
+        Live · Updated {liveUpdatedLabel}
+      </span>
+    {/if}
+    <span>Sync sec</span>
+    <input
+      class="h-8 w-20 rounded border border-input bg-background px-2 text-xs text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      type="number"
+      min={OVERVIEW_SYNC_SECONDS_MIN}
+      max={OVERVIEW_SYNC_SECONDS_MAX}
+      value={overviewSyncSeconds}
+      onchange={(event) => {
+        const raw = Number(event.currentTarget.value);
+        setOverviewSyncSeconds(raw);
+      }}
+    />
+    <Button variant="outline" size="sm" onclick={resetOverviewSyncSettings}>Reset</Button>
+  </div>
+  {#if overviewPartialMessage}
+    <div
+      class="mb-3 rounded-md border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+    >
+      {overviewPartialMessage}
     </div>
-    <div class="mb-3 flex flex-wrap items-center justify-end gap-2 text-xs text-gray-500 dark:text-gray-400">
-      {#if showingCachedOverview}
-        <span class="rounded border border-amber-300/70 bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
-          Cached · {formatRelativeTime(cachedOverviewAt) ?? "just now"} · Refreshing<LoadingDots />
-        </span>
-      {:else if overviewLastUpdatedAt}
-        <span class="rounded border border-emerald-300/70 bg-emerald-50 px-2 py-1 text-[11px] text-emerald-800">
-          Live · Updated {liveUpdatedLabel}
-        </span>
-      {/if}
-      <span>Sync sec</span>
-      <input
-        class="h-8 w-20 rounded border border-input bg-background px-2 text-xs text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        type="number"
-        min={OVERVIEW_SYNC_SECONDS_MIN}
-        max={OVERVIEW_SYNC_SECONDS_MAX}
-        value={overviewSyncSeconds}
-        onchange={(event) => {
-          const raw = Number(event.currentTarget.value);
-          setOverviewSyncSeconds(raw);
-        }}
-      />
-      <Button variant="outline" size="sm" onclick={resetOverviewSyncSettings}>Reset</Button>
-    </div>
-    {#if overviewPartialMessage}
-      <div class="mb-3 rounded-md border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-        {overviewPartialMessage}
+  {/if}
+  <div class="mb-6">
+    {#if clusterHealthError}
+      <Alert.Root variant="destructive">
+        <Alert.Title>Cluster health score unavailable</Alert.Title>
+        <Alert.Description>{clusterHealthError}</Alert.Description>
+      </Alert.Root>
+    {:else}
+      <div class="grid items-start gap-4 lg:grid-cols-2">
+        <ClusterHealthScore checks={clusterHealth} />
+        <ClusterScore checks={clusterHealth} />
       </div>
     {/if}
-    <div class="mb-6">
-      {#if clusterHealthError}
-        <Alert.Root variant="destructive">
-          <Alert.Title>Cluster health score unavailable</Alert.Title>
-          <Alert.Description>{clusterHealthError}</Alert.Description>
-        </Alert.Root>
-      {:else}
-        <div class="grid items-start gap-4 lg:grid-cols-2">
-          <ClusterHealthScore checks={clusterHealth} />
-          <ClusterScore checks={clusterHealth} />
-        </div>
-      {/if}
-    </div>
+  </div>
   {#if metricsUnavailableMessage}
-    <div class="mb-4 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+    <div
+      class="mb-4 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+    >
       {metricsUnavailableMessage}
       <a
         href={buildMetricsSourcesHref(data.slug)}
@@ -1650,12 +1757,23 @@
     </div>
   {/if}
 
+  {#if usageEnabled && usageMetricsMode === "requested" && !(usageLoading && usageMetricsLastLoadedAt <= 0)}
+    <div
+      class="mb-4 rounded-md border border-sky-300/60 bg-sky-50 px-3 py-2 text-xs text-sky-800 dark:border-sky-700/50 dark:bg-sky-950/30 dark:text-sky-300"
+    >
+      Showing resource requests vs allocatable capacity. Install metrics-server for actual
+      CPU/memory usage.
+    </div>
+  {/if}
+
   <div class="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
     {#if usageEnabled && !(usageLoading && usageMetricsLastLoadedAt <= 0)}
       {#each usageCards as card (card.id)}
         <article class="rounded-lg border border-border bg-card p-4 text-card-foreground">
           <div class="flex items-center justify-between gap-2">
-            <div class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{card.title}</div>
+            <div class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              {card.title}
+            </div>
             <span
               class={`rounded px-2 py-0.5 text-[11px] font-medium ${
                 card.severity === "critical"
@@ -1690,7 +1808,9 @@
         </article>
       {/each}
     {:else}
-      <div class="live-usage-callout rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 text-card-foreground lg:col-span-3">
+      <div
+        class="live-usage-callout rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 text-card-foreground lg:col-span-3"
+      >
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div class="min-w-0">
             <div class="flex items-center gap-2">
@@ -1726,111 +1846,125 @@
         <span class="text-xs text-muted-foreground">RBAC identity & permissions</span>
       </div>
       {#if accessProfile}
-        <div class="text-xs text-muted-foreground">Updated {formatRelativeTime(accessProfile.updatedAt) ?? "just now"}</div>
+        <div class="text-xs text-muted-foreground">
+          Updated {formatRelativeTime(accessProfile.updatedAt) ?? "just now"}
+        </div>
       {/if}
     </summary>
     <div class="px-4 pb-4">
-
-    {#if accessProfileError}
-      <div class="mt-4 rounded border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-        Access profile unavailable: {accessProfileError}
-      </div>
-    {:else if accessProfile}
-      <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr,1.9fr]">
-        <div class="rounded border border-border/80 bg-background px-3 py-3">
-          <div class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Identity</div>
-          <div class="mt-2 text-lg font-semibold">{accessProfile.subject}</div>
-          <div class="mt-1 text-xs text-muted-foreground">
-            Source:
-            {accessProfile.subjectSource === "auth_whoami"
-              ? "API-authenticated identity"
-              : accessProfile.subjectSource === "kubeconfig"
-                ? "kubeconfig context"
-                : "unknown"}
-          </div>
-          <div class="mt-1 text-xs text-muted-foreground">Context: {accessProfile.contextName ?? "unknown"}</div>
-          <div class="mt-1 text-xs text-muted-foreground">Namespace scope: {accessProfile.namespace}</div>
+      {#if accessProfileError}
+        <div
+          class="mt-4 rounded border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+        >
+          Access profile unavailable: {accessProfileError}
         </div>
-
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {#each accessProfile.capabilities as capability (capability.id)}
-            <div class="rounded border border-border/80 bg-background px-3 py-3">
-              <div class="flex items-center justify-between gap-2">
-                <div class="text-xs font-medium">{capability.title}</div>
-                <span
-                  class={`rounded px-2 py-0.5 text-[11px] font-medium ${
-                    capability.status === "allowed"
-                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
-                      : capability.status === "denied"
-                        ? "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
-                        : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                  }`}
-                >
-                  {capability.status === "allowed"
-                    ? "Allowed"
-                    : capability.status === "denied"
-                      ? "Denied"
-                      : "Unknown"}
-                </span>
-              </div>
-              <div class="mt-2 text-xs text-muted-foreground">{capability.detail}</div>
+      {:else if accessProfile}
+        <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr,1.9fr]">
+          <div class="rounded border border-border/80 bg-background px-3 py-3">
+            <div class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              Identity
             </div>
-          {/each}
-        </div>
-      </div>
-
-      <div class="mt-4 rounded border border-border/80 bg-background px-3 py-3">
-        <div class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Impact on diagnostics</div>
-        {#if accessProfile.diagnosticsImpact.length}
-          <ul class="mt-2 space-y-1 text-xs text-muted-foreground">
-            {#each accessProfile.diagnosticsImpact as impact (impact)}
-              <li>{impact}</li>
-            {/each}
-          </ul>
-        {:else}
-          <div class="mt-2 text-xs text-emerald-700 dark:text-emerald-400">
-            Current RBAC should allow the main overview diagnostics to run without major access gaps.
+            <div class="mt-2 text-lg font-semibold">{accessProfile.subject}</div>
+            <div class="mt-1 text-xs text-muted-foreground">
+              Source:
+              {accessProfile.subjectSource === "auth_whoami"
+                ? "API-authenticated identity"
+                : accessProfile.subjectSource === "kubeconfig"
+                  ? "kubeconfig context"
+                  : "unknown"}
+            </div>
+            <div class="mt-1 text-xs text-muted-foreground">
+              Context: {accessProfile.contextName ?? "unknown"}
+            </div>
+            <div class="mt-1 text-xs text-muted-foreground">
+              Namespace scope: {accessProfile.namespace}
+            </div>
           </div>
-        {/if}
-        <div class="mt-3 flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={accessProfileRefreshing}
-            onclick={() => {
-              void refreshAccessProfileNow();
-            }}
-          >
-            {accessProfileRefreshing ? "Refreshing" : "Re-run access probe"}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onclick={() => {
-              void copyToClipboard(
-                "kubectl auth can-i list pods --all-namespaces && kubectl auth can-i list nodes && kubectl auth can-i list events --all-namespaces",
-                "Access review command copied",
-              );
-            }}
-          >
-            Copy kubectl auth can-i
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onclick={() => {
-              goto(`${path}accessreviews`);
-            }}
-          >
-            Open Access Review
-          </Button>
+
+          <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {#each accessProfile.capabilities as capability (capability.id)}
+              <div class="rounded border border-border/80 bg-background px-3 py-3">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="text-xs font-medium">{capability.title}</div>
+                  <span
+                    class={`rounded px-2 py-0.5 text-[11px] font-medium ${
+                      capability.status === "allowed"
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                        : capability.status === "denied"
+                          ? "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
+                          : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                    }`}
+                  >
+                    {capability.status === "allowed"
+                      ? "Allowed"
+                      : capability.status === "denied"
+                        ? "Denied"
+                        : "Unknown"}
+                  </span>
+                </div>
+                <div class="mt-2 text-xs text-muted-foreground">{capability.detail}</div>
+              </div>
+            {/each}
+          </div>
         </div>
-      </div>
-    {:else}
-      <div class="mt-4 rounded border border-border/80 bg-background p-4 text-sm text-muted-foreground">
-        Access profile will appear after the current refresh completes.
-      </div>
-    {/if}
+
+        <div class="mt-4 rounded border border-border/80 bg-background px-3 py-3">
+          <div class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            Impact on diagnostics
+          </div>
+          {#if accessProfile.diagnosticsImpact.length}
+            <ul class="mt-2 space-y-1 text-xs text-muted-foreground">
+              {#each accessProfile.diagnosticsImpact as impact (impact)}
+                <li>{impact}</li>
+              {/each}
+            </ul>
+          {:else}
+            <div class="mt-2 text-xs text-emerald-700 dark:text-emerald-400">
+              Current RBAC should allow the main overview diagnostics to run without major access
+              gaps.
+            </div>
+          {/if}
+          <div class="mt-3 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={accessProfileRefreshing}
+              onclick={() => {
+                void refreshAccessProfileNow();
+              }}
+            >
+              {accessProfileRefreshing ? "Refreshing" : "Re-run access probe"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onclick={() => {
+                void copyToClipboard(
+                  "kubectl auth can-i list pods --all-namespaces && kubectl auth can-i list nodes && kubectl auth can-i list events --all-namespaces",
+                  "Access review command copied",
+                );
+              }}
+            >
+              Copy kubectl auth can-i
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onclick={() => {
+                goto(`${path}accessreviews`);
+              }}
+            >
+              Open Access Review
+            </Button>
+          </div>
+        </div>
+      {:else}
+        <div
+          class="mt-4 rounded border border-border/80 bg-background p-4 text-sm text-muted-foreground"
+        >
+          Access profile will appear after the current refresh completes.
+        </div>
+      {/if}
     </div>
   </details>
 
@@ -1839,7 +1973,9 @@
       <div class="flex items-center justify-between gap-3">
         <div>
           <h3 class="text-sm font-semibold">Top Risks</h3>
-          <div class="text-xs text-muted-foreground">Highest-impact issues to investigate first.</div>
+          <div class="text-xs text-muted-foreground">
+            Highest-impact issues to investigate first.
+          </div>
         </div>
         <div class="flex items-center gap-2">
           <div class="text-xs text-muted-foreground">
@@ -1850,7 +1986,9 @@
             {/if}
           </div>
           {#if showingCachedOverview && cachedOverviewAt}
-            <span class="rounded border border-amber-300/70 bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+            <span
+              class="rounded border border-amber-300/70 bg-amber-50 px-2 py-1 text-[11px] text-amber-800"
+            >
               Stale · {formatRelativeTime(cachedOverviewAt) ?? "just now"}
             </span>
           {/if}
@@ -1899,7 +2037,9 @@
                 >
                   {risk.actionLabel}
                 </Button>
-                <code class="flex-1 min-w-0 rounded bg-muted px-2 py-1 text-[11px] truncate">{risk.command}</code>
+                <code class="flex-1 min-w-0 rounded bg-muted px-2 py-1 text-[11px] truncate"
+                  >{risk.command}</code
+                >
                 <Button
                   size="sm"
                   variant="ghost"
@@ -1915,7 +2055,9 @@
           {/each}
         </div>
       {:else}
-        <div class="mt-4 rounded border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-700 dark:text-emerald-400">
+        <div
+          class="mt-4 rounded border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-700 dark:text-emerald-400"
+        >
           No major risks detected in the latest health snapshot.
         </div>
       {/if}
@@ -1925,11 +2067,15 @@
       <div class="flex items-center justify-between gap-3">
         <div>
           <h3 class="text-sm font-semibold">Change Since Last Check</h3>
-          <div class="text-xs text-muted-foreground">What shifted between the latest two snapshots.</div>
+          <div class="text-xs text-muted-foreground">
+            What shifted between the latest two snapshots.
+          </div>
         </div>
         <div class="flex items-center gap-2">
           {#if showingCachedOverview && cachedOverviewAt}
-            <span class="rounded border border-amber-300/70 bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+            <span
+              class="rounded border border-amber-300/70 bg-amber-50 px-2 py-1 text-[11px] text-amber-800"
+            >
               Stale baseline · {formatRelativeTime(cachedOverviewAt) ?? "just now"}
             </span>
           {/if}
@@ -1941,12 +2087,20 @@
       {#if changeSinceLastCheck.length}
         <div class="mt-4 space-y-2">
           {#each changeSinceLastCheck as change (change.id)}
-            <div class="rounded border px-3 py-2.5 flex items-start gap-3
-              {change.severity === 'critical' ? 'border-rose-300/60 bg-rose-50/50 dark:bg-rose-950/20 dark:border-rose-800/40' :
-               change.severity === 'warning' ? 'border-amber-300/60 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800/40' :
-               'border-sky-300/60 bg-sky-50/50 dark:bg-sky-950/20 dark:border-sky-800/40'}">
+            <div
+              class="rounded border px-3 py-2.5 flex items-start gap-3
+              {change.severity === 'critical'
+                ? 'border-rose-300/60 bg-rose-50/50 dark:bg-rose-950/20 dark:border-rose-800/40'
+                : change.severity === 'warning'
+                  ? 'border-amber-300/60 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800/40'
+                  : 'border-sky-300/60 bg-sky-50/50 dark:bg-sky-950/20 dark:border-sky-800/40'}"
+            >
               <span class="text-base leading-none mt-0.5 shrink-0">
-                {change.severity === "critical" ? "🔴" : change.severity === "warning" ? "🟡" : "🔵"}
+                {change.severity === "critical"
+                  ? "🔴"
+                  : change.severity === "warning"
+                    ? "🟡"
+                    : "🔵"}
               </span>
               <div class="flex-1 min-w-0">
                 <div class="text-sm font-medium">{change.title}</div>
@@ -1961,13 +2115,19 @@
                       : "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
                 }`}
               >
-                {change.severity === "critical" ? "Critical" : change.severity === "warning" ? "Changed" : "Info"}
+                {change.severity === "critical"
+                  ? "Critical"
+                  : change.severity === "warning"
+                    ? "Changed"
+                    : "Info"}
               </span>
             </div>
           {/each}
         </div>
       {:else}
-        <div class="mt-4 rounded border border-emerald-300/40 bg-emerald-50/30 dark:bg-emerald-950/10 dark:border-emerald-800/30 p-4 text-sm text-muted-foreground flex items-center gap-2">
+        <div
+          class="mt-4 rounded border border-emerald-300/40 bg-emerald-50/30 dark:bg-emerald-950/10 dark:border-emerald-800/30 p-4 text-sm text-muted-foreground flex items-center gap-2"
+        >
           <span class="text-emerald-500">✓</span>
           {previousHealthHistoryEntry
             ? "No material change detected since the previous snapshot."
@@ -1986,7 +2146,9 @@
         </div>
         <div class="flex items-center gap-2">
           {#if showingCachedOverview && cachedOverviewAt}
-            <span class="rounded border border-amber-300/70 bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+            <span
+              class="rounded border border-amber-300/70 bg-amber-50 px-2 py-1 text-[11px] text-amber-800"
+            >
               History from cache · {formatRelativeTime(cachedOverviewAt) ?? "just now"}
             </span>
           {/if}
@@ -2029,7 +2191,9 @@
               </svg>
               <div class="mt-1 text-[11px] text-muted-foreground">0 = healthy, 3 = critical</div>
             {:else}
-              <div class="flex h-10 items-center justify-center rounded bg-muted/30 text-[11px] text-muted-foreground">
+              <div
+                class="flex h-10 items-center justify-center rounded bg-muted/30 text-[11px] text-muted-foreground"
+              >
                 Collecting data - chart appears after 2+ refresh cycles
               </div>
             {/if}
@@ -2042,7 +2206,9 @@
       <div class="flex items-center justify-between gap-3">
         <div>
           <h3 class="text-sm font-semibold">Safe Actions</h3>
-          <div class="text-xs text-muted-foreground">Fast next steps from the current health picture.</div>
+          <div class="text-xs text-muted-foreground">
+            Fast next steps from the current health picture.
+          </div>
         </div>
         {#if safeActionFeedback}
           <div class="text-xs text-emerald-700 dark:text-emerald-400">{safeActionFeedback}</div>
@@ -2084,7 +2250,9 @@
       >
         <div class="flex items-start justify-between gap-3">
           <div>
-            <div class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{insight.title}</div>
+            <div class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              {insight.title}
+            </div>
             <div class="mt-2 text-3xl font-semibold">{insight.quantity}</div>
           </div>
           <span
@@ -2118,7 +2286,9 @@
     <div class="mb-3 flex items-center justify-between gap-3">
       <h3 class="text-sm font-semibold">Control Plane Checks</h3>
       <div class="text-xs text-muted-foreground">
-        {isManagedCluster ? `${managedProviderInfo.label} - managed control plane` : "Self-managed control plane"}
+        {isManagedCluster
+          ? `${managedProviderInfo.label} - managed control plane`
+          : "Self-managed control plane"}
       </div>
     </div>
     <div class="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
@@ -2157,7 +2327,9 @@
   </div>
 
   <div class="mt-6 rounded-lg border border-border bg-card text-card-foreground">
-    <div class="flex flex-col gap-3 border-b border-border px-4 py-3 md:flex-row md:items-center md:justify-between">
+    <div
+      class="flex flex-col gap-3 border-b border-border px-4 py-3 md:flex-row md:items-center md:justify-between"
+    >
       <div class="flex gap-6 text-sm font-medium">
         <button
           class={`pb-1 ${
@@ -2219,26 +2391,28 @@
             columns={eventColumns}
           />
         {:else}
-          <div class="rounded-md border border-border/70 bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
+          <div
+            class="rounded-md border border-border/70 bg-muted/30 px-3 py-4 text-sm text-muted-foreground"
+          >
             Live diagnostics are paused to keep Overview responsive. Open the tab again or use
             Refresh to load warning events.
           </div>
         {/if}
+      {:else if diagnosticsEnabled || certificatesHydrated}
+        <OverviewCertificatesPanel
+          {certificatesRows}
+          {rotationRows}
+          loading={certificatesLoading}
+          error={certificatesError}
+          {certificateColumns}
+          {rotationColumns}
+        />
       {:else}
-        {#if diagnosticsEnabled || certificatesHydrated}
-          <OverviewCertificatesPanel
-            certificatesRows={certificatesRows}
-            rotationRows={rotationRows}
-            loading={certificatesLoading}
-            error={certificatesError}
-            certificateColumns={certificateColumns}
-            rotationColumns={rotationColumns}
-          />
-        {:else}
-          <div class="rounded-md border border-border/70 bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
-            Certificate diagnostics are loaded on demand to avoid heavy cluster refresh on page open.
-          </div>
-        {/if}
+        <div
+          class="rounded-md border border-border/70 bg-muted/30 px-3 py-4 text-sm text-muted-foreground"
+        >
+          Certificate diagnostics are loaded on demand to avoid heavy cluster refresh on page open.
+        </div>
       {/if}
     </div>
   </div>
