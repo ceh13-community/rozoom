@@ -65,7 +65,7 @@ describe("trivy hub store", () => {
     const result = await installTrivyProvider("cluster-a", "trivy-operator");
 
     expect(result.success).toBe(true);
-    expect(installTrivyOperator).toHaveBeenCalledWith("cluster-a");
+    expect(installTrivyOperator).toHaveBeenCalledWith("cluster-a", undefined, undefined);
   });
 
   it("creates and persists trivy scan report", async () => {
