@@ -32,6 +32,8 @@
     loadClusterLinterEnabled,
     saveClusterLinterEnabled,
     isClusterHealthCheckHydrated,
+    REFRESH_INTERVAL_OPTIONS,
+    isValidRefreshInterval,
   } from "$features/check-health/";
   import {
     dashboardDataProfile,
@@ -370,7 +372,7 @@
         await getLastHealthCheck(cluster.uuid);
       }
       const si = await loadClusterRefreshInterval(cluster.uuid);
-      if (si && new Set([1, 5, 10]).has(si)) refreshInterval = `${si}`;
+      if (isValidRefreshInterval(si)) refreshInterval = `${si}`;
       linterEnabled = await loadClusterLinterEnabled(cluster.uuid);
     } catch {
       /* */
@@ -514,33 +516,46 @@
           {/if}
         {/if}
         <button
-          class="flex items-center gap-0.5 rounded border px-1 h-5 text-[10px] font-semibold transition {effectiveLinter
-            ? 'border-emerald-600 text-emerald-400'
-            : 'border-slate-600 text-slate-500'}"
+          type="button"
+          class="inline-flex h-7 w-7 items-center justify-center rounded border transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 {effectiveLinter
+            ? 'border-emerald-500/60 text-emerald-400 hover:border-emerald-400 hover:text-emerald-300'
+            : 'border-slate-500/60 text-slate-400 hover:border-slate-400 hover:text-slate-300'}"
           onclick={toggleLinter}
           disabled={!globalLinter}
+          aria-pressed={effectiveLinter}
+          aria-label="Toggle linter"
           title={!globalLinter
             ? "Linter disabled globally"
             : linterEnabled
-              ? "Linter ON"
-              : "Linter OFF"}
+              ? "Linter enabled - click to disable"
+              : "Linter disabled - click to enable"}
         >
-          <Gauge class="w-3 h-3" />
+          <Gauge class="w-3.5 h-3.5" />
         </button>
-        <select
-          class="h-6 appearance-auto rounded border border-slate-500 bg-slate-700 px-1 text-[10px] font-semibold text-white"
-          bind:value={refreshInterval}
-          onchange={(e) => {
-            const v = (e.currentTarget as HTMLSelectElement).value;
-            refreshInterval = v;
-            void saveClusterRefreshInterval(cluster.uuid, Number(v));
-          }}
-          title="Auto-refresh interval for health diagnostics"
-        >
-          {#each [{ l: "1m", v: "1" }, { l: "5m", v: "5" }, { l: "10m", v: "10" }] as o (o.v)}
-            <option value={o.v}>{o.l}</option>
-          {/each}
-        </select>
+        <div class="relative inline-flex">
+          <label class="sr-only" for={`cluster-refresh-detailed-${cluster.uuid}`}
+            >Refresh interval</label
+          >
+          <select
+            id={`cluster-refresh-detailed-${cluster.uuid}`}
+            class="h-7 min-w-[3.75rem] appearance-none cursor-pointer rounded border border-slate-500 bg-slate-700 pl-2 pr-6 text-[11px] font-semibold text-white shadow-sm outline-none transition hover:border-slate-300 focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
+            bind:value={refreshInterval}
+            onchange={(e) => {
+              const v = (e.currentTarget as HTMLSelectElement).value;
+              refreshInterval = v;
+              void saveClusterRefreshInterval(cluster.uuid, Number(v));
+            }}
+            title="Auto-refresh interval for health diagnostics"
+          >
+            {#each REFRESH_INTERVAL_OPTIONS as option (option.value)}
+              <option value={option.value}>{option.short}</option>
+            {/each}
+          </select>
+          <span
+            class="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-white/70"
+            aria-hidden="true">▾</span
+          >
+        </div>
       </div>
     </div>
 
