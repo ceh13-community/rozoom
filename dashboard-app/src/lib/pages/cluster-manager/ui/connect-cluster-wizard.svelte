@@ -274,6 +274,7 @@
     loading = true;
     const picked = autoClusters.filter((c) => autoSelected.has(autoKey(c)));
     let imported = 0;
+    const importedKeys = new Set<string>();
     const failures: string[] = [];
     for (const cluster of picked) {
       const result = await importCloudCluster(cluster);
@@ -281,6 +282,7 @@
         try {
           await addClustersFromText(result.kubeconfigYaml);
           imported += 1;
+          importedKeys.add(autoKey(cluster));
         } catch (e) {
           failures.push(`${cluster.name}: ${(e as Error).message}`);
         }
@@ -290,8 +292,12 @@
     }
     loading = false;
     if (imported > 0) {
-      autoClusters = autoClusters.filter((c) => !autoSelected.has(autoKey(c)));
-      autoSelected = new Set();
+      // Remove only the clusters that were successfully imported so that
+      // failed ones remain in the list and can be retried.
+      autoClusters = autoClusters.filter((c) => !importedKeys.has(autoKey(c)));
+      autoSelected = new Set(
+        [...autoSelected].filter((k) => !importedKeys.has(k)),
+      );
       success = `Imported ${imported} cluster${imported === 1 ? "" : "s"}.`;
     }
     if (failures.length > 0) error = failures.join("; ");
