@@ -24,7 +24,7 @@
     type CloudCluster,
     type CloudScope,
   } from "$features/cluster-manager/api/cloud-import";
-  import { addClustersFromText } from "$features/cluster-manager";
+  import { addClustersFromText, clustersList } from "$features/cluster-manager";
   import { detectedCloudConfigs } from "$features/cluster-finder/model/cli-store";
   import {
     testKubeconfig,
@@ -41,6 +41,7 @@
     Check,
     ShieldQuestion,
   } from "$shared/ui/icons";
+  import LoadingDots from "$shared/ui/loading-dots.svelte";
 
   type ConnectMethod = "exec" | "oidc" | "cloud" | "vault" | "certificate" | "token" | null;
 
@@ -701,7 +702,7 @@ users:
 
 <details
   class="bg-white/70 backdrop-blur-sm border border-slate-200/50 dark:bg-slate-800/60 dark:border-slate-700/60 rounded-xl shadow-sm group"
-  open
+  open={$clustersList.length === 0}
 >
   <summary
     class="flex items-center justify-between cursor-pointer p-4 hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition rounded-xl"
@@ -903,43 +904,55 @@ users:
             class="text-indigo-400 hover:underline">Docs</a
           >
         </p>
-        <div class="grid grid-cols-2 gap-2">
-          <input
-            type="text"
-            bind:value={oidcClusterName}
-            placeholder="Cluster name *"
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
-          />
-          <input
-            type="text"
-            bind:value={oidcServerUrl}
-            placeholder="API server URL *"
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
-          />
-          <input
-            type="text"
-            bind:value={oidcIssuerUrl}
-            placeholder={oidcPreset.issuerUrlTemplate + " *"}
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
-          />
-          <input
-            type="text"
-            bind:value={oidcClientId}
-            placeholder="Client ID *"
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
-          />
-          <input
-            type="password"
-            bind:value={oidcClientSecret}
-            placeholder="Client secret (optional)"
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
-          />
-          <input
-            type="text"
-            bind:value={oidcCaData}
-            placeholder="CA cert data (optional)"
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
-          />
+        <div class="space-y-2">
+          <p class="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
+            Cluster endpoint
+          </p>
+          <div class="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              bind:value={oidcClusterName}
+              placeholder="Cluster name *"
+              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+            />
+            <input
+              type="text"
+              bind:value={oidcServerUrl}
+              placeholder="API server URL *"
+              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+            />
+            <input
+              type="text"
+              bind:value={oidcCaData}
+              placeholder="CA cert data (optional)"
+              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 col-span-2"
+            />
+          </div>
+        </div>
+        <div class="space-y-2">
+          <p class="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
+            OIDC identity
+          </p>
+          <div class="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              bind:value={oidcIssuerUrl}
+              placeholder={oidcPreset.issuerUrlTemplate + " *"}
+              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 col-span-2"
+            />
+            <input
+              type="text"
+              bind:value={oidcClientId}
+              placeholder="Client ID *"
+              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+            />
+            <input
+              type="password"
+              bind:value={oidcClientSecret}
+              placeholder="Client secret (optional, prefer PKCE)"
+              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+            />
+          </div>
         </div>
         <p class="text-[10px] text-slate-500">
           Requires <code class="bg-slate-700 px-1 rounded">{oidcPreset.execCommand}</code> | Scopes: {oidcPreset.defaultScopes.join(
@@ -952,7 +965,11 @@ users:
           disabled={loading}
           onclick={importOidc}
         >
-          {loading ? "Importing" : "Connect via OIDC"}
+          {#if loading}
+            <span class="inline-flex items-center gap-1">Importing<LoadingDots /></span>
+          {:else}
+            Connect via OIDC
+          {/if}
         </Button>
       </div>
     {/if}
@@ -1162,6 +1179,13 @@ users:
             class="text-indigo-400 hover:underline">Docs</a
           >
         </p>
+        <div
+          class="text-[10px] text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
+        >
+          The credentials fetched from Vault are held in memory for the active session only.
+          Long-term storage happens only if the fetched kubeconfig itself contains a static token.
+          Prefer Vault roles that return exec-plugin configs or short-lived tokens.
+        </div>
         <Button
           size="sm"
           class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
@@ -1230,7 +1254,11 @@ users:
           disabled={loading}
           onclick={importCertificate}
         >
-          {loading ? "Importing" : "Connect with certificate"}
+          {#if loading}
+            <span class="inline-flex items-center gap-1">Importing<LoadingDots /></span>
+          {:else}
+            Connect with certificate
+          {/if}
         </Button>
       </div>
     {/if}
@@ -1284,7 +1312,11 @@ users:
           disabled={loading}
           onclick={importToken}
         >
-          {loading ? "Importing" : "Connect with token"}
+          {#if loading}
+            <span class="inline-flex items-center gap-1">Importing<LoadingDots /></span>
+          {:else}
+            Connect with token
+          {/if}
         </Button>
       </div>
     {/if}
@@ -1341,66 +1373,80 @@ users:
             class="text-indigo-400 hover:underline">Docs</a
           >
         </p>
-        <div class="grid grid-cols-2 gap-2">
-          <input
-            type="text"
-            bind:value={execClusterName}
-            placeholder="Cluster name *"
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
-          />
-          <input
-            type="text"
-            bind:value={execServerUrl}
-            placeholder="API server URL *"
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
-          />
-          {#if execPreset.primaryLabel}
+        <div class="space-y-2">
+          <p class="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
+            Cluster endpoint
+          </p>
+          <div class="grid grid-cols-2 gap-2">
             <input
               type="text"
-              bind:value={execPrimary}
-              placeholder={execPreset.primaryLabel}
+              bind:value={execClusterName}
+              placeholder="Cluster name *"
               class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
             />
-          {/if}
-          {#if execPreset.secondaryLabel}
             <input
               type="text"
-              bind:value={execSecondary}
-              placeholder={execPreset.secondaryLabel}
+              bind:value={execServerUrl}
+              placeholder="API server URL *"
               class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
             />
-          {/if}
-          {#if execPreset.tertiaryLabel}
-            <input
-              type="password"
-              bind:value={execTertiary}
-              placeholder={execPreset.tertiaryLabel}
-              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
-            />
-          {/if}
-          {#if execPreset.extraLabel}
             <input
               type="text"
-              bind:value={execExtra}
-              placeholder={execPreset.extraLabel}
-              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+              bind:value={execCaData}
+              placeholder="CA cert data (optional)"
+              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 col-span-2"
             />
-          {/if}
-          {#if execKind === "generic"}
-            <input
-              type="text"
-              bind:value={execCommand}
-              placeholder="Command *"
-              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
-            />
-          {/if}
-          <input
-            type="text"
-            bind:value={execCaData}
-            placeholder="CA cert data (optional)"
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 col-span-2"
-          />
+          </div>
         </div>
+        {#if execPreset.primaryLabel || execPreset.secondaryLabel || execPreset.tertiaryLabel || execPreset.extraLabel || execKind === "generic"}
+          <div class="space-y-2">
+            <p class="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
+              Plugin parameters
+            </p>
+            <div class="grid grid-cols-2 gap-2">
+              {#if execKind === "generic"}
+                <input
+                  type="text"
+                  bind:value={execCommand}
+                  placeholder="Command *"
+                  class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 col-span-2"
+                />
+              {/if}
+              {#if execPreset.primaryLabel}
+                <input
+                  type="text"
+                  bind:value={execPrimary}
+                  placeholder={execPreset.primaryLabel}
+                  class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+                />
+              {/if}
+              {#if execPreset.secondaryLabel}
+                <input
+                  type="text"
+                  bind:value={execSecondary}
+                  placeholder={execPreset.secondaryLabel}
+                  class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+                />
+              {/if}
+              {#if execPreset.tertiaryLabel}
+                <input
+                  type="password"
+                  bind:value={execTertiary}
+                  placeholder={execPreset.tertiaryLabel}
+                  class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+                />
+              {/if}
+              {#if execPreset.extraLabel}
+                <input
+                  type="text"
+                  bind:value={execExtra}
+                  placeholder={execPreset.extraLabel}
+                  class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+                />
+              {/if}
+            </div>
+          </div>
+        {/if}
         {#if !execPreset.bundled}
           <div
             class="text-[10px] text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
@@ -1415,7 +1461,11 @@ users:
           disabled={loading}
           onclick={importExec}
         >
-          {loading ? "Importing" : "Connect via exec plugin"}
+          {#if loading}
+            <span class="inline-flex items-center gap-1">Importing<LoadingDots /></span>
+          {:else}
+            Connect via exec plugin
+          {/if}
         </Button>
       </div>
     {/if}
