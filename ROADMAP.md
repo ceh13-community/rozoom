@@ -438,6 +438,432 @@ Quality-of-life improvements.
 
 ---
 
+## Phase 8: Enterprise Security Hardening
+
+Gap analysis (April 2026) flagged 10 items that block adoption in regulated
+environments: SOC 2 Type II, ISO 27001, PCI-DSS 4.0, HIPAA, FedRAMP, DORA/SOX.
+Current posture is solid for SMB / internal dev-team use (strong hygiene
+checks, RBAC scanner, PSS compliance, 0600 perm enforcement, CSP-restricted
+egress, SHA256-pinned bundled binaries) but lacks at-rest crypto, tamper-proof
+audit, signed updates, and credential-scrubbed telemetry.
+
+Items are ordered by compliance impact. 8.1 is the blocker for PCI/HIPAA/SOC 2
+and must ship first.
+
+### 8.1 Encrypted kubeconfig storage at rest
+
+- **Goal:** Kubeconfig YAML (with tokens, client-keys, client-certs) is
+  encrypted on disk. Plaintext access only in memory, only while a cluster
+  is active.
+- **Why:** Current state stores `AppData/configs/<uuid>.yaml` as plaintext
+  via `writeTextFile()`. Blocks PCI-DSS req 3, ISO 27001 A.10.1, SOC 2 CC6.1,
+  FedRAMP SC-28, HIPAA §164.312(a)(2)(iv).
+- **Status:** [ ] NOT STARTED
+
+#### Design
+
+**Primary:** `tauri-plugin-stronghold` (IOTA Stronghold). Rationale: single
+encrypted snapshot file, purpose-built for secrets, Argon2id-derived key from
+user passphrase, no dependency on OS keyring availability (works headless on
+CI runners too).
+
+**Fallback path:** OS keyring (`tauri-plugin-keyring`) per kubeconfig entry
+when user opts out of Stronghold passphrase. Uses:
+
+- Linux: Secret Service (GNOME Keyring / KWallet) via D-Bus
+- macOS: Keychain
+- Windows: DPAPI + Credential Manager
+
+Both paths converge on the same API surface:
+
+```ts
+// src/lib/features/cluster-manager/api/credential-vault.ts
+export interface CredentialVault {
+  readonly mode: "stronghold" | "keyring" | "plaintext";
+  unlock(passphrase?: string): Promise<void>;
+  get(uuid: string): Promise<string | null>;
+  put(uuid: string, yaml: string): Promise<void>;
+  remove(uuid: string): Promise<void>;
+  rotate(newPassphrase: string): Promise<void>;
+  lock(): void;
+}
+```
+
+`plaintext` mode stays supported as a migration bridge and escape hatch for
+CI contexts, but the UI warns red when it's active on an enterprise-tagged
+install.
+
+#### UX
+
+1. **First-launch onboarding** adds a new step: "Protect your credentials".
+   Three options: Stronghold (recommended), OS keyring, Skip (plaintext).
+   Each explains the trade-off in one sentence.
+2. **Session lock:** after N minutes idle (default 30, configurable) the
+   vault locks. Status bar shows a padlock; kubectl calls that need the
+   kubeconfig re-prompt for the passphrase (autofocused, Enter submits).
+3. **Passphrase rotation** in Settings → Security: asks for current
+   passphrase, new passphrase + confirmation, re-encrypts the snapshot.
+4. **Recovery code:** at setup we show a one-time BIP-39-style recovery
+   phrase that can decrypt the snapshot if the passphrase is lost. User
+   confirms by retyping. Stored nowhere; user's responsibility.
+
+#### Migration plan
+
+Runs automatically on first launch after the upgrade:
+
+1. Detect existing `AppData/configs/*.yaml` files.
+2. Show a modal: "We're upgrading your credential storage. Choose a
+   passphrase / keyring / skip."
+3. If Stronghold/keyring chosen:
+   - Read each plaintext file.
+   - Put into vault via `CredentialVault.put(uuid, yaml)`.
+   - On success, overwrite the source file with random bytes (3 passes),
+     then delete.
+   - Write migration marker to prefs store (`security.vaultVersion = 2`).
+4. If Skip chosen: set marker `security.vaultVersion = 1` (unchanged) and
+   show a persistent yellow banner in Manage Clusters.
+5. Idempotent: rerunnable if interrupted; skips files already migrated.
+
+On downgrade (version `< 2`) the app refuses to start and prints a clear
+message: "Your credentials are encrypted. Upgrade to ROZOOM >= 0.18 or
+restore the pre-encryption snapshot from ..." (we keep a one-shot
+`.pre-vault-backup/` untouched for 14 days).
+
+#### Files
+
+- **New:**
+  - `src-tauri/src/vault_cmds.rs` — Rust tauri::command wrappers for
+    stronghold/keyring calls
+  - `src-tauri/Cargo.toml` — `tauri-plugin-stronghold` + `keyring` crate
+  - `src/lib/features/cluster-manager/api/credential-vault.ts` — TS
+    interface + stronghold/keyring/plaintext adapters
+  - `src/lib/features/cluster-manager/api/credential-vault.test.ts` — unit
+    tests for each adapter with mocked Tauri commands
+  - `src/lib/features/cluster-manager/model/vault-migration.ts` — migration
+    runner with progress events
+  - `src/lib/pages/cluster-manager/ui/vault-setup-modal.svelte` — onboarding
+    + rotation UI
+  - `src/lib/shared/lib/session-lock.svelte.ts` — idle timer, lock event bus
+- **Modified:**
+  - `src/lib/features/cluster-manager/api/disk.ts` — delegate to
+    `CredentialVault` instead of raw `writeTextFile`
+  - `src/lib/shared/api/kubectl-proxy.ts` — materialize temp kubeconfig
+    from vault on-demand (same pattern as `test-connection.ts` uses today)
+  - `src-tauri/tauri.conf.json` — register stronghold plugin
+  - `src-tauri/capabilities/default.json` — grant stronghold/keyring
+    capabilities
+- **Tests:**
+  - vault adapter round-trip per backend
+  - migration idempotency (rerun after interruption)
+  - session lock timer with fake timers
+  - kubectl-proxy materialization cleanup on crash (lingering temp files
+    are swept on next launch)
+
+#### Risks
+
+- **OS keyring unavailable** on headless Linux (no D-Bus). Detected at
+  `unlock()`; UI prompts for Stronghold fallback.
+- **kubectl sidecar needs plaintext path.** Mitigation: write temp
+  kubeconfig to `AppData/session/<rand>.yaml`, pass `--kubeconfig`, delete
+  via tracked-handles cleanup on process exit + app shutdown hook.
+- **Lost passphrase → total data loss.** Mitigation: recovery code at
+  setup + 14-day `.pre-vault-backup/` snapshot.
+- **Stronghold snapshot corruption** (rare but documented). Mitigation:
+  rolling backup of last 3 snapshots under `AppData/vault-backups/`.
+
+#### Compliance unlocks
+
+- PCI-DSS 4.0 req 3.5 (stored credential protection)
+- ISO 27001 A.10.1.1 (cryptographic controls policy)
+- SOC 2 CC6.1 (logical access protection)
+- FedRAMP Moderate SC-28 (protection of information at rest)
+- HIPAA §164.312(a)(2)(iv) (encryption and decryption)
+- NIST 800-53 SC-28, IA-5(1)
+
+#### References
+
+- Tauri Stronghold plugin: https://v2.tauri.app/plugin/stronghold/
+- IOTA Stronghold: https://wiki.iota.org/stronghold.rs/overview
+- Argon2id RFC 9106: https://datatracker.ietf.org/doc/html/rfc9106
+- OWASP Secrets at Rest: https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html
+- NIST 800-63B session management: https://pages.nist.gov/800-63-3/sp800-63b.html
+
+### 8.2 Sentry credential scrubbing
+
+- **Goal:** `beforeSend` hook strips `token:`, `client-key-data`,
+  `client-certificate-data`, `--oidc-client-secret=`, Authorization
+  headers, kubeconfig paths, and server URLs from events before upload.
+- **Why:** Without scrubbing, a thrown error inside a helm/kubectl helper
+  can send a full kubeconfig path + stderr line (containing the token) to
+  Sentry. Blocks GDPR Art. 32, SOC 2 CC6.7.
+- **Files:** `src/lib/shared/config/sentry.ts` (add `beforeSend`), new
+  `src/lib/shared/config/sentry-scrub.ts` with regex set + unit tests.
+- **Status:** [ ] NOT STARTED
+- **Tests:** token masked, client-key masked, client-cert masked, bearer
+  Authorization header masked, kubeconfig absolute path → `[kubeconfig]`,
+  server URLs (`https://*.eks.amazonaws.com`) → `[apiserver]`. Fuzz with
+  known-bad Sentry payloads.
+- **Docs:** https://docs.sentry.io/platforms/javascript/configuration/filtering/
+
+### 8.3 Tamper-proof audit log
+
+- **Goal:** HMAC-chain each audit entry (entry N's HMAC covers entry N-1
+  HMAC + N body). Detect deletions and edits. Append-only file mode.
+- **Why:** Current `audit-trail.ts` stores events in
+  `dashboard-preferences.json` which the user can edit freely. Blocks SOC 2
+  CC7.3, ISO 27001 A.12.4.2, FedRAMP AU-9.
+- **Files:** `src/lib/features/cluster-manager/model/audit-trail.ts`
+  (HMAC chain), new `audit-trail-hmac.ts` + tests, `audit-trail-export.ts`
+  (JSONL for SIEM forward).
+- **Status:** [ ] NOT STARTED
+- **Tests:** edit middle entry → chain verification fails at that index;
+  delete entry → verification fails; append → chain extends; export is
+  valid JSONL parseable by jq.
+- **Docs:** https://en.wikipedia.org/wiki/Hash_chain, NIST SP 800-92.
+
+### 8.4 Enforce read-only mode
+
+- **Goal:** When `AppClusterConfig.readOnly === true`, block every non-GET
+  kubectl verb (delete/apply/patch/create/replace/scale/edit/exec) at the
+  kubectl-proxy layer and disable mutating UI controls.
+- **Why:** Flag exists but is cosmetic today. Blocks ISO 27001 A.9.4.1
+  (principle of least privilege).
+- **Files:** `src/lib/shared/api/kubectl-proxy.ts` (reject mutating args),
+  all action menus (disable in UI with tooltip), new
+  `src/lib/features/cluster-manager/model/mutation-guard.ts` (verb
+  classifier + tests).
+- **Status:** [ ] NOT STARTED
+- **Tests:** verb classifier has explicit mutating set; apply/delete/patch
+  blocked in proxy; get/list/watch pass; dry-run=client still allowed.
+
+### 8.5 Signed auto-update with rollback
+
+- **Goal:** Tauri updater enabled with Ed25519 signing; last-good version
+  pinned; automatic rollback on crash-on-launch.
+- **Why:** Manual .deb/.rpm distribution is unsigned. Blocks NIST SSDF
+  PS.2, US Executive Order 14028 (SBOM + signed releases).
+- **Files:** `src-tauri/tauri.conf.json` (updater block), GitHub Actions
+  signing step, update server endpoint, `updater-public.key` in repo.
+- **Status:** [ ] NOT STARTED
+- **Tests:** e2e: start on v0.18, server returns signed v0.19 → upgrade
+  succeeds; server returns unsigned → upgrade rejected; crash-on-launch
+  after upgrade → downgrade to v0.18.
+- **Docs:** https://v2.tauri.app/plugin/updater/
+
+### 8.6 Cosign/sigstore bundled binaries
+
+- **Goal:** Replace SHA256 checksum verification in `download-binaries.js`
+  with cosign verify against sigstore public-good instance (where
+  upstream signs, i.e. kubectl, helm, trivy, velero) plus Rekor proof.
+- **Why:** SHA256 matches whatever bytes the attacker publishes. cosign
+  + Rekor gives tamper-evident transparency log. SLSA Level 3 prereq.
+- **Files:** `download-binaries.js` refactor, bundle cosign itself for
+  verification, pin public keys per upstream.
+- **Status:** [ ] NOT STARTED
+- **Docs:** https://docs.sigstore.dev/cosign/verifying/verify/, SLSA v1.0.
+
+### 8.7 Plugin sandbox (web worker)
+
+- **Goal:** Third-party plugins load inside a Web Worker with a
+  postMessage API. No direct access to kubeconfigs, DOM, stores, or
+  network. Capabilities requested via manifest, user consents once.
+- **Why:** Current plugin tiers (core/free/pro/community) are
+  license-gated, not capability-sandboxed. As soon as marketplace goes
+  live, a malicious plugin could read every kubeconfig on disk.
+- **Files:** `src/lib/shared/plugins/sandbox/worker-host.ts`,
+  `worker-guest.ts`, capability mediator, manifest schema v2.
+- **Status:** [ ] NOT STARTED
+- **Tests:** plugin can't read kubeconfig via direct import; plugin can
+  request "read cluster X pods" and gets a scoped proxy; capability revoke
+  invalidates future calls.
+- **Docs:** OWASP ASVS V14 Sandboxing.
+
+### 8.8 Corporate proxy and custom CA support
+
+- **Goal:** Respect `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`; load
+  `REQUESTS_CA_BUNDLE` / `SSL_CERT_FILE` for MITM certificates
+  transparently used by enterprise SSL inspectors (Zscaler, Netskope,
+  BlueCoat).
+- **Why:** Today an enterprise install can't reach cloud APIs through
+  their required proxy. Hard blocker for adoption in ~60% of large orgs.
+- **Files:** `src/lib/shared/api/cli.ts` (inject env into spawns), new
+  `src/lib/shared/config/proxy.ts` with autodetection + explicit override
+  UI in Settings.
+- **Status:** [ ] NOT STARTED
+- **Tests:** unit test that spawned command env includes proxy vars when
+  set; settings UI overrides env.
+
+### 8.9 SIEM export for audit trail
+
+- **Goal:** Native forwarders for Splunk HEC, Loki push API, syslog
+  RFC 5424/5425 (TCP+TLS), and generic JSONL file tail.
+- **Why:** SOC 2 CC7.2 requires monitoring. Enterprises won't accept an
+  audit log that stays on the endpoint.
+- **Files:** `src/lib/features/cluster-manager/model/audit-trail-export.ts`,
+  `model/siem-forwarders/{splunk,loki,syslog,file}.ts`, Settings UI.
+- **Status:** [ ] NOT STARTED
+- **Tests:** each forwarder batches, retries with backoff, tolerates
+  transient failures.
+
+### 8.10 Session lock + master password
+
+- **Goal:** Same flow as 8.1 but for the whole app: after idle timeout
+  the UI locks, requires passphrase re-entry. Re-authentication events go
+  to audit log.
+- **Why:** NIST 800-53 IA-11, most enterprise policies require automatic
+  screen lock equivalent.
+- **Status:** [ ] NOT STARTED — depends on 8.1 infrastructure.
+
+### 8.11 FIPS 140-3 crypto mode (stretch)
+
+- **Goal:** Optional build flag that routes all crypto through a FIPS
+  140-3 validated module (boringssl-fips or OpenSSL FIPS 3.0 provider).
+- **Why:** FedRAMP High and DoD IL4+ require FIPS-validated crypto.
+  Without it we're locked out of US federal deployments.
+- **Status:** [ ] NOT STARTED — scope ~4 weeks, prereq for US gov sales.
+
+### 8.12 SBOM + SLSA provenance
+
+- **Goal:** CycloneDX SBOM generated for every release; SLSA Level 3
+  build provenance attested via GitHub Actions OIDC → sigstore.
+- **Why:** EU Cyber Resilience Act, US EO 14028, SLSA v1.0.
+- **Files:** `.github/workflows/release.yml` step + SBOM publish to
+  releases.
+- **Status:** [ ] NOT STARTED.
+- **Docs:** https://cyclonedx.org/, https://slsa.dev/spec/v1.0/
+
+---
+
+## Phase 9: Performance and Parallelism via Rust Workers
+
+Gradually move hot paths from the Svelte layer into the Tauri Rust
+backend. Goal is to keep per-cluster refresh under ~1 s and JS heap
+under ~200 MB when the dashboard watches 50-100 clusters
+simultaneously. Rust gives us three things TypeScript cannot:
+
+1. True parallelism across clusters (tokio / rayon), independent of
+   the JS event loop
+2. Zero-copy JSON parsing (`serde_json` + borrowed strings) on
+   multi-MB `kubectl get -o json` payloads
+3. Connection pooling, disciplined retries, and deterministic
+   timeouts for the probe layer
+
+The UI, runes, stores, and small pure-function models stay in Svelte
+so iteration speed does not suffer. Only workloads that clearly
+benefit from parallelism or avoid main-thread blocking migrate.
+
+### 9.1 Rust-side kubectl orchestration with parsed results
+
+- **Goal:** Replace `pnpm tauri plugin-shell` invocations of
+  `kubectl get ... -o json` followed by JS-side `JSON.parse` with a
+  single Tauri command that runs the shell, parses JSON in Rust, and
+  returns a typed result.
+- **Why:** A 50-cluster fleet pulling `pods -A -o json` every
+  60 s spends most of its cost in JS-side JSON parsing and string
+  allocations that stall the main thread. Rust does it on a worker
+  thread with no main-thread impact.
+- **Files:** `src-tauri/src/kubectl/mod.rs` (new); replace callsites
+  in `src/lib/shared/api/kubectl-proxy.ts` with `invoke("kubectl_get_json", ...)`.
+- **Status:** [ ] NOT STARTED.
+- **Trigger:** when fleet > 20 clusters OR refresh latency > 3 s.
+
+### 9.2 Health-check pipeline in Rust
+
+- **Goal:** Move `check-kube-state-metrics`, `check-metrics-server`,
+  `check-node-exporter`, `check-api-server-latency`,
+  `check-api-server-health`, `check-etcd-health`, `check-blackbox-probes`
+  from the Svelte `$features/check-health/api/*.ts` layer to Rust.
+  Each returns a typed `HealthCheckResult` over a single Tauri
+  command per cluster.
+- **Why:** Per-cluster health check currently fans out to 10-20
+  kubectl invocations plus JS parsing. Rust can fan out concurrently
+  within one cluster (tokio::join!) and across clusters (spawn per
+  cluster), producing 5-10x throughput on large fleets.
+- **Files:** `src-tauri/src/health/*.rs` (new); `src/lib/features/check-health/`
+  becomes a thin binding layer.
+- **Status:** [ ] NOT STARTED.
+- **Note:** Addresses the long-term root cause of the PR #219
+  workaround. With direct HTTP probes in Rust (using the resolved
+  kubeconfig context), "Installed but unreachable" false positives on
+  EKS can be distinguished from real addon degradation.
+
+### 9.3 Resource pressure and health score in Rust
+
+- **Goal:** Port `calculateResourcePressure`, `buildClusterHealthScore`,
+  `buildClusterScore`, `detectManagedProvider` to Rust pure functions
+  with compile-time-checked types. Expose via a single
+  `compute_cluster_scores` Tauri command that accepts an array of
+  raw check payloads and returns scored summaries.
+- **Why:** Currently these run on the main thread and scale O(pods)
+  per refresh. Rust enables parallelization with rayon and avoids UI
+  jank on 10k+ pod fleets.
+- **Files:** `src-tauri/src/scoring/*.rs` (new); keep vitest tests as
+  contract tests against the Rust binding output.
+- **Status:** [ ] NOT STARTED.
+- **Trigger:** when p99 refresh time on a 20-cluster fleet exceeds 2 s.
+
+### 9.4 X.509 certificate parsing in Rust
+
+- **Goal:** Parse TLS Secret contents and cert-manager Certificate
+  resources using `x509-parser` / `rustls-pki-types` instead of the
+  current JS-side PEM handling in `check-tls-certificates.ts`.
+  Return parsed `NotBefore / NotAfter / dnsNames / issuer` over a
+  Tauri command.
+- **Why:** JS-side X.509 parsing is fragile (edge cases: IDNA, SAN
+  type mismatches, multi-cert bundles). Rust `x509-parser` is
+  battle-tested and deterministic.
+- **Files:** `src-tauri/src/certs/*.rs` (new).
+- **Status:** [ ] NOT STARTED.
+- **Dependency:** couples well with Phase 8.1 (Stronghold) since
+  both touch crypto primitives in Rust.
+
+### 9.5 Connection pool and retry primitives
+
+- **Goal:** One shared `reqwest::Client` per cluster in Rust with
+  connection pooling, exponential backoff with jitter, and a single
+  place to configure TLS / auth / proxy. Replace ad-hoc fetch + manual
+  retry logic in the Svelte layer.
+- **Why:** Each kubectl invocation opens a fresh TCP+TLS connection.
+  Direct HTTP from Rust with keep-alive collapses handshake cost
+  across probes (~200-400 ms saved per refresh on large fleets).
+- **Files:** `src-tauri/src/http/cluster_client.rs` (new).
+- **Status:** [ ] NOT STARTED.
+
+### 9.6 Log stream and watcher aggregation in Rust
+
+- **Goal:** Subscribe to stern / `kubectl logs -f` output in Rust,
+  tokenize into structured frames, and push to the frontend via
+  Tauri events. Moves parsing off the main thread.
+- **Why:** Real-time log streaming UI currently stalls when any
+  cluster produces a burst of log lines. Rust parsing + batched
+  event push keeps the UI responsive.
+- **Files:** `src-tauri/src/logs/*.rs` (new).
+- **Status:** [ ] NOT STARTED.
+
+### What stays in Svelte (explicit non-goals)
+
+- UI components, runes ($state / $derived / $effect), stores,
+  keyboard handling, routing
+- Small pure-function models (`humanize*`, `severity*`, simple
+  parsers for single-cluster data)
+- Feature capability cache, command palette, form logic
+- Any logic where fast iteration matters more than raw throughput
+
+### Migration principles
+
+1. **One feature at a time.** Do not rewrite the health check layer
+   wholesale. Each phase item above is its own PR.
+2. **Keep the Svelte contract.** Rust commands return the same shape
+   the TypeScript code used to produce. Tests stay in vitest and
+   still pass against the Rust-backed binding.
+3. **Measure before each migration.** Move only when a profile shows
+   the JS version is the bottleneck on a real fleet. Do not
+   speculatively port.
+4. **No cross-layer leaks.** Rust never renders UI. Svelte never
+   owns long-running tokio tasks.
+
+---
+
 ## Commit Convention
 
 All commits for this roadmap follow the pattern:
@@ -449,4 +875,4 @@ Refs: ROADMAP Phase X.Y
 ```
 
 Types: `feat`, `fix`, `refactor`, `test`, `chore`
-Scopes: `cluster-mgr`, `health`, `helm-catalog`, `capacity`, `perf`, `security`, `fleet`
+Scopes: `cluster-mgr`, `health`, `helm-catalog`, `capacity`, `perf`, `security`, `fleet`, `vault`, `audit`, `updater`, `sandbox`
