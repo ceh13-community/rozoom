@@ -221,7 +221,7 @@ export function buildExecBlock(config: ExecPluginConfig): {
       return { apiVersion, command: "kubelogin", args };
     }
     case "oc-login": {
-      return { apiVersion, command: "oc", args: ["whoami", "-t"] };
+      return { apiVersion, command: "oc", args: ["get-token"] };
     }
     case "generic": {
       const cmd = config.primary?.trim() || config.command?.trim();
