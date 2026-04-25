@@ -17,6 +17,7 @@
   import { Badge } from "$shared/ui/badge";
   import { Skeleton } from "$shared/ui/skeleton";
   import { Button } from "$shared/ui/button";
+  import LoadingDots from "$shared/ui/loading-dots.svelte";
   import * as Popover from "$shared/ui/popover";
   import { confirmAction } from "$shared/lib/confirm-action";
   import { getTimeDifference, timeAgo } from "$shared/lib/timeFormatters";
