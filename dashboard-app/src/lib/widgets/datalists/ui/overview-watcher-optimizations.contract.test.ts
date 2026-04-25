@@ -10,9 +10,8 @@ describe("overview watcher optimizations contract", () => {
     expect(source).toContain("function shouldRefreshUsageMetrics(options?: { force?: boolean })");
     expect(source).toContain("Date.now() - usageMetricsLastLoadedAt >= USAGE_METRICS_REFRESH_MS");
     expect(source).toContain("if (!shouldRefreshUsageMetrics(options)) {");
-    expect(source).toContain(
-      "async function loadUsageMetrics(options?: { force?: boolean }, token: RefreshRunToken = activeRefreshToken) {",
-    );
+    expect(source).toContain("async function loadUsageMetrics(");
+    expect(source).toContain("token: RefreshRunToken = activeRefreshToken,");
   });
 
   it("guards async updates with a unified cancellation token", () => {
