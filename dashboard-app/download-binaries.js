@@ -112,11 +112,26 @@ async function fetchText(url, headers = UA_HEADERS, maxRedirects = 8) {
  * Best-effort fetch: returns null on non-200 (after redirects).
  */
 async function fetchLatestGitHubTag(repo) {
-  const json = await fetchText(
-    `https://api.github.com/repos/${repo}/releases/latest`,
-    getGitHubHeaders(),
-  );
-  return JSON.parse(json).tag_name;
+  const delays = [3000, 8000, 15000];
+  let lastErr;
+  for (let i = 0; i <= delays.length; i++) {
+    try {
+      const json = await fetchText(
+        `https://api.github.com/repos/${repo}/releases/latest`,
+        getGitHubHeaders(),
+      );
+      return JSON.parse(json).tag_name;
+    } catch (err) {
+      if (i < delays.length && /HTTP (403|429)/.test(String(err.message))) {
+        lastErr = err;
+        console.warn(`⚠ GitHub API rate limit (${repo}), retry in ${delays[i] / 1000}s…`);
+        await new Promise((r) => setTimeout(r, delays[i]));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
 }
 
 /**
@@ -1963,7 +1978,8 @@ async function installWebsocat() {
 
 async function installTcping() {
   const platform = os.platform();
-  const arch = os.arch() === "x64" ? "amd64" : "arm64";
+  // cloverstd/tcping only publishes darwin-amd64; on Apple Silicon, Rosetta 2 runs it fine
+  const arch = os.arch() === "x64" || platform === "darwin" ? "amd64" : "arm64";
   const ext = platform === "win32" ? ".exe" : "";
   const osName = platform === "win32" ? "windows" : platform === "darwin" ? "darwin" : "linux";
 
