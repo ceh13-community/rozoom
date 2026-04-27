@@ -9,6 +9,7 @@ import process from "process";
 import crypto from "crypto";
 import extractZip from "extract-zip";
 import console from "console";
+import { setTimeout as sleep } from "timers/promises";
 
 // IMPORTANT: make all paths absolute (extract-zip requires absolute dir)
 const PROJECT_ROOT = process.cwd();
@@ -125,7 +126,7 @@ async function fetchLatestGitHubTag(repo) {
       if (i < delays.length && /HTTP (403|429)/.test(String(err.message))) {
         lastErr = err;
         console.warn(`⚠ GitHub API rate limit (${repo}), retry in ${delays[i] / 1000}s…`);
-        await new Promise((r) => setTimeout(r, delays[i]));
+        await sleep(delays[i]);
         continue;
       }
       throw err;
