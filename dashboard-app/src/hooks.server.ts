@@ -9,6 +9,7 @@ import {
   shouldScrubSentry,
 } from "$shared/config/sentry";
 import { scrubErrorEvent, scrubBreadcrumb } from "$shared/config/sentry-scrub";
+import { HMR_ERROR_PATTERNS, HMR_URL_PATTERNS } from "$shared/config/sentry-filters";
 
 if (shouldInitSentry(dev)) {
   const dsn = getSentryDsn();
@@ -21,6 +22,9 @@ if (shouldInitSentry(dev)) {
     environment: getSentryEnvironment(),
 
     tracesSampleRate: 1.0,
+
+    ignoreErrors: [...HMR_ERROR_PATTERNS],
+    denyUrls: [...HMR_URL_PATTERNS],
 
     ...(scrub
       ? {
