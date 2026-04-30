@@ -61,8 +61,8 @@ function parseNotAfterFromDer(der: Uint8Array): string | null {
     const utcTimePattern = /(\d{12}Z)/g;
     const genTimePattern = /(\d{14}Z)/g;
 
-    const utcMatches = [...asn1Str.matchAll(utcTimePattern)].map((m) => m[1]);
-    const genMatches = [...asn1Str.matchAll(genTimePattern)].map((m) => m[1]);
+    const utcMatches = [...asn1Str.matchAll(utcTimePattern)].map((m) => m[1] as string);
+    const genMatches = [...asn1Str.matchAll(genTimePattern)].map((m) => m[1] as string);
 
     const allDates: Date[] = [];
     for (const m of utcMatches) {
@@ -206,7 +206,11 @@ async function scanCertManagerCerts(clusterId: string): Promise<{
   const result = await kubectlJson<{
     items?: Array<{
       metadata?: { name?: string; namespace?: string };
-      spec?: { dnsNames?: string[]; issuerRef?: { name?: string; kind?: string }; secretName?: string };
+      spec?: {
+        dnsNames?: string[];
+        issuerRef?: { name?: string; kind?: string };
+        secretName?: string;
+      };
       status?: {
         notAfter?: string;
         conditions?: Array<{ type?: string; status?: string; message?: string }>;
@@ -274,9 +278,7 @@ export async function scanTlsCertificates(
   // a TLS Secret with that name, so the TLS Secret and the Certificate row refer to
   // the same underlying credential and must not both appear in the table.
   const certManagerSecretKeys = new Set(
-    cmResult.certs
-      .filter((c) => c.secretName)
-      .map((c) => `${c.namespace}/${c.secretName}`),
+    cmResult.certs.filter((c) => c.secretName).map((c) => `${c.namespace}/${c.secretName}`),
   );
   const dedupedTls = tlsResult.certs.filter(
     (c) => !certManagerSecretKeys.has(`${c.namespace}/${c.name}`),
