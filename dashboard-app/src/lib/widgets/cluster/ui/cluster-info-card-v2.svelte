@@ -131,7 +131,7 @@
     if (cluster.needsInitialRefreshHint) {
       return { severity: "info" as const, title: "Initial refresh required" };
     }
-    return buildPrimaryAlert(lastCheck);
+    return buildPrimaryAlert(lastCheck, { loading: isRefreshLoading });
   });
 
   // ── Goal blocks ────────────────────────────────────────────────
