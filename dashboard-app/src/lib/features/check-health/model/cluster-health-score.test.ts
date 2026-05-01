@@ -106,14 +106,14 @@ describe("buildClusterHealthScore", () => {
     expect(summary.risks.some((risk) => risk.id === "metrics-server")).toBe(false);
   });
 
-  it("labels degraded metrics-server as unavailable rather than missing", () => {
+  it("flags metrics-server as unavailable when installed and failing", () => {
     const checks = baseHealthChecks();
     checks.metricsChecks.endpoints = {
       metrics_server: {
-        installed: false,
-        error: "metrics-server deployment not found",
+        installed: true,
+        error: "metrics-server pods in CrashLoopBackOff",
         lastSync: "",
-        status: "not found",
+        status: "degraded",
         title: "Metrics Server",
       },
     };
@@ -122,5 +122,129 @@ describe("buildClusterHealthScore", () => {
     const risk = summary.risks.find((item) => item.id === "metrics-server");
 
     expect(risk?.title).toBe("metrics-server unavailable");
+    expect(risk?.severity).toBe("critical");
+  });
+
+  describe("optional observability addons", () => {
+    it("does not penalize an EKS-style cluster that never deployed metrics-server", () => {
+      const checks = baseHealthChecks();
+      checks.metricsChecks.endpoints = {
+        metrics_server: {
+          installed: false,
+          lastSync: "",
+          status: "not found",
+          title: "Metrics Server",
+        },
+      };
+
+      const summary = buildClusterHealthScore(checks);
+
+      expect(summary.risks.some((risk) => risk.id === "metrics-server")).toBe(false);
+      expect(summary.risks.some((risk) => risk.id === "kube-state-metrics")).toBe(false);
+      expect(summary.risks.some((risk) => risk.id === "node-exporter")).toBe(false);
+      expect(summary.status).toBe("healthy");
+    });
+
+    it("does not penalize a cluster with no metrics endpoints at all", () => {
+      const checks = baseHealthChecks();
+      checks.metricsChecks.endpoints = {};
+
+      const summary = buildClusterHealthScore(checks);
+
+      expect(summary.risks).toHaveLength(0);
+      expect(summary.status).toBe("healthy");
+    });
+
+    it("does not penalize absence of kube-state-metrics or node-exporter", () => {
+      const checks = baseHealthChecks();
+      checks.metricsChecks.endpoints = {
+        "metrics-server": {
+          installed: true,
+          lastSync: "",
+          status: "ok",
+          title: "metrics-server",
+        },
+        // kube-state-metrics and node-exporter not deployed
+      };
+
+      const summary = buildClusterHealthScore(checks);
+
+      expect(summary.risks.some((risk) => risk.id === "kube-state-metrics")).toBe(false);
+      expect(summary.risks.some((risk) => risk.id === "node-exporter")).toBe(false);
+    });
+
+    it("still flags kube-state-metrics and node-exporter when installed but degraded", () => {
+      const checks = baseHealthChecks();
+      checks.metricsChecks.endpoints = {
+        "metrics-server": {
+          installed: true,
+          lastSync: "",
+          status: "ok",
+          title: "metrics-server",
+        },
+        "kube-state-metrics": {
+          installed: true,
+          error: "pod stuck in Pending",
+          lastSync: "",
+          status: "degraded",
+          title: "kube-state-metrics",
+        },
+        "node-exporter": {
+          installed: true,
+          error: "DaemonSet has 2/3 ready",
+          lastSync: "",
+          status: "degraded",
+          title: "node-exporter",
+        },
+      };
+
+      const summary = buildClusterHealthScore(checks);
+
+      const kubeState = summary.risks.find((risk) => risk.id === "kube-state-metrics");
+      const nodeExporter = summary.risks.find((risk) => risk.id === "node-exporter");
+
+      expect(kubeState?.severity).toBe("warning");
+      expect(kubeState?.title).toBe("kube-state-metrics degraded");
+      expect(nodeExporter?.severity).toBe("warning");
+      expect(nodeExporter?.title).toBe("node-exporter degraded");
+    });
+
+    it("does not penalize EKS-style 'Installed but unreachable' probe failures", () => {
+      // Addons are actually running on the cluster (`installed: true`) but
+      // the probe cannot reach them through the kube-apiserver service proxy
+      // / aggregated metrics.k8s.io API. Treat as probe-layer issue, not a
+      // cluster health signal.
+      const checks = baseHealthChecks();
+      checks.metricsChecks.endpoints = {
+        "metrics-server": {
+          installed: true,
+          error: "dial tcp: i/o timeout",
+          lastSync: "",
+          status: "🟠 Installed but unreachable",
+          title: "metrics-server",
+        },
+        "kube-state-metrics": {
+          installed: true,
+          error: "the server could not find the requested resource",
+          lastSync: "",
+          status: "🟠 Installed but unreachable",
+          title: "kube-state-metrics",
+        },
+        "node-exporter": {
+          installed: true,
+          error: "Error from server (Forbidden): pods is forbidden",
+          lastSync: "",
+          status: "🟠 Installed but unreachable",
+          title: "node-exporter",
+        },
+      };
+
+      const summary = buildClusterHealthScore(checks);
+
+      expect(summary.risks.some((risk) => risk.id === "metrics-server")).toBe(false);
+      expect(summary.risks.some((risk) => risk.id === "kube-state-metrics")).toBe(false);
+      expect(summary.risks.some((risk) => risk.id === "node-exporter")).toBe(false);
+      expect(summary.status).toBe("healthy");
+    });
   });
 });

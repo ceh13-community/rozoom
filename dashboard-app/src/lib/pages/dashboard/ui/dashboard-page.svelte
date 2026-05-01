@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { page } from "$app/stores";
+  import { goto } from "$app/navigation";
   // import { toast } from 'svelte-sonner';
   import { clustersList, loadClusters, isClustersConfigLoading } from "$features/cluster-manager";
   // import { suppressCliNotifications } from "$shared/lib/cli-notification";
@@ -692,9 +693,8 @@
       </Button>
     </div>
   {/if}
-{:else if loading}
+{:else if loading || !initialLoadComplete}
   <h2 class="text-xl font-bold">Available Kubernetes Clusters</h2>
-  <p>Loading cluster list...</p>
   <div class="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-4">
     {#each Array(4) as _, i}
       <Skeleton class="h-48 w-full rounded-lg" />
@@ -709,7 +709,28 @@
     <ErrorMessage error={errorDetailed} />
   {/if}
   {#if initialLoadComplete && !errors && !errorDetailed}
-    <p class="text-sm text-muted-foreground mt-2">No managed clusters found yet.</p>
+    <div
+      class="mt-8 mx-auto max-w-lg rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-white/60 dark:bg-slate-800/40 p-8 text-center"
+    >
+      <div class="text-5xl mb-3" aria-hidden="true">🗂️</div>
+      <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">
+        No clusters connected yet
+      </h3>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mb-5">
+        Connect your first Kubernetes cluster to start monitoring health, running diagnostics, and
+        managing workloads.
+      </p>
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <Button
+          class="bg-indigo-600 hover:bg-indigo-700 text-white"
+          onclick={() => goto("/dashboard/cluster-manager")}
+        >
+          Connect a cluster
+        </Button>
+        <Button variant="outline" onclick={loadClustersFromConfig}>Retry loading</Button>
+      </div>
+    </div>
+  {:else}
+    <Button class="mt-4" onclick={loadClustersFromConfig}>Retry Loading Clusters</Button>
   {/if}
-  <Button class="mt-4" onclick={loadClustersFromConfig}>⚡ Retry Loading Clusters</Button>
 {/if}
