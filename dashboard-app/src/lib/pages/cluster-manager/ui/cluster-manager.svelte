@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
+  import { dispatchShortcut, SHORTCUTS } from "../lib/keyboard-shortcuts";
   import { toast } from "svelte-sonner";
   import { dev } from "$app/environment";
   import { goto } from "$app/navigation";
@@ -77,7 +78,16 @@
     detectAuthMethod,
     type AuthMethodInfo,
   } from "$features/cluster-manager/model/auth-detection";
+  import { inferEnv } from "$features/cluster-manager/model/infer-env";
+  import type { FleetStatusBucket } from "$features/cluster-manager/model/fleet-summary";
+  import { bucketCluster } from "$features/cluster-manager/model/fleet-summary";
+  import {
+    getCachedAuthInfo,
+    loadClusterAuthInfo,
+  } from "$features/cluster-manager/model/cluster-auth-cache";
+  import { clusterStates, clusterHealthChecks } from "$features/check-health/";
   import ConnectClusterWizard from "./connect-cluster-wizard.svelte";
+  import FleetHealthOverview from "./fleet-health-overview.svelte";
 
   type DetectedCluster = {
     name: string;
@@ -163,6 +173,79 @@
   let managedProviderFilter = $state("all");
   let managedEnvFilter = $state("all");
   let managedSearch = $state("");
+  let fleetFilter = $state<FleetStatusBucket | null>(null);
+  let pendingRemovalUuid = $state<string | null>(null);
+  let pendingRemovalInput = $state("");
+  let clusterAuthInfo = $state<Record<string, AuthMethodInfo | null>>({});
+
+  function formatRelativeLastSeen(value: string | Date | undefined): string {
+    if (!value) return "unknown";
+    const ts = typeof value === "string" ? Date.parse(value) : value.getTime();
+    if (Number.isNaN(ts)) return "unknown";
+    const diffMs = Date.now() - ts;
+    if (diffMs < 60_000) return "just now";
+    const mins = Math.round(diffMs / 60_000);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.round(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    return new Date(ts).toLocaleDateString();
+  }
+
+  function bucketChipClass(bucket: FleetStatusBucket): string {
+    switch (bucket) {
+      case "online":
+        return "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300";
+      case "warning":
+        return "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300";
+      case "critical":
+        return "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300";
+      case "auth-error":
+        return "bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300";
+      case "offline":
+        return "bg-slate-200 text-slate-700 dark:bg-slate-600/40 dark:text-slate-300";
+      case "unknown":
+      default:
+        return "bg-slate-100 text-slate-500 dark:bg-slate-700/40 dark:text-slate-400";
+    }
+  }
+
+  function authChipLabel(info: AuthMethodInfo | null): string {
+    if (!info) return "?";
+    switch (info.method) {
+      case "x509-certificate":
+        return "x509";
+      case "bearer-token":
+        return "token";
+      case "exec-plugin":
+        return "exec";
+      case "oidc":
+        return "OIDC";
+      case "auth-provider":
+        return "auth-provider";
+      case "service-account":
+        return "sa";
+      case "unknown":
+        return "?";
+      default:
+        return info.method;
+    }
+  }
+
+  function authChipClass(info: AuthMethodInfo | null): string {
+    if (!info) return "bg-slate-100 text-slate-500 dark:bg-slate-700/40 dark:text-slate-400";
+    switch (info.securityLevel) {
+      case "high":
+        return "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300";
+      case "medium":
+        return "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300";
+      case "low":
+        return "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300";
+      default:
+        return "bg-slate-100 text-slate-600 dark:bg-slate-700/40 dark:text-slate-300";
+    }
+  }
   let probeResults = $state<Record<string, ConnectionProbeResult>>({});
   let isProbing = $state(false);
 
@@ -212,9 +295,66 @@
     cloudImportSuccess = null;
   }
 
+  let managedSearchEl = $state<HTMLInputElement | null>(null);
+  let showKeyboardHelp = $state(false);
+
+  function focusManagedSearch() {
+    managedSearchEl?.focus();
+    managedSearchEl?.select();
+  }
+
+  function setEnvFilterFromShortcut(env: "prod" | "stage" | "dev") {
+    const next = managedEnvFilter === env ? "all" : env;
+    if (!managedEnvs.includes(env) && next === env) {
+      toast.info(`No ${env} clusters to filter`);
+      return;
+    }
+    managedEnvFilter = next;
+  }
+
+  function handleGlobalKeydown(event: KeyboardEvent) {
+    const handled = dispatchShortcut(event, {
+      focusSearch: focusManagedSearch,
+      clearSearch: () => {
+        managedSearch = "";
+      },
+      toggleEnv: setEnvFilterFromShortcut,
+      clearFleetFilter: () => {
+        fleetFilter = null;
+      },
+      toggleHelp: () => {
+        showKeyboardHelp = !showKeyboardHelp;
+      },
+      hasActiveFilter: () => fleetFilter !== null || managedEnvFilter !== "all",
+    });
+    if (handled) event.preventDefault();
+  }
+
   onMount(async () => {
+    window.addEventListener("keydown", handleGlobalKeydown);
     await loadData();
     await safeDebugLog(`[Hooks on client]. Is dev? ${dev}`);
+  });
+
+  onDestroy(() => {
+    window.removeEventListener("keydown", handleGlobalKeydown);
+  });
+
+  // Preload auth method info for every managed cluster so the card can
+  // render an "OIDC / token / cert / exec" chip without blocking on a
+  // per-card async read. Results are cached across the session.
+  $effect(() => {
+    for (const cluster of $clustersList) {
+      if (clusterAuthInfo[cluster.uuid] !== undefined) continue;
+      const cached = getCachedAuthInfo(cluster.uuid);
+      if (cached !== undefined) {
+        clusterAuthInfo = { ...clusterAuthInfo, [cluster.uuid]: cached };
+        continue;
+      }
+      void loadClusterAuthInfo(cluster.uuid).then((info) => {
+        clusterAuthInfo = { ...clusterAuthInfo, [cluster.uuid]: info };
+      });
+    }
   });
 
   async function loadData() {
@@ -388,23 +528,35 @@
     await toggleClusterPin(uuid);
   }
 
-  async function handleRemoveCluster(uuid: string, clusterName: string) {
-    const confirmed = await safeDialogAsk(`Remove cluster "${clusterName}" from list?`, {
-      title: "Confirm Removal",
-      kind: "warning",
-    });
+  function requestRemoveCluster(uuid: string) {
+    pendingRemovalUuid = uuid;
+    pendingRemovalInput = "";
+  }
 
-    if (confirmed) {
-      await removeCluster(uuid);
-      void recordAudit("cluster-removed", { clusterName, clusterUuid: uuid });
+  function cancelRemoveCluster() {
+    pendingRemovalUuid = null;
+    pendingRemovalInput = "";
+  }
+
+  async function confirmRemoveCluster(uuid: string, clusterName: string) {
+    if (pendingRemovalInput.trim() !== clusterName) {
+      toast.error(`Type "${clusterName}" exactly to confirm removal`);
+      return;
     }
+    await removeCluster(uuid);
+    void recordAudit("cluster-removed", { clusterName, clusterUuid: uuid });
+    pendingRemovalUuid = null;
+    pendingRemovalInput = "";
+  }
+
+  function getSelectedManagedUuids(): string[] {
+    return Object.entries(selectedManagedClusters)
+      .filter(([key, checked]) => key !== "__all" && checked)
+      .map(([uuid]) => uuid);
   }
 
   async function handleRemoveSelectedClusters() {
-    const selected = Object.entries(selectedManagedClusters)
-      .filter(([, checked]) => checked)
-      .map(([uuid]) => uuid);
-
+    const selected = getSelectedManagedUuids();
     if (!selected.length) return;
 
     const confirmed = await safeDialogAsk(
@@ -422,6 +574,62 @@
     }
 
     selectedManagedClusters = {};
+  }
+
+  async function handleBulkSetNamespace() {
+    const selected = getSelectedManagedUuids();
+    if (!selected.length) return;
+    const next = prompt(
+      `Set default namespace on ${selected.length} selected cluster${
+        selected.length > 1 ? "s" : ""
+      }. Leave blank to clear.`,
+      "",
+    );
+    if (next === null) return;
+    const ns = next.trim() || undefined;
+    for (const uuid of selected) {
+      await updateClusterMeta(uuid, { defaultNamespace: ns });
+    }
+    toast.success(
+      ns
+        ? `Default namespace set to "${ns}" on ${selected.length} cluster${selected.length > 1 ? "s" : ""}`
+        : `Cleared default namespace on ${selected.length} cluster${selected.length > 1 ? "s" : ""}`,
+    );
+  }
+
+  async function handleBulkAddTag() {
+    const selected = getSelectedManagedUuids();
+    if (!selected.length) return;
+    const raw = prompt(
+      `Add a tag to ${selected.length} selected cluster${selected.length > 1 ? "s" : ""}. Duplicate tags are skipped.`,
+      "",
+    );
+    if (raw === null) return;
+    const tag = raw.trim().replace(/^#/, "");
+    if (!tag) return;
+    for (const uuid of selected) {
+      const cluster = $clustersList.find((c) => c.uuid === uuid);
+      if (!cluster) continue;
+      const existing = cluster.tags ?? [];
+      if (existing.includes(tag)) continue;
+      await updateClusterMeta(uuid, { tags: [...existing, tag] });
+    }
+    toast.success(
+      `Tag "#${tag}" added to ${selected.length} cluster${selected.length > 1 ? "s" : ""}`,
+    );
+  }
+
+  async function handleBulkRefresh() {
+    const selected = getSelectedManagedUuids();
+    if (!selected.length) return;
+    const { updateClusterHealthChecks } = await import("$features/check-health/");
+    toast.info(
+      `Refreshing health checks on ${selected.length} cluster${selected.length > 1 ? "s" : ""}...`,
+    );
+    await Promise.allSettled(
+      selected.map((uuid) => updateClusterHealthChecks(uuid, { force: true })),
+    );
+    toast.success(`Refreshed ${selected.length} cluster${selected.length > 1 ? "s" : ""}`);
   }
 
   async function openDashboard() {
@@ -606,6 +814,20 @@
         if (managedEnvFilter !== "all" && cluster.env !== managedEnvFilter) {
           return false;
         }
+        if (fleetFilter) {
+          const bucket = bucketCluster(
+            cluster,
+            $clusterStates[cluster.uuid],
+            $clusterHealthChecks[cluster.uuid],
+          );
+          if (fleetFilter === "online") {
+            if (bucket !== "online" && bucket !== "warning" && bucket !== "critical") {
+              return false;
+            }
+          } else if (bucket !== fleetFilter) {
+            return false;
+          }
+        }
         if (normalizedSearch) {
           const haystack =
             `${cluster.displayName} ${cluster.name} ${cluster.tags.join(" ")}`.toLowerCase();
@@ -627,6 +849,32 @@
     Object.entries(selectedManagedClusters).filter(([key, value]) => key !== "__all" && value)
       .length,
   );
+
+  const managedFiltersActive = $derived(
+    managedSearch.trim().length > 0 ||
+      managedStatusFilter !== managedStatusFilterOptions[0].value ||
+      managedProviderFilter !== "all" ||
+      managedEnvFilter !== "all" ||
+      fleetFilter !== null,
+  );
+
+  function clearManagedFilters() {
+    managedSearch = "";
+    managedStatusFilter = managedStatusFilterOptions[0].value;
+    managedProviderFilter = "all";
+    managedEnvFilter = "all";
+    fleetFilter = null;
+  }
+
+  function formatKubeconfigSource(source: string | undefined): string | null {
+    if (!source) return null;
+    const s = source.trim();
+    if (!s) return null;
+    return s
+      .replace(/^\/home\/[^/]+\//, "~/")
+      .replace(/^\/Users\/[^/]+\//, "~/")
+      .replace(/^C:\\Users\\[^\\]+\\/, "~\\");
+  }
 
   function getStatusLabel(name: string, status: DetectedCluster["status"]): string {
     const probe = probeResults[name];
@@ -654,16 +902,6 @@
     }
 
     return "ready";
-  }
-
-  function inferEnv(name: string): string {
-    const hint = name.toLowerCase();
-
-    if (hint.includes("prod")) return "prod";
-    if (hint.includes("stage") || hint.includes("staging")) return "stage";
-    if (hint.includes("dev")) return "dev";
-
-    return "shared";
   }
 
   function inferWarnings(
@@ -876,6 +1114,43 @@
           success={$clustersConfigSuccess}
           clearMessages={clearClustersConfigMessages}
         />
+      {/if}
+
+      {#if clustersCount > 0}
+        <div class="mb-5">
+          <FleetHealthOverview activeFilter={fleetFilter} onFilter={(b) => (fleetFilter = b)} />
+        </div>
+      {/if}
+
+      {#if showKeyboardHelp}
+        <div
+          class="mb-5 rounded-xl border border-indigo-200 dark:border-indigo-800/40 bg-indigo-50/60 dark:bg-indigo-950/20 p-4 text-sm"
+        >
+          <div class="flex items-center justify-between mb-2">
+            <p class="font-semibold text-slate-800 dark:text-slate-100">Keyboard shortcuts</p>
+            <button
+              type="button"
+              class="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+              onclick={() => (showKeyboardHelp = false)}>close</button
+            >
+          </div>
+          <ul
+            class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs text-slate-600 dark:text-slate-300"
+          >
+            {#each SHORTCUTS as shortcut (shortcut.keys)}
+              <li class="flex items-center gap-2">
+                <kbd
+                  class="inline-flex items-center justify-center min-w-[2rem] h-6 px-1.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-mono text-[11px] text-slate-700 dark:text-slate-200"
+                  >{shortcut.keys}</kbd
+                >
+                <span>{shortcut.description}</span>
+              </li>
+            {/each}
+          </ul>
+          <p class="mt-2 text-[10px] text-slate-500">
+            Shortcuts are inactive while typing in a text field.
+          </p>
+        </div>
       {/if}
 
       <!-- Cloud Providers panel -->
@@ -1167,14 +1442,9 @@
         </div>
       {/if}
 
-      <!-- Connect Cluster Wizard (all auth methods) -->
-      <div class="mb-6">
-        <ConnectClusterWizard />
-      </div>
-
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div
-          class="bg-white border border-slate-200 dark:bg-slate-800/60 dark:border-slate-700/60 rounded-xl shadow-sm p-6 overflow-y-auto max-h-[800px]"
+          class="bg-white border border-slate-200 dark:bg-slate-800/60 dark:border-slate-700/60 rounded-xl shadow-sm p-6 overflow-y-auto max-h-[800px] lg:order-2"
         >
           <h2 class="text-lg font-semibold mb-3 text-slate-800 dark:text-slate-100">
             Detected kubeconfig files
@@ -1469,12 +1739,22 @@
         </div>
 
         <div
-          class="bg-white border border-slate-200 dark:bg-slate-800/60 dark:border-slate-700/60 rounded-xl shadow-sm p-6 overflow-y-auto max-h-[800px]"
+          class="bg-white border border-slate-200 dark:bg-slate-800/60 dark:border-slate-700/60 rounded-xl shadow-sm p-6 overflow-y-auto max-h-[800px] lg:order-1"
         >
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100">
-              Managed Clusters
-            </h2>
+          <div class="flex items-center justify-between mb-4 gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100">
+                Managed Clusters
+              </h2>
+              <button
+                type="button"
+                class="text-[10px] px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition"
+                onclick={() => (showKeyboardHelp = !showKeyboardHelp)}
+                title="Show keyboard shortcuts"
+              >
+                ⌨ shortcuts
+              </button>
+            </div>
             <Button
               onclick={openDashboard}
               disabled={isLoading || clustersCount === 0}
@@ -1495,8 +1775,9 @@
               <Input
                 class="border-gray-200 dark:border-slate-500 bg-gray-100 dark:bg-slate-800/30"
                 type="text"
-                placeholder="Filter by name or tag"
+                placeholder="Filter by name or tag   (/ to focus, Esc to clear)"
                 bind:value={managedSearch}
+                bind:ref={managedSearchEl}
               />
             </div>
             <div class="flex flex-col lg:flex-row gap-3">
@@ -1562,9 +1843,43 @@
               </div>
               <div class="flex flex-wrap gap-2">
                 <Button
+                  onclick={handleBulkRefresh}
+                  disabled={isLoading || selectedManagedCount === 0}
+                  variant="outline"
+                  size="sm"
+                  class="text-xs h-8"
+                  title="Run health check on every selected cluster"
+                >
+                  🔄 Refresh ({selectedManagedCount})
+                </Button>
+                <Button
+                  onclick={handleBulkSetNamespace}
+                  disabled={isLoading || selectedManagedCount === 0}
+                  variant="outline"
+                  size="sm"
+                  class="text-xs h-8"
+                  title="Set default namespace on every selected cluster"
+                >
+                  📂 Set namespace
+                </Button>
+                <Button
+                  onclick={handleBulkAddTag}
+                  disabled={isLoading || selectedManagedCount === 0}
+                  variant="outline"
+                  size="sm"
+                  class="text-xs h-8"
+                  title="Append a tag to every selected cluster"
+                >
+                  🏷️ Add tag
+                </Button>
+                <span
+                  class="mx-1 h-6 w-px bg-slate-300 dark:bg-slate-600 self-center"
+                  aria-hidden="true"
+                ></span>
+                <Button
                   onclick={handleRemoveSelectedClusters}
                   disabled={isLoading || selectedManagedCount === 0}
-                  class="text-xs dark:text-white bg-red-500 hover:bg-red-600"
+                  class="text-xs dark:text-white bg-red-500 hover:bg-red-600 h-8"
                 >
                   🗑️ Remove selected ({selectedManagedCount})
                 </Button>
@@ -1577,6 +1892,19 @@
               <div class="text-4xl mb-2">🏗️</div>
               <p>No clusters added yet</p>
               <p class="text-xs mt-1">Add clusters from available configs or upload new ones</p>
+            </div>
+          {:else if managedClustersView.length === 0 && managedFiltersActive}
+            <div
+              class="text-center py-8 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-800/40 text-gray-500 dark:text-gray-300"
+            >
+              <div class="text-3xl mb-2" aria-hidden="true">🔍</div>
+              <p class="text-sm">No clusters match your filters</p>
+              <p class="text-xs mt-1 mb-3">
+                {clustersCount} cluster{clustersCount === 1 ? "" : "s"} hidden by the active filters.
+              </p>
+              <Button size="sm" variant="outline" class="text-xs" onclick={clearManagedFilters}>
+                Clear filters
+              </Button>
             </div>
           {:else}
             <div class="space-y-3 mb-4">
@@ -1651,17 +1979,69 @@
                           >
                             {cluster?.offline ? "Offline" : "Online"}
                           </Button>
+                          <span
+                            class="mx-1 h-5 w-px bg-slate-300 dark:bg-slate-600"
+                            aria-hidden="true"
+                          ></span>
                           <Button
-                            onclick={() => handleRemoveCluster(cluster.uuid, cluster.name)}
-                            disabled={isLoading}
+                            onclick={() => requestRemoveCluster(cluster.uuid)}
+                            disabled={isLoading || pendingRemovalUuid === cluster.uuid}
                             variant="ghost"
                             size="sm"
-                            class="text-red-500 hover:text-red-600 h-7 w-7 p-0"
+                            class="text-red-500 hover:text-red-600 hover:bg-red-500/10 h-7 w-7 p-0"
+                            title="Remove cluster from ROZOOM"
                           >
                             <Trash class="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </div>
+                      {#if pendingRemovalUuid === cluster.uuid}
+                        <div
+                          class="mt-2 rounded-md border border-rose-400/60 bg-rose-50 dark:bg-rose-950/30 p-2"
+                        >
+                          <p
+                            class="text-[11px] font-semibold text-rose-700 dark:text-rose-300 mb-1"
+                          >
+                            Danger zone: type the cluster name to confirm removal
+                          </p>
+                          <p class="text-[10px] text-rose-700/80 dark:text-rose-300/80 mb-2">
+                            This removes <code class="font-mono">{cluster.name}</code> from ROZOOM. The
+                            original kubeconfig file on your system is not touched; the cluster moves
+                            to the Recently Removed list and can be restored for 30 days.
+                          </p>
+                          <div class="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              placeholder={cluster.name}
+                              bind:value={pendingRemovalInput}
+                              class="h-7 text-[11px] px-2 rounded border border-rose-400/60 bg-white dark:bg-slate-900/40 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 flex-1 min-w-0 font-mono"
+                              onkeydown={(e) => {
+                                if (e.key === "Enter") {
+                                  void confirmRemoveCluster(cluster.uuid, cluster.name);
+                                } else if (e.key === "Escape") {
+                                  cancelRemoveCluster();
+                                }
+                              }}
+                            />
+                            <Button
+                              onclick={() => confirmRemoveCluster(cluster.uuid, cluster.name)}
+                              disabled={pendingRemovalInput.trim() !== cluster.name || isLoading}
+                              size="sm"
+                              class="text-[11px] h-7 px-2 bg-rose-600 hover:bg-rose-700 text-white"
+                            >
+                              Remove
+                            </Button>
+                            <Button
+                              onclick={cancelRemoveCluster}
+                              variant="outline"
+                              size="sm"
+                              class="text-[11px] h-7 px-2"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      {/if}
                       <div class="flex flex-wrap items-center gap-1 mt-1">
                         <span
                           class="text-[11px] px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200"
@@ -1695,14 +2075,64 @@
                             >Pinned</span
                           >
                         {/if}
-                        <span class="text-[10px] text-gray-400 ml-1">
-                          {new Date(cluster.addedAt).toLocaleDateString()} · {cluster.offline
-                            ? `Last: ${new Date(cluster.lastSeen).toLocaleDateString()}`
-                            : "Online"}
+                        <span
+                          class="text-[11px] px-1.5 py-0.5 rounded-full {bucketChipClass(
+                            bucketCluster(
+                              cluster,
+                              $clusterStates[cluster.uuid],
+                              $clusterHealthChecks[cluster.uuid],
+                            ),
+                          )}"
+                          title="Runtime health bucket from last diagnostic pass"
+                        >
+                          {bucketCluster(
+                            cluster,
+                            $clusterStates[cluster.uuid],
+                            $clusterHealthChecks[cluster.uuid],
+                          )}
+                        </span>
+                        {#if clusterAuthInfo[cluster.uuid] !== undefined}
+                          <span
+                            class="text-[11px] px-1.5 py-0.5 rounded-full font-mono lowercase {authChipClass(
+                              clusterAuthInfo[cluster.uuid],
+                            )}"
+                            title={clusterAuthInfo[cluster.uuid]?.label ?? "Auth method unknown"}
+                          >
+                            {authChipLabel(clusterAuthInfo[cluster.uuid])}
+                          </span>
+                        {/if}
+                        {#if probeResults[cluster.name]?.latencyMs != null}
+                          <span
+                            class="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-700/40 dark:text-slate-300 tabular-nums"
+                            title="Latency from last connection probe"
+                          >
+                            {probeResults[cluster.name].latencyMs}ms
+                          </span>
+                        {/if}
+                        <span
+                          class="text-[10px] text-gray-400 ml-1"
+                          title={`Added ${new Date(cluster.addedAt).toLocaleString()} · Last seen ${
+                            cluster.lastSeen ? new Date(cluster.lastSeen).toLocaleString() : "never"
+                          }`}
+                        >
+                          {cluster.offline
+                            ? `seen ${formatRelativeLastSeen(cluster.lastSeen)}`
+                            : "online now"}
                         </span>
                       </div>
-                      {#if cluster.tags.length > 0}
-                        <div class="flex flex-wrap gap-1 mt-1">
+                      {#if cluster.source || cluster.tags.length > 0}
+                        <div class="flex flex-wrap gap-1 mt-1 items-center">
+                          {#if cluster.source && formatKubeconfigSource(cluster.source)}
+                            <span
+                              class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300 max-w-[220px] truncate"
+                              title={`Kubeconfig source: ${cluster.source}`}
+                            >
+                              <span class="opacity-70 shrink-0">from</span>
+                              <span class="font-mono truncate"
+                                >{formatKubeconfigSource(cluster.source)}</span
+                              >
+                            </span>
+                          {/if}
                           {#each cluster.tags as tag}
                             <span
                               class="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-600/40 dark:text-slate-400"
@@ -1793,13 +2223,20 @@
         </div>
 
         <div
-          class="bg-white/70 backdrop-blur-sm border border-slate-200/50 dark:bg-slate-700 rounded-lg shadow-md p-6"
+          class="bg-white/70 backdrop-blur-sm border-l-4 border-l-indigo-500 border-t border-r border-b border-slate-200/50 dark:bg-slate-700 rounded-lg shadow-md p-6"
         >
-          <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-white">
-            📁 Upload kubeconfig file
-          </h2>
+          <div class="flex items-center gap-2 mb-4">
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white">
+              📁 Upload kubeconfig file
+            </h2>
+            <span
+              class="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300"
+              >Recommended</span
+            >
+          </div>
           <p class="text-gray-600 dark:text-gray-300 mb-4 text-sm">
-            Upload an existing kubeconfig file to import clusters
+            Upload an existing kubeconfig file to import clusters. File stays on your machine;
+            ROZOOM copies it into its isolated app data directory.
           </p>
 
           <Button
@@ -1816,13 +2253,13 @@
         </div>
 
         <div
-          class="bg-white/70 backdrop-blur-sm border border-slate-200/50 dark:bg-slate-700 rounded-lg shadow-md p-6"
+          class="bg-white/50 backdrop-blur-sm border border-dashed border-slate-300 dark:border-slate-600 dark:bg-slate-700/60 rounded-lg p-6"
         >
-          <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-white">
+          <h2 class="text-lg font-semibold mb-1 text-gray-700 dark:text-gray-200">
             📝 Paste kubeconfig YAML
           </h2>
-          <p class="text-gray-600 dark:text-gray-300 mb-4 text-sm">
-            Paste kubeconfig content manually (YAML format)
+          <p class="text-gray-500 dark:text-gray-400 mb-4 text-xs">
+            Alternative: paste YAML contents directly from clipboard
           </p>
 
           <Textarea
@@ -1836,7 +2273,8 @@
             <Button
               onclick={handleImportFromText}
               disabled={!rawConfigData.trim() || isLoading}
-              class="dark:text-white bg-indigo-600 hover:bg-indigo-700"
+              variant="outline"
+              class="text-xs"
             >
               {#if isLoading}
                 <LoadingSpinner />
@@ -1848,64 +2286,80 @@
         </div>
       </div>
 
-      <!-- Catalog Export/Import -->
-      <div
-        class="mt-6 bg-white/70 backdrop-blur-sm border border-slate-200/50 dark:bg-slate-700 rounded-lg shadow-md p-6"
-      >
-        <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-white">
-          Catalog Export / Import
-        </h2>
-        <p class="text-gray-600 dark:text-gray-300 mb-4 text-sm">
-          Export cluster groups, tags, and display names as JSON (no secrets). Import on another
-          machine.
-        </p>
-        <div class="flex gap-2">
-          <Button
-            onclick={async () => {
-              const { exportCatalog } = await import(
-                "$features/cluster-manager/model/catalog-export"
-              );
-              const { loadGroups, loadGroupMembership } = await import(
-                "$shared/lib/cluster-groups"
-              );
-              const groups = await loadGroups();
-              const membership = await loadGroupMembership();
-              const catalog = exportCatalog($clustersList, groups, membership);
-              const json = JSON.stringify(catalog, null, 2);
-              await navigator.clipboard.writeText(json);
-              toast.success("Catalog copied to clipboard! Paste into a .json file to share.");
-            }}
-            disabled={isLoading || clustersCount === 0}
-            class="dark:text-white bg-emerald-600 hover:bg-emerald-700 text-xs"
-            size="sm"
-          >
-            Export to clipboard
-          </Button>
-          <Button
-            onclick={async () => {
-              const json = prompt("Paste catalog JSON:");
-              if (!json?.trim()) return;
-              const { importCatalog } = await import(
-                "$features/cluster-manager/model/catalog-export"
-              );
-              const result = importCatalog(json);
-              if (result.error) {
-                toast.error("Import failed: " + result.error);
-                return;
-              }
-              toast.success(
-                `Catalog loaded: ${result.catalog!.clusters.length} clusters, ${result.catalog!.groups.length} groups. Apply metadata manually.`,
-              );
-            }}
-            disabled={isLoading}
-            variant="outline"
-            class="text-xs"
-            size="sm"
-          >
-            Import from clipboard
-          </Button>
-        </div>
+      <!-- Connect Cluster Wizard (moved below grid; daily use case is managing
+           existing clusters - adding new ones is occasional). -->
+      <div class="mt-6">
+        <ConnectClusterWizard />
       </div>
+
+      <!-- Catalog Export/Import -->
+      <details
+        class="mt-6 bg-white/70 backdrop-blur-sm border border-slate-200/50 dark:bg-slate-700 rounded-lg shadow-md group"
+      >
+        <summary
+          class="flex items-center justify-between cursor-pointer p-6 hover:bg-slate-50/50 dark:hover:bg-slate-700/30 rounded-lg"
+        >
+          <div>
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-white">
+              Catalog Export / Import
+            </h2>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              Share cluster groups, tags, and display names between machines (no secrets)
+            </p>
+          </div>
+          <span class="text-slate-400 group-open:rotate-180 transition-transform text-sm"
+            >&#9660;</span
+          >
+        </summary>
+        <div class="px-6 pb-6 pt-0">
+          <div class="flex gap-2">
+            <Button
+              onclick={async () => {
+                const { exportCatalog } = await import(
+                  "$features/cluster-manager/model/catalog-export"
+                );
+                const { loadGroups, loadGroupMembership } = await import(
+                  "$shared/lib/cluster-groups"
+                );
+                const groups = await loadGroups();
+                const membership = await loadGroupMembership();
+                const catalog = exportCatalog($clustersList, groups, membership);
+                const json = JSON.stringify(catalog, null, 2);
+                await navigator.clipboard.writeText(json);
+                toast.success("Catalog copied to clipboard! Paste into a .json file to share.");
+              }}
+              disabled={isLoading || clustersCount === 0}
+              class="dark:text-white bg-emerald-600 hover:bg-emerald-700 text-xs"
+              size="sm"
+            >
+              Export to clipboard
+            </Button>
+            <Button
+              onclick={async () => {
+                const json = prompt("Paste catalog JSON:");
+                if (!json?.trim()) return;
+                const { importCatalog } = await import(
+                  "$features/cluster-manager/model/catalog-export"
+                );
+                const result = importCatalog(json);
+                if (result.error) {
+                  toast.error("Import failed: " + result.error);
+                  return;
+                }
+                toast.success(
+                  `Catalog loaded: ${result.catalog!.clusters.length} clusters, ${result.catalog!.groups.length} groups. Apply metadata manually.`,
+                );
+              }}
+              disabled={isLoading}
+              variant="outline"
+              class="text-xs"
+              size="sm"
+            >
+              Import from clipboard
+            </Button>
+          </div>
+        </div>
+      </details>
 
       {#if activeCluster}
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

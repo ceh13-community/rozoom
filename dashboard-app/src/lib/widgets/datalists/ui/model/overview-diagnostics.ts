@@ -13,6 +13,15 @@ export type OverviewTopRisk = {
   evidence?: string;
   command: string;
   actionLabel: string;
+  /**
+   * In-app route segment the user can jump to in order to investigate
+   * the failing resource directly. Appended to `/dashboard/clusters/<slug>`
+   * by the Overview template. Null for risks that don't have a specific
+   * workload page (e.g. control-plane-wide issues).
+   */
+  investigateRoute: string | null;
+  /** Short label for the Investigate button ("Open pods", "See nodes", ...). */
+  investigateLabel: string | null;
 };
 
 export type OverviewPrimaryAlert = {
@@ -102,6 +111,50 @@ function commandForRisk(id: string): { command: string; actionLabel: string } {
         command: "kubectl get --raw='/readyz?verbose'",
         actionLabel: "Inspect control plane",
       };
+  }
+}
+
+/**
+ * Map a risk id to an in-app route the Investigate button can navigate
+ * to. Keeping this beside commandForRisk so adding a new risk keeps
+ * both UX affordances in sync.
+ */
+/**
+ * Route values are appended to `/dashboard/clusters/<slug>?workload=`
+ * in the Overview template, so each entry is just the workload slug
+ * plus any query-string suffix (leading `&` starts the suffix).
+ */
+function investigateForRisk(id: string): { route: string | null; label: string | null } {
+  switch (id) {
+    case "crashloops":
+      return { route: "pods&filter=crashloop", label: "Open failing pods" };
+    case "pending-pods":
+      return { route: "pods&filter=pending", label: "Open pending pods" };
+    case "pod-restarts":
+      return { route: "podsrestarts", label: "Open pod restarts" };
+    case "warning-events":
+      return { route: "events&filter=warning", label: "Open warning events" };
+    case "nodes-not-ready":
+    case "node-disk-pressure":
+    case "node-memory-pressure":
+    case "node-pid-pressure":
+    case "node-network-unavailable":
+      return { route: "nodes", label: "Open nodes" };
+    case "cert-expiry":
+      return { route: "certificates", label: "Open certificates" };
+    case "metrics-server":
+      return { route: "metricssources", label: "Open metrics sources" };
+    case "deprecations":
+      return { route: "deprecationscan", label: "Open deprecation scan" };
+    // Control-plane-only risks have no per-workload page.
+    case "etcd-health":
+    case "api-health":
+    case "api-latency":
+    case "apf-health":
+    case "admission-webhooks":
+      return { route: null, label: null };
+    default:
+      return { route: null, label: null };
   }
 }
 
@@ -247,6 +300,7 @@ export function buildOverviewTopRisks(checks: ClusterHealthChecks | null): Overv
     .topRisks.slice(0, 4)
     .map((risk) => {
       const command = commandForRisk(risk.id);
+      const investigate = investigateForRisk(risk.id);
       return {
         id: risk.id,
         severity: riskSeverity(risk.severity),
@@ -256,6 +310,8 @@ export function buildOverviewTopRisks(checks: ClusterHealthChecks | null): Overv
         evidence: buildRiskEvidence(checks, risk.id),
         command: command.command,
         actionLabel: command.actionLabel,
+        investigateRoute: investigate.route,
+        investigateLabel: investigate.label,
       };
     });
 }

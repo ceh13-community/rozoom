@@ -24,7 +24,7 @@
     type CloudCluster,
     type CloudScope,
   } from "$features/cluster-manager/api/cloud-import";
-  import { addClustersFromText } from "$features/cluster-manager";
+  import { addClustersFromText, clustersList } from "$features/cluster-manager";
   import { detectedCloudConfigs } from "$features/cluster-finder/model/cli-store";
   import {
     testKubeconfig,
@@ -706,7 +706,7 @@ users:
 
 <details
   class="bg-white/70 backdrop-blur-sm border border-slate-200/50 dark:bg-slate-800/60 dark:border-slate-700/60 rounded-xl shadow-sm group"
-  open
+  open={$clustersList.length === 0}
 >
   <summary
     class="flex items-center justify-between cursor-pointer p-4 hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition rounded-xl"

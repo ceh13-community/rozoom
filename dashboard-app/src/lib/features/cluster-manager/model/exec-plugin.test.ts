@@ -118,14 +118,14 @@ describe("exec-plugin / buildExecBlock", () => {
     expect(block.args).toEqual(["token", "-i", "prod"]);
   });
 
-  it("oc-login uses whoami -t", () => {
+  it("oc-login uses get-token", () => {
     const block = buildExecBlock({
       kind: "oc-login",
       clusterName: "o",
       serverUrl: "x",
     });
     expect(block.command).toBe("oc");
-    expect(block.args).toEqual(["whoami", "-t"]);
+    expect(block.args).toEqual(["get-token"]);
   });
 
   it("generic splits extra string into args", () => {
