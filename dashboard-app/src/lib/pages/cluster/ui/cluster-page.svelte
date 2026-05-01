@@ -7,16 +7,17 @@
   import Pin from "@lucide/svelte/icons/pin";
   import PinOff from "@lucide/svelte/icons/pin-off";
   import X from "@lucide/svelte/icons/x";
+  import { showRuntimeDiagnostics } from "$features/check-health/model/runtime-diagnostics-preferences";
   import { CommandPalette, buildAllCommands } from "$features/command-palette";
   import { getGotoChords } from "$features/command-palette/model/goto-shortcuts";
   import { handleGlobalKeydown, registerShortcut } from "$shared/lib/keyboard-manager";
-  import { showRuntimeDiagnostics } from "$features/check-health/model/runtime-diagnostics-preferences";
   import { NamespaceSelect } from "$widgets/namespace";
   import { WorkloadDisplay } from "$widgets/workload";
   import * as Alert from "$shared/ui/alert";
   import { Badge } from "$shared/ui/badge";
   import { Skeleton } from "$shared/ui/skeleton";
   import { Button } from "$shared/ui/button";
+  import LoadingDots from "$shared/ui/loading-dots.svelte";
   import * as Popover from "$shared/ui/popover";
   import { confirmAction } from "$shared/lib/confirm-action";
   import { getTimeDifference, timeAgo } from "$shared/lib/timeFormatters";
@@ -1667,7 +1668,7 @@
                     class="inline-block h-2 w-2 animate-spin rounded-full border-2 border-current border-t-transparent"
                     aria-hidden="true"
                   ></span>
-                  Updating
+                  Updating…
                 </span>
               {:else if headerSyncDisplayText === "updated"}
                 <span
