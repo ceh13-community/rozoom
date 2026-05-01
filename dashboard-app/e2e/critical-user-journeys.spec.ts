@@ -178,7 +178,7 @@ test.describe("critical user journeys", () => {
     await expect(page.getByText("Observability").first()).toBeVisible();
 
     // At least one chart name
-    await expect(page.getByText("kube-prometheus-stack")).toBeVisible();
+    await expect(page.getByText("kube-prometheus-stack").first()).toBeVisible();
   });
 
   test("7. search clusters on dashboard", async ({ page }) => {
