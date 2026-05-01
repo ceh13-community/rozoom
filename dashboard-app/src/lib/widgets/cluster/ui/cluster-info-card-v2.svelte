@@ -32,16 +32,16 @@
     loadClusterLinterEnabled,
     saveClusterLinterEnabled,
     isClusterHealthCheckHydrated,
-    REFRESH_INTERVAL_OPTIONS,
-    isValidRefreshInterval,
   } from "$features/check-health/";
   import {
     dashboardDataProfile,
+    setDashboardDataProfile,
     shouldAutoRunDiagnostics,
   } from "$shared/lib/dashboard-data-profile.svelte";
   import { getClusterPlatformLabel } from "$shared/ui/cluster-platform";
   import {
     humanizeClusterError,
+    isAuthError,
     isConnectionError,
   } from "$widgets/datalists/ui/model/overview-diagnostics";
   import { onMount, onDestroy, type Component } from "svelte";
@@ -90,6 +90,14 @@
         color: "bg-slate-500",
         text: "Pending",
         tooltip: "Waiting for initial health check. Click the refresh button to start.",
+      };
+    if (checkState.error && isAuthError(checkState.error))
+      return {
+        color: "bg-amber-600",
+        text: "Auth expired",
+        tooltip:
+          "Kubeconfig credentials were rejected by the API server (Unauthorized/Forbidden). " +
+          "Refresh the token via the Cluster Manager or re-import the kubeconfig.",
       };
     if (checkState.error && isConnectionError(checkState.error))
       return {
@@ -325,6 +333,44 @@
   let healthCheckHydrated = $state(false);
   const refreshIntervalMs = $derived(Number(refreshInterval) * 60_000);
 
+  // `now` ticks every 30s so the "N ago" label stays fresh without a full
+  // reactive dependency chain. 30s is coarse enough to be cheap and still
+  // feels live at the minute-granularity the cards display.
+  let now = $state(Date.now());
+  $effect(() => {
+    const id = setInterval(() => (now = Date.now()), 30_000);
+    return () => clearInterval(id);
+  });
+
+  const lastRefreshedAt = $derived.by(() => {
+    if (!lastCheck || "errors" in lastCheck) return null;
+    const ts = (lastCheck as { timestamp?: number }).timestamp;
+    return typeof ts === "number" ? ts : null;
+  });
+  const lastRefreshedLabel = $derived.by(() => {
+    void now; // keep the label live
+    if (!lastRefreshedAt) return "never";
+    const deltaSec = Math.max(0, Math.round((Date.now() - lastRefreshedAt) / 1000));
+    if (deltaSec < 45) return "just now";
+    if (deltaSec < 90) return "1m ago";
+    const mins = Math.round(deltaSec / 60);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.round(hours / 24);
+    return `${days}d ago`;
+  });
+  const refreshStale = $derived.by(() => {
+    if (!lastRefreshedAt) return false;
+    const budget = refreshIntervalMs * 3;
+    return Date.now() - lastRefreshedAt > budget;
+  });
+
+  const autoRefreshProfile = $derived($dashboardDataProfile);
+  function enableAutoDiagnostics() {
+    setDashboardDataProfile("balanced");
+  }
+
   function goToCluster() {
     if (!cluster.name) return;
     stopAllBackgroundPollers();
@@ -372,7 +418,7 @@
         await getLastHealthCheck(cluster.uuid);
       }
       const si = await loadClusterRefreshInterval(cluster.uuid);
-      if (isValidRefreshInterval(si)) refreshInterval = `${si}`;
+      if (si && new Set([1, 5, 10]).has(si)) refreshInterval = `${si}`;
       linterEnabled = await loadClusterLinterEnabled(cluster.uuid);
     } catch {
       /* */
@@ -516,51 +562,78 @@
           {/if}
         {/if}
         <button
-          type="button"
-          class="inline-flex h-7 w-7 items-center justify-center rounded border transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 {effectiveLinter
-            ? 'border-emerald-500/60 text-emerald-400 hover:border-emerald-400 hover:text-emerald-300'
-            : 'border-slate-500/60 text-slate-400 hover:border-slate-400 hover:text-slate-300'}"
+          class="flex items-center gap-0.5 rounded border px-1 h-5 text-[10px] font-semibold transition {effectiveLinter
+            ? 'border-emerald-600 text-emerald-400'
+            : 'border-slate-600 text-slate-500'}"
           onclick={toggleLinter}
           disabled={!globalLinter}
-          aria-pressed={effectiveLinter}
-          aria-label="Toggle linter"
           title={!globalLinter
             ? "Linter disabled globally"
             : linterEnabled
-              ? "Linter enabled - click to disable"
-              : "Linter disabled - click to enable"}
+              ? "Linter ON"
+              : "Linter OFF"}
         >
-          <Gauge class="w-3.5 h-3.5" />
+          <Gauge class="w-3 h-3" />
         </button>
-        <div class="relative inline-flex">
-          <label class="sr-only" for={`cluster-refresh-detailed-${cluster.uuid}`}
-            >Refresh interval</label
-          >
-          <select
-            id={`cluster-refresh-detailed-${cluster.uuid}`}
-            class="h-7 min-w-[3.75rem] appearance-none cursor-pointer rounded border border-slate-500 bg-slate-700 pl-2 pr-6 text-[11px] font-semibold text-white shadow-sm outline-none transition hover:border-slate-300 focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
-            bind:value={refreshInterval}
-            onchange={(e) => {
-              const v = (e.currentTarget as HTMLSelectElement).value;
-              refreshInterval = v;
-              void saveClusterRefreshInterval(cluster.uuid, Number(v));
-            }}
-            title="Auto-refresh interval for health diagnostics"
-          >
-            {#each REFRESH_INTERVAL_OPTIONS as option (option.value)}
-              <option value={option.value}>{option.short}</option>
-            {/each}
-          </select>
-          <span
-            class="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-white/70"
-            aria-hidden="true">▾</span
-          >
-        </div>
+        <select
+          class="h-6 appearance-auto rounded border border-slate-500 bg-slate-700 px-1 text-[10px] font-semibold text-white"
+          bind:value={refreshInterval}
+          onchange={(e) => {
+            const v = (e.currentTarget as HTMLSelectElement).value;
+            refreshInterval = v;
+            void saveClusterRefreshInterval(cluster.uuid, Number(v));
+          }}
+          title="Auto-refresh interval for health diagnostics"
+        >
+          {#each [{ l: "1m", v: "1" }, { l: "5m", v: "5" }, { l: "10m", v: "10" }] as o (o.v)}
+            <option value={o.v}>{o.l}</option>
+          {/each}
+        </select>
       </div>
     </div>
 
-    <!-- Connection error (from checkState, may appear before primaryAlert updates) -->
-    {#if checkState.error && isConnectionError(checkState.error) && primaryAlert.severity === "ok"}
+    <div class="mx-3 flex flex-wrap items-center gap-1.5 pb-1 text-[10px] text-white/70">
+      {#if isRefreshLoading}
+        <span class="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-sky-300"></span>
+        <span>Refreshing now</span>
+      {:else if !autoDiagnosticsEnabled}
+        <span class="inline-flex h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+        <span title="Data profile '{autoRefreshProfile.label}' disables scheduled health checks.">
+          Auto-refresh off (profile: {autoRefreshProfile.label})
+        </span>
+        <button
+          type="button"
+          class="rounded border border-amber-400/60 bg-amber-400/10 px-1.5 py-[1px] text-[9px] font-medium text-amber-200 hover:bg-amber-400/20"
+          onclick={enableAutoDiagnostics}
+          title="Switch the global dashboard profile to Balanced so cards refresh on schedule"
+        >
+          Enable
+        </button>
+      {:else}
+        <span
+          class="inline-flex h-1.5 w-1.5 rounded-full {refreshStale
+            ? 'bg-amber-400'
+            : 'bg-emerald-400'}"
+          title={refreshStale ? "Last refresh is older than 3x the interval" : "Up-to-date"}
+        ></span>
+        <span>Last refresh: {lastRefreshedLabel}</span>
+      {/if}
+    </div>
+
+    <!-- Auth expired (kubeconfig token/credentials rejected) -->
+    {#if checkState.error && isAuthError(checkState.error)}
+      <a
+        href="/cluster-manager"
+        class="mx-3 mb-2 block w-[calc(100%-1.5rem)] rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-1.5 text-left text-xs shadow-sm transition hover:opacity-80 dark:border-amber-800/40 dark:bg-amber-950/30"
+        title="Open Cluster Manager to refresh credentials"
+      >
+        <div class="flex items-center justify-between gap-2">
+          <span class="truncate font-medium">Credentials expired - refresh in Cluster Manager</span>
+          <Badge class="h-4 shrink-0 bg-amber-600 px-1 text-[9px] text-white">Auth</Badge>
+        </div>
+      </a>
+      <!-- Connection error (from checkState, may appear before primaryAlert updates) -->
+    {:else if checkState.error && isConnectionError(checkState.error) && primaryAlert.severity === "ok"}
       {@const friendly = humanizeClusterError(checkState.error)}
       <button
         type="button"

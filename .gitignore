@@ -14,7 +14,6 @@ node_modules
 # *.vscode/
 .idea/
 *.sublime-workspace
-.claude/
 
 # ─── Logs, temp, cache ───────────────────────────────
 *.log
