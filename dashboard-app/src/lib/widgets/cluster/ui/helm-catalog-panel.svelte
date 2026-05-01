@@ -473,34 +473,17 @@ lokiCanary:
       scoring: "Distributed tracing, metrics pipeline, log forwarding.",
     },
     {
-      id: "nginx-ingress",
-      name: "nginx-ingress",
-      releaseName: "nginx-ingress",
-      namespace: "nginx-ingress",
-      repoName: "nginx-stable",
-      // F5/NGINX official Helm repo (NGINX Ingress Controller by NGINX Inc).
-      // Note this is a different project from the CNCF community
-      // kubernetes/ingress-nginx - F5 ships their own supported controller
-      // with commercial options and the official chart lives here.
-      repoUrl: "https://helm.nginx.com/stable",
-      chart: "nginx-stable/nginx-ingress",
+      id: "ingress-nginx",
+      name: "ingress-nginx",
+      releaseName: "ingress-nginx",
+      namespace: "ingress-nginx",
+      repoName: "ingress-nginx",
+      repoUrl: "https://kubernetes.github.io/ingress-nginx",
+      chart: "ingress-nginx/ingress-nginx",
       category: "Networking",
       description:
-        "Official F5 NGINX Ingress Controller. Production-grade, commercially supported, same codebase as NGINX Plus.",
-      scoring: "Traffic routing, TLS termination, rate limiting, commercial support path.",
-    },
-    {
-      id: "traefik",
-      name: "traefik",
-      releaseName: "traefik",
-      namespace: "traefik",
-      repoName: "traefik",
-      repoUrl: "https://traefik.github.io/charts",
-      chart: "traefik/traefik",
-      category: "Networking",
-      description:
-        "Cloud-native reverse proxy and Ingress / Gateway API controller. Dynamic configuration, Let's Encrypt integration, dashboard UI.",
-      scoring: "Traffic routing, TLS termination, Gateway API support, dashboard visibility.",
+        "Production-grade Ingress controller powered by NGINX. Most widely used K8s ingress.",
+      scoring: "Traffic routing, TLS termination, rate limiting.",
     },
     {
       id: "argocd",
