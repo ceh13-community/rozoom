@@ -15,6 +15,9 @@
     loadClusterLinterEnabled,
     saveClusterLinterEnabled,
     isClusterHealthCheckHydrated,
+    REFRESH_INTERVAL_OPTIONS,
+    DEFAULT_REFRESH_INTERVAL_MINUTES,
+    isValidRefreshInterval,
     type ClusterHealthChecks,
   } from "$features/check-health/";
   import { armorHubState } from "$features/armor-hub";
@@ -79,9 +82,15 @@
     ChevronDown,
     Gauge,
     Refresh,
+    Shield,
     ShieldQuestion,
     SquareChevronRight,
   } from "$shared/ui/icons";
+  import {
+    loadCredentialReport,
+    getCachedCredentialReport,
+  } from "$features/cluster-manager/model/credential-risk-cache";
+  import type { CredentialSecurityReport } from "$features/cluster-manager/model/credential-security";
   import { Button } from "$shared/ui/button";
   import { Checkbox } from "$shared/ui/checkbox";
   import type { AppClusterConfig } from "$entities/config/";
@@ -117,6 +126,22 @@
   }
 
   const { cluster, autoRefreshActive = true, syntheticMode = false }: Props = $props();
+
+  let credRisk = $state<CredentialSecurityReport | null>(
+    getCachedCredentialReport(cluster.uuid) ?? null,
+  );
+  const credRiskLabel = $derived.by(() => {
+    if (!credRisk || credRisk.findings.length === 0) return null;
+    if (credRisk.overallRisk !== "critical" && credRisk.overallRisk !== "high") return null;
+    const top = credRisk.findings.find((f) => f.risk === "critical" || f.risk === "high");
+    return top
+      ? {
+          risk: credRisk.overallRisk,
+          title: top.title,
+          tooltip: `${top.title}\n\n${top.description}\n\nFix: ${top.remediation}`,
+        }
+      : null;
+  });
 
   const clusterUuid = cluster.uuid;
   const clusterCheck$ = selectClusterHealthCheck(clusterUuid);
@@ -479,16 +504,9 @@
     return sortedMetricsEndpoints((lastCheck as ClusterHealthChecks).metricsChecks.endpoints);
   });
 
-  const refreshOptions = [
-    { label: "1 min", value: "1" },
-    { label: "5 min", value: "5" },
-    { label: "10 min", value: "10" },
-    { label: "15 min", value: "15" },
-  ];
-  const refreshIntervalValues = new Set([1, 5, 10, 15]);
   const CARD_DIAGNOSTICS_TTL_MS = 5 * 60_000;
   type CardDiagnosticsScope = "config" | "health" | "infrastructure";
-  let refreshInterval = $state("5");
+  let refreshInterval = $state(String(DEFAULT_REFRESH_INTERVAL_MINUTES));
   let linterEnabled = $state(true);
   let manualRefreshPending = $state(false);
   let healthCheckHydrated = $state(false);
@@ -741,10 +759,14 @@
         await getLastHealthCheck(cluster.uuid);
       }
       const storedInterval = await loadClusterRefreshInterval(cluster.uuid);
-      if (storedInterval && refreshIntervalValues.has(storedInterval)) {
+      if (isValidRefreshInterval(storedInterval)) {
         refreshInterval = `${storedInterval}`;
       }
       linterEnabled = await loadClusterLinterEnabled(cluster.uuid);
+      if (credRisk === null) {
+        const report = await loadCredentialReport(cluster.uuid, cluster.name);
+        credRisk = report;
+      }
     } catch (error) {
       // Don't set cluster.status = "error" - it mutates the prop and never resets.
       // The card will show the error state via checkState.error from the watcher instead.
@@ -845,6 +867,24 @@
       Platform:
       <Badge class="text-white bg-slate-500 max-w-24 h-7">{platformLabel}</Badge>
     </div>
+    {#if credRiskLabel}
+      <div class="px-6 flex justify-between items-center gap-2 mb-2">
+        Credentials:
+        <button
+          type="button"
+          onclick={() =>
+            goto(`/dashboard/clusters/${encodeURIComponent(cluster.uuid)}?workload=compliancehub`)}
+          class="inline-flex items-center gap-1 rounded h-7 px-2 text-[11px] font-semibold border cursor-help transition {credRiskLabel.risk ===
+          'critical'
+            ? 'border-rose-500 text-rose-400 bg-rose-500/10 hover:bg-rose-500/20'
+            : 'border-orange-500 text-orange-400 bg-orange-500/10 hover:bg-orange-500/20'}"
+          title={credRiskLabel.tooltip}
+        >
+          <Shield class="w-3 h-3" />
+          <span class="truncate max-w-[180px]">{credRiskLabel.title}</span>
+        </button>
+      </div>
+    {/if}
     <button
       type="button"
       class="mx-6 mb-3 block w-[calc(100%-3rem)] rounded-xl border border-slate-300/90 bg-white px-3.5 py-3.5 text-left text-sm text-slate-900 shadow-sm transition hover:bg-slate-50"
@@ -879,46 +919,50 @@
       Refresh:
       <div class="flex items-center gap-2">
         <label class="sr-only" for={`cluster-refresh-${cluster.uuid}`}>Refresh interval</label>
-        <select
-          id={`cluster-refresh-${cluster.uuid}`}
-          class="h-7 min-w-[4.75rem] appearance-auto rounded-md border border-slate-500 bg-slate-700 px-2 pr-7 text-xs font-semibold text-white shadow-sm outline-none transition focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
-          bind:value={refreshInterval}
-          onchange={(event) =>
-            updateRefreshInterval((event.currentTarget as HTMLSelectElement).value)}
-        >
-          {#each refreshOptions as option (option.value)}
-            <option value={option.value}>{option.label}</option>
-          {/each}
-        </select>
+        <div class="relative inline-flex">
+          <select
+            id={`cluster-refresh-${cluster.uuid}`}
+            class="h-8 min-w-[5.25rem] appearance-none cursor-pointer rounded-md border border-slate-500 bg-slate-700 pl-2.5 pr-7 text-xs font-semibold text-white shadow-sm outline-none transition hover:border-slate-300 focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
+            bind:value={refreshInterval}
+            onchange={(event) =>
+              updateRefreshInterval((event.currentTarget as HTMLSelectElement).value)}
+          >
+            {#each REFRESH_INTERVAL_OPTIONS as option (option.value)}
+              <option value={option.value}>{option.label}</option>
+            {/each}
+          </select>
+          <span
+            class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-white/70"
+            aria-hidden="true">▾</span
+          >
+        </div>
         {#if !syntheticMode}
           <Popover.Root>
             <Popover.Trigger>
-              <Button variant="outline" size="sm" class="h-7 px-2 text-xs">Runtime</Button>
+              <Button variant="outline" size="sm" class="h-8 px-2.5 text-xs">Runtime</Button>
             </Popover.Trigger>
             <Popover.Content class="w-[392px]" sideOffset={8}>
               <ClusterRuntimeTuningPanel clusterId={cluster.uuid} />
             </Popover.Content>
           </Popover.Root>
         {/if}
-        <label
-          class="flex items-center gap-1 cursor-pointer text-xs {effectiveLinter
-            ? 'text-emerald-400'
-            : 'text-slate-500'}"
+        <button
+          type="button"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-md border transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 {effectiveLinter
+            ? 'border-emerald-500/60 text-emerald-400 hover:border-emerald-400 hover:text-emerald-300'
+            : 'border-slate-500/60 text-slate-400 hover:border-slate-400 hover:text-slate-300'}"
+          onclick={toggleLinter}
+          disabled={!globalLinter}
+          aria-pressed={effectiveLinter}
+          aria-label="Toggle linter"
           title={!globalLinter
             ? "Linter disabled globally"
             : linterEnabled
-              ? "Linter enabled"
-              : "Linter disabled"}
+              ? "Linter enabled - click to disable"
+              : "Linter disabled - click to enable"}
         >
-          <input
-            type="checkbox"
-            checked={effectiveLinter}
-            disabled={!globalLinter}
-            onchange={toggleLinter}
-            class="h-3 w-3 accent-emerald-500"
-          />
-          <Gauge class="w-3 h-3" />
-        </label>
+          <Gauge class="w-4 h-4" />
+        </button>
       </div>
       {#if effectiveLinter && (displayClusterCardColor?.text === "Unknown" || displayClusterCardColor?.text === "Offline" || (cluster.status === "error" && cluster.errors?.length) || (checkState.error && checkState.error.length))}
         {@const rawError = cluster.errors ?? checkState.error ?? ""}
