@@ -23,6 +23,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  TCPING_VERSION: "0.1.1"
 
 jobs:
   pr_checks:

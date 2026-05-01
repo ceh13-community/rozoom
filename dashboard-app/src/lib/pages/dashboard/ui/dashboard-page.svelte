@@ -3,6 +3,7 @@
   import { page } from "$app/stores";
   // import { toast } from 'svelte-sonner';
   import { clustersList, loadClusters, isClustersConfigLoading } from "$features/cluster-manager";
+  // import { suppressCliNotifications } from "$shared/lib/cli-notification";
   import { sortClustersArrayByState } from "$shared";
   import { compareClustersByEnv, loadEnvSortPriority } from "$shared/lib/env-sort-priority";
   import { ClusterInfoCard } from "$widgets/cluster";
@@ -33,7 +34,11 @@
   import SyntheticFleetStressPanel from "./synthetic-fleet-stress-panel.svelte";
   import { stopAllBackgroundPollers } from "$shared/lib/background-pollers";
   import { resetDashboardDiagnosticsEntitySnapshots } from "$features/check-health/model/collect-cluster-data";
-  import { globalLinterEnabled, buildClusterHealthScore, saveGlobalLinterEnabled } from "$features/check-health";
+  import {
+    globalLinterEnabled,
+    buildClusterHealthScore,
+    saveGlobalLinterEnabled,
+  } from "$features/check-health";
   import { stopAllWatchers } from "$features/check-health/model/watchers";
   import { ShieldCheck, ShieldOff } from "$shared/ui/icons";
   import { loadClusterOrder, saveClusterOrder, applyClusterOrder } from "$shared/lib/cluster-order";
@@ -106,17 +111,18 @@
     return [...list].sort((a, b) => {
       const ca = checks[a.uuid];
       const cb = checks[b.uuid];
-      const sa = ca && !("errors" in ca) ? (buildClusterHealthScore(ca)?.score ?? 100) : (ca ? -1 : 101);
-      const sb = cb && !("errors" in cb) ? (buildClusterHealthScore(cb)?.score ?? 100) : (cb ? -1 : 101);
+      const sa =
+        ca && !("errors" in ca) ? (buildClusterHealthScore(ca)?.score ?? 100) : ca ? -1 : 101;
+      const sb =
+        cb && !("errors" in cb) ? (buildClusterHealthScore(cb)?.score ?? 100) : cb ? -1 : 101;
       return sa - sb;
     });
   }
 
   let filteredClusters = $derived.by(() => {
     if (!clusters || clusters.length === 0) return [];
-    const ordered = clusterOrder.length > 0
-      ? applyClusterOrder(clusters, clusterOrder)
-      : sortByHealth(clusters);
+    const ordered =
+      clusterOrder.length > 0 ? applyClusterOrder(clusters, clusterOrder) : sortByHealth(clusters);
     if (!searchQuery || searchQuery.trim() === "") return ordered;
     return ordered.filter((c) => {
       const name = c.name || "";
@@ -246,6 +252,7 @@
   }
 
   onMount(async () => {
+    // suppressCliNotifications(true);
     clusterOrder = await loadClusterOrder();
     await loadEnvSortPriority();
     groups = await loadGroups();
@@ -271,6 +278,7 @@
   }
 
   onDestroy(() => {
+    // suppressCliNotifications(false);
     stopAllBackgroundPollers();
     stopAutoRefreshRotation();
     resetDashboardDiagnosticsEntitySnapshots();
@@ -288,37 +296,69 @@
     <button
       onclick={() => (showDashboardInfo = !showDashboardInfo)}
       class="shrink-0 w-6 h-6 rounded-full bg-amber-400/90 dark:bg-amber-500/80 text-slate-900 dark:text-slate-900 hover:bg-amber-300 dark:hover:bg-amber-400 shadow-sm hover:shadow-md transition-all text-xs font-bold leading-none flex items-center justify-center"
-      title="About this page"
-    >?</button>
+      title="About this page">?</button
+    >
   </div>
 
   {#if showDashboardInfo}
-    <div class="mb-4 rounded-xl border border-indigo-200 dark:border-indigo-800/40 bg-indigo-50/50 dark:bg-indigo-950/20 p-4 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+    <div
+      class="mb-4 rounded-xl border border-indigo-200 dark:border-indigo-800/40 bg-indigo-50/50 dark:bg-indigo-950/20 p-4 text-sm text-slate-600 dark:text-slate-300 leading-relaxed"
+    >
       <div class="flex items-start justify-between gap-3">
         <div class="space-y-2">
           <p class="font-medium text-slate-800 dark:text-slate-100">Fleet Dashboard</p>
-          <p>Real-time overview of all managed Kubernetes clusters with health scores, capacity metrics, security posture, and drift detection.</p>
+          <p>
+            Real-time overview of all managed Kubernetes clusters with health scores, capacity
+            metrics, security posture, and drift detection.
+          </p>
           <ul class="list-disc list-inside space-y-0.5 text-xs text-slate-500 dark:text-slate-400">
-            <li><strong>Compact / Detailed</strong> - toggle card density; compact for fleet overview, detailed for full diagnostics</li>
-            <li><strong>List / Grid</strong> - switch layout; grid uses virtual scrolling for 20+ clusters</li>
-            <li><strong>Groups</strong> - organize clusters into custom groups; smart groups auto-assign by provider/env/tags</li>
-            <li><strong>Saved Views</strong> - save and quick-switch filter presets (env, provider, status, tags)</li>
-            <li><strong>Fleet Control Plane</strong> - collapsible panel with data profiles, runtime health, and drift analysis</li>
-            <li><strong>Auto-refresh</strong> - rotates through clusters within the configured concurrency budget</li>
-            <li><strong>Health Score</strong> - composite from API server, pods, certificates, security, and config checks</li>
-            <li><strong>Cluster Score</strong> - reliability + security risk scoring with top-3 risk tooltip</li>
-            <li><strong>Linter toggle</strong> - enable/disable diagnostics globally or per cluster</li>
+            <li>
+              <strong>Compact / Detailed</strong> - toggle card density; compact for fleet overview,
+              detailed for full diagnostics
+            </li>
+            <li>
+              <strong>List / Grid</strong> - switch layout; grid uses virtual scrolling for 20+ clusters
+            </li>
+            <li>
+              <strong>Groups</strong> - organize clusters into custom groups; smart groups auto-assign
+              by provider/env/tags
+            </li>
+            <li>
+              <strong>Saved Views</strong> - save and quick-switch filter presets (env, provider, status,
+              tags)
+            </li>
+            <li>
+              <strong>Fleet Control Plane</strong> - collapsible panel with data profiles, runtime health,
+              and drift analysis
+            </li>
+            <li>
+              <strong>Auto-refresh</strong> - rotates through clusters within the configured concurrency
+              budget
+            </li>
+            <li>
+              <strong>Health Score</strong> - composite from API server, pods, certificates, security,
+              and config checks
+            </li>
+            <li>
+              <strong>Cluster Score</strong> - reliability + security risk scoring with top-3 risk tooltip
+            </li>
+            <li>
+              <strong>Linter toggle</strong> - enable/disable diagnostics globally or per cluster
+            </li>
           </ul>
         </div>
         <button
           onclick={() => (showDashboardInfo = false)}
           class="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg leading-none"
-        >&times;</button>
+          >&times;</button
+        >
       </div>
     </div>
   {/if}
   <details class="group my-4">
-    <summary class="flex items-center gap-2 cursor-pointer py-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+    <summary
+      class="flex items-center gap-2 cursor-pointer py-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+    >
       <ChevronDown class="w-4 h-4 transition-transform group-open:rotate-180" />
       Fleet Control Plane
     </summary>
@@ -348,15 +388,21 @@
       </div>
     </form>
     <div class="flex items-center gap-2">
-      <div class="flex items-center rounded-md border border-slate-300 dark:border-slate-600 overflow-hidden text-xs">
+      <div
+        class="flex items-center rounded-md border border-slate-300 dark:border-slate-600 overflow-hidden text-xs"
+      >
         <button
-          class="px-2.5 py-1.5 font-semibold transition {cardVersion === 'compact' ? 'bg-slate-700 text-white' : 'bg-transparent text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-700'}"
-          onclick={() => (cardVersion = "compact")}
-        >Compact</button>
+          class="px-2.5 py-1.5 font-semibold transition {cardVersion === 'compact'
+            ? 'bg-slate-700 text-white'
+            : 'bg-transparent text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-700'}"
+          onclick={() => (cardVersion = "compact")}>Compact</button
+        >
         <button
-          class="px-2.5 py-1.5 font-semibold transition {cardVersion === 'detailed' ? 'bg-slate-700 text-white' : 'bg-transparent text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-700'}"
-          onclick={() => (cardVersion = "detailed")}
-        >Detailed</button>
+          class="px-2.5 py-1.5 font-semibold transition {cardVersion === 'detailed'
+            ? 'bg-slate-700 text-white'
+            : 'bg-transparent text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-700'}"
+          onclick={() => (cardVersion = "detailed")}>Detailed</button
+        >
       </div>
       <Button variant="outline" onclick={() => (viewMode = "list")}>
         {#if viewMode === "list"}<ListCheck />{:else}<List />{/if}
@@ -377,7 +423,9 @@
         </Button>
       {/if}
       <button
-        class="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition {linterEnabled ? 'border-emerald-500/50 bg-emerald-950/30 text-emerald-400 hover:bg-emerald-950/50' : 'border-red-500/50 bg-red-950/30 text-red-400 hover:bg-red-950/50'}"
+        class="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition {linterEnabled
+          ? 'border-emerald-500/50 bg-emerald-950/30 text-emerald-400 hover:bg-emerald-950/50'
+          : 'border-red-500/50 bg-red-950/30 text-red-400 hover:bg-red-950/50'}"
         onclick={toggleGlobalLinter}
         title={linterEnabled ? "Linter on - click to disable" : "Linter off - click to enable"}
       >
@@ -395,16 +443,23 @@
   {#if savedViews.length > 0 || groups.length > 0}
     <div class="flex items-center gap-2 mb-3 flex-wrap">
       {#if savedViews.length > 0}
-        <span class="text-[10px] text-muted-foreground uppercase tracking-widest shrink-0">Views:</span>
+        <span class="text-[10px] text-muted-foreground uppercase tracking-widest shrink-0"
+          >Views:</span
+        >
         <button
-          class="text-xs px-2 py-0.5 rounded-full border transition {!activeViewId ? 'border-indigo-500 bg-indigo-500/10 text-indigo-400' : 'border-slate-600 text-slate-400 hover:border-slate-400'}"
-          onclick={() => (activeViewId = null)}
-        >All</button>
+          class="text-xs px-2 py-0.5 rounded-full border transition {!activeViewId
+            ? 'border-indigo-500 bg-indigo-500/10 text-indigo-400'
+            : 'border-slate-600 text-slate-400 hover:border-slate-400'}"
+          onclick={() => (activeViewId = null)}>All</button
+        >
         {#each savedViews as view (view.id)}
           <button
-            class="text-xs px-2 py-0.5 rounded-full border transition {activeViewId === view.id ? 'border-indigo-500 bg-indigo-500/10 text-indigo-400' : 'border-slate-600 text-slate-400 hover:border-slate-400'}"
+            class="text-xs px-2 py-0.5 rounded-full border transition {activeViewId === view.id
+              ? 'border-indigo-500 bg-indigo-500/10 text-indigo-400'
+              : 'border-slate-600 text-slate-400 hover:border-slate-400'}"
             onclick={() => (activeViewId = activeViewId === view.id ? null : view.id)}
-          >{view.name}</button>
+            >{view.name}</button
+          >
         {/each}
         <button
           class="text-[10px] text-slate-500 hover:text-rose-400 transition"
@@ -417,8 +472,8 @@
               savedViews = addView(savedViews, name.trim(), filters);
               void saveSavedViews(savedViews);
             }
-          }}
-        >+ Save view</button>
+          }}>+ Save view</button
+        >
       {:else}
         <button
           class="text-[10px] text-slate-500 hover:text-indigo-400 transition"
@@ -428,16 +483,18 @@
               savedViews = addView(savedViews, name.trim(), {});
               void saveSavedViews(savedViews);
             }
-          }}
-        >+ Create view</button>
+          }}>+ Create view</button
+        >
       {/if}
 
       <span class="mx-1 text-slate-700">|</span>
 
       <button
-        class="text-[10px] px-2 py-0.5 rounded border transition {showGroupPanel ? 'border-amber-500 bg-amber-500/10 text-amber-400' : 'border-slate-600 text-slate-400 hover:border-slate-400'}"
-        onclick={() => (showGroupPanel = !showGroupPanel)}
-      >Groups ({groups.length})</button>
+        class="text-[10px] px-2 py-0.5 rounded border transition {showGroupPanel
+          ? 'border-amber-500 bg-amber-500/10 text-amber-400'
+          : 'border-slate-600 text-slate-400 hover:border-slate-400'}"
+        onclick={() => (showGroupPanel = !showGroupPanel)}>Groups ({groups.length})</button
+      >
     </div>
   {:else}
     <div class="flex gap-2 mb-3">
@@ -449,8 +506,8 @@
             savedViews = addView(savedViews, name.trim(), {});
             void saveSavedViews(savedViews);
           }
-        }}
-      >+ Create view</button>
+        }}>+ Create view</button
+      >
       <button
         class="text-[10px] text-slate-500 hover:text-amber-400 transition"
         onclick={async () => {
@@ -459,8 +516,8 @@
             groups = addGroup(groups, name.trim());
             await saveGroups(groups);
           }
-        }}
-      >+ Create group</button>
+        }}>+ Create group</button
+      >
     </div>
   {/if}
 
@@ -477,11 +534,13 @@
               groups = addGroup(groups, name.trim());
               await saveGroups(groups);
             }
-          }}
-        >+ Add group</button>
+          }}>+ Add group</button
+        >
       </div>
       {#each groups as group (group.id)}
-        <div class="flex items-center justify-between gap-2 rounded border border-slate-600 px-2 py-1">
+        <div
+          class="flex items-center justify-between gap-2 rounded border border-slate-600 px-2 py-1"
+        >
           <span class="text-slate-200">{group.name}</span>
           <div class="flex gap-1">
             <button
@@ -492,13 +551,15 @@
                 groupMembership = result.membership;
                 await saveGroups(groups);
                 await saveGroupMembership(groupMembership);
-              }}
-            >Delete</button>
+              }}>Delete</button
+            >
           </div>
         </div>
       {/each}
       {#if groups.length > 0}
-        <p class="text-[10px] text-slate-500">Drag clusters to groups or use the dropdown on each card to assign.</p>
+        <p class="text-[10px] text-slate-500">
+          Drag clusters to groups or use the dropdown on each card to assign.
+        </p>
       {/if}
     </div>
     <SmartGroupsPanel {clusters} />
@@ -518,10 +579,18 @@
           <span class="text-[10px] text-slate-600">({section.clusters.length})</span>
         </h3>
         {#key `${cardVersion}-${linterEnabled}-${section.group?.id ?? "u"}`}
-          <div class={viewMode === "grid" ? "grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "space-y-3"}>
+          <div
+            class={viewMode === "grid"
+              ? "grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+              : "space-y-3"}
+          >
             {#each section.clusters as cluster, index (cluster.uuid)}
               {#if cardVersion === "compact"}
-                <ClusterInfoCardV2 cluster={cluster} autoRefreshActive={isAutoRefreshActive(index)} layout={viewMode === "list" ? "horizontal" : "vertical"} />
+                <ClusterInfoCardV2
+                  {cluster}
+                  autoRefreshActive={isAutoRefreshActive(index)}
+                  layout={viewMode === "list" ? "horizontal" : "vertical"}
+                />
               {:else}
                 <ClusterInfoCard {cluster} />
               {/if}
@@ -563,56 +632,56 @@
             </div>
           {/each}
         </div>
+      {:else if filteredClusters.length > 20}
+        <VirtualCardGrid items={filteredClusters}>
+          {#snippet children({ item, index })}
+            {#if cardVersion === "compact"}
+              <ClusterInfoCardV2
+                cluster={item}
+                autoRefreshActive={isAutoRefreshActive(index)}
+                syntheticMode={Boolean(syntheticFleetSize)}
+              />
+            {:else}
+              <ClusterInfoCard
+                cluster={item}
+                autoRefreshActive={isAutoRefreshActive(index)}
+                syntheticMode={Boolean(syntheticFleetSize)}
+              />
+            {/if}
+          {/snippet}
+        </VirtualCardGrid>
       {:else}
-        {#if filteredClusters.length > 20}
-          <VirtualCardGrid items={filteredClusters}>
-            {#snippet children({ item, index })}
+        <div class="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {#each filteredClusters as cluster, index (cluster.uuid)}
+            <div
+              role="listitem"
+              draggable={reorderMode}
+              ondragstart={(e) => onDragStart(e, index)}
+              ondragover={(e) => onDragOver(e, index)}
+              ondragleave={onDragLeave}
+              ondrop={(e) => onDrop(e, index)}
+              ondragend={onDragEnd}
+              class="{dragIdx === index ? 'opacity-30' : ''} {dropIdx === index
+                ? 'ml-6 scale-[0.97]'
+                : ''}"
+              style="transition: margin 150ms ease, transform 150ms ease"
+            >
               {#if cardVersion === "compact"}
                 <ClusterInfoCardV2
-                  cluster={item}
+                  {cluster}
                   autoRefreshActive={isAutoRefreshActive(index)}
                   syntheticMode={Boolean(syntheticFleetSize)}
                 />
               {:else}
                 <ClusterInfoCard
-                  cluster={item}
+                  {cluster}
                   autoRefreshActive={isAutoRefreshActive(index)}
                   syntheticMode={Boolean(syntheticFleetSize)}
                 />
               {/if}
-            {/snippet}
-          </VirtualCardGrid>
-        {:else}
-          <div class="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {#each filteredClusters as cluster, index (cluster.uuid)}
-              <div
-                role="listitem"
-                draggable={reorderMode}
-                ondragstart={(e) => onDragStart(e, index)}
-                ondragover={(e) => onDragOver(e, index)}
-                ondragleave={onDragLeave}
-                ondrop={(e) => onDrop(e, index)}
-                ondragend={onDragEnd}
-                class="{dragIdx === index ? 'opacity-30' : ''} {dropIdx === index ? 'ml-6 scale-[0.97]' : ''}"
-                style="transition: margin 150ms ease, transform 150ms ease"
-              >
-                {#if cardVersion === "compact"}
-                  <ClusterInfoCardV2
-                    {cluster}
-                    autoRefreshActive={isAutoRefreshActive(index)}
-                    syntheticMode={Boolean(syntheticFleetSize)}
-                  />
-                {:else}
-                  <ClusterInfoCard
-                    {cluster}
-                    autoRefreshActive={isAutoRefreshActive(index)}
-                    syntheticMode={Boolean(syntheticFleetSize)}
-                  />
-                {/if}
-              </div>
-            {/each}
-          </div>
-        {/if}
+            </div>
+          {/each}
+        </div>
       {/if}
     {/key}
   {:else}
