@@ -694,9 +694,50 @@
           ?
         </button>
       </div>
-      <p class="text-sm text-slate-500 dark:text-slate-400 mb-4 text-center">
-        Add, verify, and open Kubernetes clusters from your kubeconfig files
-      </p>
+      {#if !hasEverScanned}
+        <div class="flex flex-col items-center gap-2 mb-5">
+          <p class="text-sm text-slate-500 dark:text-slate-400 text-center">
+            Add, verify, and open Kubernetes clusters from your kubeconfig files
+          </p>
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-wait disabled:opacity-70"
+            onclick={() => void handleManualRefresh()}
+            disabled={isLoading}
+          >
+            {#if isLoading}
+              Scanning<LoadingDots />
+            {:else}
+              Scan kubeconfig files & cloud providers
+            {/if}
+          </button>
+        </div>
+      {:else}
+        <div
+          class="flex flex-wrap items-center justify-center gap-2 mb-4 text-xs text-slate-500 dark:text-slate-400"
+        >
+          {#if lastScanAt !== null}
+            <span>Last scanned:</span>
+            <span class="font-semibold text-slate-700 dark:text-slate-200">{lastScanLabel}</span>
+            <span class="opacity-40">·</span>
+          {/if}
+          <span>{clustersCount} cluster{clustersCount === 1 ? "" : "s"}</span>
+          <span class="opacity-40">·</span>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 rounded-md border border-slate-300 dark:border-slate-600 px-2 py-0.5 font-semibold text-slate-700 dark:text-slate-200 transition hover:bg-slate-100 dark:hover:bg-slate-700 disabled:cursor-wait disabled:opacity-70"
+            onclick={() => void handleManualRefresh()}
+            disabled={isLoading}
+            title="Re-scan kubeconfig files, cloud configs, and re-probe cluster connectivity"
+          >
+            {#if isLoading}
+              Refreshing<LoadingDots />
+            {:else}
+              Refresh
+            {/if}
+          </button>
+        </div>
+      {/if}
 
       {#if showPageInfo}
         <div class="mb-5 rounded-xl border border-indigo-200 dark:border-indigo-800/40 bg-indigo-50/50 dark:bg-indigo-950/20 p-4 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
