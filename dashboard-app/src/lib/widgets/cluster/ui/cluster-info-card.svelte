@@ -92,6 +92,7 @@
   import { stopAllBackgroundPollers } from "$shared/lib/background-pollers";
   import {
     dashboardDataProfile,
+    setDashboardDataProfile,
     shouldAutoRunDiagnostics,
   } from "$shared/lib/dashboard-data-profile.svelte";
   import { resolveClusterRuntimeBudgetForCluster } from "$shared/lib/cluster-runtime-manager";
@@ -507,6 +508,42 @@
   const refreshIntervalMs = $derived.by(() => Number(refreshInterval) * 60_000);
   const isRefreshLoading = $derived(checkState.loading || refreshUiLoading);
   const autoDiagnosticsEnabled = $derived(shouldAutoRunDiagnostics($dashboardDataProfile));
+  const autoRefreshProfile = $derived($dashboardDataProfile);
+
+  // Keep the "Nm ago" label live without tying every tick to a full
+  // reactivity chain; 30s resolution is plenty at minute granularity.
+  let nowTick = $state(Date.now());
+  $effect(() => {
+    const id = setInterval(() => (nowTick = Date.now()), 30_000);
+    return () => clearInterval(id);
+  });
+
+  const lastRefreshedAt = $derived.by(() => {
+    if (!lastCheck || "errors" in lastCheck) return null;
+    const ts = (lastCheck as { timestamp?: number }).timestamp;
+    return typeof ts === "number" ? ts : null;
+  });
+  const lastRefreshedLabel = $derived.by(() => {
+    void nowTick;
+    if (!lastRefreshedAt) return "never";
+    const deltaSec = Math.max(0, Math.round((Date.now() - lastRefreshedAt) / 1000));
+    if (deltaSec < 45) return "just now";
+    if (deltaSec < 90) return "1m ago";
+    const mins = Math.round(deltaSec / 60);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.round(hours / 24);
+    return `${days}d ago`;
+  });
+  const refreshStale = $derived.by(() => {
+    if (!lastRefreshedAt) return false;
+    return Date.now() - lastRefreshedAt > refreshIntervalMs * 3;
+  });
+
+  function enableAutoDiagnostics() {
+    setDashboardDataProfile("balanced");
+  }
   const effectiveLinter = $derived(globalLinter && linterEnabled);
   const effectiveDiagnosticsEnabled = $derived(autoDiagnosticsEnabled && effectiveLinter);
   const effectiveRuntimeBudget = $derived(resolveClusterRuntimeBudgetForCluster(cluster.uuid));
@@ -942,6 +979,33 @@
           />
           <Gauge class="w-3 h-3" />
         </label>
+      </div>
+      <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
+        {#if isRefreshLoading}
+          <span class="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-sky-400"></span>
+          <span>Refreshing now</span>
+        {:else if !autoDiagnosticsEnabled}
+          <span class="inline-flex h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+          <span title="Data profile '{autoRefreshProfile.label}' disables scheduled health checks.">
+            Auto-refresh off ({autoRefreshProfile.label})
+          </span>
+          <button
+            type="button"
+            class="rounded border border-amber-400/60 bg-amber-400/10 px-1.5 py-[1px] text-[10px] font-medium text-amber-300 hover:bg-amber-400/20"
+            onclick={enableAutoDiagnostics}
+            title="Switch the global dashboard profile to Balanced so cards refresh on schedule"
+          >
+            Enable
+          </button>
+        {:else}
+          <span
+            class="inline-flex h-1.5 w-1.5 rounded-full {refreshStale
+              ? 'bg-amber-400'
+              : 'bg-emerald-400'}"
+            title={refreshStale ? "Last refresh is older than 3x the interval" : "Up-to-date"}
+          ></span>
+          <span>Last refresh: {lastRefreshedLabel}</span>
+        {/if}
       </div>
       {#if effectiveLinter && (displayClusterCardColor?.text === "Unknown" || displayClusterCardColor?.text === "Offline" || (cluster.status === "error" && cluster.errors?.length) || (checkState.error && checkState.error.length))}
         {@const rawError = cluster.errors ?? checkState.error ?? ""}
