@@ -115,6 +115,32 @@ planned hardening are tracked as **Phase 8** in [`ROADMAP.md`](../ROADMAP.md):
 Phase 8.1 (encrypted kubeconfig at rest via Tauri Stronghold or OS keyring)
 is the single highest-priority item and unlocks PCI-DSS, HIPAA, and SOC 2.
 
+## Compliance posture
+
+Suitable today for **internal dev-team use**: strong RBAC/PSS/hygiene checks,
+restrictive CSP, per-file 0600 permissions, SHA256-pinned bundled binaries,
+no external telemetry beyond optional Sentry.
+
+Not yet suitable for **regulated environments** (SOC 2 Type II, ISO 27001,
+PCI-DSS 4.0, HIPAA, FedRAMP). Known gaps, their compliance mapping, and the
+planned hardening are tracked as **Phase 8** in [`ROADMAP.md`](../ROADMAP.md):
+
+| Gap                                      | Risk                         | Blocks                                                                                |
+| ---------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------- |
+| Plaintext kubeconfig on disk             | CRITICAL                     | PCI-DSS req 3, ISO 27001 A.10.1, SOC 2 CC6.1, FedRAMP SC-28, HIPAA §164.312(a)(2)(iv) |
+| Sentry without credential scrubbing      | HIGH                         | GDPR Art. 32, SOC 2 CC6.7                                                             |
+| Audit log has no tamper protection       | HIGH                         | SOC 2 CC7.3, ISO 27001 A.12.4.2, FedRAMP AU-9                                         |
+| `readOnly` flag not enforced             | MEDIUM                       | ISO 27001 A.9.4.1                                                                     |
+| No signed auto-update                    | HIGH                         | NIST SSDF PS.2, US EO 14028                                                           |
+| Bundled binaries verified only by SHA256 | MEDIUM                       | SLSA Level 3+                                                                         |
+| Plugins not sandboxed                    | HIGH (when marketplace live) | OWASP ASVS V14                                                                        |
+| No HTTP_PROXY / custom CA support        | MEDIUM                       | enterprise MITM proxies                                                               |
+| No SIEM export                           | MEDIUM                       | SOC 2 CC7.2                                                                           |
+| No app-level session lock                | MEDIUM                       | NIST 800-53 IA-11                                                                     |
+
+Phase 8.1 (encrypted kubeconfig at rest via Tauri Stronghold or OS keyring)
+is the single highest-priority item and unlocks PCI-DSS, HIPAA, and SOC 2.
+
 ## Reporting security issues
 
 If you discover a security vulnerability, please report it responsibly:
