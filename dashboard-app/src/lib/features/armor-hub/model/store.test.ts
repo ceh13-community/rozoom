@@ -46,6 +46,6 @@ describe("armor hub store", () => {
     vi.mocked(installKubeArmor).mockResolvedValue({ success: true });
     const result = await installArmorProvider("cluster-a", "kubearmor");
     expect(result.success).toBe(true);
-    expect(installKubeArmor).toHaveBeenCalledWith("cluster-a", undefined, undefined);
+    expect(installKubeArmor).toHaveBeenCalledWith("cluster-a");
   });
 });
