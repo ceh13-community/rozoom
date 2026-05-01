@@ -202,6 +202,50 @@ describe("alerts hub store", () => {
     expect(state.errors?.[0]).toContain("helm unavailable");
   });
 
+  it("dedupes alerts by fingerprint so keyed #each blocks do not crash", async () => {
+    vi.mocked(getPrometheusStackRelease).mockResolvedValueOnce({
+      installed: true,
+      release: {
+        name: "kps",
+        namespace: "kps",
+        chart: "prometheus-community/kube-prometheus-stack-61.7.2",
+      },
+    });
+    // Alertmanager really does return the same fingerprint twice when a
+    // rule routes through multiple receivers. Before the fix, both
+    // AlertItems landed with the same id and Svelte crashed with
+    // each_key_duplicate on the panel's keyed each block.
+    vi.mocked(kubectlRawArgsFront).mockResolvedValueOnce({
+      code: 0,
+      errors: "",
+      output: JSON.stringify([
+        {
+          fingerprint: "kps/AlertmanagerClusterFailedToSendAlerts",
+          status: { state: "active", silencedBy: [], inhibitedBy: [] },
+          labels: { alertname: "AlertmanagerClusterFailedToSendAlerts", severity: "warning" },
+          annotations: {},
+          startsAt: "2026-02-17T10:00:00Z",
+          receivers: [{ name: "slack-default" }],
+        },
+        {
+          fingerprint: "kps/AlertmanagerClusterFailedToSendAlerts",
+          status: { state: "active", silencedBy: [], inhibitedBy: [] },
+          labels: { alertname: "AlertmanagerClusterFailedToSendAlerts", severity: "critical" },
+          annotations: {},
+          startsAt: "2026-02-17T10:00:00Z",
+          receivers: [{ name: "pager" }],
+        },
+      ]),
+    });
+
+    const state = await runAlertHubScan("cluster-a", { force: true });
+
+    expect(state.alerts.length).toBe(2);
+    expect(state.alerts[0].id).toBe("kps/AlertmanagerClusterFailedToSendAlerts");
+    expect(state.alerts[1].id).toBe("kps/AlertmanagerClusterFailedToSendAlerts#1");
+    expect(new Set(state.alerts.map((a) => a.id)).size).toBe(state.alerts.length);
+  });
+
   it("suspends heavy polling when runtime budget disables heavy diagnostics", async () => {
     vi.mocked(getPrometheusStackRelease).mockResolvedValue({
       installed: false,
