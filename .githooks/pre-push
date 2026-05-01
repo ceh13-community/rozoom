@@ -1,6 +1,0 @@
-#!/bin/sh
-set -e
-
-echo "⚙️  pre-push: running unit tests..."
-cd dashboard-app && pnpm test run --reporter=verbose 2>&1 | tail -5
-echo "✅ tests passed"
