@@ -29,6 +29,16 @@
     loadShowRuntimeDiagnostics,
     saveShowRuntimeDiagnostics,
   } from "$features/check-health/model/runtime-diagnostics-preferences";
+  import {
+    appNotifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    dismissNotification,
+    dismissAllNotifications,
+    formatTimeAgo,
+  } from "$shared/lib/app-notifications";
+  import * as Popover from "$shared/ui/popover";
 
   let {
     sidebarOpen,
@@ -104,10 +114,137 @@
         <span class={cn(sidebarOpen ? "block" : "hidden")}>Settings</span>
       </Button>
       <LightSwitch showLabel={sidebarOpen} />
-      <Button class="w-full p-2 justify-start" variant="ghost" title="Notifications">
-        <Bell class="h-4 w-4" />
-        <span class={cn(sidebarOpen ? "block" : "hidden")}>Notifications</span>
-      </Button>
+      <Popover.Root>
+        <Popover.Trigger class="w-full">
+          <button
+            class="flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium text-muted-foreground hover:bg-muted relative"
+            title="Notifications"
+          >
+            <Bell class="h-4 w-4" />
+            {#if $unreadCount > 0}
+              <span
+                class="absolute top-0.5 left-4.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white animate-pulse"
+              >
+                {$unreadCount > 99 ? "99+" : $unreadCount}
+              </span>
+            {/if}
+            <span class={cn(sidebarOpen ? "block" : "hidden")}>Notifications</span>
+          </button>
+        </Popover.Trigger>
+        <Popover.Content
+          class="w-[360px] max-h-[480px] overflow-hidden p-0 flex flex-col"
+          side="right"
+          sideOffset={8}
+        >
+          <div class="flex items-center justify-between border-b border-border px-3 py-2 shrink-0">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold">Notifications</span>
+              {#if $unreadCount > 0}
+                <span
+                  class="rounded-full bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-medium text-rose-500"
+                >
+                  {$unreadCount} new
+                </span>
+              {/if}
+            </div>
+            <div class="flex items-center gap-2">
+              {#if $unreadCount > 0}
+                <button
+                  class="text-[11px] text-sky-500 hover:text-sky-400"
+                  onclick={() => markAllAsRead()}>Mark all read</button
+                >
+              {/if}
+              {#if $appNotifications.length > 0}
+                <button
+                  class="text-[11px] text-muted-foreground hover:text-foreground"
+                  onclick={() => dismissAllNotifications()}>Clear all</button
+                >
+              {/if}
+            </div>
+          </div>
+          <div class="overflow-y-auto flex-1">
+            {#if $appNotifications.length === 0}
+              <div class="px-3 py-8 text-center">
+                <Bell class="h-8 w-8 mx-auto text-muted-foreground/30 mb-2" />
+                <p class="text-xs text-muted-foreground">No notifications</p>
+                <p class="text-[10px] text-muted-foreground/60 mt-1">
+                  Certificate alerts will appear here
+                </p>
+              </div>
+            {:else}
+              {#each $appNotifications as notif (notif.id)}
+                <div
+                  class={cn(
+                    "flex w-full items-start gap-2 border-b border-border px-3 py-2.5 text-left transition-colors last:border-0 cursor-pointer",
+                    notif.readAt
+                      ? "bg-transparent opacity-60 hover:opacity-80"
+                      : "bg-sky-500/5 hover:bg-sky-500/10",
+                  )}
+                  role="button"
+                  tabindex="0"
+                  onclick={() => markAsRead(notif.id)}
+                  onkeydown={(e) => {
+                    if (e.key === "Enter") markAsRead(notif.id);
+                  }}
+                >
+                  <span class="mt-1 flex-shrink-0">
+                    {#if notif.severity === "critical"}
+                      <span
+                        class={cn(
+                          "inline-block h-2.5 w-2.5 rounded-full bg-rose-500",
+                          !notif.readAt && "animate-pulse",
+                        )}
+                      ></span>
+                    {:else if notif.severity === "warning"}
+                      <span
+                        class={cn(
+                          "inline-block h-2.5 w-2.5 rounded-full bg-amber-500",
+                          !notif.readAt && "animate-pulse",
+                        )}
+                      ></span>
+                    {:else}
+                      <span class="inline-block h-2.5 w-2.5 rounded-full bg-sky-500"></span>
+                    {/if}
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <div class={cn("text-xs", notif.readAt ? "font-normal" : "font-semibold")}>
+                      {notif.title}
+                    </div>
+                    {#if notif.detail}
+                      <div class="text-[11px] text-muted-foreground mt-0.5">{notif.detail}</div>
+                    {/if}
+                    <div class="flex items-center gap-2 mt-1">
+                      <span class="text-[10px] text-muted-foreground/60">
+                        {formatTimeAgo(notif.createdAt)}
+                      </span>
+                      {#if notif.category === "certificate"}
+                        <span
+                          class="rounded bg-amber-500/20 px-1 py-px text-[9px] font-medium text-amber-500"
+                          >cert</span
+                        >
+                      {/if}
+                      {#if !notif.readAt}
+                        <span
+                          class="rounded bg-sky-500/20 px-1 py-px text-[9px] font-medium text-sky-400"
+                          >new</span
+                        >
+                      {/if}
+                    </div>
+                  </div>
+                  <button
+                    class="flex-shrink-0 mt-1 text-muted-foreground/40 hover:text-foreground text-sm leading-none"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      dismissNotification(notif.id);
+                    }}
+                    title="Dismiss">&times;</button
+                  >
+                </div>
+              {/each}
+            {/if}
+          </div>
+        </Popover.Content>
+      </Popover.Root>
       <button
         class={cn(
           "flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium",
