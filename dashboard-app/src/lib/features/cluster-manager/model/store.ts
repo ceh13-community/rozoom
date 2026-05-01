@@ -70,6 +70,34 @@ async function saveClusters(clusters: AppClusterConfig[]): Promise<void> {
   }
 }
 
+/**
+ * Fire one health check against a freshly-added cluster and clear its
+ * needsInitialRefreshHint flag once the attempt settles (success or
+ * failure). Without this the card stays in 'No diagnostics yet' state
+ * until the user manually clicks the refresh button, which has been a
+ * recurring confusion: users expect auto-refresh to start immediately.
+ *
+ * Dynamic imports keep the cluster-manager feature free of a static
+ * dep on the check-health module graph so the two can still be loaded
+ * independently on cold starts.
+ */
+async function triggerInitialHealthCheck(uuid: string): Promise<void> {
+  try {
+    const { updateClusterHealthChecks } = await import("$features/check-health");
+    await updateClusterHealthChecks(uuid, { force: true });
+  } catch {
+    // Swallow - the card still works; the hint just stays until the
+    // user clicks refresh. Errors from the check itself are already
+    // surfaced via clusterStates.error.
+  } finally {
+    try {
+      await markClusterRefreshHintSeen(uuid);
+    } catch {
+      // nothing to do
+    }
+  }
+}
+
 export async function addClustersFromKubeconfig(
   loadedConfig: KubeConfigFileType,
   kubeconfigPath: string,
@@ -189,6 +217,11 @@ async function addClusters(
         await saveClusterOnDisk(addResult, yaml.output);
 
         result.added.push(cluster.name);
+        // Kick off one health check in the background so the new card
+        // stops showing 'No diagnostics yet' without the user having to
+        // click the refresh button first. Dynamic import keeps cluster-
+        // manager decoupled from the check-health module graph.
+        void triggerInitialHealthCheck(addResult);
       } catch (error) {
         if (addResult) {
           clustersList.update((clusters) => clusters.filter((entry) => entry.uuid !== addResult));
