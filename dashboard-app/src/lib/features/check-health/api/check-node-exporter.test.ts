@@ -22,6 +22,17 @@ vi.mock("@/lib/shared/api/kubectl-proxy", () => ({
 describe("checkNodeExporter", () => {
   const clusterId = "test-cluster";
 
+  /**
+   * The service-proxy path issues `get services -A -l ...` as the first
+   * kubectlRawFront call. Tests that want to exercise the legacy pod-probe
+   * paths use this to consume that call with an empty response so
+   * tryServiceProxy returns null and the test's subsequent mocks line up
+   * with the pod-probe invocations in order.
+   */
+  const stubEmptyServiceList = () => {
+    vi.mocked(kubectlRawFront).mockResolvedValueOnce({ output: "", errors: "" });
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -57,6 +68,7 @@ describe("checkNodeExporter", () => {
     vi.mocked(getAllPods).mockResolvedValue(mockPods as PodItem[]);
 
     const metricsOutput = "# HELP node_cpu_seconds_total\n# TYPE node_cpu_seconds_total counter\n";
+    stubEmptyServiceList();
     vi.mocked(kubectlRawFront)
       .mockResolvedValueOnce({ output: metricsOutput, errors: "" })
       .mockResolvedValueOnce({ output: metricsOutput, errors: "" });
@@ -171,6 +183,158 @@ describe("checkNodeExporter", () => {
 
     expect(result.status).toHaveLength(1);
     expect(result.errors).toBeUndefined();
+  });
+
+  it("service-proxy success short-circuits per-pod probes (EKS hostNetwork case)", async () => {
+    // Covers the EKS failure reported by users: pod-proxy to hostNetwork
+    // nodes is blocked by the managed CNI, so the legacy per-pod /metrics
+    // probe would time out for every node. The service proxy still works
+    // because it routes via ClusterIP, and one success is enough to mark
+    // every Ready pod as available.
+    const mockPods: Partial<PodItem>[] = [
+      {
+        metadata: {
+          name: "kps-node-exporter-aaa",
+          namespace: "kps",
+          labels: { "app.kubernetes.io/name": "prometheus-node-exporter" },
+        },
+        status: {
+          phase: "Running",
+          containerStatuses: [{ name: "exporter", ready: true, restartCount: 0, state: {} as any }],
+        },
+        spec: { nodeName: "ip-10-0-1-1", containers: [], volumes: [] },
+      },
+      {
+        metadata: {
+          name: "kps-node-exporter-bbb",
+          namespace: "kps",
+          labels: { "app.kubernetes.io/name": "prometheus-node-exporter" },
+        },
+        status: {
+          phase: "Running",
+          containerStatuses: [{ name: "exporter", ready: true, restartCount: 0, state: {} as any }],
+        },
+        spec: { nodeName: "ip-10-0-1-2", containers: [], volumes: [] },
+      },
+    ];
+    vi.mocked(getAllPods).mockResolvedValue(mockPods as PodItem[]);
+    vi.mocked(kubectlRawFront)
+      // Service list query - finds the stack's prometheus-node-exporter service
+      .mockResolvedValueOnce({
+        output: JSON.stringify({
+          items: [
+            {
+              metadata: {
+                name: "kps-prometheus-node-exporter",
+                namespace: "kps",
+                labels: {
+                  "app.kubernetes.io/name": "prometheus-node-exporter",
+                  "app.kubernetes.io/managed-by": "Helm",
+                },
+              },
+              spec: { ports: [{ name: "metrics", port: 9100 }] },
+            },
+          ],
+        }),
+        errors: "",
+      })
+      // Service-proxy probe returns valid metrics
+      .mockResolvedValueOnce({
+        output: "# HELP node_cpu_seconds_total\n# TYPE node_cpu_seconds_total counter\n",
+        errors: "",
+      });
+
+    const result = await checkNodeExporter(clusterId);
+
+    expect(result.installed).toBe(true);
+    expect(result.status).toHaveLength(2);
+    expect(result.status.every((s) => s.result === 1)).toBe(true);
+    expect(result.url).toContain("kps-prometheus-node-exporter:9100");
+    // Exactly 2 calls: services list + service-proxy probe. No per-pod hits.
+    expect(vi.mocked(kubectlRawFront).mock.calls).toHaveLength(2);
+  });
+
+  it("probes the declared container port first, then falls back to 9100", async () => {
+    const mockPods: Partial<PodItem>[] = [
+      {
+        metadata: {
+          name: "node-exporter-xyz",
+          namespace: "kps",
+          labels: { "app.kubernetes.io/name": "prometheus-node-exporter" },
+        },
+        status: {
+          phase: "Running",
+          containerStatuses: [{ name: "exporter", ready: true, restartCount: 0, state: {} as any }],
+        },
+        spec: {
+          nodeName: "worker-1",
+          containers: [
+            { name: "node-exporter", ports: [{ containerPort: 9100, name: "metrics" }] },
+          ] as any,
+          volumes: [],
+        },
+      },
+    ];
+
+    vi.mocked(getAllPods).mockResolvedValue(mockPods as PodItem[]);
+    const metricsOutput = "# HELP node_cpu_seconds_total\n# TYPE node_cpu_seconds_total counter\n";
+    stubEmptyServiceList();
+    vi.mocked(kubectlRawFront).mockResolvedValueOnce({ output: metricsOutput, errors: "" });
+
+    const result = await checkNodeExporter(clusterId);
+
+    expect(result.status[0]).toEqual({ nodeName: "worker-1", result: 1 });
+    const probeCall = vi.mocked(kubectlRawFront).mock.calls[1]?.[0];
+    expect(probeCall).toContain("/pods/node-exporter-xyz:9100/proxy/metrics");
+  });
+
+  it("falls through to a second port when the first one refuses the probe", async () => {
+    // Hardened kube-prometheus-stack installs bind node-exporter behind
+    // kube-rbac-proxy on 9091 and keep the plain exporter on 9100. The first
+    // probe at 9091 hits the proxy which refuses unauthenticated traffic;
+    // we must try 9100 next.
+    const mockPods: Partial<PodItem>[] = [
+      {
+        metadata: {
+          name: "node-exporter-hardened",
+          namespace: "kps",
+          labels: { "app.kubernetes.io/name": "prometheus-node-exporter" },
+        },
+        status: {
+          phase: "Running",
+          containerStatuses: [{ name: "exporter", ready: true, restartCount: 0, state: {} as any }],
+        },
+        spec: {
+          nodeName: "worker-2",
+          containers: [
+            {
+              name: "kube-rbac-proxy",
+              ports: [{ containerPort: 9091, name: "https" }],
+            },
+            {
+              name: "node-exporter",
+              ports: [{ containerPort: 9100, name: "metrics" }],
+            },
+          ] as any,
+          volumes: [],
+        },
+      },
+    ];
+
+    vi.mocked(getAllPods).mockResolvedValue(mockPods as PodItem[]);
+    stubEmptyServiceList();
+    vi.mocked(kubectlRawFront)
+      .mockResolvedValueOnce({ output: "", errors: "unauthorized" })
+      .mockResolvedValueOnce({
+        output: "# HELP node_cpu\n# TYPE node_cpu counter\n",
+        errors: "",
+      });
+
+    const result = await checkNodeExporter(clusterId);
+
+    expect(result.status[0]).toEqual({ nodeName: "worker-2", result: 1 });
+    expect(vi.mocked(kubectlRawFront).mock.calls[1]?.[0]).toContain(":9091/proxy/metrics");
+    expect(vi.mocked(kubectlRawFront).mock.calls[2]?.[0]).toContain(":9100/proxy/metrics");
   });
 
   it("should use pod.metadata.name as nodeNam if no pod.spec.nodeName", async () => {
