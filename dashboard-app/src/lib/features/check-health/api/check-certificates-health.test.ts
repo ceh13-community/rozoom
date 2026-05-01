@@ -22,9 +22,6 @@ describe("checkCertificatesHealth", () => {
           code: 0,
         });
       }
-      if (command === "get csr -o json") {
-        return Promise.resolve({ output: JSON.stringify({ items: [] }), errors: "", code: 0 });
-      }
       return new Promise((_resolve, reject) => {
         options?.signal?.addEventListener("abort", () => {
           reject(new DOMException("Kubectl request aborted", "AbortError"));
@@ -35,11 +32,11 @@ describe("checkCertificatesHealth", () => {
     const { checkCertificatesHealth } = await import("./check-certificates-health");
     const pending = checkCertificatesHealth("cluster-a", { force: true });
 
-    await vi.advanceTimersByTimeAsync(24_000);
+    await vi.advanceTimersByTimeAsync(12_000);
     const report = await pending;
 
     expect(report.status).toBe("unknown");
-    expect(report.errors).toBe("Unable to check certificates.");
+    expect(report.errors).toBe("find-control-plane-pod kubectl call timeout after 12000ms");
     expect(kubectlRawFront).toHaveBeenCalledWith(
       "get pods -n kube-system -l component=kube-apiserver -o json",
       expect.objectContaining({
@@ -51,11 +48,11 @@ describe("checkCertificatesHealth", () => {
     const firstCallSignal = kubectlRawFront.mock.calls[0]?.[1]?.signal as AbortSignal;
     expect(firstCallSignal.aborted).toBe(true);
     expect(logError).toHaveBeenCalledWith(
-      "findControlPlanePod: probe error (RBAC denial or timeout)",
+      "Control-plane cert check failed: find-control-plane-pod kubectl call timeout after 12000ms",
     );
 
     vi.useRealTimers();
-  }, 30_000);
+  }, 20_000);
 
   it("falls back to CSR evidence when /nodes/<node>/proxy/configz is unreachable", async () => {
     kubectlRawFront.mockReset();

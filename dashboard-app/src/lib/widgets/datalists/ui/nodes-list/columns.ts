@@ -35,22 +35,13 @@ export type NodesStatusesData = {
 const compactSortingButtonClass =
   "h-8 max-w-full overflow-hidden px-2 py-1 text-xs [&>span]:truncate";
 
-const METRIC_LOADING_HTML =
-  `<span class="text-muted-foreground">` +
-  `Updating` +
-  `<span class="loading-dots" aria-hidden="true">` +
-  `<span class="loading-dot" style="animation-delay:0s">.</span>` +
-  `<span class="loading-dot" style="animation-delay:0.16s">.</span>` +
-  `<span class="loading-dot" style="animation-delay:0.32s">.</span>` +
-  `</span></span>`;
-
 function renderMetric(
   value: string | null,
   metricsLoading: boolean,
   metricsError: string | null,
 ): string {
   if (metricsError) return "Error";
-  if (metricsLoading) return METRIC_LOADING_HTML;
+  if (metricsLoading) return "Updating…";
   if (!value) return "-";
   return value;
 }
@@ -347,12 +338,9 @@ export const createColumns = ({
         row.original.metricsError,
       );
       const tone = getProblemTone(row.original.memorySeverity);
-      const loading = row.original.metricsLoading;
       const memSnippet = createRawSnippet(() => ({
         render: () =>
-          loading
-            ? METRIC_LOADING_HTML
-            : `<span class="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap ${tone.text}" title="${value}">${value}</span>`,
+          `<span class="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap ${tone.text}" title="${value}">${value}</span>`,
       }));
       return renderSnippet(memSnippet, {});
     },
@@ -373,12 +361,9 @@ export const createColumns = ({
         row.original.metricsLoading,
         row.original.metricsError,
       );
-      const diskLoading = row.original.metricsLoading;
       const diskSnippet = createRawSnippet(() => ({
         render: () =>
-          diskLoading
-            ? METRIC_LOADING_HTML
-            : `<span class="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap" title="${value}">${value}</span>`,
+          `<span class="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap" title="${value}">${value}</span>`,
       }));
       return renderSnippet(diskSnippet, {});
     },

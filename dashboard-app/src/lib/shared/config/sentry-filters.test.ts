@@ -24,11 +24,9 @@ describe("HMR_ERROR_PATTERNS", () => {
     ).toBe(true);
   });
 
-  it("does NOT catch generic ReferenceError - Safari emits the same wording for real prod bugs", () => {
-    // Prod visibility must survive: the error-message filter stays narrow.
-    // HMR-originating ReferenceErrors are dropped via denyUrls (stack origin).
-    expect(matchesHmrError("ReferenceError: Can't find variable: inferEnv")).toBe(false);
-    expect(matchesHmrError("ReferenceError: Can't find variable: fetchData")).toBe(false);
+  it("catches transient ReferenceError for variables moved between modules", () => {
+    expect(matchesHmrError("ReferenceError: Can't find variable: inferEnv")).toBe(true);
+    expect(matchesHmrError("ReferenceError: Can't find variable: ClipboardPaste")).toBe(true);
   });
 
   it("catches Svelte lifecycle getter errors during HMR swap", () => {
@@ -50,6 +48,7 @@ describe("HMR_ERROR_PATTERNS", () => {
     );
     expect(matchesHmrError("Error: Cluster health check failed")).toBe(false);
     expect(matchesHmrError("kubectl: connection refused")).toBe(false);
+    expect(matchesHmrError("ReferenceError: Can't find variable: inferEnv.something")).toBe(false);
   });
 
   it("handles undefined input", () => {
@@ -61,7 +60,7 @@ describe("HMR_ERROR_PATTERNS", () => {
     for (const p of HMR_ERROR_PATTERNS) {
       expect(p).toBeInstanceOf(RegExp);
     }
-    expect(HMR_ERROR_PATTERNS.length).toBeGreaterThanOrEqual(3);
+    expect(HMR_ERROR_PATTERNS.length).toBeGreaterThan(3);
   });
 });
 

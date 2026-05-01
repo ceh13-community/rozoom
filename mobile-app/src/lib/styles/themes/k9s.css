@@ -1,0 +1,44 @@
+/* K9s theme - terminal-inspired, matches desktop dashboard-app k9s theme */
+:root[data-theme="k9s"] {
+  --bg: hsl(0 0% 2%);
+  --bg-card: hsl(0 0% 4%);
+  --bg-raised: hsl(197 44% 8%);
+  --border: hsl(191 88% 44%);
+  --text: hsl(203 100% 74%);
+  --text-dim: hsl(202 34% 50%);
+  --accent: hsl(41 100% 50%);
+  --accent-bg: hsla(41, 100%, 50%, 0.12);
+  --green: hsl(203 100% 74%);
+  --green-bg: hsla(203, 100%, 74%, 0.12);
+  --yellow: hsl(41 100% 57%);
+  --yellow-bg: hsla(41, 100%, 57%, 0.12);
+  --red: hsl(0 84% 60%);
+  --red-bg: hsla(0, 84%, 60%, 0.12);
+  --orange: hsl(25 95% 53%);
+  --ring: hsl(191 88% 44%);
+  --tab-bg: hsl(0 0% 2%);
+  --tab-border: hsl(191 60% 25%);
+  --search-bg: hsl(197 44% 8%);
+  --status-bar: #050505;
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+  color-scheme: dark;
+}
+
+:root[data-theme="k9s"] body {
+  font-family: var(--font-mono), monospace;
+}
+
+:root[data-theme="k9s"] .card {
+  border-width: 1px;
+  border-style: solid;
+}
+
+:root[data-theme="k9s"] .cluster-status {
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+}
+
+:root[data-theme="k9s"] .tab-bar {
+  border-top-width: 1px;
+}

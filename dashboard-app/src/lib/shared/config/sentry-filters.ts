@@ -25,18 +25,15 @@ export const HMR_ERROR_PATTERNS: ReadonlyArray<RegExp> = [
   // undefined before the new module finishes loading.
   /undefined is not an object \(evaluating 'module\.default'\)/,
   /Cannot read properties of undefined \(reading 'default'\)/,
+  // When a function was renamed or moved between files, the stale
+  // closure can briefly throw a ReferenceError against a name that no
+  // longer exists at that call site. Safe to ignore in dev - a prod
+  // build would have failed at bundle time instead.
+  /ReferenceError: Can't find variable: [A-Za-z_$][\w$]*$/,
   // Tied to Vite HMR: when a boundary accepts an update, lifecycle
   // cleanup of the old module can yield transient null getters.
   /undefined is not an object \(evaluating '(first_child_getter|next_sibling_getter)\.call'\)/,
 ];
-
-// Note: a broader `ReferenceError: Can't find variable: <id>` pattern was
-// considered for transient stale-closure reloads during HMR. It was not
-// included because Safari emits the same wording for legitimate
-// production failures (cross-frame iframe access, late-binding globals,
-// feature-detection probes). HMR-originating ReferenceErrors are dropped
-// via HMR_URL_PATTERNS / Sentry `denyUrls` based on their stack origin,
-// which keeps prod visibility intact.
 
 export const HMR_URL_PATTERNS: ReadonlyArray<RegExp> = [
   /\/@vite\//,

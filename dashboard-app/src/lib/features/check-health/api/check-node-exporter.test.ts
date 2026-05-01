@@ -30,7 +30,9 @@ describe("checkNodeExporter", () => {
    * with the pod-probe invocations in order.
    */
   const stubEmptyServiceList = () => {
-    vi.mocked(kubectlRawFront).mockResolvedValueOnce({ output: "", errors: "" });
+    vi.mocked(kubectlRawFront)
+      .mockResolvedValueOnce({ output: "", errors: "" })
+      .mockResolvedValueOnce({ output: "", errors: "" });
   };
 
   beforeEach(() => {

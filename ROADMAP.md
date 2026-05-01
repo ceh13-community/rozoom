@@ -734,6 +734,136 @@ restore the pre-encryption snapshot from ..." (we keep a one-shot
 
 ---
 
+## Phase 9: Performance and Parallelism via Rust Workers
+
+Gradually move hot paths from the Svelte layer into the Tauri Rust
+backend. Goal is to keep per-cluster refresh under ~1 s and JS heap
+under ~200 MB when the dashboard watches 50-100 clusters
+simultaneously. Rust gives us three things TypeScript cannot:
+
+1. True parallelism across clusters (tokio / rayon), independent of
+   the JS event loop
+2. Zero-copy JSON parsing (`serde_json` + borrowed strings) on
+   multi-MB `kubectl get -o json` payloads
+3. Connection pooling, disciplined retries, and deterministic
+   timeouts for the probe layer
+
+The UI, runes, stores, and small pure-function models stay in Svelte
+so iteration speed does not suffer. Only workloads that clearly
+benefit from parallelism or avoid main-thread blocking migrate.
+
+### 9.1 Rust-side kubectl orchestration with parsed results
+
+- **Goal:** Replace `pnpm tauri plugin-shell` invocations of
+  `kubectl get ... -o json` followed by JS-side `JSON.parse` with a
+  single Tauri command that runs the shell, parses JSON in Rust, and
+  returns a typed result.
+- **Why:** A 50-cluster fleet pulling `pods -A -o json` every
+  60 s spends most of its cost in JS-side JSON parsing and string
+  allocations that stall the main thread. Rust does it on a worker
+  thread with no main-thread impact.
+- **Files:** `src-tauri/src/kubectl/mod.rs` (new); replace callsites
+  in `src/lib/shared/api/kubectl-proxy.ts` with `invoke("kubectl_get_json", ...)`.
+- **Status:** [ ] NOT STARTED.
+- **Trigger:** when fleet > 20 clusters OR refresh latency > 3 s.
+
+### 9.2 Health-check pipeline in Rust
+
+- **Goal:** Move `check-kube-state-metrics`, `check-metrics-server`,
+  `check-node-exporter`, `check-api-server-latency`,
+  `check-api-server-health`, `check-etcd-health`, `check-blackbox-probes`
+  from the Svelte `$features/check-health/api/*.ts` layer to Rust.
+  Each returns a typed `HealthCheckResult` over a single Tauri
+  command per cluster.
+- **Why:** Per-cluster health check currently fans out to 10-20
+  kubectl invocations plus JS parsing. Rust can fan out concurrently
+  within one cluster (tokio::join!) and across clusters (spawn per
+  cluster), producing 5-10x throughput on large fleets.
+- **Files:** `src-tauri/src/health/*.rs` (new); `src/lib/features/check-health/`
+  becomes a thin binding layer.
+- **Status:** [ ] NOT STARTED.
+- **Note:** Addresses the long-term root cause of the PR #219
+  workaround. With direct HTTP probes in Rust (using the resolved
+  kubeconfig context), "Installed but unreachable" false positives on
+  EKS can be distinguished from real addon degradation.
+
+### 9.3 Resource pressure and health score in Rust
+
+- **Goal:** Port `calculateResourcePressure`, `buildClusterHealthScore`,
+  `buildClusterScore`, `detectManagedProvider` to Rust pure functions
+  with compile-time-checked types. Expose via a single
+  `compute_cluster_scores` Tauri command that accepts an array of
+  raw check payloads and returns scored summaries.
+- **Why:** Currently these run on the main thread and scale O(pods)
+  per refresh. Rust enables parallelization with rayon and avoids UI
+  jank on 10k+ pod fleets.
+- **Files:** `src-tauri/src/scoring/*.rs` (new); keep vitest tests as
+  contract tests against the Rust binding output.
+- **Status:** [ ] NOT STARTED.
+- **Trigger:** when p99 refresh time on a 20-cluster fleet exceeds 2 s.
+
+### 9.4 X.509 certificate parsing in Rust
+
+- **Goal:** Parse TLS Secret contents and cert-manager Certificate
+  resources using `x509-parser` / `rustls-pki-types` instead of the
+  current JS-side PEM handling in `check-tls-certificates.ts`.
+  Return parsed `NotBefore / NotAfter / dnsNames / issuer` over a
+  Tauri command.
+- **Why:** JS-side X.509 parsing is fragile (edge cases: IDNA, SAN
+  type mismatches, multi-cert bundles). Rust `x509-parser` is
+  battle-tested and deterministic.
+- **Files:** `src-tauri/src/certs/*.rs` (new).
+- **Status:** [ ] NOT STARTED.
+- **Dependency:** couples well with Phase 8.1 (Stronghold) since
+  both touch crypto primitives in Rust.
+
+### 9.5 Connection pool and retry primitives
+
+- **Goal:** One shared `reqwest::Client` per cluster in Rust with
+  connection pooling, exponential backoff with jitter, and a single
+  place to configure TLS / auth / proxy. Replace ad-hoc fetch + manual
+  retry logic in the Svelte layer.
+- **Why:** Each kubectl invocation opens a fresh TCP+TLS connection.
+  Direct HTTP from Rust with keep-alive collapses handshake cost
+  across probes (~200-400 ms saved per refresh on large fleets).
+- **Files:** `src-tauri/src/http/cluster_client.rs` (new).
+- **Status:** [ ] NOT STARTED.
+
+### 9.6 Log stream and watcher aggregation in Rust
+
+- **Goal:** Subscribe to stern / `kubectl logs -f` output in Rust,
+  tokenize into structured frames, and push to the frontend via
+  Tauri events. Moves parsing off the main thread.
+- **Why:** Real-time log streaming UI currently stalls when any
+  cluster produces a burst of log lines. Rust parsing + batched
+  event push keeps the UI responsive.
+- **Files:** `src-tauri/src/logs/*.rs` (new).
+- **Status:** [ ] NOT STARTED.
+
+### What stays in Svelte (explicit non-goals)
+
+- UI components, runes ($state / $derived / $effect), stores,
+  keyboard handling, routing
+- Small pure-function models (`humanize*`, `severity*`, simple
+  parsers for single-cluster data)
+- Feature capability cache, command palette, form logic
+- Any logic where fast iteration matters more than raw throughput
+
+### Migration principles
+
+1. **One feature at a time.** Do not rewrite the health check layer
+   wholesale. Each phase item above is its own PR.
+2. **Keep the Svelte contract.** Rust commands return the same shape
+   the TypeScript code used to produce. Tests stay in vitest and
+   still pass against the Rust-backed binding.
+3. **Measure before each migration.** Move only when a profile shows
+   the JS version is the bottleneck on a real fleet. Do not
+   speculatively port.
+4. **No cross-layer leaks.** Rust never renders UI. Svelte never
+   owns long-running tokio tasks.
+
+---
+
 ## Commit Convention
 
 All commits for this roadmap follow the pattern:
