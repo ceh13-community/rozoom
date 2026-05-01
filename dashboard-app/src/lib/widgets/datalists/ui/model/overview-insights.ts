@@ -116,76 +116,6 @@ export function parseMemoryQuantityToBytes(value: string | null | undefined): nu
   return amount * factor;
 }
 
-export function calculateResourcePressure(
-  nodeItems: unknown[],
-  podItems: unknown[],
-): {
-  cpuPercent: number | null;
-  memoryPercent: number | null;
-  cpuRequestedCores: number;
-  memoryRequestedBytes: number;
-} {
-  let allocatableCpu = 0;
-  let allocatableMem = 0;
-  let hasNodes = false;
-
-  for (const item of nodeItems) {
-    if (!item || typeof item !== "object") continue;
-    const node = item as { status?: { allocatable?: { cpu?: string; memory?: string } } };
-    const cpuRaw = node.status?.allocatable?.cpu;
-    const memRaw = node.status?.allocatable?.memory;
-    const cpu = parseCpuQuantityToCores(cpuRaw ?? null);
-    const mem = parseMemoryQuantityToBytes(memRaw ?? null);
-    if (cpu !== null && cpu > 0) {
-      allocatableCpu += cpu;
-      hasNodes = true;
-    }
-    if (mem !== null && mem > 0) {
-      allocatableMem += mem;
-      hasNodes = true;
-    }
-  }
-
-  if (!hasNodes) {
-    return { cpuPercent: null, memoryPercent: null, cpuRequestedCores: 0, memoryRequestedBytes: 0 };
-  }
-
-  let requestedCpu = 0;
-  let requestedMem = 0;
-
-  for (const item of podItems) {
-    if (!item || typeof item !== "object") continue;
-    const pod = item as {
-      status?: { phase?: string };
-      spec?: {
-        containers?: Array<{ resources?: { requests?: { cpu?: string; memory?: string } } }>;
-      };
-    };
-    const phase = pod.status?.phase;
-    if (phase !== "Running" && phase !== "Pending") continue;
-    const containers = pod.spec?.containers;
-    if (!Array.isArray(containers)) continue;
-    for (const container of containers) {
-      const cpuReq = parseCpuQuantityToCores(container.resources?.requests?.cpu ?? null);
-      const memReq = parseMemoryQuantityToBytes(container.resources?.requests?.memory ?? null);
-      if (cpuReq !== null && cpuReq > 0) requestedCpu += cpuReq;
-      if (memReq !== null && memReq > 0) requestedMem += memReq;
-    }
-  }
-
-  const cpuPercent =
-    allocatableCpu > 0 ? Math.max(0, Math.min(100, (requestedCpu / allocatableCpu) * 100)) : null;
-  const memoryPercent =
-    allocatableMem > 0 ? Math.max(0, Math.min(100, (requestedMem / allocatableMem) * 100)) : null;
-
-  return {
-    cpuPercent,
-    memoryPercent,
-    cpuRequestedCores: requestedCpu,
-    memoryRequestedBytes: requestedMem,
-  };
-}
-
 function formatCpuCores(value: number): string {
   return `${value.toFixed(2)} cores`;
 }
@@ -267,7 +197,6 @@ function buildComponentCheck(params: {
   podFallback?: { status: "ok" | "warning" | "critical"; message: string };
   isManagedCluster: boolean;
   managedDetail?: string;
-  apiServerOk?: boolean;
 }): ControlPlaneCheck {
   const readyzEvidence = parseReadyzEvidence(params.readyOutput, params.probes);
 
@@ -292,29 +221,13 @@ function buildComponentCheck(params: {
     };
   }
 
-  if (readyzEvidence) {
-    return {
-      id: params.id,
-      title: params.title,
-      severity: "unavailable",
-      detail: `No visible kube-system control-plane pods. ${readyzEvidence}`,
-    };
-  }
-
-  if (params.apiServerOk) {
-    return {
-      id: params.id,
-      title: params.title,
-      severity: "ok",
-      detail: "Not visible as pods (may run as system containers). API server is healthy.",
-    };
-  }
-
   return {
     id: params.id,
     title: params.title,
     severity: "unavailable",
-    detail: "No visible kube-system control-plane pods and no provider-managed fallback.",
+    detail: readyzEvidence
+      ? `No visible kube-system control-plane pods. ${readyzEvidence}`
+      : "No visible kube-system control-plane pods and no provider-managed fallback.",
   };
 }
 
@@ -354,15 +267,12 @@ export function buildOverviewResourceInsights(
       const podIssues = checks?.podIssues;
       const crashLoop = podIssues?.crashLoopCount ?? 0;
       const pending = podIssues?.pendingCount ?? 0;
-      const podStatus = podIssues?.status;
       const severity =
         crashLoop > 0
           ? "critical"
           : pending > 0
             ? "warning"
-            : podStatus === "ok" || (crashLoop === 0 && pending === 0 && checks !== null)
-              ? "ok"
-              : severityFromGlobalStatus(podStatus);
+            : severityFromGlobalStatus(podIssues?.status);
       const reason =
         crashLoop > 0
           ? `${crashLoop} CrashLoopBackOff pod(s).`
@@ -400,8 +310,6 @@ export function buildOverviewResourceInsights(
   });
 }
 
-export type UsageMetricsMode = "actual" | "requested";
-
 export function buildUsageCards(params: {
   cpuAveragePercent: number | null;
   memoryAveragePercent: number | null;
@@ -409,11 +317,9 @@ export function buildUsageCards(params: {
   podCapacity: number | null;
   cpuReservedCores?: number | null;
   memoryReservedBytes?: number | null;
-  mode?: UsageMetricsMode;
 }): OverviewUsageCard[] {
   const cpu = params.cpuAveragePercent;
   const memory = params.memoryAveragePercent;
-  const isRequested = params.mode === "requested";
   const cpuUsed =
     cpu !== null &&
     params.cpuReservedCores !== null &&
@@ -433,37 +339,29 @@ export function buildUsageCards(params: {
       ? (params.podCount / params.podCapacity) * 100
       : null;
 
-  const cpuLabel = isRequested ? "CPU requested" : "CPU usage";
-  const memLabel = isRequested ? "Memory requested" : "Memory usage";
-  const cpuHintAvailable = isRequested
-    ? "Sum of pod CPU requests vs allocatable. Install metrics-server for actual usage."
-    : "Average usage across nodes.";
-  const memHintAvailable = isRequested
-    ? "Sum of pod memory requests vs allocatable. Install metrics-server for actual usage."
-    : "Average usage across nodes.";
   return [
     {
       id: "cpu",
-      title: cpuLabel,
+      title: "CPU usage",
       percent: cpu,
       value: cpu === null ? "N/A" : `${cpu.toFixed(1)}%`,
       usedReserved:
         cpuUsed !== null && params.cpuReservedCores && params.cpuReservedCores > 0
           ? `${formatCpuCores(cpuUsed)} / ${formatCpuCores(params.cpuReservedCores)}`
           : "N/A / N/A",
-      hint: cpu === null ? "CPU metrics unavailable." : cpuHintAvailable,
+      hint: cpu === null ? "CPU metrics unavailable." : "Average usage across nodes.",
       severity: severityFromPercent(cpu),
     },
     {
       id: "memory",
-      title: memLabel,
+      title: "Memory usage",
       percent: memory,
       value: memory === null ? "N/A" : `${memory.toFixed(1)}%`,
       usedReserved:
         memoryUsed !== null && params.memoryReservedBytes && params.memoryReservedBytes > 0
           ? `${formatMemoryGiB(memoryUsed)} / ${formatMemoryGiB(params.memoryReservedBytes)}`
           : "N/A / N/A",
-      hint: memory === null ? "Memory metrics unavailable." : memHintAvailable,
+      hint: memory === null ? "Memory metrics unavailable." : "Average usage across nodes.",
       severity: severityFromPercent(memory),
     },
     {
@@ -699,7 +597,6 @@ export function buildControlPlaneChecks(params: {
         podFallback: controlPlaneComponents?.scheduler,
         isManagedCluster: params.isManagedCluster,
         managedDetail,
-        apiServerOk: apiStatus === "ok",
       }),
     },
     {
@@ -711,7 +608,6 @@ export function buildControlPlaneChecks(params: {
         podFallback: controlPlaneComponents?.controllerManager,
         isManagedCluster: params.isManagedCluster,
         managedDetail,
-        apiServerOk: apiStatus === "ok",
       }),
     },
     etcdCheck,

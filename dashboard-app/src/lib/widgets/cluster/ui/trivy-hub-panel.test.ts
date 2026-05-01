@@ -98,7 +98,6 @@ describe("trivy-hub-panel", () => {
       expect(trivyHubModule.installTrivyProvider).toHaveBeenCalledWith(
         "cluster-a",
         "trivy-operator",
-        expect.any(Function),
       );
       expect(trivyHubModule.runTrivyHubScan).toHaveBeenNthCalledWith(1, "cluster-a", {
         force: false,
