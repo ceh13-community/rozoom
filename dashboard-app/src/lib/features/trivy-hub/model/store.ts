@@ -195,9 +195,10 @@ export function setTrivyHubReport(clusterId: string, reportRaw: string) {
 export async function installTrivyProvider(
   clusterId: string,
   providerId: TrivyProviderId,
+  onOutput?: (chunk: string) => void,
 ): Promise<{ success: boolean; error?: string }> {
   void providerId;
-  return installTrivyOperator(clusterId);
+  return installTrivyOperator(clusterId, undefined, onOutput);
 }
 
 function parseItemsCount(output: string): number {

@@ -57,7 +57,14 @@ const KUBEARMOR_CHART_CANDIDATES = [
 const MODELARMOR_RELEASE = "modelarmor";
 const MODELARMOR_NAMESPACE = "modelarmor";
 const MODELARMOR_CHART_CANDIDATES = [`${KUBEARMOR_REPO_NAME}/modelarmor`];
-const DEFAULT_TIMEOUT_MS = 120_000;
+// Must be larger than the longest helm `--timeout` flag we pass (currently
+// 10m for installs) plus a comfortable buffer, otherwise the JS-level
+// race in runHelmCommand kills the process before helm finishes - even
+// when the install itself is progressing. 15m covers 10m helm budget +
+// first-image-pull overhead on slow clusters like minikube. Read-only
+// helm commands (list, get, repo add) finish in seconds regardless, so
+// the bigger ceiling does not slow them down.
+const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;
 const PRIVILEGED_NAMESPACES = new Set([
   PROM_STACK_NAMESPACE,
   NODE_EXPORTER_NAMESPACE,
@@ -171,7 +178,15 @@ async function ensurePrivilegedNamespace(clusterId: string, namespace: string): 
 async function runHelmCommand(
   args: string[],
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
+  /**
+   * Optional sink for a live transcript of the command: banner line plus
+   * stdout/stderr chunks as they arrive. Used by panels that show an
+   * inline command-console so the user sees progress without tailing
+   * external logs.
+   */
+  onOutput?: (chunk: string) => void,
 ): Promise<HelmCommandResult> {
+  onOutput?.(`$ helm ${args.join(" ")}\n`);
   let stdout = "";
   let stderr = "";
   let resolveClose: ((code: number) => void) | undefined;
@@ -184,9 +199,11 @@ async function runHelmCommand(
   const { child } = await spawnCli("helm", args, {
     onStdoutLine: (line) => {
       stdout += line;
+      onOutput?.(line);
     },
     onStderrLine: (line) => {
       stderr += line;
+      onOutput?.(line);
     },
     onClose: (e) => {
       if (typeof e === "object" && e !== null && "code" in e) {
@@ -241,18 +258,30 @@ async function runHelmCommand(
   return { success: true, stdout, stderr, code };
 }
 
-async function runHelm(args: string[], timeoutMs?: number): Promise<HelmResult> {
-  const result = await runHelmCommand(args, timeoutMs);
+async function runHelm(
+  args: string[],
+  timeoutMs?: number,
+  onOutput?: (chunk: string) => void,
+): Promise<HelmResult> {
+  const result = await runHelmCommand(args, timeoutMs, onOutput);
   return result.success
     ? { success: true }
     : { success: false, error: result.error ?? "Helm command failed" };
 }
 
-async function ensureHelmRepo(repoName: string, repoUrl: string): Promise<HelmResult> {
-  const addResult = await runHelm(["repo", "add", repoName, repoUrl, "--force-update"]);
+async function ensureHelmRepo(
+  repoName: string,
+  repoUrl: string,
+  onOutput?: (chunk: string) => void,
+): Promise<HelmResult> {
+  const addResult = await runHelm(
+    ["repo", "add", repoName, repoUrl, "--force-update"],
+    undefined,
+    onOutput,
+  );
   if (!addResult.success) return addResult;
 
-  return runHelm(["repo", "update", repoName]);
+  return runHelm(["repo", "update", repoName], undefined, onOutput);
 }
 
 type HelmRelease = {
@@ -422,6 +451,101 @@ export async function listHelmRepos(): Promise<{
   }
 }
 
+export type HelmChartVersion = {
+  name: string;
+  version: string;
+  appVersion?: string;
+};
+
+export async function searchHelmChartVersions(
+  chart: string,
+  limit = 20,
+  options?: { repoName?: string; repoUrl?: string },
+): Promise<{ versions: HelmChartVersion[]; error?: string }> {
+  const normalized = chart.trim();
+  if (!normalized) return { versions: [], error: "Chart name is required" };
+
+  // helm search repo walks the local repo index. If the repo was never added
+  // on this machine, search returns 0 results silently. Ensure presence for
+  // classic `<repo>/<chart>` refs (OCI refs are not searchable this way).
+  const repoName = options?.repoName?.trim();
+  const repoUrl = options?.repoUrl?.trim();
+  if (!normalized.startsWith("oci://") && repoName && repoUrl) {
+    await runHelmCommand(["repo", "add", repoName, repoUrl, "--force-update"]).catch(() => null);
+    await runHelmCommand(["repo", "update", repoName]).catch(() => null);
+  }
+
+  const result = await runHelmCommand([
+    "search",
+    "repo",
+    normalized,
+    "--versions",
+    "--output",
+    "json",
+    "--max-col-width",
+    "0",
+  ]);
+  if (!result.success) {
+    return { versions: [], error: result.error ?? "Failed to search chart versions" };
+  }
+  try {
+    const parsed = JSON.parse(result.stdout || "[]") as Array<{
+      name?: string;
+      version?: string;
+      app_version?: string;
+    }>;
+    const versions = parsed
+      .filter(
+        (entry): entry is Required<Pick<typeof entry, "name">> & typeof entry =>
+          typeof entry.name === "string" && entry.name === normalized,
+      )
+      .map((entry) => ({
+        name: entry.name,
+        version: typeof entry.version === "string" ? entry.version : "",
+        appVersion: typeof entry.app_version === "string" ? entry.app_version : undefined,
+      }))
+      .filter((entry) => entry.version.length > 0)
+      .slice(0, limit);
+    return { versions };
+  } catch (error) {
+    return {
+      versions: [],
+      error: error instanceof Error ? error.message : "Failed to parse chart versions",
+    };
+  }
+}
+
+export async function showHelmChartValues(
+  chart: string,
+  chartVersion?: string,
+  options?: { repoName?: string; repoUrl?: string },
+): Promise<{ values: string; error?: string }> {
+  const normalized = chart.trim();
+  if (!normalized) return { values: "", error: "Chart name is required" };
+
+  // helm show values on `<repo>/<chart>` requires the repo to be present in
+  // the local helm config. Add/refresh it first so the prefill-from-defaults
+  // flow in the Catalog editor works even when the user has never installed
+  // from that repo. OCI refs resolve directly and do not need repo add.
+  const repoName = options?.repoName?.trim();
+  const repoUrl = options?.repoUrl?.trim();
+  const isOciRef = normalized.startsWith("oci://");
+  if (!isOciRef && repoName && repoUrl) {
+    await runHelmCommand(["repo", "add", repoName, repoUrl, "--force-update"]).catch(() => null);
+    await runHelmCommand(["repo", "update", repoName]).catch(() => null);
+  }
+
+  const args = ["show", "values", normalized];
+  if (chartVersion?.trim()) {
+    args.push("--version", chartVersion.trim());
+  }
+  const result = await runHelmCommand(args);
+  if (!result.success) {
+    return { values: "", error: result.error ?? "Failed to fetch chart default values" };
+  }
+  return { values: result.stdout.trim() };
+}
+
 export async function addHelmRepo(name: string, url: string): Promise<HelmResult> {
   const repoName = name.trim();
   const repoUrl = url.trim();
@@ -450,8 +574,24 @@ export async function installOrUpgradeHelmRelease(
     chart: string;
     namespace: string;
     createNamespace?: boolean;
+    dryRun?: boolean;
+    chartVersion?: string;
+    /** Raw YAML content to pass via --values <tmpfile>. */
+    valuesYaml?: string;
+    /** When the chart is of the form `<repoName>/<chartName>`, ensure the repo
+     *  is added/updated before the install. Pass explicit name + url to
+     *  guarantee the repo exists and is fresh. */
+    repoName?: string;
+    repoUrl?: string;
+    /**
+     * Optional sink for a live transcript (banner + stdout/stderr chunks).
+     * Panels pipe this into a ConsoleSession so the user watches the helm
+     * run in real time instead of seeing only a final success/failure
+     * banner.
+     */
+    onOutput?: (chunk: string) => void;
   },
-): Promise<HelmResult> {
+): Promise<HelmResult & { output?: string }> {
   const releaseName = params.releaseName.trim();
   const chart = params.chart.trim();
   const namespace = params.namespace.trim();
@@ -459,30 +599,117 @@ export async function installOrUpgradeHelmRelease(
     return { success: false, error: "Release name, chart and namespace are required" };
   }
 
-  await ensurePrivilegedNamespace(clusterId, namespace);
-  const kubeconfigPath = await getKubeconfigPath(clusterId);
-  const args = [
-    "upgrade",
-    "--install",
-    releaseName,
-    chart,
-    "--namespace",
-    namespace,
-    "--wait=watcher",
-    "--rollback-on-failure",
-    "--timeout",
-    "3m",
-    "--kubeconfig",
-    kubeconfigPath,
-  ];
-  if (params.createNamespace ?? true) {
-    args.splice(6, 0, "--create-namespace");
+  // Add/refresh repo so Helm can resolve `<repo>/<chart>`. Collect errors
+  // here so that, if the subsequent upgrade --install also fails, we can
+  // surface a compound message - otherwise users see only "chart not found"
+  // and never learn the real cause was a repo add network failure.
+  const repoName = params.repoName?.trim();
+  const repoUrl = params.repoUrl?.trim();
+  const repoErrors: string[] = [];
+  if (repoName && repoUrl) {
+    const addResult = await runHelmCommand(
+      ["repo", "add", repoName, repoUrl, "--force-update"],
+      undefined,
+      params.onOutput,
+    ).catch((e: unknown) => ({
+      success: false,
+      stdout: "",
+      stderr: e instanceof Error ? e.message : String(e),
+      code: 1,
+    }));
+    if (!addResult.success) {
+      repoErrors.push(
+        `helm repo add ${repoName}: ${(addResult.stderr || addResult.stdout || "").trim()}`,
+      );
+    }
+    const updateResult = await runHelmCommand(
+      ["repo", "update", repoName],
+      undefined,
+      params.onOutput,
+    ).catch((e: unknown) => ({
+      success: false,
+      stdout: "",
+      stderr: e instanceof Error ? e.message : String(e),
+      code: 1,
+    }));
+    if (!updateResult.success) {
+      repoErrors.push(
+        `helm repo update ${repoName}: ${(updateResult.stderr || updateResult.stdout || "").trim()}`,
+      );
+    }
   }
 
-  const result = await runHelmCommand(args);
-  return result.success
-    ? { success: true }
-    : { success: false, error: formatHelmError(result, "Helm install/upgrade failed") };
+  if (!params.dryRun) {
+    await ensurePrivilegedNamespace(clusterId, namespace);
+  }
+  const kubeconfigPath = await getKubeconfigPath(clusterId);
+  const args = ["upgrade", "--install", releaseName, chart, "--namespace", namespace];
+  if (params.createNamespace ?? true) {
+    args.push("--create-namespace");
+  }
+  if (!params.dryRun) {
+    args.push("--wait=watcher", "--rollback-on-failure", "--timeout", "10m");
+  }
+  args.push("--kubeconfig", kubeconfigPath);
+  if (params.chartVersion?.trim()) {
+    args.push("--version", params.chartVersion.trim());
+  }
+  if (params.dryRun) {
+    // Helm 3.13+ deprecated bare `--dry-run`; `client` renders without
+    // talking to the cluster and is what modern preview UIs want.
+    args.push("--dry-run=client");
+  }
+
+  let valuesCleanup: (() => Promise<void>) | null = null;
+  if (params.valuesYaml?.trim()) {
+    const { writeTextFile, remove } = await import("@tauri-apps/plugin-fs");
+    const appDir = await appDataDir();
+    const path = `${appDir}/helm-values-${Math.random().toString(36).slice(2, 10)}.yaml`;
+    await writeTextFile(path, params.valuesYaml);
+    args.push("--values", path);
+    valuesCleanup = async () => {
+      await remove(path).catch(() => {});
+    };
+  }
+
+  try {
+    const result = await runHelmCommand(args, undefined, params.onOutput);
+    if (result.success) {
+      return { success: true, output: result.stdout };
+    }
+    // Compose downstream install error + any earlier repo-add errors so the
+    // real cause is never swallowed.
+    const downstream = formatHelmError(result, "Helm install/upgrade failed");
+    const compound = repoErrors.length > 0 ? `${repoErrors.join("\n")}\n${downstream}` : downstream;
+    return { success: false, error: compound };
+  } finally {
+    if (valuesCleanup) await valuesCleanup();
+  }
+}
+
+/**
+ * Best-effort sweep of stale `helm-values-<rand>.yaml` tempfiles left by
+ * crashed installs. Call on app startup.
+ */
+export async function sweepHelmValuesTempfiles(): Promise<void> {
+  try {
+    const { readDir, remove } = await import("@tauri-apps/plugin-fs");
+    const appDir = await appDataDir();
+    const entries = await readDir(appDir).catch(() => []);
+    const maxAgeMs = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    for (const entry of entries) {
+      if (!entry.isFile) continue;
+      if (!entry.name.startsWith("helm-values-") || !entry.name.endsWith(".yaml")) continue;
+      // Best-effort delete; don't stat, just remove - the name random suffix
+      // means a concurrent install won't collide.
+      await remove(`${appDir}/${entry.name}`).catch(() => {});
+    }
+    void maxAgeMs;
+    void now;
+  } catch {
+    // best-effort sweep; never fail app startup
+  }
 }
 
 export async function uninstallHelmRelease(
@@ -490,6 +717,7 @@ export async function uninstallHelmRelease(
   params: {
     releaseName: string;
     namespace: string;
+    onOutput?: (chunk: string) => void;
   },
 ): Promise<HelmResult> {
   const releaseName = params.releaseName.trim();
@@ -499,16 +727,20 @@ export async function uninstallHelmRelease(
   }
 
   const kubeconfigPath = await getKubeconfigPath(clusterId);
-  const result = await runHelmCommand([
-    "uninstall",
-    releaseName,
-    "--namespace",
-    namespace,
-    "--timeout",
-    "2m",
-    "--kubeconfig",
-    kubeconfigPath,
-  ]);
+  const result = await runHelmCommand(
+    [
+      "uninstall",
+      releaseName,
+      "--namespace",
+      namespace,
+      "--timeout",
+      "2m",
+      "--kubeconfig",
+      kubeconfigPath,
+    ],
+    undefined,
+    params.onOutput,
+  );
 
   return result.success
     ? { success: true }
@@ -645,6 +877,7 @@ export async function rollbackHelmRelease(
     releaseName: string;
     namespace: string;
     revision: string;
+    onOutput?: (chunk: string) => void;
   },
 ): Promise<HelmResult> {
   const releaseName = params.releaseName.trim();
@@ -655,18 +888,22 @@ export async function rollbackHelmRelease(
   }
 
   const kubeconfigPath = await getKubeconfigPath(clusterId);
-  const result = await runHelmCommand([
-    "rollback",
-    releaseName,
-    revision,
-    "--namespace",
-    namespace,
-    "--wait",
-    "--timeout",
-    "3m",
-    "--kubeconfig",
-    kubeconfigPath,
-  ]);
+  const result = await runHelmCommand(
+    [
+      "rollback",
+      releaseName,
+      revision,
+      "--namespace",
+      namespace,
+      "--wait",
+      "--timeout",
+      "3m",
+      "--kubeconfig",
+      kubeconfigPath,
+    ],
+    undefined,
+    params.onOutput,
+  );
 
   return result.success
     ? { success: true }
@@ -675,7 +912,11 @@ export async function rollbackHelmRelease(
 
 export async function testHelmRelease(
   clusterId: string,
-  params: { releaseName: string; namespace: string },
+  params: {
+    releaseName: string;
+    namespace: string;
+    onOutput?: (chunk: string) => void;
+  },
 ): Promise<{ success: boolean; logs: string; error?: string }> {
   const releaseName = params.releaseName.trim();
   const namespace = params.namespace.trim();
@@ -684,17 +925,21 @@ export async function testHelmRelease(
   }
 
   const kubeconfigPath = await getKubeconfigPath(clusterId);
-  const result = await runHelmCommand([
-    "test",
-    releaseName,
-    "--namespace",
-    namespace,
-    "--logs",
-    "--timeout",
-    "3m",
-    "--kubeconfig",
-    kubeconfigPath,
-  ]);
+  const result = await runHelmCommand(
+    [
+      "test",
+      releaseName,
+      "--namespace",
+      namespace,
+      "--logs",
+      "--timeout",
+      "3m",
+      "--kubeconfig",
+      kubeconfigPath,
+    ],
+    undefined,
+    params.onOutput,
+  );
 
   return result.success
     ? { success: true, logs: result.stdout || "" }
@@ -780,25 +1025,30 @@ async function resolveReleaseLocation(
 export async function installKubeStateMetrics(
   clusterId: string,
   namespace: string = DEFAULT_NAMESPACE,
+  onOutput?: (chunk: string) => void,
 ): Promise<HelmResult> {
-  const repoResult = await ensureHelmRepo(REPO_NAME, REPO_URL);
+  const repoResult = await ensureHelmRepo(REPO_NAME, REPO_URL, onOutput);
   if (!repoResult.success) return repoResult;
 
   const kubeconfigPath = await getKubeconfigPath(clusterId);
-  const installResult = await runHelmCommand([
-    "install",
-    RELEASE_NAME,
-    CHART_NAME,
-    "--namespace",
-    namespace,
-    "--create-namespace",
-    "--wait=watcher",
-    "--rollback-on-failure",
-    "--timeout",
-    "2m",
-    "--kubeconfig",
-    kubeconfigPath,
-  ]);
+  const installResult = await runHelmCommand(
+    [
+      "install",
+      RELEASE_NAME,
+      CHART_NAME,
+      "--namespace",
+      namespace,
+      "--create-namespace",
+      "--wait=watcher",
+      "--rollback-on-failure",
+      "--timeout",
+      "10m",
+      "--kubeconfig",
+      kubeconfigPath,
+    ],
+    undefined,
+    onOutput,
+  );
 
   if (installResult.success) {
     return { success: true };
@@ -809,50 +1059,63 @@ export async function installKubeStateMetrics(
     return { success: false, error: formatHelmError(installResult, "Helm install failed") };
   }
 
-  return runHelm([
-    "upgrade",
-    "--install",
-    RELEASE_NAME,
-    CHART_NAME,
-    "--namespace",
-    namespace,
-    "--create-namespace",
-    "--wait=watcher",
-    "--rollback-on-failure",
-    "--timeout",
-    "2m",
-    "--kubeconfig",
-    kubeconfigPath,
-  ]);
+  return runHelm(
+    [
+      "upgrade",
+      "--install",
+      RELEASE_NAME,
+      CHART_NAME,
+      "--namespace",
+      namespace,
+      "--create-namespace",
+      "--wait=watcher",
+      "--rollback-on-failure",
+      "--timeout",
+      "10m",
+      "--kubeconfig",
+      kubeconfigPath,
+    ],
+    undefined,
+    onOutput,
+  );
 }
 
 export async function installMetricsServer(
   clusterId: string,
   namespace: string = METRICS_SERVER_NAMESPACE,
   profile: MetricsServerInstallProfile = "auto",
+  onOutput?: (chunk: string) => void,
 ): Promise<HelmResult> {
-  const repoResult = await ensureHelmRepo(METRICS_SERVER_REPO_NAME, METRICS_SERVER_REPO_URL);
+  const repoResult = await ensureHelmRepo(
+    METRICS_SERVER_REPO_NAME,
+    METRICS_SERVER_REPO_URL,
+    onOutput,
+  );
   if (!repoResult.success) return repoResult;
 
   const kubeconfigPath = await getKubeconfigPath(clusterId);
   const resolvedProfile = await resolveMetricsServerProfile(clusterId, profile);
   const installArgs = METRICS_SERVER_INSTALL_PROFILES[resolvedProfile].args;
-  const installResult = await runHelmCommand([
-    "install",
-    METRICS_SERVER_RELEASE,
-    METRICS_SERVER_CHART,
-    "--namespace",
-    namespace,
-    "--create-namespace",
-    "--set-json",
-    `args=${JSON.stringify(installArgs)}`,
-    "--wait=watcher",
-    "--rollback-on-failure",
-    "--timeout",
-    "2m",
-    "--kubeconfig",
-    kubeconfigPath,
-  ]);
+  const installResult = await runHelmCommand(
+    [
+      "install",
+      METRICS_SERVER_RELEASE,
+      METRICS_SERVER_CHART,
+      "--namespace",
+      namespace,
+      "--create-namespace",
+      "--set-json",
+      `args=${JSON.stringify(installArgs)}`,
+      "--wait=watcher",
+      "--rollback-on-failure",
+      "--timeout",
+      "10m",
+      "--kubeconfig",
+      kubeconfigPath,
+    ],
+    undefined,
+    onOutput,
+  );
 
   if (installResult.success) {
     return { success: true };
@@ -863,42 +1126,51 @@ export async function installMetricsServer(
     return { success: false, error: formatHelmError(installResult, "Helm install failed") };
   }
 
-  return runHelm([
-    "upgrade",
-    "--install",
-    METRICS_SERVER_RELEASE,
-    METRICS_SERVER_CHART,
-    "--namespace",
-    namespace,
-    "--create-namespace",
-    "--set-json",
-    `args=${JSON.stringify(installArgs)}`,
-    "--wait=watcher",
-    "--rollback-on-failure",
-    "--timeout",
-    "2m",
-    "--kubeconfig",
-    kubeconfigPath,
-  ]);
+  return runHelm(
+    [
+      "upgrade",
+      "--install",
+      METRICS_SERVER_RELEASE,
+      METRICS_SERVER_CHART,
+      "--namespace",
+      namespace,
+      "--create-namespace",
+      "--set-json",
+      `args=${JSON.stringify(installArgs)}`,
+      "--wait=watcher",
+      "--rollback-on-failure",
+      "--timeout",
+      "10m",
+      "--kubeconfig",
+      kubeconfigPath,
+    ],
+    undefined,
+    onOutput,
+  );
 }
 
 export async function uninstallMetricsServer(
   clusterId: string,
   namespace: string = METRICS_SERVER_NAMESPACE,
   releaseName?: string,
+  onOutput?: (chunk: string) => void,
 ): Promise<HelmResult> {
   const kubeconfigPath = await getKubeconfigPath(clusterId);
   const targetRelease = releaseName || METRICS_SERVER_RELEASE;
-  const result = await runHelmCommand([
-    "uninstall",
-    targetRelease,
-    "--namespace",
-    namespace,
-    "--timeout",
-    "2m",
-    "--kubeconfig",
-    kubeconfigPath,
-  ]);
+  const result = await runHelmCommand(
+    [
+      "uninstall",
+      targetRelease,
+      "--namespace",
+      namespace,
+      "--timeout",
+      "2m",
+      "--kubeconfig",
+      kubeconfigPath,
+    ],
+    undefined,
+    onOutput,
+  );
 
   return result.success
     ? { success: true }
@@ -908,26 +1180,31 @@ export async function uninstallMetricsServer(
 export async function installNodeExporter(
   clusterId: string,
   namespace: string = NODE_EXPORTER_NAMESPACE,
+  onOutput?: (chunk: string) => void,
 ): Promise<HelmResult> {
   await ensurePrivilegedNamespace(clusterId, namespace);
-  const repoResult = await ensureHelmRepo(REPO_NAME, REPO_URL);
+  const repoResult = await ensureHelmRepo(REPO_NAME, REPO_URL, onOutput);
   if (!repoResult.success) return repoResult;
 
   const kubeconfigPath = await getKubeconfigPath(clusterId);
-  const installResult = await runHelmCommand([
-    "install",
-    NODE_EXPORTER_RELEASE,
-    NODE_EXPORTER_CHART,
-    "--namespace",
-    namespace,
-    "--create-namespace",
-    "--wait=watcher",
-    "--rollback-on-failure",
-    "--timeout",
-    "2m",
-    "--kubeconfig",
-    kubeconfigPath,
-  ]);
+  const installResult = await runHelmCommand(
+    [
+      "install",
+      NODE_EXPORTER_RELEASE,
+      NODE_EXPORTER_CHART,
+      "--namespace",
+      namespace,
+      "--create-namespace",
+      "--wait=watcher",
+      "--rollback-on-failure",
+      "--timeout",
+      "10m",
+      "--kubeconfig",
+      kubeconfigPath,
+    ],
+    undefined,
+    onOutput,
+  );
 
   if (installResult.success) {
     return { success: true };
@@ -938,48 +1215,57 @@ export async function installNodeExporter(
     return { success: false, error: formatHelmError(installResult, "Helm install failed") };
   }
 
-  return runHelm([
-    "upgrade",
-    "--install",
-    NODE_EXPORTER_RELEASE,
-    NODE_EXPORTER_CHART,
-    "--namespace",
-    namespace,
-    "--create-namespace",
-    "--wait=watcher",
-    "--rollback-on-failure",
-    "--timeout",
-    "2m",
-    "--kubeconfig",
-    kubeconfigPath,
-  ]);
+  return runHelm(
+    [
+      "upgrade",
+      "--install",
+      NODE_EXPORTER_RELEASE,
+      NODE_EXPORTER_CHART,
+      "--namespace",
+      namespace,
+      "--create-namespace",
+      "--wait=watcher",
+      "--rollback-on-failure",
+      "--timeout",
+      "10m",
+      "--kubeconfig",
+      kubeconfigPath,
+    ],
+    undefined,
+    onOutput,
+  );
 }
 
 export async function installKubescape(
   clusterId: string,
   namespace: string = KUBESCAPE_NAMESPACE,
+  onOutput?: (chunk: string) => void,
 ): Promise<HelmResult> {
   await ensurePrivilegedNamespace(clusterId, namespace);
-  const repoResult = await ensureHelmRepo(KUBESCAPE_REPO_NAME, KUBESCAPE_REPO_URL);
+  const repoResult = await ensureHelmRepo(KUBESCAPE_REPO_NAME, KUBESCAPE_REPO_URL, onOutput);
   if (!repoResult.success) return repoResult;
 
   const kubeconfigPath = await getKubeconfigPath(clusterId);
-  const installResult = await runHelmCommand([
-    "install",
-    KUBESCAPE_RELEASE,
-    KUBESCAPE_CHART,
-    "--namespace",
-    namespace,
-    "--create-namespace",
-    "--set",
-    "capabilities.continuousScan=enable",
-    "--wait=watcher",
-    "--rollback-on-failure",
-    "--timeout",
-    "3m",
-    "--kubeconfig",
-    kubeconfigPath,
-  ]);
+  const installResult = await runHelmCommand(
+    [
+      "install",
+      KUBESCAPE_RELEASE,
+      KUBESCAPE_CHART,
+      "--namespace",
+      namespace,
+      "--create-namespace",
+      "--set",
+      "capabilities.continuousScan=enable",
+      "--wait=watcher",
+      "--rollback-on-failure",
+      "--timeout",
+      "10m",
+      "--kubeconfig",
+      kubeconfigPath,
+    ],
+    undefined,
+    onOutput,
+  );
 
   if (installResult.success) {
     return { success: true };
@@ -990,23 +1276,27 @@ export async function installKubescape(
     return { success: false, error: formatHelmError(installResult, "Helm install failed") };
   }
 
-  return runHelm([
-    "upgrade",
-    "--install",
-    KUBESCAPE_RELEASE,
-    KUBESCAPE_CHART,
-    "--namespace",
-    namespace,
-    "--create-namespace",
-    "--set",
-    "capabilities.continuousScan=enable",
-    "--wait=watcher",
-    "--rollback-on-failure",
-    "--timeout",
-    "3m",
-    "--kubeconfig",
-    kubeconfigPath,
-  ]);
+  return runHelm(
+    [
+      "upgrade",
+      "--install",
+      KUBESCAPE_RELEASE,
+      KUBESCAPE_CHART,
+      "--namespace",
+      namespace,
+      "--create-namespace",
+      "--set",
+      "capabilities.continuousScan=enable",
+      "--wait=watcher",
+      "--rollback-on-failure",
+      "--timeout",
+      "10m",
+      "--kubeconfig",
+      kubeconfigPath,
+    ],
+    undefined,
+    onOutput,
+  );
 }
 
 export function installKubeBench(
@@ -1025,16 +1315,22 @@ export function installKubeBench(
 export async function installTrivyOperator(
   clusterId: string,
   namespace: string = TRIVY_OPERATOR_NAMESPACE,
+  onOutput?: (chunk: string) => void,
 ): Promise<HelmResult> {
   await ensurePrivilegedNamespace(clusterId, namespace);
-  const repoResult = await ensureHelmRepo(TRIVY_OPERATOR_REPO_NAME, TRIVY_OPERATOR_REPO_URL);
+  const repoResult = await ensureHelmRepo(
+    TRIVY_OPERATOR_REPO_NAME,
+    TRIVY_OPERATOR_REPO_URL,
+    onOutput,
+  );
   if (!repoResult.success) return repoResult;
   return installByChartCandidates(
     clusterId,
     TRIVY_OPERATOR_RELEASE,
     namespace,
     TRIVY_OPERATOR_CHART_CANDIDATES,
-    "3m",
+    "10m",
+    onOutput,
   );
 }
 
@@ -1042,19 +1338,24 @@ export async function uninstallNodeExporter(
   clusterId: string,
   namespace: string = NODE_EXPORTER_NAMESPACE,
   releaseName?: string,
+  onOutput?: (chunk: string) => void,
 ): Promise<HelmResult> {
   const kubeconfigPath = await getKubeconfigPath(clusterId);
   const targetRelease = releaseName || NODE_EXPORTER_RELEASE;
-  const result = await runHelmCommand([
-    "uninstall",
-    targetRelease,
-    "--namespace",
-    namespace,
-    "--timeout",
-    "2m",
-    "--kubeconfig",
-    kubeconfigPath,
-  ]);
+  const result = await runHelmCommand(
+    [
+      "uninstall",
+      targetRelease,
+      "--namespace",
+      namespace,
+      "--timeout",
+      "2m",
+      "--kubeconfig",
+      kubeconfigPath,
+    ],
+    undefined,
+    onOutput,
+  );
 
   return result.success
     ? { success: true }
@@ -1150,13 +1451,14 @@ export async function installVelero(
     gcpServiceAccount?: string;
     gcpCredentialsJson?: string;
   },
+  onOutput?: (chunk: string) => void,
 ): Promise<HelmResult> {
   const existing = await getVeleroRelease(clusterId);
   if (existing.error) return { success: false, error: existing.error };
   if (existing.installed) return { success: true };
 
   await ensurePrivilegedNamespace(clusterId, namespace);
-  const repoResult = await ensureHelmRepo(VELERO_REPO_NAME, VELERO_REPO_URL);
+  const repoResult = await ensureHelmRepo(VELERO_REPO_NAME, VELERO_REPO_URL, onOutput);
   if (!repoResult.success) return repoResult;
 
   const kubeconfigPath = await getKubeconfigPath(clusterId);
@@ -1170,7 +1472,7 @@ export async function installVelero(
     "--wait=watcher",
     "--rollback-on-failure",
     "--timeout",
-    "3m",
+    "10m",
     "--kubeconfig",
     kubeconfigPath,
   ];
@@ -1426,7 +1728,7 @@ export async function installVelero(
     }
   }
 
-  const installResult = await runHelmCommand(installArgs);
+  const installResult = await runHelmCommand(installArgs, undefined, onOutput);
 
   if (installResult.success) {
     return { success: true };
@@ -1448,7 +1750,7 @@ export async function installVelero(
     "--wait=watcher",
     "--rollback-on-failure",
     "--timeout",
-    "3m",
+    "10m",
     "--kubeconfig",
     kubeconfigPath,
   ];
@@ -1459,36 +1761,41 @@ export async function installVelero(
     ...installArgs.slice(firstSetFlagIndex > -1 ? firstSetFlagIndex : installArgs.length),
   );
 
-  return runHelm(upgradeArgs);
+  return runHelm(upgradeArgs, undefined, onOutput);
 }
 
 export async function installPrometheusStack(
   clusterId: string,
   namespace: string = PROM_STACK_NAMESPACE,
+  onOutput?: (chunk: string) => void,
 ): Promise<HelmResult> {
   const existing = await getPrometheusStackRelease(clusterId);
   if (existing.error) return { success: false, error: existing.error };
   if (existing.installed) return { success: true };
 
   await ensurePrivilegedNamespace(clusterId, namespace);
-  const repoResult = await ensureHelmRepo(REPO_NAME, REPO_URL);
+  const repoResult = await ensureHelmRepo(REPO_NAME, REPO_URL, onOutput);
   if (!repoResult.success) return repoResult;
 
   const kubeconfigPath = await getKubeconfigPath(clusterId);
-  const installResult = await runHelmCommand([
-    "install",
-    PROM_STACK_RELEASE,
-    PROM_STACK_CHART,
-    "--namespace",
-    namespace,
-    "--create-namespace",
-    "--wait=watcher",
-    "--rollback-on-failure",
-    "--timeout",
-    "3m",
-    "--kubeconfig",
-    kubeconfigPath,
-  ]);
+  const installResult = await runHelmCommand(
+    [
+      "install",
+      PROM_STACK_RELEASE,
+      PROM_STACK_CHART,
+      "--namespace",
+      namespace,
+      "--create-namespace",
+      "--wait=watcher",
+      "--rollback-on-failure",
+      "--timeout",
+      "10m",
+      "--kubeconfig",
+      kubeconfigPath,
+    ],
+    undefined,
+    onOutput,
+  );
 
   if (installResult.success) {
     return { success: true };
@@ -1499,21 +1806,25 @@ export async function installPrometheusStack(
     return { success: false, error: formatHelmError(installResult, "Helm install failed") };
   }
 
-  return runHelm([
-    "upgrade",
-    "--install",
-    PROM_STACK_RELEASE,
-    PROM_STACK_CHART,
-    "--namespace",
-    namespace,
-    "--create-namespace",
-    "--wait=watcher",
-    "--rollback-on-failure",
-    "--timeout",
-    "3m",
-    "--kubeconfig",
-    kubeconfigPath,
-  ]);
+  return runHelm(
+    [
+      "upgrade",
+      "--install",
+      PROM_STACK_RELEASE,
+      PROM_STACK_CHART,
+      "--namespace",
+      namespace,
+      "--create-namespace",
+      "--wait=watcher",
+      "--rollback-on-failure",
+      "--timeout",
+      "10m",
+      "--kubeconfig",
+      kubeconfigPath,
+    ],
+    undefined,
+    onOutput,
+  );
 }
 
 async function installByChartCandidates(
@@ -1521,26 +1832,31 @@ async function installByChartCandidates(
   release: string,
   namespace: string,
   chartCandidates: string[],
-  timeout: string = "3m",
+  timeout: string = "10m",
+  onOutput?: (chunk: string) => void,
 ): Promise<HelmResult> {
   const kubeconfigPath = await getKubeconfigPath(clusterId);
   let lastError = "Helm install failed";
 
   for (const chart of chartCandidates) {
-    const installResult = await runHelmCommand([
-      "install",
-      release,
-      chart,
-      "--namespace",
-      namespace,
-      "--create-namespace",
-      "--wait=watcher",
-      "--rollback-on-failure",
-      "--timeout",
-      timeout,
-      "--kubeconfig",
-      kubeconfigPath,
-    ]);
+    const installResult = await runHelmCommand(
+      [
+        "install",
+        release,
+        chart,
+        "--namespace",
+        namespace,
+        "--create-namespace",
+        "--wait=watcher",
+        "--rollback-on-failure",
+        "--timeout",
+        timeout,
+        "--kubeconfig",
+        kubeconfigPath,
+      ],
+      undefined,
+      onOutput,
+    );
 
     if (installResult.success) return { success: true };
 
@@ -1558,21 +1874,25 @@ async function installByChartCandidates(
       return { success: false, error: installError };
     }
 
-    const upgrade = await runHelm([
-      "upgrade",
-      "--install",
-      release,
-      chart,
-      "--namespace",
-      namespace,
-      "--create-namespace",
-      "--wait=watcher",
-      "--rollback-on-failure",
-      "--timeout",
-      timeout,
-      "--kubeconfig",
-      kubeconfigPath,
-    ]);
+    const upgrade = await runHelm(
+      [
+        "upgrade",
+        "--install",
+        release,
+        chart,
+        "--namespace",
+        namespace,
+        "--create-namespace",
+        "--wait=watcher",
+        "--rollback-on-failure",
+        "--timeout",
+        timeout,
+        "--kubeconfig",
+        kubeconfigPath,
+      ],
+      undefined,
+      onOutput,
+    );
     if (upgrade.success) return { success: true };
     lastError = upgrade.error ?? lastError;
   }
@@ -1583,16 +1903,18 @@ async function installByChartCandidates(
 export async function installKubeArmor(
   clusterId: string,
   namespace: string = KUBEARMOR_NAMESPACE,
+  onOutput?: (chunk: string) => void,
 ): Promise<HelmResult> {
   await ensurePrivilegedNamespace(clusterId, namespace);
-  const repoResult = await ensureHelmRepo(KUBEARMOR_REPO_NAME, KUBEARMOR_REPO_URL);
+  const repoResult = await ensureHelmRepo(KUBEARMOR_REPO_NAME, KUBEARMOR_REPO_URL, onOutput);
   if (!repoResult.success) return repoResult;
   return installByChartCandidates(
     clusterId,
     KUBEARMOR_RELEASE,
     namespace,
     KUBEARMOR_CHART_CANDIDATES,
-    "3m",
+    "10m",
+    onOutput,
   );
 }
 
