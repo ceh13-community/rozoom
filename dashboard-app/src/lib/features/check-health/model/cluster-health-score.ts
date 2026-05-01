@@ -108,6 +108,38 @@ const isEndpointHealthy = (
   return true;
 };
 
+// Decide whether an observability endpoint should contribute to the cluster
+// health score. We penalize only when we have positive evidence the addon
+// itself is degraded - crashlooping pods, OOM, RBAC failures against the
+// addon's own API, and so on.
+//
+// The following states are NOT penalized:
+//   - `installed: false` or endpoint missing: the operator did not deploy
+//     this optional addon. Common on managed clusters (EKS etc.) that do
+//     not pre-install metrics-server / kube-state-metrics / node-exporter,
+//     and on any cluster that skipped the Prometheus stack. Deployment
+//     choice, not a health signal.
+//   - `status` contains "unreachable": the probe could not reach the addon
+//     (service-proxy rejected, kubelet auth mismatch, transient aggregated
+//     API 503, VPC routing). The addon's own pods may be Ready and
+//     serving. Probe-layer issues should not masquerade as cluster health
+//     degradation.
+const isEndpointInstalledButUnhealthy = (
+  endpoints: Array<{
+    key: string;
+    value: { installed?: boolean; error?: string; status?: string };
+  }>,
+  pattern: RegExp,
+) => {
+  const match = endpoints.find((endpoint) => pattern.test(endpoint.key));
+  if (!match) return false;
+  if (match.value.installed === false) return false;
+  if (!match.value.error) return false;
+  const statusText = (match.value.status ?? "").toLowerCase();
+  if (statusText.includes("unreachable")) return false;
+  return true;
+};
+
 const createRisk = (risk: Omit<ClusterHealthRiskItem, "penalty"> & { penalty: number }) => ({
   ...risk,
   penalty: clamp(risk.penalty, 1, DOMAIN_WEIGHTS[risk.domain]),
@@ -447,14 +479,17 @@ export const buildClusterHealthScore = (
     );
   }
 
-  const metricsChecksPresent = metricsEndpoints.length > 0;
-  const metricsServerHealthy = isEndpointHealthy(metricsEndpoints, /metrics[-_ ]?server/);
-  const kubeStateHealthy = isEndpointHealthy(metricsEndpoints, /kube[-_ ]?state/);
-  const nodeExporterHealthy = isEndpointHealthy(metricsEndpoints, /node[-_ ]?exporter/);
   const prometheusHealthy = isEndpointHealthy(metricsEndpoints, /prometheus/);
   const alertmanagerHealthy = isEndpointHealthy(metricsEndpoints, /alertmanager/);
 
-  if (!metricsChecksPresent || !metricsServerHealthy) {
+  // Observability addons (metrics-server, kube-state-metrics, node-exporter)
+  // are penalized only when deployed-but-broken. Their absence is a
+  // deployment choice - managed clusters (EKS in particular) do not
+  // pre-install them, and self-managed clusters may skip Prometheus-stack
+  // entirely. An addon that reports `installed: false` or is missing from
+  // the metrics-check output should not make the cluster yellow or red.
+
+  if (isEndpointInstalledButUnhealthy(metricsEndpoints, /metrics[-_ ]?server/)) {
     risks.push(
       createRisk({
         id: "metrics-server",
@@ -462,37 +497,37 @@ export const buildClusterHealthScore = (
         severity: "critical",
         title: "metrics-server unavailable",
         reason: "Resource metrics are unavailable or incomplete, reducing visibility.",
-        fix: "Restore metrics-server health or install it if it is absent.",
+        fix: "Restore metrics-server health.",
         penalty: 10,
         references: [],
       }),
     );
   }
 
-  if (!metricsChecksPresent || !kubeStateHealthy) {
+  if (isEndpointInstalledButUnhealthy(metricsEndpoints, /kube[-_ ]?state/)) {
     risks.push(
       createRisk({
         id: "kube-state-metrics",
         domain: "observability",
         severity: "warning",
-        title: "kube-state-metrics missing",
+        title: "kube-state-metrics degraded",
         reason: "Workload state metrics are unavailable.",
-        fix: "Install kube-state-metrics to restore workload telemetry.",
+        fix: "Check the kube-state-metrics deployment for crashloops or RBAC errors.",
         penalty: 6,
         references: [],
       }),
     );
   }
 
-  if (!metricsChecksPresent || !nodeExporterHealthy) {
+  if (isEndpointInstalledButUnhealthy(metricsEndpoints, /node[-_ ]?exporter/)) {
     risks.push(
       createRisk({
         id: "node-exporter",
         domain: "observability",
         severity: "warning",
-        title: "node-exporter missing",
+        title: "node-exporter degraded",
         reason: "Node-level metrics are unavailable.",
-        fix: "Install node-exporter to restore node telemetry.",
+        fix: "Check the node-exporter DaemonSet for pod failures.",
         penalty: 6,
         references: [],
       }),
@@ -596,21 +631,6 @@ export const buildClusterHealthScore = (
         }),
       );
     }
-  }
-
-  if (podIssues?.crashLoopCount && !metricsServerHealthy) {
-    risks.push(
-      createRisk({
-        id: "crashloops-no-metrics",
-        domain: "observability",
-        severity: "warning",
-        title: "Crashloops with missing metrics",
-        reason: "Limited metrics make diagnosing crashes harder.",
-        fix: "Restore metrics-server to unblock troubleshooting.",
-        penalty: 4,
-        references: [],
-      }),
-    );
   }
 
   const domainSummaries: ClusterHealthDomainSummary[] = (
