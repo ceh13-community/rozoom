@@ -46,6 +46,87 @@ type KubeletConfigz = {
   };
 };
 
+type CsrItem = {
+  metadata?: { name?: string; creationTimestamp?: string };
+  spec?: {
+    signerName?: string;
+    username?: string;
+  };
+  status?: {
+    conditions?: Array<{ type?: string; status?: string }>;
+  };
+};
+
+type CsrList = { items?: CsrItem[] };
+
+/**
+ * Node name → CSR evidence. A node with an approved CSR for either
+ * signer in the last 30 days is treated as proof that rotation is
+ * active, even when `/nodes/<node>/proxy/configz` is unavailable.
+ */
+type CsrEvidence = {
+  hasServerCsr: boolean;
+  hasClientCsr: boolean;
+  lastApprovedAt?: string;
+};
+
+const CSR_EVIDENCE_WINDOW_DAYS = 60;
+
+function isCsrApproved(csr: CsrItem): boolean {
+  return Boolean(
+    csr.status?.conditions?.some(
+      (c) => c.type === "Approved" && (c.status === "True" || c.status === undefined),
+    ),
+  );
+}
+
+function nodeNameFromCsrUsername(username?: string): string | null {
+  // Kubelet CSR usernames are of the form `system:node:<name>` for
+  // both kubelet-serving (server) and kube-apiserver-client-kubelet
+  // (client) signers.
+  if (!username) return null;
+  const prefix = "system:node:";
+  return username.startsWith(prefix) ? username.slice(prefix.length) : null;
+}
+
+async function fetchKubeletCsrEvidence(clusterId: string): Promise<Map<string, CsrEvidence>> {
+  const result = new Map<string, CsrEvidence>();
+  try {
+    const response = await kubectlWithTimeout(
+      "get csr -o json",
+      clusterId,
+      KUBECTL_CALL_TIMEOUT_MS,
+      "kubelet-rotation csr list",
+      "check-certificates-health:csr-list",
+      true,
+    );
+    if (response.errors || response.code !== 0) return result;
+    const parsed = parseJson(response.output) as CsrList | null;
+    const items = parsed?.items ?? [];
+    const cutoff = Date.now() - CSR_EVIDENCE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    for (const csr of items) {
+      if (!isCsrApproved(csr)) continue;
+      const createdAt = csr.metadata?.creationTimestamp;
+      if (!createdAt) continue;
+      const ts = Date.parse(createdAt);
+      if (!Number.isFinite(ts) || ts < cutoff) continue;
+      const node = nodeNameFromCsrUsername(csr.spec?.username);
+      if (!node) continue;
+      const signer = csr.spec?.signerName ?? "";
+      const entry = result.get(node) ?? { hasServerCsr: false, hasClientCsr: false };
+      if (signer === "kubernetes.io/kubelet-serving") entry.hasServerCsr = true;
+      if (signer === "kubernetes.io/kube-apiserver-client-kubelet") entry.hasClientCsr = true;
+      if (!entry.lastApprovedAt || createdAt > entry.lastApprovedAt) {
+        entry.lastApprovedAt = createdAt;
+      }
+      result.set(node, entry);
+    }
+  } catch {
+    // Best effort; absence of CSRs just means we stay "unknown".
+  }
+  return result;
+}
+
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   return Promise.race([
     promise,
@@ -107,21 +188,36 @@ function isNodeList(value: unknown): value is NodeList {
   return Array.isArray(list.items);
 }
 
-async function findControlPlanePod(clusterId: string): Promise<string | null> {
+async function findControlPlanePod(
+  clusterId: string,
+): Promise<{ podName: string | null; probeError: boolean }> {
+  let hadProbeError = false;
   for (const label of CONTROL_PLANE_LABELS) {
-    const response = await kubectlWithTimeout(
-      `get pods -n ${CONTROL_PLANE_NAMESPACE} -l ${label} -o json`,
-      clusterId,
-      KUBECTL_CALL_TIMEOUT_MS,
-      "find-control-plane-pod kubectl call",
-      "check-certificates-health:find-control-plane-pod",
-    );
+    let response: Awaited<ReturnType<typeof kubectlWithTimeout>>;
+    try {
+      response = await kubectlWithTimeout(
+        `get pods -n ${CONTROL_PLANE_NAMESPACE} -l ${label} -o json`,
+        clusterId,
+        KUBECTL_CALL_TIMEOUT_MS,
+        "find-control-plane-pod kubectl call",
+        "check-certificates-health:find-control-plane-pod",
+      );
+    } catch {
+      // Timeout or transport failure — keep trying other labels but note the error.
+      hadProbeError = true;
+      continue;
+    }
+    if (response.code !== 0) {
+      // RBAC denial or other API error — not the same as "no control-plane pods".
+      hadProbeError = true;
+      continue;
+    }
     const parsed = parseJson(response.output);
     if (!parsed || !isPodList(parsed)) continue;
     const pod = parsed.items?.find((item) => item.status?.phase === "Running");
-    if (pod?.metadata?.name) return pod.metadata.name;
+    if (pod?.metadata?.name) return { podName: pod.metadata.name, probeError: false };
   }
-  return null;
+  return { podName: null, probeError: hadProbeError };
 }
 
 function parseResidualDays(value?: string): number | undefined {
@@ -236,8 +332,17 @@ async function checkKubeletRotation(clusterId: string): Promise<KubeletRotationI
   const nodes = parsed.items?.map((item) => item.metadata?.name).filter(Boolean) ?? [];
 
   const results: KubeletRotationItem[] = [];
+  if (nodes.length === 0) return results;
+
+  // Pull CSR evidence once so we can infer rotation status on nodes
+  // where `/proxy/configz` is unavailable (managed clusters, blocked
+  // kubelet auth, broken metrics pipeline, etc.). An approved
+  // kubernetes.io/kubelet-serving or kube-apiserver-client-kubelet
+  // CSR in the last 60 days is strong evidence that rotation is on.
+  const csrEvidence = await fetchKubeletCsrEvidence(clusterId);
   for (const node of nodes) {
     if (!node) continue;
+    const evidence = csrEvidence.get(node);
     try {
       const safeConfigResponse = await kubectlWithTimeout(
         `get --raw /api/v1/nodes/${node}/proxy/configz`,
@@ -246,11 +351,24 @@ async function checkKubeletRotation(clusterId: string): Promise<KubeletRotationI
         `kubelet-rotation configz ${node} call`,
       );
       if (safeConfigResponse.errors || safeConfigResponse.code !== 0) {
-        results.push({
-          node,
-          status: "unknown",
-          message: "Node unreachable for certificate check.",
-        });
+        // Fallback: infer from CSR approvals if we saw any recently.
+        if (evidence && (evidence.hasClientCsr || evidence.hasServerCsr)) {
+          results.push({
+            node,
+            rotateClient: evidence.hasClientCsr || undefined,
+            rotateServer: evidence.hasServerCsr || undefined,
+            status: "enabled",
+            message: `Inferred from approved CSR at ${evidence.lastApprovedAt}`,
+          });
+        } else {
+          results.push({
+            node,
+            status: "unknown",
+            message:
+              "Kubelet /proxy/configz unreachable and no recent kubelet CSR found. " +
+              "Common on managed clusters; check provider rotation policy.",
+          });
+        }
         continue;
       }
       const config = parseJson(safeConfigResponse.output) as KubeletConfigz | null;
@@ -269,6 +387,16 @@ async function checkKubeletRotation(clusterId: string): Promise<KubeletRotationI
         status,
       });
     } catch (error) {
+      if (evidence && (evidence.hasClientCsr || evidence.hasServerCsr)) {
+        results.push({
+          node,
+          rotateClient: evidence.hasClientCsr || undefined,
+          rotateServer: evidence.hasServerCsr || undefined,
+          status: "enabled",
+          message: `Inferred from approved CSR at ${evidence.lastApprovedAt}`,
+        });
+        continue;
+      }
       const message =
         error instanceof Error ? error.message : "Node unreachable for certificate check.";
       results.push({ node, status: "unknown", message });
@@ -278,9 +406,24 @@ async function checkKubeletRotation(clusterId: string): Promise<KubeletRotationI
   return results;
 }
 
-async function checkControlPlaneCerts(clusterId: string): Promise<CertificateItem[]> {
-  const podName = await findControlPlanePod(clusterId);
-  if (!podName) return [];
+async function checkControlPlaneCerts(
+  clusterId: string,
+): Promise<{ certificates: CertificateItem[]; controlPlaneDetected: boolean }> {
+  const { podName, probeError } = await findControlPlanePod(clusterId);
+  if (probeError && !podName) {
+    // RBAC denial or timeout — we couldn't confirm whether a control plane exists.
+    // Treat as detected so the caller surfaces an error rather than silently skipping.
+    await logCertificateProbeErrorIfUnexpected(
+      "findControlPlanePod: probe error (RBAC denial or timeout)",
+    );
+    return { certificates: [], controlPlaneDetected: true };
+  }
+  if (!podName) {
+    // Managed control plane (Rancher, RKE2, EKS, GKE, AKS): no
+    // kube-apiserver static pod exposed in kube-system. Not an error -
+    // just a different cluster topology. Caller decides how to message.
+    return { certificates: [], controlPlaneDetected: false };
+  }
   const result = await kubectlWithTimeout(
     `exec -n ${CONTROL_PLANE_NAMESPACE} ${podName} -- kubeadm certs check-expiration`,
     clusterId,
@@ -293,9 +436,9 @@ async function checkControlPlaneCerts(clusterId: string): Promise<CertificateIte
     await logCertificateProbeErrorIfUnexpected(
       `kubeadm certs check-expiration failed: ${result.errors || result.output}`,
     );
-    return [];
+    return { certificates: [], controlPlaneDetected: true };
   }
-  return parseKubeadmOutput(result.output);
+  return { certificates: parseKubeadmOutput(result.output), controlPlaneDetected: true };
 }
 
 export async function checkCertificatesHealth(
@@ -312,10 +455,13 @@ export async function checkCertificatesHealth(
   let certificates = cached?.report.certificates ?? [];
   let kubeletRotation = cached?.report.kubeletRotation ?? [];
   let errorMessage: string | undefined;
+  let controlPlaneDetected: boolean | undefined = cached?.report.controlPlaneDetected;
 
   try {
     if (shouldRefreshCerts) {
-      certificates = await checkControlPlaneCerts(clusterId);
+      const result = await checkControlPlaneCerts(clusterId);
+      certificates = result.certificates;
+      controlPlaneDetected = result.controlPlaneDetected;
     }
   } catch (error) {
     errorMessage =
@@ -334,7 +480,14 @@ export async function checkCertificatesHealth(
     await logError(`Kubelet rotation check failed: ${message}`);
   }
 
-  if (!certificates.length && !kubeletRotation.length && !errorMessage) {
+  // Managed control plane is an expected state, not a failure - don't
+  // surface a scary "Unable to check certificates" message.
+  if (
+    !certificates.length &&
+    !kubeletRotation.length &&
+    !errorMessage &&
+    controlPlaneDetected !== false
+  ) {
     errorMessage = "Unable to check certificates.";
   }
 
@@ -344,6 +497,7 @@ export async function checkCertificatesHealth(
     summary: { ...summary, updatedAt: Date.now() },
     certificates,
     kubeletRotation,
+    controlPlaneDetected,
     errors: errorMessage,
     updatedAt: Date.now(),
   };
