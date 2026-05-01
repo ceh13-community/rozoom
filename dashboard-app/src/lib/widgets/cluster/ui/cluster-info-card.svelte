@@ -79,9 +79,15 @@
     ChevronDown,
     Gauge,
     Refresh,
+    Shield,
     ShieldQuestion,
     SquareChevronRight,
   } from "$shared/ui/icons";
+  import {
+    loadCredentialReport,
+    getCachedCredentialReport,
+  } from "$features/cluster-manager/model/credential-risk-cache";
+  import type { CredentialSecurityReport } from "$features/cluster-manager/model/credential-security";
   import { Button } from "$shared/ui/button";
   import { Checkbox } from "$shared/ui/checkbox";
   import type { AppClusterConfig } from "$entities/config/";
@@ -117,6 +123,22 @@
   }
 
   const { cluster, autoRefreshActive = true, syntheticMode = false }: Props = $props();
+
+  let credRisk = $state<CredentialSecurityReport | null>(
+    getCachedCredentialReport(cluster.uuid) ?? null,
+  );
+  const credRiskLabel = $derived.by(() => {
+    if (!credRisk || credRisk.findings.length === 0) return null;
+    if (credRisk.overallRisk !== "critical" && credRisk.overallRisk !== "high") return null;
+    const top = credRisk.findings.find((f) => f.risk === "critical" || f.risk === "high");
+    return top
+      ? {
+          risk: credRisk.overallRisk,
+          title: top.title,
+          tooltip: `${top.title}\n\n${top.description}\n\nFix: ${top.remediation}`,
+        }
+      : null;
+  });
 
   const clusterUuid = cluster.uuid;
   const clusterCheck$ = selectClusterHealthCheck(clusterUuid);
@@ -745,6 +767,10 @@
         refreshInterval = `${storedInterval}`;
       }
       linterEnabled = await loadClusterLinterEnabled(cluster.uuid);
+      if (credRisk === null) {
+        const report = await loadCredentialReport(cluster.uuid, cluster.name);
+        credRisk = report;
+      }
     } catch (error) {
       // Don't set cluster.status = "error" - it mutates the prop and never resets.
       // The card will show the error state via checkState.error from the watcher instead.
@@ -845,6 +871,24 @@
       Platform:
       <Badge class="text-white bg-slate-500 max-w-24 h-7">{platformLabel}</Badge>
     </div>
+    {#if credRiskLabel}
+      <div class="px-6 flex justify-between items-center gap-2 mb-2">
+        Credentials:
+        <button
+          type="button"
+          onclick={() =>
+            goto(`/dashboard/clusters/${encodeURIComponent(cluster.uuid)}?workload=compliancehub`)}
+          class="inline-flex items-center gap-1 rounded h-7 px-2 text-[11px] font-semibold border cursor-help transition {credRiskLabel.risk ===
+          'critical'
+            ? 'border-rose-500 text-rose-400 bg-rose-500/10 hover:bg-rose-500/20'
+            : 'border-orange-500 text-orange-400 bg-orange-500/10 hover:bg-orange-500/20'}"
+          title={credRiskLabel.tooltip}
+        >
+          <Shield class="w-3 h-3" />
+          <span class="truncate max-w-[180px]">{credRiskLabel.title}</span>
+        </button>
+      </div>
+    {/if}
     <button
       type="button"
       class="mx-6 mb-3 block w-[calc(100%-3rem)] rounded-xl border border-slate-300/90 bg-white px-3.5 py-3.5 text-left text-sm text-slate-900 shadow-sm transition hover:bg-slate-50"
