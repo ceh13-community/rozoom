@@ -30,7 +30,7 @@
   const displayMessage = $derived.by(() => {
     const rawMessage = summary?.message ?? "Unable to verify backup";
     if (!summary || summary.status !== "unverifiable") return rawMessage;
-    if (rawMessage.toLowerCase().includes("resource type \"backups\"")) {
+    if (rawMessage.toLowerCase().includes('resource type "backups"')) {
       return "Velero Backup CRD is not installed";
     }
     return rawMessage;
@@ -138,7 +138,10 @@
 
     if (offline) {
       if (pollingActive) {
-        void writeRuntimeDebugLog("runtime", "backup_summary_poll_stopped", { clusterId, reason: "offline" });
+        void writeRuntimeDebugLog("runtime", "backup_summary_poll_stopped", {
+          clusterId,
+          reason: "offline",
+        });
         stopBackupAuditPolling(clusterId);
         pollingActive = false;
       }
@@ -216,17 +219,28 @@
   <div>
     {statusEmoji[summary.status]}
   </div>
-{:else if lazyLoad && !manuallyActivated}
+{:else if (lazyLoad && !manuallyActivated) || bootstrapInFlight}
   <button
     type="button"
-    class="rounded-md border border-slate-400 bg-slate-700 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-slate-600"
-    onclick={(e) => { e.stopPropagation(); handleManualLoad(); }}
+    class="inline-flex items-center gap-1 rounded-md border border-slate-400 bg-slate-700 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-slate-600 disabled:cursor-wait disabled:opacity-70"
+    onclick={(e) => {
+      e.stopPropagation();
+      handleManualLoad();
+    }}
+    disabled={Boolean(bootstrapInFlight)}
+    title={bootstrapInFlight
+      ? "Listing Velero Backup and Schedule resources in-cluster..."
+      : "Reads Velero Backup + Schedule CRs to report the latest backup age and status (kubectl get backup/schedule). Fast on clusters with a velero namespace; shows 'unavailable' otherwise."}
   >
-    Load
+    {#if bootstrapInFlight}
+      <span
+        class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-transparent"
+      ></span>
+      <span>Checking<LoadingDots /></span>
+    {:else}
+      Load
+    {/if}
   </button>
-{:else if bootstrapInFlight}
-  <div class="truncate text-gray-500 text-xs">Loading<LoadingDots /></div>
-  <div class="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-transparent"></div>
 {:else}
   <div>Unable to verify backup</div>
   <div>{statusEmoji.unverifiable}</div>
