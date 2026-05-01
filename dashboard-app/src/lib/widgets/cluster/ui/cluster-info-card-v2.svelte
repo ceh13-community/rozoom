@@ -538,10 +538,14 @@
                 : healthScore.score >= 65
                   ? 'text-amber-500'
                   : 'text-rose-500'}"
-              title="Health Score: {healthScore.score}/100">{healthScore.score}</span
+              title="Health Score: {healthScore.score}/100"
+              ><span class="text-[9px] font-normal opacity-70 mr-0.5">H</span
+              >{healthScore.score}</span
             >
           {:else}
-            <span class="text-xs text-muted-foreground" title="Health Score">-</span>
+            <span class="text-xs text-muted-foreground" title="Health Score"
+              ><span class="text-[9px] font-normal opacity-70 mr-0.5">H</span>-</span
+            >
           {/if}
           {#if clusterScore.score != null}
             <span
@@ -552,10 +556,14 @@
                   : 'text-rose-500'}"
               title="Cluster Score: {clusterScore.score}/100{clusterScore.topRisks.length > 0
                 ? `\nTop risks:\n${clusterScore.topRisks.map((r) => `- ${r.title}`).join('\n')}`
-                : ''}">{clusterScore.score}</span
+                : ''}"
+              ><span class="text-[9px] font-normal opacity-70 mr-0.5">C</span
+              >{clusterScore.score}</span
             >
           {:else}
-            <span class="text-xs text-muted-foreground" title="Cluster Score">-</span>
+            <span class="text-xs text-muted-foreground" title="Cluster Score"
+              ><span class="text-[9px] font-normal opacity-70 mr-0.5">C</span>-</span
+            >
           {/if}
         {/if}
         <button
