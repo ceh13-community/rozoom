@@ -1,3 +1,13 @@
+export function isLoopbackUrl(url: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(url);
+    if (protocol !== "http:" && protocol !== "https:") return false;
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  } catch {
+    return false;
+  }
+}
+
 export async function openExternalUrl(url: string): Promise<void> {
   try {
     const { openUrl } = await import("@tauri-apps/plugin-opener");
