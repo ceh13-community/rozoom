@@ -47,7 +47,12 @@ export function isLoopbackUrl(raw: string): boolean {
   try {
     const { protocol, hostname } = new URL(raw);
     if (protocol !== "http:" && protocol !== "https:") return false;
-    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]" || hostname === "::1";
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "[::1]" ||
+      hostname === "::1"
+    );
   } catch {
     return false;
   }
