@@ -459,10 +459,10 @@ users:
     }
     loading = false;
     if (imported > 0) {
+      // Remove only the clusters that were successfully imported so that
+      // failed ones remain in the list and can be retried.
       autoClusters = autoClusters.filter((c) => !importedKeys.has(autoKey(c)));
-      autoSelected = new Set(
-        [...autoSelected].filter((k) => !importedKeys.has(k)),
-      );
+      autoSelected = new Set([...autoSelected].filter((k) => !importedKeys.has(k)));
       success = `Imported ${imported} cluster${imported === 1 ? "" : "s"}.`;
     }
     if (failures.length > 0) error = failures.join("; ");

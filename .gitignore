@@ -52,3 +52,5 @@ dashboard-app/test-results/
 dashboard-app/playwright-report/
 dashboard-app/blob-report/
 
+# ─── Release staging (local only) ───────────────────
+release/

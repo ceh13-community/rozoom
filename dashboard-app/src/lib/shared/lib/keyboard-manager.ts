@@ -125,9 +125,8 @@ export function handleGlobalKeydown(event: KeyboardEvent): void {
     return;
   }
 
-  // Single-key shortcuts and chords - skip when input is focused or modifier held
+  // Single-key shortcuts and chords - skip when input is focused
   if (isInputFocused()) return;
-  if (event.ctrlKey || event.metaKey || event.altKey) return;
 
   const pressedKey = event.key.toLowerCase();
 
