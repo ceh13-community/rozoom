@@ -242,9 +242,13 @@ export { countTotalPodRestarts } from "./model/get-statuses";
 export { buildClusterScore } from "./model/cluster-score";
 export { buildClusterHealthScore } from "./model/cluster-health-score";
 export {
+  DEFAULT_REFRESH_INTERVAL_MINUTES,
+  REFRESH_INTERVAL_OPTIONS,
+  isValidRefreshInterval,
   loadClusterRefreshInterval,
   saveClusterRefreshInterval,
 } from "./model/refresh-preferences";
+export type { RefreshIntervalOption } from "./model/refresh-preferences";
 export {
   loadClusterLinterEnabled,
   saveClusterLinterEnabled,
