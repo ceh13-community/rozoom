@@ -10,7 +10,7 @@
       setTimeout(() => {
         visible = false;
       }, 600);
-    }, 3000);
+    }, 500);
     return () => clearTimeout(timer);
   });
 </script>
