@@ -22,7 +22,6 @@
   import TableSurface from "$shared/ui/table-surface.svelte";
   import LoadingDots from "$shared/ui/loading-dots.svelte";
   import MultiPaneWorkbench from "$shared/ui/multi-pane-workbench.svelte";
-  import { CommandConsole, createConsoleSession } from "$shared/ui/command-console";
   import ResourceYamlSheet from "$widgets/datalists/ui/common/resource-yaml-sheet.svelte";
   import {
     confirmWorkbenchTabClose,
@@ -79,13 +78,6 @@
   type StepStatus = "idle" | "running" | "ok" | "fail";
   let stepStatus = $state<Record<string, StepStatus>>({});
   let stepOutput = $state<Record<string, string>>({});
-  // Top-level shared console: mirrors output from whichever bootstrap
-  // step is currently running, so the user sees the same live transcript
-  // UX (auto-collapse, dismiss, pulsing dots) that every other install
-  // flow in the app uses. Per-step output blocks below keep the
-  // granular breakdown.
-  const bootstrapSession = createConsoleSession();
-  let bootstrapSessionLabel = $state("GitOps bootstrap");
   let stepExpanded = $state<Record<string, boolean>>({});
 
   // Workbench state
@@ -458,14 +450,11 @@
 
   function setStepStatus(stepId: string, status: StepStatus) {
     stepStatus = { ...stepStatus, [stepId]: status };
-    if (status === "ok") bootstrapSession.succeed();
-    else if (status === "fail") bootstrapSession.fail();
   }
 
   function appendStepOutput(stepId: string, chunk: string) {
     const prev = stepOutput[stepId] ?? "";
     stepOutput = { ...stepOutput, [stepId]: prev + chunk };
-    bootstrapSession.append(chunk);
   }
 
   async function waitForDeploymentReady(
@@ -599,13 +588,6 @@
       );
       if (!confirmed) return;
     }
-    bootstrapSessionLabel =
-      stepId === "argocd-install"
-        ? "Installing Argo CD"
-        : stepId === "flux-install"
-          ? "Installing Flux"
-          : `Running ${stepId}`;
-    bootstrapSession.start();
     setStepStatus(stepId, "running");
     stepOutput = { ...stepOutput, [stepId]: "" };
     stepExpanded = { ...stepExpanded, [stepId]: true };
@@ -1150,8 +1132,6 @@
       </Button>
     </div>
   </div>
-
-  <CommandConsole session={bootstrapSession} label={bootstrapSessionLabel} />
 
   <!-- Create config inputs -->
   {#if activeTabId === "yaml:new"}
