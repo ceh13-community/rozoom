@@ -973,9 +973,9 @@
       <div class="mt-2 text-sm font-semibold leading-5 text-slate-950">{primaryAlert.title}</div>
       <div class="mt-1.5 text-xs font-medium leading-5 text-slate-700">{primaryAlert.detail}</div>
     </button>
-    <div class="px-6 flex justify-between items-center gap-2 mb-3">
-      Refresh:
-      <div class="flex items-center gap-2">
+    <div class="px-6 flex flex-wrap justify-between items-center gap-y-1.5 gap-x-2 mb-3">
+      <span class="shrink-0">Refresh:</span>
+      <div class="flex flex-wrap items-center gap-2">
         <label class="sr-only" for={`cluster-refresh-${cluster.uuid}`}>Refresh interval</label>
         <select
           id={`cluster-refresh-${cluster.uuid}`}
