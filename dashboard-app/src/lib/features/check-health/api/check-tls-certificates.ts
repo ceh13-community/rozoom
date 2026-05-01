@@ -61,8 +61,8 @@ function parseNotAfterFromDer(der: Uint8Array): string | null {
     const utcTimePattern = /(\d{12}Z)/g;
     const genTimePattern = /(\d{14}Z)/g;
 
-    const utcMatches = [...asn1Str.matchAll(utcTimePattern)].map((m) => m[1] as string);
-    const genMatches = [...asn1Str.matchAll(genTimePattern)].map((m) => m[1] as string);
+    const utcMatches = [...asn1Str.matchAll(utcTimePattern)].map((m) => m[1]);
+    const genMatches = [...asn1Str.matchAll(genTimePattern)].map((m) => m[1]);
 
     const allDates: Date[] = [];
     for (const m of utcMatches) {
