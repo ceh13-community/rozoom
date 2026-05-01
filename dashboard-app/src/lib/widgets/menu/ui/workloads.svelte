@@ -25,7 +25,6 @@
   import Lock from "@lucide/svelte/icons/lock";
   import FileCog from "@lucide/svelte/icons/file-cog";
   import Waypoints from "@lucide/svelte/icons/waypoints";
-  import Workflow from "@lucide/svelte/icons/workflow";
   import ShieldAlert from "@lucide/svelte/icons/shield-alert";
   import Flag from "@lucide/svelte/icons/flag";
   import Braces from "@lucide/svelte/icons/braces";
@@ -33,15 +32,6 @@
   import Package from "@lucide/svelte/icons/package";
   import LibraryBig from "@lucide/svelte/icons/library-big";
   import SlidersHorizontal from "@lucide/svelte/icons/sliders-horizontal";
-  import Blocks from "@lucide/svelte/icons/blocks";
-  import KeyRound from "@lucide/svelte/icons/key-round";
-  import Archive from "@lucide/svelte/icons/archive";
-  import GitBranch from "@lucide/svelte/icons/git-branch";
-  import History from "@lucide/svelte/icons/history";
-  import Bug from "@lucide/svelte/icons/bug";
-  import Zap from "@lucide/svelte/icons/zap";
-  import AlarmClockCheck from "@lucide/svelte/icons/alarm-clock-check";
-  import { menuVisibility, disabledPluginsCount } from "$shared/plugins";
 
   type MenuItem = {
     key: string;
@@ -61,8 +51,7 @@
     | "storage"
     | "cluster_ops"
     | "security_compliance"
-    | "observability"
-    | "marketplace";
+    | "observability";
   type MenuSection = {
     key: MenuSectionKey;
     label: string;
@@ -189,8 +178,8 @@
     {
       key: "helm",
       href: "?workload=helm",
-      label: "Helm Releases",
-      title: "Manage installed Helm releases: upgrade, rollback, uninstall, history.",
+      label: "Helm",
+      title: "Manage Helm repositories and releases for this cluster.",
       icon: Package,
     },
     {
@@ -201,56 +190,88 @@
       icon: LibraryBig,
     },
     {
-      key: "gitopsbootstrap",
-      href: "?workload=gitopsbootstrap",
-      label: "GitOps Bootstrap",
-      title: "Set up ArgoCD or Flux GitOps for this cluster.",
-      icon: GitBranch,
-    },
-    {
       key: "deprecationscan",
       href: "?workload=deprecationscan",
       label: "API Deprecation Scan",
       title: "Detect deprecated or removed Kubernetes API versions.",
-      icon: History,
+      icon: ClipboardCheck,
     },
     {
       key: "versionaudit",
       href: "?workload=versionaudit",
-      label: "Version Audit",
+      label: "Cluster Version & Helm Audit",
       title: "Compare cluster version and Helm chart versions against policy.",
       icon: GitCompareArrows,
     },
     {
       key: "backupaudit",
       href: "?workload=backupaudit",
-      label: "Backup Status",
-      title:
-        "Backup recency and metadata for cluster configuration. Requires Velero or local YAML backup.",
-      icon: Archive,
+      label: "Cluster Backup Status",
+      title: "Backup recency and metadata for cluster configuration.",
+      icon: CloudUpload,
     },
     {
       key: "rotatecerts",
       href: "?workload=rotatecerts",
       label: "Rotate Certificates",
       title: "View and renew control-plane and kubelet TLS certificates.",
-      icon: KeyRound,
+      icon: ShieldCheck,
+    },
+    {
+      key: "gitopsbootstrap",
+      href: "?workload=gitopsbootstrap",
+      label: "GitOps Bootstrap",
+      title: "Set up ArgoCD or Flux GitOps for this cluster.",
+      icon: CloudUpload,
+    },
+    {
+      key: "capacityintelligence",
+      href: "?workload=capacityintelligence",
+      label: "Capacity Intelligence",
+      title: "Resource efficiency, bin-packing score, cost analysis.",
+      icon: BarChart3,
+    },
+    {
+      key: "performanceobs",
+      href: "?workload=performanceobs",
+      label: "Performance",
+      title: "RED metrics, CPU throttling, SLO tracking.",
+      icon: Activity,
+    },
+    {
+      key: "securityaudit",
+      href: "?workload=securityaudit",
+      label: "Security Audit",
+      title: "RBAC risk scanner and Pod Security Standards compliance.",
+      icon: ShieldAlert,
+    },
+    {
+      key: "authsecurity",
+      href: "?workload=authsecurity",
+      label: "Auth & Credentials",
+      title: "Authentication method, token expiry, and credential storage security.",
+      icon: Lock,
+    },
+    {
+      key: "plugins",
+      href: "?workload=plugins",
+      label: "Plugins",
+      title: "Plugin marketplace - extend ROZOOM with pro modules.",
+      icon: Package,
     },
     {
       key: "visualizer",
       href: "?workload=visualizer",
       label: "Workload Map",
-      title:
-        "Visual dependency map: Ingress -> Service -> Deployment -> Pod -> Volumes/Secrets/RBAC.",
+      title: "Visual dependency map: Ingress -> Service -> Deployment -> Pod -> Volumes/Secrets/RBAC.",
       icon: Waypoints,
     },
     {
       key: "resourcemap",
       href: "?workload=resourcemap",
-      label: "Service Chains",
-      title:
-        "Linear per-Service chains grouped by namespace: Ingress -> Service -> Workload -> Pod, mounted ConfigMaps/Secrets/PVCs. Choose Workload Map for graph view.",
-      icon: Workflow,
+      label: "Resource Map",
+      title: "Full cluster resource dependency chains grouped by namespace. Traffic flow and mounted resources.",
+      icon: Waypoints,
     },
   ];
 
@@ -526,40 +547,25 @@
 
   const securityComplianceItems: MenuItem[] = [
     {
-      key: "securityaudit",
-      href: "?workload=securityaudit",
-      label: "Security Audit",
-      title: "RBAC risk scanner and Pod Security Standards compliance.",
-      icon: ShieldAlert,
-    },
-    {
-      key: "authsecurity",
-      href: "?workload=authsecurity",
-      label: "Auth & Credentials",
-      title: "Authentication method, token expiry, and credential storage security.",
-      icon: Lock,
+      key: "armorhub",
+      href: "?workload=armorhub",
+      label: "KubeArmor",
+      title: "Runtime protection integration status for KubeArmor.",
+      icon: ShieldCheck,
     },
     {
       key: "compliancehub",
       href: "?workload=compliancehub",
       label: "Compliance Hub",
-      title: "Kubescape and kube-bench status, scans, and findings. Requires Kubescape Operator.",
+      title: "Kubescape and kube-bench status, scans, and findings.",
       icon: ListCheck,
     },
     {
       key: "trivyhub",
       href: "?workload=trivyhub",
       label: "Trivy",
-      title:
-        "Trivy Operator status and latest vulnerability scan snapshot. Requires Trivy Operator.",
-      icon: Bug,
-    },
-    {
-      key: "armorhub",
-      href: "?workload=armorhub",
-      label: "KubeArmor",
-      title: "Runtime protection integration status for KubeArmor. Requires KubeArmor Operator.",
-      icon: ShieldCheck,
+      title: "Trivy Operator status and latest vulnerability scan snapshot.",
+      icon: ClipboardCheck,
     },
   ];
 
@@ -568,8 +574,7 @@
       key: "alertshub",
       href: "?workload=alertshub",
       label: "Cluster Alerts",
-      title:
-        "Unified alerts feed from Alertmanager, Prometheus, and Events. Falls back to Events when Prometheus is not installed.",
+      title: "Unified alerts feed from Alertmanager, Prometheus, and Events.",
       icon: Bell,
     },
     {
@@ -580,32 +585,9 @@
       icon: Gauge,
     },
     {
-      key: "capacityintelligence",
-      href: "?workload=capacityintelligence",
-      label: "Cost & Efficiency",
-      title:
-        "Resource efficiency, bin-packing score, cost analysis. Requires metrics-server and kube-state-metrics.",
-      icon: BarChart3,
-    },
-    {
-      key: "performanceobs",
-      href: "?workload=performanceobs",
-      label: "Performance",
-      title: "RED metrics, CPU throttling, SLO tracking. Requires Prometheus.",
-      icon: Zap,
-    },
-    {
-      key: "nodespressures",
-      href: "?workload=nodespressures",
-      label: "Nodes Pressures",
-      title: "Node readiness and pressure conditions overview.",
-      icon: TriangleAlert,
-      showWhenCollapsed: true,
-    },
-    {
       key: "podsrestarts",
       href: "?workload=podsrestarts",
-      label: "Pod Restarts",
+      label: "Pod restarts",
       title: "Recent pod restarts indicating potential instability.",
       icon: RotateCw,
       showWhenCollapsed: true,
@@ -615,18 +597,16 @@
       href: "?workload=cronjobshealth",
       label: "CronJobs Monitoring",
       title: "CronJob monitoring for missed schedules, failures, or long-running jobs.",
-      icon: AlarmClockCheck,
+      icon: Activity,
       showWhenCollapsed: true,
     },
-  ];
-
-  const marketplaceItems: MenuItem[] = [
     {
-      key: "plugins",
-      href: "?workload=plugins",
-      label: "Plugin Marketplace",
-      title: "Extend ROZOOM with pro modules and third-party integrations.",
-      icon: Blocks,
+      key: "nodespressures",
+      href: "?workload=nodespressures",
+      label: "Nodes Pressures",
+      title: "Node readiness and pressure conditions overview.",
+      icon: TriangleAlert,
+      showWhenCollapsed: true,
     },
   ];
   const sections: MenuSection[] = [
@@ -640,7 +620,6 @@
     { key: "cluster_ops", label: "Cluster Ops", items: clusterOpsItems },
     { key: "security_compliance", label: "Security & Compliance", items: securityComplianceItems },
     { key: "observability", label: "Observability", items: observabilityItems },
-    { key: "marketplace", label: "Marketplace", items: marketplaceItems },
   ];
   const defaultSectionState: Record<MenuSectionKey, boolean> = {
     workloads: false,
@@ -653,7 +632,6 @@
     cluster_ops: false,
     security_compliance: false,
     observability: false,
-    marketplace: false,
   };
 
   function loadSectionState(): Record<MenuSectionKey, boolean> {
@@ -673,7 +651,6 @@
         cluster_ops: Boolean(parsed.cluster_ops),
         security_compliance: Boolean(parsed.security_compliance),
         observability: Boolean(parsed.observability),
-        marketplace: Boolean(parsed.marketplace),
       };
     } catch {
       return defaultSectionState;
@@ -703,24 +680,6 @@
     lastAutoOpenedWorkload = activeWorkload;
   });
 
-  // Filter each section's items through the plugin visibility map so that
-  // disabling a plugin in the Marketplace reactively hides its pages from
-  // the sidebar. Items without an owning plugin are always kept.
-  const visibleSections = $derived.by(() => {
-    const visibility = $menuVisibility;
-    return sections
-      .map((section) => ({
-        ...section,
-        items: section.items.filter((item) => visibility.get(item.key) !== false),
-      }))
-      .filter((section) => section.items.length > 0);
-  });
-
-  const visibleOverviewItems = $derived.by(() => {
-    const visibility = $menuVisibility;
-    return overviewItems.filter((item) => visibility.get(item.key) !== false);
-  });
-
   function isActive(key: string) {
     return searchParams?.workload === key;
   }
@@ -746,7 +705,7 @@
   }
 </script>
 
-{#each visibleOverviewItems as item}
+{#each overviewItems as item}
   {#if shouldRender(item)}
     <a
       href={item.href}
@@ -768,7 +727,7 @@
 
 {#if !collapsed}
   <hr class="my-4" />
-  {#each visibleSections as section (section.key)}
+  {#each sections as section}
     <div class="mb-1">
       <button
         type="button"
@@ -776,43 +735,33 @@
         onclick={() => toggleSection(section.key)}
       >
         <span>{section.label}</span>
-        <ChevronDown
-          class="h-4 w-4 transition-transform {sectionOpen[section.key] ? 'rotate-180' : ''}"
-        />
+        <ChevronDown class="h-4 w-4 transition-transform {sectionOpen[section.key] ? 'rotate-180' : ''}" />
       </button>
       {#if sectionOpen[section.key]}
         <div class="mt-1">
-          {#each section.items as item (item.key)}
-            <a
-              href={item.href}
-              class={menuItemClass}
-              class:active={isActive(item.key)}
-              onclick={onItemClick}
-              title={withNavigationHint(item.title)}
-            >
-              <div class="flex items-center gap-2">
-                {#if item.icon}
-                  <item.icon class="h-4 w-4 shrink-0" />
-                {/if}
-                <span>{item.label}</span>
-                {#if item.key === "plugins" && $disabledPluginsCount > 0}
-                  <span
-                    class="ml-auto rounded-full bg-amber-500/15 px-1.5 text-[10px] font-semibold text-amber-300"
-                    title={`${$disabledPluginsCount} plugins disabled - pages hidden from sidebar`}
-                  >
-                    {$disabledPluginsCount} off
-                  </span>
-                {/if}
-              </div>
-            </a>
-          {/each}
+        {#each section.items as item}
+          <a
+            href={item.href}
+            class={menuItemClass}
+            class:active={isActive(item.key)}
+            onclick={onItemClick}
+            title={withNavigationHint(item.title)}
+          >
+            <div class="flex items-center gap-2">
+              {#if item.icon}
+                <item.icon class="h-4 w-4 shrink-0" />
+              {/if}
+              <span>{item.label}</span>
+            </div>
+          </a>
+        {/each}
         </div>
       {/if}
     </div>
   {/each}
 {:else}
-  {#each visibleSections as section (section.key)}
-    {#each section.items as item (item.key)}
+  {#each sections as section}
+    {#each section.items as item}
       {#if shouldRender(item)}
         <a
           href={item.href}

@@ -293,10 +293,9 @@ export function setArmorHubReport(clusterId: string, reportRaw: string) {
 export async function installArmorProvider(
   clusterId: string,
   providerId: ArmorProviderId,
-  onOutput?: (chunk: string) => void,
 ): Promise<{ success: boolean; error?: string }> {
   void providerId;
-  return installKubeArmor(clusterId, undefined, onOutput);
+  return installKubeArmor(clusterId);
 }
 
 function parseItemsCount(output: string): number {

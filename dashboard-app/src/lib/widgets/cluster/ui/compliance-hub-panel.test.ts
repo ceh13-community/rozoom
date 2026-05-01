@@ -58,12 +58,12 @@ describe("compliance-hub-panel", () => {
   });
 
   it("renders provider and installs it via helm", async () => {
-    const { getByRole, getAllByText, getByText } = render(ComplianceHubPanel, {
+    const { getByRole, getByText } = render(ComplianceHubPanel, {
       props: { clusterId: "cluster-a" },
     });
 
     expect(getByText("Compliance Hub")).toBeInTheDocument();
-    expect(getAllByText("Kubescape").length).toBeGreaterThan(0);
+    expect(getByText("Kubescape")).toBeInTheDocument();
 
     await fireEvent.click(getByRole("button", { name: "Install (Helm)" }));
 
@@ -71,7 +71,6 @@ describe("compliance-hub-panel", () => {
       expect(complianceHubModule.installComplianceProvider).toHaveBeenCalledWith(
         "cluster-a",
         "kubescape",
-        expect.any(Function),
       );
     });
     expect(getByText("Action completed")).toBeInTheDocument();
