@@ -407,8 +407,20 @@ export function humanizeClusterError(raw: string): { title: string; detail: stri
 
 export function buildPrimaryAlert(
   checks: ClusterHealthChecks | ClusterCheckError | null,
+  options?: { loading?: boolean },
 ): OverviewPrimaryAlert {
   if (!checks) {
+    // Loading = auto-initial or user-triggered refresh is in flight.
+    // Show what we're doing instead of a static "no data" message so the
+    // card isn't blank for the 5-10s window between cluster add and the
+    // first collect settling.
+    if (options?.loading) {
+      return {
+        severity: "info",
+        title: "Collecting diagnostics...",
+        detail: "Scanning pods, nodes, and control-plane health. This takes a few seconds.",
+      };
+    }
     return {
       severity: "info",
       title: "No diagnostics yet",
