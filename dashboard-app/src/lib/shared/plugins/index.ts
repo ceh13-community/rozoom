@@ -30,11 +30,3 @@ export {
   getInstalledPlugins,
   isFeatureAvailable,
 } from "./feature-flags";
-
-export {
-  disabledPluginsCount,
-  isMenuKeyVisible,
-  menuVisibility,
-  pagesHiddenByDisabling,
-  pluginForMenuKey,
-} from "./menu-visibility";
