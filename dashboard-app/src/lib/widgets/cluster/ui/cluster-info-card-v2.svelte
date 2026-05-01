@@ -38,7 +38,7 @@
     setDashboardDataProfile,
     shouldAutoRunDiagnostics,
   } from "$shared/lib/dashboard-data-profile.svelte";
-  import { getClusterPlatformLabel } from "$shared/ui/cluster-platform";
+  import { getClusterPlatformLabel, resolveClusterDisplayName } from "$shared/ui/cluster-platform";
   import {
     humanizeClusterError,
     isAuthError,
@@ -117,6 +117,7 @@
     return { ...base, tooltip };
   });
   const platformLabel = $derived(getClusterPlatformLabel(cluster.name));
+  const displayName = $derived(resolveClusterDisplayName(cluster));
   const isRefreshLoading = $derived(checkState.loading);
   const showInitialRefreshHint = $derived(
     Boolean(cluster.needsInitialRefreshHint) && !isRefreshLoading && isClustersListRoute,
@@ -534,9 +535,10 @@
         type="button"
         class="truncate font-semibold bg-transparent border-0 text-white text-left cursor-pointer"
         title={cluster.name}
+        aria-label={cluster.name}
         onclick={goToCluster}
       >
-        {cluster.name}
+        {displayName}
       </button>
       <Button class="hover:bg-transparent ml-auto" variant="ghost" onclick={goToCluster}>
         <SquareChevronRight class="w-4 h-4" />
