@@ -1,4 +1,5 @@
 export { default as Trash } from "@lucide/svelte/icons/trash";
+export { default as MessageSquareCode } from "@lucide/svelte/icons/message-square-code";
 export { default as Menu } from "@lucide/svelte/icons/menu";
 export { default as Container } from "@lucide/svelte/icons/container";
 export { default as Home } from "@lucide/svelte/icons/home";
@@ -40,3 +41,9 @@ export { default as ShieldCheck } from "@lucide/svelte/icons/shield-check";
 export { default as ShieldOff } from "@lucide/svelte/icons/shield-off";
 export { default as Activity } from "@lucide/svelte/icons/activity";
 export { default as EyeOff } from "@lucide/svelte/icons/eye-off";
+export { default as KeyRound } from "@lucide/svelte/icons/key-round";
+export { default as Cloud } from "@lucide/svelte/icons/cloud";
+export { default as Vault } from "@lucide/svelte/icons/vault";
+export { default as FileText } from "@lucide/svelte/icons/file-text";
+export { default as Ticket } from "@lucide/svelte/icons/ticket";
+export { default as ClipboardPaste } from "@lucide/svelte/icons/clipboard-paste";
