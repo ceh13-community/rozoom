@@ -50,11 +50,6 @@
   import { markClusterRefreshHintSeen } from "$features/cluster-manager";
   import { globalLinterEnabled } from "$features/check-health/model/linter-preferences";
   import { buildPrimaryAlert } from "$widgets/datalists/ui/model/overview-diagnostics";
-  import {
-    loadCredentialReport,
-    getCachedCredentialReport,
-  } from "$features/cluster-manager/model/credential-risk-cache";
-  import type { CredentialSecurityReport } from "$features/cluster-manager/model/credential-security";
   import DriftBadge from "./drift-badge.svelte";
 
   interface Props {
@@ -331,23 +326,6 @@
     unknown: "text-slate-400",
   };
 
-  // ── Credential risk ────────────────────────────────────────────
-  let credRisk = $state<CredentialSecurityReport | null>(
-    getCachedCredentialReport(cluster.uuid) ?? null,
-  );
-  const credRiskLabel = $derived.by(() => {
-    if (!credRisk || credRisk.findings.length === 0) return null;
-    if (credRisk.overallRisk !== "critical" && credRisk.overallRisk !== "high") return null;
-    const top = credRisk.findings.find((f) => f.risk === "critical" || f.risk === "high");
-    return top
-      ? {
-          risk: credRisk.overallRisk,
-          title: top.title,
-          tooltip: `${top.title}\n\n${top.description}\n\nFix: ${top.remediation}`,
-        }
-      : null;
-  });
-
   // ── Navigation ─────────────────────────────────────────────────
   let refreshInterval = $state("5");
   let linterEnabled = $state(true);
@@ -467,10 +445,6 @@
       const si = await loadClusterRefreshInterval(cluster.uuid);
       if (si && new Set([1, 5, 10]).has(si)) refreshInterval = `${si}`;
       linterEnabled = await loadClusterLinterEnabled(cluster.uuid);
-      if (credRisk === null) {
-        const report = await loadCredentialReport(cluster.uuid, cluster.name);
-        credRisk = report;
-      }
     } catch {
       /* */
     } finally {
@@ -583,23 +557,6 @@
         </Badge>
         <DriftBadge clusterId={cluster.uuid} />
         <span class="text-xs text-muted-foreground">{platformLabel}</span>
-        {#if credRiskLabel}
-          <button
-            type="button"
-            onclick={() =>
-              goto(
-                `/dashboard/clusters/${encodeURIComponent(cluster.uuid)}?workload=compliancehub`,
-              )}
-            class="inline-flex items-center gap-1 rounded h-5 px-1.5 text-[10px] font-semibold border cursor-help transition {credRiskLabel.risk ===
-            'critical'
-              ? 'border-rose-500 text-rose-400 bg-rose-500/10 hover:bg-rose-500/20'
-              : 'border-orange-500 text-orange-400 bg-orange-500/10 hover:bg-orange-500/20'}"
-            title={credRiskLabel.tooltip}
-          >
-            <Shield class="w-3 h-3" />
-            <span class="truncate max-w-[120px]">{credRiskLabel.title}</span>
-          </button>
-        {/if}
       </div>
       <div class="flex items-center gap-2">
         {#if effectiveLinter}
@@ -610,14 +567,10 @@
                 : healthScore.score >= 65
                   ? 'text-amber-500'
                   : 'text-rose-500'}"
-              title="Health Score: {healthScore.score}/100"
-              ><span class="text-[9px] font-normal opacity-70 mr-0.5">H</span
-              >{healthScore.score}</span
+              title="Health Score: {healthScore.score}/100">{healthScore.score}</span
             >
           {:else}
-            <span class="text-xs text-muted-foreground" title="Health Score"
-              ><span class="text-[9px] font-normal opacity-70 mr-0.5">H</span>-</span
-            >
+            <span class="text-xs text-muted-foreground" title="Health Score">-</span>
           {/if}
           {#if clusterScore.score != null}
             <span
@@ -628,14 +581,10 @@
                   : 'text-rose-500'}"
               title="Cluster Score: {clusterScore.score}/100{clusterScore.topRisks.length > 0
                 ? `\nTop risks:\n${clusterScore.topRisks.map((r) => `- ${r.title}`).join('\n')}`
-                : ''}"
-              ><span class="text-[9px] font-normal opacity-70 mr-0.5">C</span
-              >{clusterScore.score}</span
+                : ''}">{clusterScore.score}</span
             >
           {:else}
-            <span class="text-xs text-muted-foreground" title="Cluster Score"
-              ><span class="text-[9px] font-normal opacity-70 mr-0.5">C</span>-</span
-            >
+            <span class="text-xs text-muted-foreground" title="Cluster Score">-</span>
           {/if}
         {/if}
         <button
