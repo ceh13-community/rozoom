@@ -8,6 +8,7 @@
   import { compareClustersByEnv, loadEnvSortPriority } from "$shared/lib/env-sort-priority";
   import { ClusterInfoCard } from "$widgets/cluster";
   import ClusterInfoCardV2 from "$widgets/cluster/ui/cluster-info-card-v2.svelte";
+  import RotationDebugger from "./rotation-debugger.svelte";
   import {
     clusterHealthChecks,
     hydrateLatestHealthChecks,
@@ -421,6 +422,9 @@
         <Button variant="outline" onclick={resetOrder} title="Reset to default sort">
           <RotateCcw class="h-4 w-4" />
         </Button>
+      {/if}
+      {#if clusters.length > 0}
+        <RotationDebugger filteredCount={filteredClusters.length} />
       {/if}
       <button
         class="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition {linterEnabled
