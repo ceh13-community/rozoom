@@ -59,12 +59,10 @@ export async function testKubeconfig(kubeconfigYaml: string): Promise<TestConnec
   const id = randomId();
   const relPath = `${TEST_DIR}/${id}.yaml`;
   let absPath: string | null = null;
-  let fileWritten = false;
 
   try {
     await mkdir(TEST_DIR, { recursive: true, baseDir: BaseDirectory.AppData });
     await writeTextFile(relPath, kubeconfigYaml, { baseDir: BaseDirectory.AppData });
-    fileWritten = true;
     const home = await appDataDir();
     absPath = `${home}/${relPath}`;
 
@@ -103,7 +101,7 @@ export async function testKubeconfig(kubeconfigYaml: string): Promise<TestConnec
       durationMs: Date.now() - started,
     };
   } finally {
-    if (fileWritten) {
+    if (absPath) {
       try {
         await remove(relPath, { baseDir: BaseDirectory.AppData });
       } catch {
