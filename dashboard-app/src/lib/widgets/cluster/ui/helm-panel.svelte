@@ -26,7 +26,9 @@
   import TableSurface from "$shared/ui/table-surface.svelte";
   import TableEmptyState from "$shared/ui/table-empty-state.svelte";
   import DiagnosticSummaryCard from "$shared/ui/diagnostic-summary-card.svelte";
+  import { humanizeHelmError } from "$features/helm-ux/model/humanize";
   import { confirmAction } from "$shared/lib/confirm-action";
+  import { CommandConsole, createConsoleSession } from "$shared/ui/command-console";
   import {
     markSectionRefreshed,
     shouldRefreshOnSectionEnter,
@@ -41,11 +43,37 @@
 
   let releases = $state<HelmListedRelease[]>([]);
   let repos = $state<HelmListedRepo[]>([]);
+  let releaseFilter = $state("");
+  let repoFilter = $state("");
   let isLoading = $state(false);
+
+  const filteredReleases = $derived.by(() => {
+    const q = releaseFilter.trim().toLowerCase();
+    if (!q) return releases;
+    return releases.filter(
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        r.namespace.toLowerCase().includes(q) ||
+        (r.chart ?? "").toLowerCase().includes(q) ||
+        (r.status ?? "").toLowerCase().includes(q),
+    );
+  });
+
+  const filteredRepos = $derived.by(() => {
+    const q = repoFilter.trim().toLowerCase();
+    if (!q) return repos;
+    return repos.filter(
+      (r) => r.name.toLowerCase().includes(q) || (r.url ?? "").toLowerCase().includes(q),
+    );
+  });
   let releaseError = $state<string | null>(null);
   let repoError = $state<string | null>(null);
   let actionInFlight = $state<string | null>(null);
   let actionNotice = $state<{ type: "success" | "error"; text: string } | null>(null);
+  // Shared console for all helm actions. actionInFlight already serializes
+  // to one action at a time, so a single session is safe.
+  const helmSession = createConsoleSession();
+  let helmSessionLabel = $state("Helm");
   let repoForm = $state({ name: "", url: "" });
   let installForm = $state({
     releaseName: "",
@@ -53,6 +81,8 @@
     namespace: "default",
     createNamespace: true,
   });
+  let dryRunOutput = $state<string | null>(null);
+  let diffView = $state<{ current: string; next: string } | null>(null);
   let selectedRelease = $state<{ releaseName: string; namespace: string } | null>(null);
   let rollbackRevision = $state("");
   let releaseStatusJson = $state<string | null>(null);
@@ -96,7 +126,7 @@
     return "bg-slate-500";
   }
 
-    async function refreshAll() {
+  async function refreshAll() {
     if (!clusterId || isLoading) return;
     isLoading = true;
     releaseError = null;
@@ -108,15 +138,15 @@
         listHelmRepos(),
       ]);
 
-        releases = releaseResult.releases;
-        repos = repoResult.repos;
-        releaseError = releaseResult.error ?? null;
-        repoError = repoResult.error ?? null;
-        markSectionRefreshed(`helm:${clusterId}`);
-      } finally {
-        isLoading = false;
-      }
+      releases = releaseResult.releases;
+      repos = repoResult.repos;
+      releaseError = releaseResult.error ?? null;
+      repoError = repoResult.error ?? null;
+      markSectionRefreshed(`helm:${clusterId}`);
+    } finally {
+      isLoading = false;
     }
+  }
 
   async function onAddRepo() {
     if (actionInFlight) return;
@@ -157,19 +187,111 @@
 
   async function onInstallOrUpgrade() {
     if (actionInFlight) return;
+    const existing = releases.find(
+      (r) =>
+        r.name === installForm.releaseName.trim() && r.namespace === installForm.namespace.trim(),
+    );
+    if (existing) {
+      const confirmed = await confirmAction(
+        `Release "${existing.name}" already exists in "${existing.namespace}" ` +
+          `(chart: ${existing.chart}, status: ${existing.status ?? "unknown"}).\n\n` +
+          `Proceeding will run helm upgrade and may replace workloads. ` +
+          `Use Preview (dry-run) first if you want to see what changes.\n\nContinue?`,
+        "Confirm upgrade",
+      );
+      if (!confirmed) return;
+    }
     actionInFlight = "release:install";
     actionNotice = null;
+    dryRunOutput = null;
+    helmSessionLabel = `Helm upgrade --install ${installForm.releaseName}`;
+    helmSession.start();
     try {
-      const result = await installOrUpgradeHelmRelease(clusterId, installForm);
+      const result = await installOrUpgradeHelmRelease(clusterId, {
+        ...installForm,
+        onOutput: (chunk) => helmSession.append(chunk),
+      });
       if (!result.success) {
         actionNotice = { type: "error", text: result.error ?? "Helm install/upgrade failed" };
+        helmSession.fail();
         return;
       }
       actionNotice = {
         type: "success",
         text: `Release "${installForm.releaseName}" applied in namespace "${installForm.namespace}".`,
       };
+      helmSession.succeed();
       await refreshAll();
+    } finally {
+      actionInFlight = null;
+    }
+  }
+
+  async function onDiffAgainstCurrent() {
+    if (actionInFlight) return;
+    const target = releases.find(
+      (r) =>
+        r.name === installForm.releaseName.trim() && r.namespace === installForm.namespace.trim(),
+    );
+    if (!target) {
+      actionNotice = {
+        type: "error",
+        text: "Release with this name+namespace is not installed yet; use Preview instead.",
+      };
+      return;
+    }
+    actionInFlight = "release:diff";
+    actionNotice = null;
+    dryRunOutput = null;
+    diffView = null;
+    try {
+      const [currentResult, nextResult] = await Promise.all([
+        getHelmReleaseManifest(clusterId, {
+          releaseName: target.name,
+          namespace: target.namespace,
+        }),
+        installOrUpgradeHelmRelease(clusterId, { ...installForm, dryRun: true }),
+      ]);
+      if (currentResult.error) {
+        actionNotice = { type: "error", text: currentResult.error };
+        return;
+      }
+      if (!nextResult.success) {
+        actionNotice = { type: "error", text: nextResult.error ?? "Dry-run failed" };
+        return;
+      }
+      diffView = {
+        current: currentResult.manifest?.trim() || "(empty)",
+        next: nextResult.output?.trim() || "(empty)",
+      };
+      actionNotice = {
+        type: "success",
+        text: "Diff prepared. Review current vs proposed manifest below, then Apply.",
+      };
+    } finally {
+      actionInFlight = null;
+    }
+  }
+
+  async function onDryRun() {
+    if (actionInFlight) return;
+    actionInFlight = "release:dry-run";
+    actionNotice = null;
+    dryRunOutput = null;
+    try {
+      const result = await installOrUpgradeHelmRelease(clusterId, {
+        ...installForm,
+        dryRun: true,
+      });
+      if (!result.success) {
+        actionNotice = { type: "error", text: result.error ?? "Dry-run failed" };
+        return;
+      }
+      dryRunOutput = result.output?.trim() || "(empty rendered template)";
+      actionNotice = {
+        type: "success",
+        text: `Dry-run completed. Review the rendered template below, then Apply to install.`,
+      };
     } finally {
       actionInFlight = null;
     }
@@ -186,19 +308,24 @@
     }
     actionInFlight = `release:uninstall:${release.namespace}:${release.name}`;
     actionNotice = null;
+    helmSessionLabel = `Helm uninstall ${release.name}`;
+    helmSession.start();
     try {
       const result = await uninstallHelmRelease(clusterId, {
         releaseName: release.name,
         namespace: release.namespace,
+        onOutput: (chunk) => helmSession.append(chunk),
       });
       if (!result.success) {
         actionNotice = { type: "error", text: result.error ?? "Failed to uninstall release" };
+        helmSession.fail();
         return;
       }
       actionNotice = {
         type: "success",
         text: `Release "${release.name}" was uninstalled from "${release.namespace}".`,
       };
+      helmSession.succeed();
       await refreshAll();
     } finally {
       actionInFlight = null;
@@ -286,55 +413,79 @@
     actionNotice = null;
     selectedRelease = { releaseName: release.name, namespace: release.namespace };
     clearInspector();
+    helmSessionLabel = `Helm test ${release.name}`;
+    helmSession.start();
     try {
-      const result = await testHelmRelease(clusterId, selectedRelease);
+      const result = await testHelmRelease(clusterId, {
+        ...selectedRelease,
+        onOutput: (chunk) => helmSession.append(chunk),
+      });
       releaseTestLogs = result.logs || "(no logs)";
       if (!result.success) {
         actionNotice = { type: "error", text: result.error ?? "Helm test failed" };
+        helmSession.fail();
         return;
       }
       actionNotice = { type: "success", text: `Helm test completed for "${release.name}".` };
+      helmSession.succeed();
     } finally {
       actionInFlight = null;
     }
   }
 
-  async function onRollbackRelease() {
+  async function onRollbackRelease(revision?: string) {
     if (!selectedRelease) {
-      actionNotice = { type: "error", text: "Select a release action first (history/status/values)." };
+      actionNotice = {
+        type: "error",
+        text: "Select a release action first (history/status/values).",
+      };
       return;
     }
-    if (!rollbackRevision.trim()) {
+    const rev = (revision ?? rollbackRevision).toString().trim();
+    if (!rev) {
       actionNotice = { type: "error", text: "Revision is required for rollback." };
       return;
     }
+    const confirmed = await confirmAction(
+      `Rollback "${selectedRelease.releaseName}" in namespace "${selectedRelease.namespace}" ` +
+        `to revision ${rev}?\n\n` +
+        `Helm will re-apply the manifests from that revision. Running workloads may restart.`,
+      "Confirm rollback",
+    );
+    if (!confirmed) return;
     if (actionInFlight) return;
     actionInFlight = releaseActionKey("rollback", selectedRelease);
     actionNotice = null;
+    helmSessionLabel = `Helm rollback ${selectedRelease.releaseName} -> rev ${rev}`;
+    helmSession.start();
     try {
       const result = await rollbackHelmRelease(clusterId, {
         ...selectedRelease,
-        revision: rollbackRevision,
+        revision: rev,
+        onOutput: (chunk) => helmSession.append(chunk),
       });
       if (!result.success) {
         actionNotice = { type: "error", text: result.error ?? "Helm rollback failed" };
+        helmSession.fail();
         return;
       }
       actionNotice = {
         type: "success",
-        text: `Release "${selectedRelease.releaseName}" rolled back to revision ${rollbackRevision}.`,
+        text: `Release "${selectedRelease.releaseName}" rolled back to revision ${rev}.`,
       };
+      helmSession.succeed();
+      rollbackRevision = "";
       await refreshAll();
     } finally {
       actionInFlight = null;
     }
   }
 
-    $effect(() => {
-      if (!clusterId || offline) return;
-      if (!shouldRefreshOnSectionEnter(`helm:${clusterId}`, 30_000)) return;
-      void refreshAll();
-    });
+  $effect(() => {
+    if (!clusterId || offline) return;
+    if (!shouldRefreshOnSectionEnter(`helm:${clusterId}`, 30_000)) return;
+    void refreshAll();
+  });
 </script>
 
 <Card.Root class="bg-card text-card-foreground">
@@ -383,11 +534,19 @@
     {/if}
 
     {#if actionNotice?.type === "error"}
+      {@const humanized = humanizeHelmError(actionNotice.text)}
       <Alert.Root variant="destructive">
-        <Alert.Title>Action failed</Alert.Title>
-        <Alert.Description>{actionNotice.text}</Alert.Description>
+        <Alert.Title>{humanized.title}</Alert.Title>
+        <Alert.Description>
+          {#if humanized.hint}
+            <p class="mb-1">{humanized.hint}</p>
+          {/if}
+          <pre class="whitespace-pre-wrap text-[11px] opacity-80">{actionNotice.text}</pre>
+        </Alert.Description>
       </Alert.Root>
     {/if}
+
+    <CommandConsole session={helmSession} label={helmSessionLabel} />
 
     <div class="grid gap-4 md:grid-cols-2">
       <DiagnosticSummaryCard title="Repositories">
@@ -460,20 +619,92 @@
             <input type="checkbox" bind:checked={installForm.createNamespace} />
             Create namespace if missing
           </label>
-          <Button
-            variant="outline"
-            onclick={onInstallOrUpgrade}
-            disabled={offline || actionInFlight === "release:install"}
-          >
-            Install / upgrade
-            {#if actionInFlight === "release:install"}
-              <LoadingDots />
+          <div class="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onclick={onDryRun}
+              disabled={offline || Boolean(actionInFlight)}
+              title="Render the chart with these values without touching the cluster (helm --dry-run)"
+            >
+              Preview (dry-run)
+              {#if actionInFlight === "release:dry-run"}
+                <LoadingDots />
+              {/if}
+            </Button>
+            {#if releases.some((r) => r.name === installForm.releaseName.trim() && r.namespace === installForm.namespace.trim())}
+              <Button
+                variant="outline"
+                size="sm"
+                onclick={onDiffAgainstCurrent}
+                disabled={offline || Boolean(actionInFlight)}
+                title="Compare current live manifest to the dry-run output for the new values"
+              >
+                Diff vs current
+                {#if actionInFlight === "release:diff"}
+                  <LoadingDots />
+                {/if}
+              </Button>
             {/if}
-          </Button>
+            <Button
+              variant="outline"
+              onclick={onInstallOrUpgrade}
+              disabled={offline || Boolean(actionInFlight)}
+            >
+              Install / upgrade
+              {#if actionInFlight === "release:install"}
+                <LoadingDots />
+              {/if}
+            </Button>
+          </div>
+          {#if dryRunOutput}
+            <div class="mt-2">
+              <div class="mb-1 flex items-center justify-between">
+                <p class="text-xs font-semibold text-muted-foreground">Dry-run output</p>
+                <Button variant="ghost" size="sm" onclick={() => (dryRunOutput = null)}>
+                  Dismiss
+                </Button>
+              </div>
+              <pre
+                class="max-h-80 overflow-auto rounded-md border border-border bg-muted p-3 text-[11px] font-mono whitespace-pre-wrap">{dryRunOutput}</pre>
+            </div>
+          {/if}
+          {#if diffView}
+            <div class="mt-2">
+              <div class="mb-1 flex items-center justify-between">
+                <p class="text-xs font-semibold text-muted-foreground">
+                  Manifest diff: current (left) vs proposed (right)
+                </p>
+                <Button variant="ghost" size="sm" onclick={() => (diffView = null)}>Dismiss</Button>
+              </div>
+              <div class="grid gap-2 md:grid-cols-2">
+                <div>
+                  <p class="mb-1 text-[11px] font-semibold text-emerald-400">Current (live)</p>
+                  <pre
+                    class="max-h-80 overflow-auto rounded-md border border-border bg-muted p-3 text-[11px] font-mono whitespace-pre-wrap">{diffView.current}</pre>
+                </div>
+                <div>
+                  <p class="mb-1 text-[11px] font-semibold text-sky-400">Proposed (dry-run)</p>
+                  <pre
+                    class="max-h-80 overflow-auto rounded-md border border-border bg-muted p-3 text-[11px] font-mono whitespace-pre-wrap">{diffView.next}</pre>
+                </div>
+              </div>
+            </div>
+          {/if}
         </div>
       </div>
     </div>
 
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <p class="text-sm font-semibold">Repositories ({filteredRepos.length}/{repos.length})</p>
+      <input
+        type="search"
+        class="h-8 w-64 rounded-md border border-border bg-background px-2 text-xs"
+        placeholder="Filter by name or URL"
+        aria-label="Filter repositories"
+        bind:value={repoFilter}
+      />
+    </div>
     <TableSurface maxHeightClass="">
       <Table.Table>
         <Table.TableHeader>
@@ -487,11 +718,21 @@
           {#if repos.length === 0}
             <Table.TableRow>
               <Table.TableCell colspan={3} class="text-center">
-                <TableEmptyState message="No Helm repositories configured." />
+                <TableEmptyState
+                  message="No Helm repositories configured. Add one above to install charts."
+                />
+              </Table.TableCell>
+            </Table.TableRow>
+          {:else if filteredRepos.length === 0}
+            <Table.TableRow>
+              <Table.TableCell colspan={3} class="text-center">
+                <TableEmptyState
+                  message={`No repositories match "${repoFilter}". Clear the filter to see all ${repos.length}.`}
+                />
               </Table.TableCell>
             </Table.TableRow>
           {:else}
-            {#each repos as repo}
+            {#each filteredRepos as repo}
               <Table.TableRow>
                 <Table.TableCell class="font-medium">{repo.name}</Table.TableCell>
                 <Table.TableCell class="text-xs text-muted-foreground">{repo.url}</Table.TableCell>
@@ -512,6 +753,16 @@
       </Table.Table>
     </TableSurface>
 
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <p class="text-sm font-semibold">Releases ({filteredReleases.length}/{releases.length})</p>
+      <input
+        type="search"
+        class="h-8 w-72 rounded-md border border-border bg-background px-2 text-xs"
+        placeholder="Filter by name, namespace, chart or status"
+        aria-label="Filter releases"
+        bind:value={releaseFilter}
+      />
+    </div>
     <TableSurface maxHeightClass="">
       <Table.Table>
         <Table.TableHeader>
@@ -527,15 +778,27 @@
           {#if releases.length === 0}
             <Table.TableRow>
               <Table.TableCell colspan={5} class="text-center">
-                <TableEmptyState message="No Helm releases found." />
+                <TableEmptyState
+                  message="No Helm releases found. Install a chart via the form above or browse the Helm Catalog."
+                />
+              </Table.TableCell>
+            </Table.TableRow>
+          {:else if filteredReleases.length === 0}
+            <Table.TableRow>
+              <Table.TableCell colspan={5} class="text-center">
+                <TableEmptyState
+                  message={`No releases match "${releaseFilter}". Clear the filter to see all ${releases.length}.`}
+                />
               </Table.TableCell>
             </Table.TableRow>
           {:else}
-            {#each releases as release}
+            {#each filteredReleases as release}
               <Table.TableRow>
                 <Table.TableCell class="font-medium">{release.name}</Table.TableCell>
                 <Table.TableCell>{release.namespace}</Table.TableCell>
-                <Table.TableCell class="text-xs text-muted-foreground">{release.chart}</Table.TableCell>
+                <Table.TableCell class="text-xs text-muted-foreground"
+                  >{release.chart}</Table.TableCell
+                >
                 <Table.TableCell>
                   <Badge class={`text-white ${statusClass(release.status)}`}>
                     {release.status || "unknown"}
@@ -587,7 +850,8 @@
                       variant="destructive"
                       size="sm"
                       onclick={() => onUninstall(release)}
-                      disabled={offline || actionInFlight === releaseActionKey("uninstall", release)}
+                      disabled={offline ||
+                        actionInFlight === releaseActionKey("uninstall", release)}
                     >
                       Uninstall
                     </Button>
@@ -604,12 +868,16 @@
       <div class="flex flex-wrap items-center gap-2">
         <p class="text-sm font-semibold">Release inspector</p>
         {#if selectedRelease}
-          <Badge class="bg-slate-500 text-white">{selectedRelease.namespace}/{selectedRelease.releaseName}</Badge>
+          <Badge class="bg-slate-500 text-white"
+            >{selectedRelease.namespace}/{selectedRelease.releaseName}</Badge
+          >
         {/if}
       </div>
       <div class="mt-3 flex flex-wrap items-end gap-2">
         <div class="flex flex-col gap-1">
-          <label class="text-xs text-muted-foreground" for="rollback-revision">Rollback revision</label>
+          <label class="text-xs text-muted-foreground" for="rollback-revision"
+            >Rollback revision</label
+          >
           <input
             id="rollback-revision"
             class="h-8 rounded-md border border-border bg-background px-2 text-xs"
@@ -619,13 +887,18 @@
         </div>
         <Button
           variant="outline"
-          onclick={onRollbackRelease}
-          disabled={offline || actionInFlight === releaseActionKey("rollback", selectedRelease ?? { releaseName: "", namespace: "" })}
+          onclick={() => void onRollbackRelease()}
+          disabled={offline ||
+            actionInFlight ===
+              releaseActionKey("rollback", selectedRelease ?? { releaseName: "", namespace: "" })}
         >
           Rollback
         </Button>
       </div>
       {#if releaseHistory.length > 0}
+        {@const currentRevision = [...releaseHistory].sort(
+          (a, b) => Number(b.revision ?? 0) - Number(a.revision ?? 0),
+        )[0]?.revision}
         <div class="mt-3 overflow-x-auto">
           <TableSurface maxHeightClass="max-h-80">
             <Table.Table>
@@ -635,15 +908,42 @@
                   <Table.TableHead>Status</Table.TableHead>
                   <Table.TableHead>Updated</Table.TableHead>
                   <Table.TableHead>Description</Table.TableHead>
+                  <Table.TableHead class="text-right">Action</Table.TableHead>
                 </Table.TableRow>
               </Table.TableHeader>
               <Table.TableBody>
                 {#each releaseHistory as entry}
+                  {@const isCurrent = entry.revision === currentRevision}
                   <Table.TableRow>
-                    <Table.TableCell>{entry.revision}</Table.TableCell>
+                    <Table.TableCell class="font-mono">
+                      {entry.revision}
+                      {#if isCurrent}
+                        <Badge class="ml-1 bg-emerald-600 text-[9px] text-white">current</Badge>
+                      {/if}
+                    </Table.TableCell>
                     <Table.TableCell>{entry.status ?? "-"}</Table.TableCell>
                     <Table.TableCell>{entry.updated ?? "-"}</Table.TableCell>
-                    <Table.TableCell>{entry.description ?? "-"}</Table.TableCell>
+                    <Table.TableCell class="max-w-[240px] truncate" title={entry.description ?? ""}>
+                      {entry.description ?? "-"}
+                    </Table.TableCell>
+                    <Table.TableCell class="text-right">
+                      {#if !isCurrent}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onclick={() => void onRollbackRelease(String(entry.revision))}
+                          disabled={offline ||
+                            actionInFlight ===
+                              releaseActionKey(
+                                "rollback",
+                                selectedRelease ?? { releaseName: "", namespace: "" },
+                              )}
+                          title={`Rollback to revision ${entry.revision}`}
+                        >
+                          Rollback
+                        </Button>
+                      {/if}
+                    </Table.TableCell>
                   </Table.TableRow>
                 {/each}
               </Table.TableBody>
@@ -652,16 +952,20 @@
         </div>
       {/if}
       {#if releaseStatusJson}
-        <pre class="mt-3 max-h-80 overflow-auto rounded-md border border-border bg-muted p-3 text-xs">{releaseStatusJson}</pre>
+        <pre
+          class="mt-3 max-h-80 overflow-auto rounded-md border border-border bg-muted p-3 text-xs">{releaseStatusJson}</pre>
       {/if}
       {#if releaseValues}
-        <pre class="mt-3 max-h-80 overflow-auto rounded-md border border-border bg-muted p-3 text-xs">{releaseValues}</pre>
+        <pre
+          class="mt-3 max-h-80 overflow-auto rounded-md border border-border bg-muted p-3 text-xs">{releaseValues}</pre>
       {/if}
       {#if releaseManifest}
-        <pre class="mt-3 max-h-80 overflow-auto rounded-md border border-border bg-muted p-3 text-xs">{releaseManifest}</pre>
+        <pre
+          class="mt-3 max-h-80 overflow-auto rounded-md border border-border bg-muted p-3 text-xs">{releaseManifest}</pre>
       {/if}
       {#if releaseTestLogs}
-        <pre class="mt-3 max-h-80 overflow-auto rounded-md border border-border bg-muted p-3 text-xs">{releaseTestLogs}</pre>
+        <pre
+          class="mt-3 max-h-80 overflow-auto rounded-md border border-border bg-muted p-3 text-xs">{releaseTestLogs}</pre>
       {/if}
     </div>
   </Card.Content>
