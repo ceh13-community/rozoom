@@ -745,4 +745,4 @@ Refs: ROADMAP Phase X.Y
 ```
 
 Types: `feat`, `fix`, `refactor`, `test`, `chore`
-Scopes: `cluster-mgr`, `health`, `helm-catalog`, `capacity`, `perf`, `security`, `fleet`, `vault`, `audit`, `updater`, `sandbox`
+Scopes: `cluster-mgr`, `health`, `helm-catalog`, `capacity`, `perf`, `security`, `fleet`
