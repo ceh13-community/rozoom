@@ -43,6 +43,14 @@ export type PluginManifest = {
   keywords?: string[];
   provides: PluginCapabilities;
   pricing?: PluginPricing;
+  /**
+   * Start the app with this plugin disabled on first run. The intent is to
+   * keep the default sidebar focused on what the Fleet Dashboard cluster
+   * cards surface: everything else is opt-in via the Marketplace. Has no
+   * effect on subsequent runs - once the user has any stored preference
+   * we respect their choices.
+   */
+  defaultDisabled?: boolean;
 };
 
 export type PluginCapabilities = {
