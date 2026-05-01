@@ -4,7 +4,19 @@ export async function openExternalUrl(url: string): Promise<void> {
     await openUrl(url);
     return;
   } catch (err) {
-    console.warn("[open-external] Tauri opener failed, falling back to window.open:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn("[open-external] openUrl rejected:", msg, "url:", url);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("plugin:opener|open_url", { url });
+      console.info("[open-external] fallback invoke succeeded");
+      return;
+    } catch (invokeErr) {
+      console.warn(
+        "[open-external] invoke fallback also failed:",
+        invokeErr instanceof Error ? invokeErr.message : String(invokeErr),
+      );
+    }
     if (typeof window === "undefined") return;
     window.open(url, "_blank", "noopener,noreferrer");
   }
