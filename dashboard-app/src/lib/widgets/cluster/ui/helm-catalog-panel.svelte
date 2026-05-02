@@ -66,14 +66,6 @@
       clusterId: string,
       onOutput?: (chunk: string) => void,
     ) => Promise<{ success: boolean; error?: string }>;
-    /**
-     * Default YAML values passed via helm `--values <tmpfile>` when the chart
-     * is installed through the generic path (no installFn). Used for charts
-     * that refuse to boot with chart defaults alone - cert-manager needs
-     * installCRDs=true, loki 6+ needs a minimal SingleBinary storage config,
-     * etc. Kept empty string when no override needed.
-     */
-    defaultValuesYaml?: string;
   }
 
   type PresetId = "monitoring" | "security" | "observability-lite";
@@ -218,10 +210,6 @@
       category: "Security & Compliance",
       description: "Automated TLS certificate management with Let's Encrypt and other issuers.",
       scoring: "TLS coverage, certificate expiry checks. Core for 95+ score.",
-      // Without installCRDs=true the chart installs but no Certificate /
-      // ClusterIssuer CRDs are created - controller is non-functional.
-      // Jetstack docs require either this flag or a separate CRD apply.
-      defaultValuesYaml: "installCRDs: true\n",
     },
     {
       id: "falco",
@@ -300,43 +288,6 @@
       description:
         "Log aggregation system by Grafana. Lightweight alternative to ELK, pairs with Prometheus.",
       scoring: "Log collection, error correlation, audit trail.",
-      // Loki chart v6+ rejects the default config: SingleBinary mode needs an
-      // explicit storage + schema block, and the scalable replicas must be
-      // zeroed out. This is the minimum working config for kick-the-tyres
-      // installs; production deployments should customise via the Helm page.
-      defaultValuesYaml: `deploymentMode: SingleBinary
-loki:
-  auth_enabled: false
-  commonConfig:
-    replication_factor: 1
-  storage:
-    type: filesystem
-  schemaConfig:
-    configs:
-      - from: "2024-01-01"
-        store: tsdb
-        object_store: filesystem
-        schema: v13
-        index:
-          prefix: loki_index_
-          period: 24h
-singleBinary:
-  replicas: 1
-read:
-  replicas: 0
-write:
-  replicas: 0
-backend:
-  replicas: 0
-chunksCache:
-  enabled: false
-resultsCache:
-  enabled: false
-test:
-  enabled: false
-lokiCanary:
-  enabled: false
-`,
     },
     {
       id: "promtail",
@@ -449,10 +400,7 @@ lokiCanary:
       releaseName: "external-secrets",
       namespace: "external-secrets",
       repoName: "external-secrets",
-      // charts.external-secrets.io 302-redirects to external-secrets.io.
-      // Modern helm follows it, but pinning the canonical endpoint avoids
-      // corp proxies that drop redirects.
-      repoUrl: "https://external-secrets.io",
+      repoUrl: "https://charts.external-secrets.io",
       chart: "external-secrets/external-secrets",
       category: "Security & Compliance",
       description:
@@ -961,7 +909,6 @@ lokiCanary:
       chartVersion: version || undefined,
       repoName: chart.repoName,
       repoUrl: chart.repoUrl,
-      valuesYaml: chart.defaultValuesYaml,
       onOutput,
     });
   }
@@ -1103,15 +1050,11 @@ lokiCanary:
     // chart reset between iterations does not open a window for concurrent
     // clicks from other buttons.
     actionInFlight = `preset:${preset.id}`;
-    currentActionLabel = `Installing preset: ${preset.title}`;
-    session.start();
-    const onOutput = (chunk: string) => session.append(chunk);
     try {
       for (const chart of targets) {
         presetProgress = { ...presetProgress, current: chart.name };
-        session.append(`\n--- ${chart.name} (ns: ${chart.namespace}) ---\n`);
         try {
-          const result = await runInstall(chart, onOutput);
+          const result = await runInstall(chart);
           if (!result.success) {
             presetProgress = {
               ...presetProgress,
@@ -1127,16 +1070,13 @@ lokiCanary:
       }
       await refreshReleases();
       const fails = presetProgress.failures;
-      if (fails.length === 0) {
-        actionNotice = { type: "success", text: `Preset "${preset.title}" installed.` };
-        session.succeed();
-      } else {
-        actionNotice = {
-          type: "error",
-          text: `Preset "${preset.title}" installed with ${fails.length} failure(s). First: ${fails[0]}`,
-        };
-        session.fail();
-      }
+      actionNotice =
+        fails.length === 0
+          ? { type: "success", text: `Preset "${preset.title}" installed.` }
+          : {
+              type: "error",
+              text: `Preset "${preset.title}" installed with ${fails.length} failure(s). First: ${fails[0]}`,
+            };
     } finally {
       presetProgress = null;
       actionInFlight = null;
