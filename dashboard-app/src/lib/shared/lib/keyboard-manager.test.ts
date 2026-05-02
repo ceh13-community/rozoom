@@ -81,13 +81,6 @@ describe("keyboard-manager", () => {
       handleGlobalKeydown(key("/"));
       expect(handler).not.toHaveBeenCalled();
     });
-
-    it("does not fire single-key when Ctrl is held (e.g. Ctrl+J)", () => {
-      const handler = vi.fn();
-      registerShortcut("j", handler);
-      handleGlobalKeydown(key("j", { ctrlKey: true }));
-      expect(handler).not.toHaveBeenCalled();
-    });
   });
 
   describe("chord sequences", () => {

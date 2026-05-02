@@ -4,11 +4,13 @@ on:
   pull_request:
     branches:
       - main
+      - master
     types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - main
-  workflow_dispatch: {}
+      - master
+  workflow_dispatch: {} # Manual run button
 
 defaults:
   run:
@@ -81,7 +83,60 @@ jobs:
           path: dashboard-app/playwright-report
           if-no-files-found: ignore
 
+  # android_checks:
+  #   name: Android validation (PR)
+  #   if: github.event_name == 'pull_request'
+  #   runs-on: ubuntu-24.04
+  #   timeout-minutes: 60
+  #   permissions:
+  #     contents: read
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #       with:
+  #         fetch-depth: 1
+  #
+  #     - name: Setup pnpm
+  #       uses: ./.github/actions/setup-pnpm
+  #
+  #     - name: Setup Rust
+  #       uses: dtolnay/rust-toolchain@stable
+  #       with:
+  #         targets: aarch64-linux-android
+  #
+  #     - name: Rust cache
+  #       uses: swatinem/rust-cache@v2
+  #       with:
+  #         workspaces: './dashboard-app/src-tauri -> target'
+  #
+  #     - name: Setup Java
+  #       uses: actions/setup-java@v4
+  #       with:
+  #         distribution: temurin
+  #         java-version: "17"
+  #
+  #     - name: Setup Android SDK
+  #       uses: android-actions/setup-android@v3
+  #
+  #     - name: Install Linux build dependencies
+  #       run: |
+  #         sudo apt-get update
+  #         sudo apt-get install -y --no-install-recommends libglib2.0-dev libgtk-3-dev pkg-config
+  #
+  #     - name: Install Android dependencies
+  #       run: |
+  #         sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125"
+  #
+  #     - name: Download binaries
+  #       run: pnpm download:binaries
+  #
+  #     - name: Init Android project
+  #       run: pnpm tauri android init
+  #
+  #     - name: Build Android APK (debug)
+  #       run: pnpm tauri android build --debug
+
   publish-tauri:
+    ### Release only manually and only from master
     if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     permissions:
       contents: write
@@ -89,13 +144,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # macOS ARM (Apple Silicon M1+)
           - platform: "macos-latest"
             args: "--target aarch64-apple-darwin --bundles app,dmg"
             label: "macOS ARM64"
+          # # macOS Intel (disabled)
+          # - platform: "macos-latest"
+          #   args: "--target x86_64-apple-darwin --bundles app,dmg"
+          #   label: "macOS x64"
           # Linux x86_64 (DEB + RPM; AppImage built separately below)
           - platform: "ubuntu-22.04"
             args: "--bundles deb,rpm"
             label: "Linux x64"
+          # # Linux ARM64 (disabled)
+          # - platform: "ubuntu-24.04"
+          #   args: "--target aarch64-unknown-linux-gnu --bundles deb"
+          #   label: "Linux ARM64"
+          # Windows x64 (MSI + NSIS installer)
           - platform: "windows-latest"
             args: "--bundles msi,nsis"
             label: "Windows x64"
@@ -117,6 +182,13 @@ jobs:
 
       - name: Setup rust
         uses: ./.github/actions/setup-rust
+
+      - name: Install ARM64 cross-compilation toolchain
+        if: contains(matrix.args, 'aarch64-unknown-linux-gnu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          rustup target add aarch64-unknown-linux-gnu
 
       - name: Download binaries
         env:
@@ -152,17 +224,26 @@ jobs:
         with:
           projectPath: dashboard-app
           tagName: app-v${{ env.APP_VERSION }}
-          releaseName: "ROZOOM v${{ env.APP_VERSION }}"
+          releaseName: "App v${{ env.APP_VERSION }}"
           releaseBody: |
-            ## Artifacts
+            Release `v${{ env.APP_VERSION }}` is available as a draft build.
+
+            ## Artifacts by platform
 
             | Platform | Architecture | Artifacts |
             |----------|-------------|-----------|
-            | **macOS** | ARM64 (M1+) | `.dmg`, `.app.tar.gz` |
-            | **Linux** | x64 | `.deb`, `.rpm`, `.AppImage` |
             | **Windows** | x64 | `.msi`, `.exe` (NSIS) |
+            | **macOS** | ARM64 (M1+) | `.dmg`, `.app.tar.gz` |
+            | **macOS** | x64 (Intel) | `.dmg`, `.app.tar.gz` |
+            | **Linux** | x64 | `.deb`, `.rpm`, `.AppImage` |
+            | **Linux** | ARM64 | `.deb` |
 
             Download the package matching your OS and architecture.
+
+            Notes:
+            - Linux artifacts use normalized filenames with underscores.
+            - macOS: run `xattr -dr com.apple.quarantine /Applications/ROZOOM*.app` if quarantined.
+            - This draft release is intended for validation before final publication.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
@@ -186,3 +267,69 @@ jobs:
           tag_name: app-v${{ env.APP_VERSION }}
           draft: true
           files: dashboard-app/src-tauri/target/release/bundle/appimage/*.AppImage
+
+      - name: Build RPM fallback artifact
+        if: runner.os == 'Linux'
+        working-directory: ./dashboard-app
+        run: pnpm run build:rpm
+
+      - name: Upload RPM fallback to draft release
+        if: runner.os == 'Linux'
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: app-v${{ env.APP_VERSION }}
+          draft: true
+          files: dashboard-app/src-tauri/target/release/bundle/rpm/ROZOOM_K8s_Linter_IDE_${{ env.APP_VERSION }}_x86_64.rpm
+
+  # android-build:
+  #   name: Build Android (manual)
+  #   if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+  #   runs-on: ubuntu-24.04
+  #   timeout-minutes: 60
+  #   permissions:
+  #     contents: read
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #       with:
+  #         fetch-depth: 1
+  #
+  #     - name: Setup pnpm
+  #       uses: ./.github/actions/setup-pnpm
+  #
+  #     - name: Setup Rust
+  #       uses: dtolnay/rust-toolchain@stable
+  #       with:
+  #         targets: aarch64-linux-android
+  #
+  #     - name: Rust cache
+  #       uses: swatinem/rust-cache@v2
+  #       with:
+  #         workspaces: './dashboard-app/src-tauri -> target'
+  #
+  #     - name: Setup Java
+  #       uses: actions/setup-java@v4
+  #       with:
+  #         distribution: temurin
+  #         java-version: "17"
+  #
+  #     - name: Setup Android SDK
+  #       uses: android-actions/setup-android@v3
+  #
+  #     - name: Install Android dependencies
+  #       run: |
+  #         sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125"
+  #
+  #     - name: Download binaries
+  #       run: pnpm download:binaries
+  #
+  #     - name: Build Android APK (debug)
+  #       run: pnpm tauri android build --debug
+  #
+  #     - name: Upload APK artifact
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: android-apk
+  #         path: dashboard-app/src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+  #         if-no-files-found: error

@@ -17,7 +17,6 @@
   import { Badge } from "$shared/ui/badge";
   import { Skeleton } from "$shared/ui/skeleton";
   import { Button } from "$shared/ui/button";
-  import LoadingDots from "$shared/ui/loading-dots.svelte";
   import * as Popover from "$shared/ui/popover";
   import { confirmAction } from "$shared/lib/confirm-action";
   import { getTimeDifference, timeAgo } from "$shared/lib/timeFormatters";
@@ -1668,7 +1667,7 @@
                     class="inline-block h-2 w-2 animate-spin rounded-full border-2 border-current border-t-transparent"
                     aria-hidden="true"
                   ></span>
-                  Updating…
+                  Updating
                 </span>
               {:else if headerSyncDisplayText === "updated"}
                 <span

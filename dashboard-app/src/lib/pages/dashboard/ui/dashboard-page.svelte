@@ -697,8 +697,9 @@
       </Button>
     </div>
   {/if}
-{:else if loading || !initialLoadComplete}
+{:else if loading}
   <h2 class="text-xl font-bold">Available Kubernetes Clusters</h2>
+  <p>Loading cluster list...</p>
   <div class="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-4">
     {#each Array(4) as _, i}
       <Skeleton class="h-48 w-full rounded-lg" />

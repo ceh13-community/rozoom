@@ -51,14 +51,12 @@ export const SCRUB_RULES: ReadonlyArray<{
   },
   // Bare "Bearer <token>" without the Authorization prefix (e.g. when
   // stored as a plain header value in a JS object). Keeps the scheme
-  // word so debug context survives. Case-insensitive because HTTP auth
-  // schemes are case-insensitive per RFC 7235 - "bearer abc" must be
-  // scrubbed as aggressively as "Bearer abc". Threshold is deliberately
-  // low - a false-positive redaction of "Bearer Grylls" is better than
-  // leaking a real short-lived token.
+  // word so debug context survives. Threshold is deliberately low - a
+  // false-positive redaction of "Bearer Grylls" is better than leaking a
+  // real short-lived token.
   {
     name: "bare-bearer-token",
-    pattern: /\b(Bearer\s+)([A-Za-z0-9._~+/=-]{3,})/gi,
+    pattern: /\b(Bearer\s+)([A-Za-z0-9._~+/=-]{3,})/g,
     replace: (_m, prefix) => `${prefix}${REDACTED}`,
   },
   // Common password field in CLI args or URLs.
