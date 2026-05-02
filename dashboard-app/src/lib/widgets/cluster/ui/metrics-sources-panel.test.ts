@@ -133,12 +133,7 @@ describe("metrics-sources-panel", () => {
     );
 
     await waitFor(() => {
-      expect(helmModule.installMetricsServer).toHaveBeenCalledWith(
-        "cluster-a",
-        undefined,
-        undefined,
-        expect.any(Function),
-      );
+      expect(helmModule.installMetricsServer).toHaveBeenCalledWith("cluster-a");
       expect(mockToastSuccess).toHaveBeenCalledWith("metrics-server installed and verified.");
     });
   });
@@ -196,11 +191,7 @@ describe("metrics-sources-panel", () => {
     );
 
     await waitFor(() => {
-      expect(helmModule.installKubeStateMetrics).toHaveBeenCalledWith(
-        "cluster-a",
-        undefined,
-        expect.any(Function),
-      );
+      expect(helmModule.installKubeStateMetrics).toHaveBeenCalledWith("cluster-a");
       expect(mockToastError).toHaveBeenCalledWith("kube-state-metrics: helm install failed");
     });
   });
