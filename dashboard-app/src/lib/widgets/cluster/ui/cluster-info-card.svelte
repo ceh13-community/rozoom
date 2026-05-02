@@ -1040,51 +1040,6 @@
         </Popover.Root>
       {/if}
     </div>
-    <div class="px-6 mb-2 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
-      {#if isRefreshLoading}
-        <span class="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-sky-400"></span>
-        <span>Refreshing now</span>
-      {:else if cluster.needsInitialRefreshHint}
-        <span class="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-sky-400"></span>
-        <span title="Auto-refresh starts after the first manual refresh.">
-          Press ↻ to start auto-refresh
-        </span>
-      {:else if !autoDiagnosticsEnabled}
-        <span class="inline-flex h-1.5 w-1.5 rounded-full bg-amber-400"></span>
-        <span title="Data profile '{autoRefreshProfile.label}' disables scheduled health checks.">
-          Auto-refresh off ({autoRefreshProfile.label})
-        </span>
-        <button
-          type="button"
-          class="rounded border border-amber-400/60 bg-amber-400/10 px-1.5 py-[1px] text-[10px] font-medium text-amber-300 hover:bg-amber-400/20"
-          onclick={enableAutoDiagnostics}
-          title="Switch the global dashboard profile to Balanced so cards refresh on schedule"
-        >
-          Enable
-        </button>
-      {:else if !autoRefreshActive}
-        <span class="inline-flex h-1.5 w-1.5 rounded-full bg-slate-400"></span>
-        <span
-          title="This card is outside the current auto-refresh rotation window. Profile limits the number of cards polling in parallel; scroll / reorder or switch profile to change the window."
-        >
-          Auto-refresh queued (rotation)
-        </span>
-      {:else}
-        <span
-          class="inline-flex h-1.5 w-1.5 rounded-full {lastRefreshHadError
-            ? 'bg-rose-400'
-            : refreshStale
-              ? 'bg-amber-400'
-              : 'bg-emerald-400'}"
-          title={lastRefreshHadError
-            ? "Last refresh attempt failed - see the alert above for details"
-            : refreshStale
-              ? "Last refresh is older than 3x the interval"
-              : "Up-to-date"}
-        ></span>
-        <span>Last refresh: {lastRefreshedLabel}{lastRefreshHadError ? " (failed)" : ""}</span>
-      {/if}
-    </div>
     {#if !cluster.needsInitialRefreshHint && !syntheticMode}
       <div
         class="px-6 flex justify-between items-center gap-2 mb-2 cursor-pointer"
