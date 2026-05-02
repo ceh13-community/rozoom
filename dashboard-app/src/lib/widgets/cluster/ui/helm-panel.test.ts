@@ -110,6 +110,7 @@ describe("helm-panel", () => {
         chart: "bitnami/redis",
         namespace: "cache",
         createNamespace: true,
+        onOutput: expect.any(Function),
       });
     });
   });
@@ -130,6 +131,7 @@ describe("helm-panel", () => {
       expect(helmModule.uninstallHelmRelease).toHaveBeenCalledWith("cluster-a", {
         releaseName: "nginx",
         namespace: "apps",
+        onOutput: expect.any(Function),
       });
       expect(confirmModule.confirmAction).toHaveBeenCalled();
     });
@@ -161,6 +163,7 @@ describe("helm-panel", () => {
         releaseName: "nginx",
         namespace: "apps",
         revision: "1",
+        onOutput: expect.any(Function),
       });
     });
   });
