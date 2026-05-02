@@ -96,11 +96,7 @@ describe("armor-hub-panel", () => {
     await fireEvent.click(getByRole("button", { name: "Install (Helm)" }));
 
     await waitFor(() => {
-      expect(armorHubModule.installArmorProvider).toHaveBeenCalledWith(
-        "cluster-a",
-        "kubearmor",
-        expect.any(Function),
-      );
+      expect(armorHubModule.installArmorProvider).toHaveBeenCalledWith("cluster-a", "kubearmor");
       expect(armorHubModule.runArmorHubScan).toHaveBeenNthCalledWith(1, "cluster-a", {
         force: false,
         statusOnly: true,
@@ -123,7 +119,7 @@ describe("armor-hub-panel", () => {
     });
   });
 
-  it("keeps previously saved report visible on Report tab", async () => {
+  it("keeps previously saved report visible", () => {
     armorHubModule.armorHubReports.set({
       "cluster-a": JSON.stringify(
         { generatedAt: "2026-02-18T00:00:00Z", summary: { providersInstalled: 1 } },
@@ -132,14 +128,10 @@ describe("armor-hub-panel", () => {
       ),
     });
 
-    const { getByText, getByRole } = render(ArmorHubPanel, {
+    const { getByText } = render(ArmorHubPanel, {
       props: { clusterId: "cluster-a" },
     });
 
-    await fireEvent.click(getByRole("button", { name: /^Report$/ }));
-
-    await waitFor(() => {
-      expect(getByText("Latest armor scan report")).toBeInTheDocument();
-    });
+    expect(getByText("Latest armor scan report")).toBeInTheDocument();
   });
 });
