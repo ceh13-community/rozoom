@@ -10,7 +10,7 @@ function getInitial(): ThemeId {
   if (!browser) return "dark";
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored && THEME_ORDER.includes(stored as ThemeId)) return stored as ThemeId;
-  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  return "dark";
 }
 
 function createThemeStore() {
