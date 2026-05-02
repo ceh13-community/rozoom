@@ -1,0 +1,24 @@
+/* Light theme - matches desktop dashboard-app light theme */
+:root[data-theme="light"] {
+  --bg: hsl(210 100% 99%);
+  --bg-card: hsl(0 0% 100%);
+  --bg-raised: hsl(210 60% 96%);
+  --border: hsl(214 41% 86%);
+  --text: hsl(217 45% 15%);
+  --text-dim: hsl(217 24% 45%);
+  --accent: hsl(219 75% 55%);
+  --accent-bg: hsla(219, 75%, 55%, 0.1);
+  --green: hsl(142 71% 45%);
+  --green-bg: hsla(142, 71%, 45%, 0.1);
+  --yellow: hsl(45 93% 47%);
+  --yellow-bg: hsla(45, 93%, 47%, 0.1);
+  --red: hsl(0 72% 51%);
+  --red-bg: hsla(0, 72%, 51%, 0.1);
+  --orange: hsl(25 95% 53%);
+  --ring: hsl(219 75% 55%);
+  --tab-bg: hsl(0 0% 100%);
+  --tab-border: hsl(214 41% 86%);
+  --search-bg: hsl(210 60% 96%);
+  --status-bar: #f8faff;
+  color-scheme: light;
+}

@@ -1,0 +1,91 @@
+name: "Mobile App CI"
+
+on:
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "mobile-app/**"
+      - ".github/workflows/mobile-ci.yml"
+  push:
+    branches: [main, master]
+    paths:
+      - "mobile-app/**"
+      - ".github/workflows/mobile-ci.yml"
+
+defaults:
+  run:
+    working-directory: ./mobile-app
+
+concurrency:
+  group: mobile-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Lint, type-check, unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: pnpm
+          cache-dependency-path: mobile-app/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Static checks (format + lint + types)
+        run: pnpm run check
+
+      - name: Unit tests
+        run: pnpm test:run
+
+  e2e:
+    name: E2E smoke (Playwright)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    needs: checks
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: pnpm
+          cache-dependency-path: mobile-app/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright
+        run: pnpm exec playwright install --with-deps chromium webkit
+
+      - name: Run E2E tests
+        run: pnpm test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-playwright-report
+          path: mobile-app/playwright-report
+          if-no-files-found: ignore

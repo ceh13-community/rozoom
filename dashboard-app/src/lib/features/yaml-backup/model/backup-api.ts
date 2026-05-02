@@ -1,4 +1,4 @@
-import { kubectlRawFront } from "$shared/api/kubectl-proxy";
+import { kubectlRawArgsFront, kubectlRawFront } from "$shared/api/kubectl-proxy";
 import { isTauriAvailable } from "$shared/lib/tauri-runtime";
 import {
   buildBackupDirPath,
@@ -296,11 +296,12 @@ export async function restoreFromYamlBackup(
       // Server-side dry-run validates admission + defaults against live cluster
       // state. Client-side only checks local parse, which does not catch
       // webhook rejections, quota, immutability, or conflicts.
-      const dryRunFlag = options.dryRun ? "--dry-run=server" : "";
-      const result = await kubectlRawFront(
-        `apply -f ${tempPath} ${dryRunFlag} --request-timeout=30s`,
-        { clusterId },
-      );
+      // Use kubectlRawArgsFront (array args) so tempPath with spaces in appDataDir
+      // is passed as a single argument and not split by the whitespace tokenizer.
+      const applyArgs = ["apply", "-f", tempPath];
+      if (options.dryRun) applyArgs.push("--dry-run=server");
+      applyArgs.push("--request-timeout=30s");
+      const result = await kubectlRawArgsFront(applyArgs, { clusterId });
 
       if (result.code !== 0 || result.errors.length > 0) {
         progress.errors.push(`${file.filename}: ${result.errors}`);

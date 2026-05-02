@@ -343,7 +343,7 @@
   const paneIndexes = $derived(getPaneIndexes());
 
   const rowsSource = $derived(
-    (deploymentsSnapshot ?? []).filter((item) =>
+    deploymentsSnapshot.filter((item) =>
       namespaceMatches($selectedNamespace, item.metadata?.namespace),
     ),
   );
@@ -709,7 +709,7 @@
   }
 
   function getSelectedDeployments() {
-    return (deploymentsSnapshot ?? []).filter((item) => {
+    return deploymentsSnapshot.filter((item) => {
       const id = `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? "-"}`;
       return selectedDeploymentIds.has(id);
     });

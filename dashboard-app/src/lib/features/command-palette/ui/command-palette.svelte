@@ -104,11 +104,11 @@
         {#if flatFiltered.length === 0}
           <div class="px-3 py-6 text-center text-sm text-muted-foreground">No commands found.</div>
         {:else}
-          {#each groups as [group, cmds] (group)}
+          {#each groups as [group, cmds]}
             <div class="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
               {group}
             </div>
-            {#each cmds as cmd (cmd.id)}
+            {#each cmds as cmd}
               {@const idx = flatFiltered.indexOf(cmd)}
               <button
                 type="button"

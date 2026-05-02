@@ -12,6 +12,7 @@ pnpm-lock.yaml
 *.dat
 
 node_modules/
+.pnpm-store/
 
 *.snap
 

@@ -185,29 +185,36 @@ const tryServiceProxy = async (
   // Every API-server hop here is best-effort: a failure must yield null so
   // the caller can try pod-proxy next instead of dragging the whole check
   // into the outer catch-all error path.
-  let svcResponse: Awaited<ReturnType<typeof kubectlRawFront>>;
-  try {
-    svcResponse = await kubectlRawFront(
-      `get services -A -l app.kubernetes.io/name in (node-exporter,prometheus-node-exporter) -o json`,
-      { clusterId },
-    );
-  } catch {
-    return null;
-  }
-  if (svcResponse.errors.length > 0 || !svcResponse.output) return null;
-
+  // Set-based selectors (e.g. "name in (a,b)") contain spaces and are tokenized
+  // by kubectlRawFront; use two equality-based calls instead.
   type SvcPort = { name?: string; port?: number };
   type SvcItem = {
     metadata?: { name?: string; namespace?: string; labels?: Record<string, string> };
     spec?: { ports?: SvcPort[] };
   };
-  let parsed: { items?: SvcItem[] };
-  try {
-    parsed = JSON.parse(svcResponse.output) as { items?: SvcItem[] };
-  } catch {
-    return null;
+  let services: SvcItem[] = [];
+  for (const labelValue of ["node-exporter", "prometheus-node-exporter"]) {
+    let svcResponse: Awaited<ReturnType<typeof kubectlRawFront>>;
+    try {
+      svcResponse = await kubectlRawFront(
+        `get services -A -l app.kubernetes.io/name=${labelValue} -o json`,
+        { clusterId },
+      );
+    } catch {
+      continue;
+    }
+    if (svcResponse.errors.length > 0 || !svcResponse.output) continue;
+    let parsed: { items?: SvcItem[] };
+    try {
+      parsed = JSON.parse(svcResponse.output) as { items?: SvcItem[] };
+    } catch {
+      continue;
+    }
+    if (parsed.items && parsed.items.length > 0) {
+      services = parsed.items;
+      break;
+    }
   }
-  const services = parsed.items ?? [];
   if (services.length === 0) return null;
 
   const service = services[0];

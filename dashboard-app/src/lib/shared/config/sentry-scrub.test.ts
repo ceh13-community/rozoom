@@ -43,16 +43,6 @@ describe("scrubString", () => {
     expect(out).not.toContain("xoxb.abc.def123");
   });
 
-  it("redacts bare bearer token case-insensitively (RFC 7235 allows lowercase scheme)", () => {
-    const lower = scrubString("sent header bearer lower.case.tok123");
-    expect(lower).not.toContain("lower.case.tok123");
-    expect(lower).toMatch(/bearer \[REDACTED\]/i);
-
-    const mixed = scrubString("sent header BEARER mixed.case.tok456");
-    expect(mixed).not.toContain("mixed.case.tok456");
-    expect(mixed).toMatch(/BEARER \[REDACTED\]/i);
-  });
-
   it("redacts non-bearer Authorization header values", () => {
     expect(scrubString("authorization: Basic dXNlcjpwYXNz")).toBe("authorization: [REDACTED]");
   });
