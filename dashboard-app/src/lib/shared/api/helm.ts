@@ -641,7 +641,7 @@ export async function installOrUpgradeHelmRelease(
     args.push("--create-namespace");
   }
   if (!params.dryRun) {
-    args.push("--wait=watcher", "--rollback-on-failure", "--timeout", "10m");
+    args.push("--wait=watcher", "--rollback-on-failure", "--timeout", "3m");
   }
   args.push("--kubeconfig", kubeconfigPath);
   if (params.chartVersion?.trim()) {
@@ -1035,7 +1035,7 @@ export async function installKubeStateMetrics(
       "--wait=watcher",
       "--rollback-on-failure",
       "--timeout",
-      "10m",
+      "2m",
       "--kubeconfig",
       kubeconfigPath,
     ],
@@ -1064,7 +1064,7 @@ export async function installKubeStateMetrics(
       "--wait=watcher",
       "--rollback-on-failure",
       "--timeout",
-      "10m",
+      "2m",
       "--kubeconfig",
       kubeconfigPath,
     ],
@@ -1102,7 +1102,7 @@ export async function installMetricsServer(
       "--wait=watcher",
       "--rollback-on-failure",
       "--timeout",
-      "10m",
+      "2m",
       "--kubeconfig",
       kubeconfigPath,
     ],
@@ -1133,7 +1133,7 @@ export async function installMetricsServer(
       "--wait=watcher",
       "--rollback-on-failure",
       "--timeout",
-      "10m",
+      "2m",
       "--kubeconfig",
       kubeconfigPath,
     ],
@@ -1191,7 +1191,7 @@ export async function installNodeExporter(
       "--wait=watcher",
       "--rollback-on-failure",
       "--timeout",
-      "10m",
+      "2m",
       "--kubeconfig",
       kubeconfigPath,
     ],
@@ -1220,7 +1220,7 @@ export async function installNodeExporter(
       "--wait=watcher",
       "--rollback-on-failure",
       "--timeout",
-      "10m",
+      "2m",
       "--kubeconfig",
       kubeconfigPath,
     ],
@@ -1252,7 +1252,7 @@ export async function installKubescape(
       "--wait=watcher",
       "--rollback-on-failure",
       "--timeout",
-      "10m",
+      "3m",
       "--kubeconfig",
       kubeconfigPath,
     ],
@@ -1283,7 +1283,7 @@ export async function installKubescape(
       "--wait=watcher",
       "--rollback-on-failure",
       "--timeout",
-      "10m",
+      "3m",
       "--kubeconfig",
       kubeconfigPath,
     ],
@@ -1322,7 +1322,7 @@ export async function installTrivyOperator(
     TRIVY_OPERATOR_RELEASE,
     namespace,
     TRIVY_OPERATOR_CHART_CANDIDATES,
-    "10m",
+    "3m",
     onOutput,
   );
 }
@@ -1465,7 +1465,7 @@ export async function installVelero(
     "--wait=watcher",
     "--rollback-on-failure",
     "--timeout",
-    "10m",
+    "3m",
     "--kubeconfig",
     kubeconfigPath,
   ];
@@ -1743,7 +1743,7 @@ export async function installVelero(
     "--wait=watcher",
     "--rollback-on-failure",
     "--timeout",
-    "10m",
+    "3m",
     "--kubeconfig",
     kubeconfigPath,
   ];
@@ -1782,7 +1782,7 @@ export async function installPrometheusStack(
       "--wait=watcher",
       "--rollback-on-failure",
       "--timeout",
-      "10m",
+      "3m",
       "--kubeconfig",
       kubeconfigPath,
     ],
@@ -1811,7 +1811,7 @@ export async function installPrometheusStack(
       "--wait=watcher",
       "--rollback-on-failure",
       "--timeout",
-      "10m",
+      "3m",
       "--kubeconfig",
       kubeconfigPath,
     ],
@@ -1825,7 +1825,7 @@ async function installByChartCandidates(
   release: string,
   namespace: string,
   chartCandidates: string[],
-  timeout: string = "10m",
+  timeout: string = "3m",
   onOutput?: (chunk: string) => void,
 ): Promise<HelmResult> {
   const kubeconfigPath = await getKubeconfigPath(clusterId);
@@ -1906,7 +1906,7 @@ export async function installKubeArmor(
     KUBEARMOR_RELEASE,
     namespace,
     KUBEARMOR_CHART_CANDIDATES,
-    "10m",
+    "3m",
     onOutput,
   );
 }
