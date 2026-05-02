@@ -1,4 +1,57 @@
+import { load as parseYaml, dump as dumpYaml } from "js-yaml";
+
 export type GitOpsProvider = "argocd" | "flux";
+
+const STRIPPED_METADATA_FIELDS = [
+  "creationTimestamp",
+  "generation",
+  "resourceVersion",
+  "selfLink",
+  "uid",
+  "managedFields",
+  "ownerReferences",
+];
+
+const STRIPPED_ANNOTATION_KEYS = ["kubectl.kubernetes.io/last-applied-configuration"];
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function sanitizeResourceYamlForEdit(rawYaml: string): string {
+  if (!rawYaml.trim()) return rawYaml;
+  let parsed: unknown;
+  try {
+    parsed = parseYaml(rawYaml);
+  } catch {
+    return rawYaml;
+  }
+  if (!isPlainObject(parsed)) return rawYaml;
+
+  delete parsed.status;
+
+  const metadata = parsed.metadata;
+  if (isPlainObject(metadata)) {
+    for (const key of STRIPPED_METADATA_FIELDS) {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete metadata[key];
+    }
+    const annotations = metadata.annotations;
+    if (isPlainObject(annotations)) {
+      for (const key of STRIPPED_ANNOTATION_KEYS) {
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+        delete annotations[key];
+      }
+      if (Object.keys(annotations).length === 0) delete metadata.annotations;
+    }
+  }
+
+  try {
+    return dumpYaml(parsed, { lineWidth: -1, noRefs: true, sortKeys: false });
+  } catch {
+    return rawYaml;
+  }
+}
 
 export type GitOpsBootstrapConfig = {
   provider: GitOpsProvider;
@@ -26,9 +79,9 @@ export function getBootstrapSteps(config: GitOpsBootstrapConfig): BootstrapStep[
 }
 
 function getArgoCDSteps(
-  repoUrl: string,
-  branch: string,
-  path: string,
+  _repoUrl: string,
+  _branch: string,
+  _path: string,
   namespace: string,
 ): BootstrapStep[] {
   return [
@@ -49,18 +102,13 @@ function getArgoCDSteps(
         "5m",
       ],
     },
-    {
-      id: "argocd-app",
-      label: "Create ArgoCD Application",
-      command: ["kubectl", "apply", "-f", "-"],
-    },
   ];
 }
 
 function getFluxSteps(
-  repoUrl: string,
-  branch: string,
-  path: string,
+  _repoUrl: string,
+  _branch: string,
+  _path: string,
   namespace: string,
 ): BootstrapStep[] {
   return [
@@ -80,16 +128,6 @@ function getFluxSteps(
         "--timeout",
         "5m",
       ],
-    },
-    {
-      id: "flux-source",
-      label: "Create GitRepository source",
-      command: ["kubectl", "apply", "-f", "-"],
-    },
-    {
-      id: "flux-kustomization",
-      label: "Create Flux Kustomization",
-      command: ["kubectl", "apply", "-f", "-"],
     },
   ];
 }
