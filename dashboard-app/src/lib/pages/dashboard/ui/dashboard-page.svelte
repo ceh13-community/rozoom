@@ -75,6 +75,12 @@
     type ClusterGroup,
     type GroupedClusters,
   } from "$shared/lib/cluster-groups";
+  import {
+    loadDashboardCardVersion,
+    saveDashboardCardVersion,
+    loadDashboardViewMode,
+    saveDashboardViewMode,
+  } from "$shared/lib/dashboard-view-preferences";
   import SmartGroupsPanel from "./smart-groups-panel.svelte";
 
   let clusters: AppClusterConfig[] = $state([]);
@@ -260,6 +266,10 @@
     groups = await loadGroups();
     groupMembership = await loadGroupMembership();
     savedViews = await loadSavedViews();
+    const savedCardVersion = await loadDashboardCardVersion();
+    if (savedCardVersion) cardVersion = savedCardVersion;
+    const savedViewMode = await loadDashboardViewMode();
+    if (savedViewMode) viewMode = savedViewMode;
     await loadClustersFromConfig();
   });
 
@@ -397,19 +407,37 @@
           class="px-2.5 py-1.5 font-semibold transition {cardVersion === 'compact'
             ? 'bg-slate-700 text-white'
             : 'bg-transparent text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-700'}"
-          onclick={() => (cardVersion = "compact")}>Compact</button
+          onclick={() => {
+            cardVersion = "compact";
+            void saveDashboardCardVersion("compact");
+          }}>Compact</button
         >
         <button
           class="px-2.5 py-1.5 font-semibold transition {cardVersion === 'detailed'
             ? 'bg-slate-700 text-white'
             : 'bg-transparent text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-700'}"
-          onclick={() => (cardVersion = "detailed")}>Detailed</button
+          onclick={() => {
+            cardVersion = "detailed";
+            void saveDashboardCardVersion("detailed");
+          }}>Detailed</button
         >
       </div>
-      <Button variant="outline" onclick={() => (viewMode = "list")}>
+      <Button
+        variant="outline"
+        onclick={() => {
+          viewMode = "list";
+          void saveDashboardViewMode("list");
+        }}
+      >
         {#if viewMode === "list"}<ListCheck />{:else}<List />{/if}
       </Button>
-      <Button variant="outline" onclick={() => (viewMode = "grid")}>
+      <Button
+        variant="outline"
+        onclick={() => {
+          viewMode = "grid";
+          void saveDashboardViewMode("grid");
+        }}
+      >
         {#if viewMode === "grid"}<Grid2X2Check />{:else}<Grid2X2 />{/if}
       </Button>
       <Button
