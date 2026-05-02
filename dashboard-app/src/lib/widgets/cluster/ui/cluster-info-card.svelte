@@ -120,6 +120,10 @@
   import ImageFreshnessStatus from "./image-freshness-status.svelte";
   import NodeUtilizationStatus from "./node-utilization-status.svelte";
   import LoadingDots from "$shared/ui/loading-dots.svelte";
+  import {
+    loadClusterCardSections,
+    saveClusterCardSections,
+  } from "$shared/lib/dashboard-view-preferences";
 
   interface Props {
     cluster: AppClusterConfig;
@@ -534,6 +538,20 @@
 
   const CARD_DIAGNOSTICS_TTL_MS = 5 * 60_000;
   type CardDiagnosticsScope = "config" | "health" | "infrastructure";
+  let sectionOpen = $state({
+    workloads: false,
+    security: false,
+    observability: false,
+    configuration: false,
+    infrastructure: false,
+    health: false,
+  });
+
+  function toggleSection(section: keyof typeof sectionOpen, e: Event) {
+    sectionOpen[section] = (e.currentTarget as HTMLDetailsElement).open;
+    void saveClusterCardSections(cluster.uuid, { ...sectionOpen });
+  }
+
   let refreshInterval = $state(String(DEFAULT_REFRESH_INTERVAL_MINUTES));
   let linterEnabled = $state(true);
   let manualRefreshPending = $state(false);
@@ -861,6 +879,12 @@
         const report = await loadCredentialReport(cluster.uuid, cluster.name);
         credRisk = report;
       }
+      const savedSections = await loadClusterCardSections(cluster.uuid);
+      if (savedSections) {
+        for (const key of Object.keys(sectionOpen) as Array<keyof typeof sectionOpen>) {
+          if (typeof savedSections[key] === "boolean") sectionOpen[key] = savedSections[key];
+        }
+      }
     } catch (error) {
       // Don't set cluster.status = "error" - it mutates the prop and never resets.
       // The card will show the error state via checkState.error from the watcher instead.
@@ -1162,7 +1186,11 @@
       </div>
     {/if}
     {#if lastCheck}
-      <details class="group px-6 mb-3">
+      <details
+        class="group px-6 mb-3"
+        open={sectionOpen.workloads}
+        ontoggle={(e) => toggleSection("workloads", e)}
+      >
         <summary class="flex items-center justify-between cursor-pointer py-1">
           <span>Workloads</span>
           <ChevronDown class="w-4 h-4 transition-transform group-open:rotate-180" />
@@ -1251,7 +1279,11 @@
       </details>
       <NamespacesList namespaces={nameSpaacesList} />
     {/if}
-    <details class="group px-6 mb-3">
+    <details
+      class="group px-6 mb-3"
+      open={sectionOpen.security}
+      ontoggle={(e) => toggleSection("security", e)}
+    >
       <summary class="flex items-center justify-between cursor-pointer py-1">
         <span>Security & Compliance</span>
         <ChevronDown class="w-4 h-4 transition-transform group-open:rotate-180" />
@@ -1305,7 +1337,11 @@
         </div>
       </div>
     </details>
-    <details class="group px-6 mb-3">
+    <details
+      class="group px-6 mb-3"
+      open={sectionOpen.observability}
+      ontoggle={(e) => toggleSection("observability", e)}
+    >
       <summary class="flex items-center justify-between cursor-pointer py-1">
         <span>Observability</span>
         <ChevronDown class="w-4 h-4 transition-transform group-open:rotate-180" />
@@ -1342,7 +1378,11 @@
       </div>
     </details>
     {#if effectiveLinter}
-      <details class="group px-6 mb-3">
+      <details
+        class="group px-6 mb-3"
+        open={sectionOpen.configuration}
+        ontoggle={(e) => toggleSection("configuration", e)}
+      >
         <summary class="flex items-center justify-between cursor-pointer py-1">
           <span>Configuration check</span>
           <ChevronDown class="w-4 h-4 transition-transform group-open:rotate-180" />
@@ -1428,7 +1468,11 @@
           <SecurityHardening report={securityHardening} clusterId={cluster.uuid} />
         </div>
       </details>
-      <details class="group px-6 mb-3">
+      <details
+        class="group px-6 mb-3"
+        open={sectionOpen.infrastructure}
+        ontoggle={(e) => toggleSection("infrastructure", e)}
+      >
         <summary class="flex items-center justify-between cursor-pointer py-1">
           <span>Infrastructure</span>
           <ChevronDown class="w-4 h-4 transition-transform group-open:rotate-180" />
@@ -1472,7 +1516,11 @@
         </div>
       </details>
       {#if lastCheck}
-        <details class="group px-6 mb-3">
+        <details
+          class="group px-6 mb-3"
+          open={sectionOpen.health}
+          ontoggle={(e) => toggleSection("health", e)}
+        >
           <summary class="flex items-center justify-between cursor-pointer py-1">
             <span>Health checks</span>
             <ChevronDown class="w-4 h-4 transition-transform group-open:rotate-180" />
