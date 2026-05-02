@@ -32,8 +32,6 @@
     loadClusterLinterEnabled,
     saveClusterLinterEnabled,
     isClusterHealthCheckHydrated,
-    REFRESH_INTERVAL_OPTIONS,
-    isValidRefreshInterval,
   } from "$features/check-health/";
   import {
     dashboardDataProfile,
@@ -52,6 +50,11 @@
   import { markClusterRefreshHintSeen } from "$features/cluster-manager";
   import { globalLinterEnabled } from "$features/check-health/model/linter-preferences";
   import { buildPrimaryAlert } from "$widgets/datalists/ui/model/overview-diagnostics";
+  import {
+    loadCredentialReport,
+    getCachedCredentialReport,
+  } from "$features/cluster-manager/model/credential-risk-cache";
+  import type { CredentialSecurityReport } from "$features/cluster-manager/model/credential-security";
   import DriftBadge from "./drift-badge.svelte";
 
   interface Props {
@@ -328,6 +331,23 @@
     unknown: "text-slate-400",
   };
 
+  // ── Credential risk ────────────────────────────────────────────
+  let credRisk = $state<CredentialSecurityReport | null>(
+    getCachedCredentialReport(cluster.uuid) ?? null,
+  );
+  const credRiskLabel = $derived.by(() => {
+    if (!credRisk || credRisk.findings.length === 0) return null;
+    if (credRisk.overallRisk !== "critical" && credRisk.overallRisk !== "high") return null;
+    const top = credRisk.findings.find((f) => f.risk === "critical" || f.risk === "high");
+    return top
+      ? {
+          risk: credRisk.overallRisk,
+          title: top.title,
+          tooltip: `${top.title}\n\n${top.description}\n\nFix: ${top.remediation}`,
+        }
+      : null;
+  });
+
   // ── Navigation ─────────────────────────────────────────────────
   let refreshInterval = $state("5");
   let linterEnabled = $state(true);
@@ -445,8 +465,12 @@
         await getLastHealthCheck(cluster.uuid);
       }
       const si = await loadClusterRefreshInterval(cluster.uuid);
-      if (isValidRefreshInterval(si)) refreshInterval = `${si}`;
+      if (si && new Set([1, 5, 10]).has(si)) refreshInterval = `${si}`;
       linterEnabled = await loadClusterLinterEnabled(cluster.uuid);
+      if (credRisk === null) {
+        const report = await loadCredentialReport(cluster.uuid, cluster.name);
+        credRisk = report;
+      }
     } catch {
       /* */
     } finally {
@@ -559,6 +583,23 @@
         </Badge>
         <DriftBadge clusterId={cluster.uuid} />
         <span class="text-xs text-muted-foreground">{platformLabel}</span>
+        {#if credRiskLabel}
+          <button
+            type="button"
+            onclick={() =>
+              goto(
+                `/dashboard/clusters/${encodeURIComponent(cluster.uuid)}?workload=compliancehub`,
+              )}
+            class="inline-flex items-center gap-1 rounded h-5 px-1.5 text-[10px] font-semibold border cursor-help transition {credRiskLabel.risk ===
+            'critical'
+              ? 'border-rose-500 text-rose-400 bg-rose-500/10 hover:bg-rose-500/20'
+              : 'border-orange-500 text-orange-400 bg-orange-500/10 hover:bg-orange-500/20'}"
+            title={credRiskLabel.tooltip}
+          >
+            <Shield class="w-3 h-3" />
+            <span class="truncate max-w-[120px]">{credRiskLabel.title}</span>
+          </button>
+        {/if}
       </div>
       <div class="flex items-center gap-2">
         {#if effectiveLinter}
@@ -569,10 +610,14 @@
                 : healthScore.score >= 65
                   ? 'text-amber-500'
                   : 'text-rose-500'}"
-              title="Health Score: {healthScore.score}/100">{healthScore.score}</span
+              title="Health Score: {healthScore.score}/100"
+              ><span class="text-[9px] font-normal opacity-70 mr-0.5">H</span
+              >{healthScore.score}</span
             >
           {:else}
-            <span class="text-xs text-muted-foreground" title="Health Score">-</span>
+            <span class="text-xs text-muted-foreground" title="Health Score"
+              ><span class="text-[9px] font-normal opacity-70 mr-0.5">H</span>-</span
+            >
           {/if}
           {#if clusterScore.score != null}
             <span
@@ -583,53 +628,53 @@
                   : 'text-rose-500'}"
               title="Cluster Score: {clusterScore.score}/100{clusterScore.topRisks.length > 0
                 ? `\nTop risks:\n${clusterScore.topRisks.map((r) => `- ${r.title}`).join('\n')}`
-                : ''}">{clusterScore.score}</span
+                : ''}"
+              ><span class="text-[9px] font-normal opacity-70 mr-0.5">C</span
+              >{clusterScore.score}</span
             >
           {:else}
-            <span class="text-xs text-muted-foreground" title="Cluster Score">-</span>
+            <span class="text-xs text-muted-foreground" title="Cluster Score"
+              ><span class="text-[9px] font-normal opacity-70 mr-0.5">C</span>-</span
+            >
           {/if}
         {/if}
         <button
-          type="button"
-          class="inline-flex h-7 w-7 items-center justify-center rounded border transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 {effectiveLinter
-            ? 'border-emerald-500/60 text-emerald-400 hover:border-emerald-400 hover:text-emerald-300'
-            : 'border-slate-500/60 text-slate-400 hover:border-slate-400 hover:text-slate-300'}"
+          class="flex items-center gap-0.5 rounded border px-1 h-5 text-[10px] font-semibold transition {effectiveLinter
+            ? 'border-emerald-600 text-emerald-400'
+            : 'border-slate-600 text-slate-500'}"
           onclick={toggleLinter}
           disabled={!globalLinter}
-          aria-pressed={effectiveLinter}
-          aria-label="Toggle linter"
           title={!globalLinter
             ? "Linter disabled globally"
             : linterEnabled
-              ? "Linter enabled - click to disable"
-              : "Linter disabled - click to enable"}
+              ? "Linter ON"
+              : "Linter OFF"}
         >
-          <Gauge class="w-3.5 h-3.5" />
+          <Gauge class="w-3 h-3" />
         </button>
-        <div class="relative inline-flex">
-          <label class="sr-only" for={`cluster-refresh-detailed-${cluster.uuid}`}
-            >Refresh interval</label
-          >
+        <label
+          class="relative inline-flex h-5 items-center gap-1 rounded border border-slate-500 bg-slate-700 pl-1.5 pr-4 text-[10px] font-semibold text-white cursor-pointer"
+          title="Auto-refresh interval for health diagnostics"
+        >
+          <span class="opacity-70">every</span>
           <select
-            id={`cluster-refresh-detailed-${cluster.uuid}`}
-            class="h-7 min-w-[3.75rem] appearance-none cursor-pointer rounded border border-slate-500 bg-slate-700 pl-2 pr-6 text-[11px] font-semibold text-white shadow-sm outline-none transition hover:border-slate-300 focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
+            class="appearance-none bg-transparent outline-none leading-none text-[10px] font-semibold py-0 m-0 pr-0 border-0"
             bind:value={refreshInterval}
             onchange={(e) => {
               const v = (e.currentTarget as HTMLSelectElement).value;
               refreshInterval = v;
               void saveClusterRefreshInterval(cluster.uuid, Number(v));
             }}
-            title="Auto-refresh interval for health diagnostics"
           >
-            {#each REFRESH_INTERVAL_OPTIONS as option (option.value)}
-              <option value={option.value}>{option.short}</option>
+            {#each [{ l: "1m", v: "1" }, { l: "5m", v: "5" }, { l: "10m", v: "10" }] as o (o.v)}
+              <option value={o.v}>{o.l}</option>
             {/each}
           </select>
           <span
-            class="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-white/70"
+            class="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-[8px] opacity-70"
             aria-hidden="true">▾</span
           >
-        </div>
+        </label>
       </div>
     </div>
 
