@@ -172,6 +172,7 @@
   // ── Command Palette ────────────────────────────────────────────
   let commandPaletteOpen = $state(false);
   const paletteCommands = $derived(buildAllCommands(cluster));
+  const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
 
   $effect(() => {
     const disposers: Array<() => void> = [];
@@ -1570,7 +1571,7 @@
           >
             <kbd
               class="rounded border border-indigo-500/40 bg-indigo-950/60 px-1.5 py-0.5 font-mono text-[10px] text-indigo-300 group-hover:border-indigo-400/60 group-hover:bg-indigo-900/60"
-              >Ctrl</kbd
+              >{isMac ? "⌘" : "Ctrl"}</kbd
             >
             <kbd
               class="rounded border border-indigo-500/40 bg-indigo-950/60 px-1.5 py-0.5 font-mono text-[10px] text-indigo-300 group-hover:border-indigo-400/60 group-hover:bg-indigo-900/60"
