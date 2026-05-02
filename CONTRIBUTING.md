@@ -5,7 +5,7 @@ Thank you for your interest in contributing! This guide will help you get starte
 ## Quick Start
 
 ```bash
-git clone https://github.com/ceh13-community/rozoom.git
+git clone https://github.com/ceh13-community/svelte-dashboard.git
 cd dashboard-app
 pnpm install
 pnpm download:binaries

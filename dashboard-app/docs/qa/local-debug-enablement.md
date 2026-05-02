@@ -16,7 +16,7 @@ Create or update `.env.local`:
 PUBLIC_SENTRY_DSN=
 PUBLIC_SENTRY_ENVIRONMENT=development
 PUBLIC_SENTRY_ENABLE_IN_DEV=false
-SENTRY_ORG=your-org
+SENTRY_ORG=loyly
 SENTRY_PROJECT=javascript-sveltekit
 SENTRY_AUTH_TOKEN=
 SENTRY_ENABLE_SOURCE_MAP_UPLOAD=false
@@ -92,7 +92,7 @@ For source map upload during a production-like build, also set:
 
 ```bash
 SENTRY_AUTH_TOKEN=...
-SENTRY_ORG=your-org
+SENTRY_ORG=loyly
 SENTRY_PROJECT=javascript-sveltekit
 SENTRY_ENABLE_SOURCE_MAP_UPLOAD=true
 ```
