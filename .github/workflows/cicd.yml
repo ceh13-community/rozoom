@@ -25,6 +25,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  TRIVY_VERSION: "0.70.0"
 
 jobs:
   pr_checks:
