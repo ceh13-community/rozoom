@@ -30,7 +30,9 @@ describe("checkNodeExporter", () => {
    * with the pod-probe invocations in order.
    */
   const stubEmptyServiceList = () => {
-    vi.mocked(kubectlRawFront).mockResolvedValueOnce({ output: "", errors: "" });
+    vi.mocked(kubectlRawFront)
+      .mockResolvedValueOnce({ output: "", errors: "" })
+      .mockResolvedValueOnce({ output: "", errors: "" });
   };
 
   beforeEach(() => {
@@ -284,7 +286,7 @@ describe("checkNodeExporter", () => {
     const result = await checkNodeExporter(clusterId);
 
     expect(result.status[0]).toEqual({ nodeName: "worker-1", result: 1 });
-    const probeCall = vi.mocked(kubectlRawFront).mock.calls[1]?.[0];
+    const probeCall = vi.mocked(kubectlRawFront).mock.calls[2]?.[0];
     expect(probeCall).toContain("/pods/node-exporter-xyz:9100/proxy/metrics");
   });
 
@@ -333,8 +335,8 @@ describe("checkNodeExporter", () => {
     const result = await checkNodeExporter(clusterId);
 
     expect(result.status[0]).toEqual({ nodeName: "worker-2", result: 1 });
-    expect(vi.mocked(kubectlRawFront).mock.calls[1]?.[0]).toContain(":9091/proxy/metrics");
-    expect(vi.mocked(kubectlRawFront).mock.calls[2]?.[0]).toContain(":9100/proxy/metrics");
+    expect(vi.mocked(kubectlRawFront).mock.calls[2]?.[0]).toContain(":9091/proxy/metrics");
+    expect(vi.mocked(kubectlRawFront).mock.calls[3]?.[0]).toContain(":9100/proxy/metrics");
   });
 
   it("should use pod.metadata.name as nodeNam if no pod.spec.nodeName", async () => {
