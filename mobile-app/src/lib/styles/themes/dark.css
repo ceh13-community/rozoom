@@ -1,0 +1,24 @@
+/* Dark theme - matches desktop dashboard-app dark theme */
+:root[data-theme="dark"] {
+  --bg: hsl(222 47% 7%);
+  --bg-card: hsl(222 36% 11%);
+  --bg-raised: hsl(222 24% 16%);
+  --border: hsl(217 24% 20%);
+  --text: hsl(210 40% 96%);
+  --text-dim: hsl(215 20% 55%);
+  --accent: hsl(217 91% 60%);
+  --accent-bg: hsla(217, 91%, 60%, 0.12);
+  --green: hsl(142 71% 45%);
+  --green-bg: hsla(142, 71%, 45%, 0.12);
+  --yellow: hsl(48 96% 53%);
+  --yellow-bg: hsla(48, 96%, 53%, 0.12);
+  --red: hsl(0 84% 60%);
+  --red-bg: hsla(0, 84%, 60%, 0.12);
+  --orange: hsl(25 95% 53%);
+  --ring: hsl(217 91% 60%);
+  --tab-bg: hsl(222 36% 11%);
+  --tab-border: hsl(217 24% 20%);
+  --search-bg: hsl(222 24% 16%);
+  --status-bar: #0d1017;
+  color-scheme: dark;
+}

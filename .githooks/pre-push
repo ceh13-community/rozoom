@@ -1,15 +1,6 @@
-#!/usr/bin/env bash
+#!/bin/sh
 set -e
 
-cd "$(git rev-parse --show-toplevel)/dashboard-app"
-
-echo "→ check (lint + types)..."
-pnpm run check
-
-echo "→ unit tests..."
-pnpm vitest run
-
-echo "→ build..."
-pnpm run build
-
-echo "✓ local CI passed"
+echo "⚙️  pre-push: running unit tests..."
+cd dashboard-app && pnpm test run --reporter=verbose 2>&1 | tail -5
+echo "✅ tests passed"

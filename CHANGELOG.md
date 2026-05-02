@@ -2,36 +2,6 @@
 
 All notable changes to ROZOOM - K8s Linter IDE.
 
-## [0.21.0-rc.3] - 2026-04-25
-
-### Added
-- Exec-plugin connect method with credential risk chip on cluster cards
-- Preview kubeconfig + live Test Connection in Connect wizard
-- Connect wizard auto-detect, paste kubeconfig, recency restore
-- Fleet Health Overview at top of Manage Clusters
-- Keyboard shortcuts on Manage Clusters (j/k navigation)
-- Danger Zone with typed confirmation in Cluster Manager
-- CM bulk operations: refresh, set namespace, add tag
-- Certificates tab: TLS Secrets + cert-manager integration
-- CSR-based fallback for kubelet rotation status
-- Graceful fallback for managed control plane cert health
-- Shell: multi-line terminal input + proper command tokenizer
-- Actionable Investigate buttons on Top Risks (Overview)
-- Namespace filter context indicator on Overview
-- Resource Insights promoted above the fold
-
-### Fixed
-- Cert panel: populate Domain column + hide noisy kubelet rotation on managed clusters
-- Per-cell tooltips explaining Unknown kubelet rotation status
-- Pulsing dots on certificate loading indicators
-- Cluster-card: sync refresh-interval dropdown between compact and detailed views
-- Cluster-score: do not penalize absence of optional observability addons
-- Shell: normalise CRLF line endings in tokenizer
-- Shell: tolerate whitespace between backslash and newline
-
-### Changed
-- Dashboard card scores, cluster manager hierarchy, empty state polish
-
 ## [0.21.0-rc.2] - 2026-04-23
 
 ### Added
@@ -55,6 +25,7 @@ All notable changes to ROZOOM - K8s Linter IDE.
 
 ### Added
 - Pre-commit hooks via husky + lint-staged (format + lint on every commit)
+- Dev-only UI component catalog at /dev/ui-catalog
 - Network recovery listener - auto-recovers clusters after VPN reconnect
 - Fleet heartbeat - lightweight /healthz probe every 60s for all clusters
 - All resource categories in workspace pane dropdown (Configuration, Access Control, Network, Storage, Custom Resources)
@@ -65,107 +36,76 @@ All notable changes to ROZOOM - K8s Linter IDE.
 - Multi-pane layout (2/3) collapsing to 1 when navigating between workloads
 - Workspace pane state lost on cluster switch in unpinned mode
 - Offline clusters appearing in pane cluster selector
+- 47 pre-existing svelte-check type errors (interleaved handlers, duplicate accessors, deprecated components)
+- 14 pre-existing eslint errors
+- 12 pre-existing prettier formatting issues
+- onCopyKubectlDescribe missing from ResourceActionsMenu props
 
 ### Changed
 - Feature capability cache clears only unreachable entries on network restore (not all)
 - Workspace layout and pane config persisted to localStorage for unpinned tabs
 
----
+## [0.19.0] - 2026-03-29
 
-## Pre-release History
-
-### [0.19.0]
-
-- Three-state secret visibility in details sheets (masked, base64, decoded)
+### Added
+- Three-state secret visibility in details sheets (masked -> base64 -> decoded)
 - Resource metrics badge with CPU/Memory progress bars for pods and nodes
-- Node disk usage from kubelet stats, PVC disk usage bar
-- Traffic chain visualization for 20 resource types
-- Resource Map page (full cluster dependency map)
+- Node disk usage indicator from kubelet stats summary API
+- PVC disk usage bar in details sheet from kubelet stats
+- Traffic chain visualization for all 20 resource types
+- Resource Map page in Cluster Ops (full cluster dependency map)
 - Problem-first default sorting for RBAC, Namespaces, Custom Resources
-- Risk findings with severity levels and colored indicators
+- Risk findings with severity levels (critical/high/medium) and colored indicators
+- Animated LoadingDots across all loading states
 - Shell command history persistence (up to 200 commands)
-- Unified details sheets with DetailsSheetPortal (10 sheets consolidated)
+- Sidebar and workloads menu state persistence
+- Loading states for Pod Restarts and Node Pressures pages
+- App version display in sidebar footer
+
+### Changed
+- Explain this state section made collapsible (auto-opens on sync error)
+- Metrics badge moved from header to body in details sheets
+- Dropdown menus use dynamic max-height for viewport fitting
+
+### Fixed
+- Pod watcher timeout too short for remote clusters in Tauri dev mode
+- Pod Attach using kubectl exec instead of kubectl attach
+- Kubelet health check key mismatch (kubelet -> kubelet_cadvisor)
+- Node-exporter detection limited to monitoring namespace
+- Kubescape CRD existence check before triggering scan
+- Hetzner backup region placeholder and checksumAlgorithm for S3-compat
+- Details sheet fixed positioning via DOM portal
+- Sidebar z-index too low (page content overlapped)
+- Sidebar icon alignment in collapsed mode
+
+### Refactored
+- Unified details sheets with DetailsSheetPortal (10 sheets)
 - Unified action menus with ResourceActionsMenu (4 duplicates removed)
+- Unified workbench panels with ResourceYamlWorkbenchPanel
+- Deleted 7 dead-code files (-695 lines net)
 
-### [0.18.0]
+### Documentation
+- Comprehensive docs update for all new features
+- Updated CONTRIBUTING.md with architecture overview and component reference
 
+## [0.18.0] - 2026-03-29
+
+### Added
 - YAML editor: lint gutter, hover tooltips, breadcrumb, multi-doc nav, path copy, diff view
 - Managed provider detection for 11 cloud providers
+- Hetzner Object Storage backup support with checksumAlgorithm fix
+
+### Fixed
+- OVH providerID prefix (ovh:// -> openstack://)
+- Dropdown menus overflowing viewport on small screens
+
+## [0.17.0] - 2026-03-27
+
+### Added
+- Hetzner Object Storage as backup provider
 - Kubeconform schema validation in YAML editor
 - K8s-aware autocompletion with snippets
 
-### [0.17.0]
-
-- Hetzner Object Storage as backup provider
-- Cloud import and cross-platform shell improvements
-
-### [0.16.0]
-
-- Velero backup profiles with multi-cloud credential management (AWS S3, Azure Blob, GCP, MinIO)
-- Backup audit panel with schedule compliance and recency monitoring
-- Configuration details sheet with inline data viewer and decoded secrets
-
-### [0.15.0]
-
-- Storage resource pages (PVCs, PVs, Storage Classes, Volume Snapshots, CSI)
-- Access control pages (Roles, RoleBindings, ClusterRoles, Access Reviews)
-- Custom Resources page (CRD discovery and generic instance browser)
-- Network pages (Services, Ingresses, Endpoints, NetworkPolicies, Gateway API)
-
-### [0.14.0]
-
-- Multi-pane workspace (1/2/3 side-by-side views)
-- Pinned tab system with per-workspace state persistence
-- Data profiles (realtime, balanced, low-load, fleet, manual)
-
-### [0.13.0]
-
-- Helm release management and one-click Helm Catalog (17+ curated charts)
-- GitOps bootstrap wizard (ArgoCD, Flux)
-- Certificate rotation panel (EKS, GKE, AKS, kubeadm, K3s, minikube)
-
-### [0.12.0]
-
-- Global Triage (cross-resource problem scanner with impact ranking)
-- API deprecation scan via Pluto
-- Version audit across fleet
-- Fleet drift detection
-
-### [0.11.0]
-
-- Security and compliance: KubeArmor, Trivy Operator, Kubescape integration
-- Alerts hub (Alertmanager, Prometheus, K8s Events)
-- Metrics source monitoring (kubelet, metrics-server, kube-state-metrics, node-exporter)
-
-### [0.10.0]
-
-- Interactive shell (exec, attach, debug containers)
-- Log streaming via stern
-- Port forwarding with browser tab integration
-
-### [0.9.0]
-
-- Configuration pages (ConfigMaps, Secrets, HPAs, PDBs, Webhooks, and 10 more)
-- Namespace management page
-
-### [0.8.0]
-
-- Workload pages: Pods, Deployments, DaemonSets, StatefulSets, ReplicaSets, Jobs, CronJobs
-- Pod Restarts monitoring, CronJobs health monitoring
-- Nodes status and Node pressures pages
-
-### [0.7.0]
-
-- Fleet dashboard with cluster cards, health scores, cluster scores
-- Auto-refresh rotation for large fleets
-- Adaptive connectivity with degradation detection
-
-### [0.1.0 - 0.6.0]
-
-- Initial architecture (SvelteKit 5 + Tauri 2 + TypeScript strict)
-- Feature-Sliced Design project structure
-- Cluster Manager with kubeconfig discovery
-- Bundled CLI tools infrastructure (14 sidecar binaries)
-- K9s retro terminal theme
-- Three-theme system (dark, light, k9s)
-- 18 cluster type auto-detection (EKS, GKE, AKS, Rancher, K3s, minikube, ...)
+### Fixed
+- Cloud import, cross-platform shell, race condition in CLI execution
+- Risk findings readability on dark and k9s themes

@@ -45,14 +45,9 @@ function buildInAppPreviewUrl(targetUrl: string, redirect = false): string {
 
 export function isLoopbackUrl(raw: string): boolean {
   try {
-    const { protocol, hostname } = new URL(raw);
-    if (protocol !== "http:" && protocol !== "https:") return false;
-    return (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "[::1]" ||
-      hostname === "::1"
-    );
+    const parsed = new URL(raw);
+    const host = parsed.hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1";
   } catch {
     return false;
   }
