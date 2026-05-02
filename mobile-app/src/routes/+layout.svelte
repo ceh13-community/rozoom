@@ -27,7 +27,7 @@
 </main>
 
 <nav class="tab-bar">
-  {#each tabs as tab}
+  {#each tabs as tab (tab.id)}
     <a href={tab.href} class:active={isActive(tab.href)}>
       {#if tab.icon === "grid"}
         <svg
