@@ -203,7 +203,7 @@ const tryServiceProxy = async (
     } catch {
       continue;
     }
-    if (svcResponse.errors.length > 0 || !svcResponse.output) continue;
+    if (!svcResponse || svcResponse.errors.length > 0 || !svcResponse.output) continue;
     let parsed: { items?: SvcItem[] };
     try {
       parsed = JSON.parse(svcResponse.output) as { items?: SvcItem[] };
