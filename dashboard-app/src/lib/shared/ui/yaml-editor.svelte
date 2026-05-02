@@ -1,13 +1,54 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
-  import { EditorState, StateField, StateEffect, Compartment, type Extension } from "@codemirror/state";
-  import { EditorView, Decoration, type DecorationSet, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, rectangularSelection, crosshairCursor, scrollPastEnd, ViewUpdate, hoverTooltip, type Tooltip } from "@codemirror/view";
+  import {
+    EditorState,
+    StateField,
+    StateEffect,
+    Compartment,
+    type Extension,
+  } from "@codemirror/state";
+  import {
+    EditorView,
+    Decoration,
+    type DecorationSet,
+    keymap,
+    lineNumbers,
+    highlightActiveLine,
+    highlightActiveLineGutter,
+    drawSelection,
+    rectangularSelection,
+    crosshairCursor,
+    scrollPastEnd,
+    ViewUpdate,
+    hoverTooltip,
+    type Tooltip,
+  } from "@codemirror/view";
   import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
   import { yaml } from "@codemirror/lang-yaml";
-  import { syntaxHighlighting, indentOnInput, bracketMatching, foldGutter, foldKeymap, indentUnit, HighlightStyle } from "@codemirror/language";
+  import {
+    syntaxHighlighting,
+    indentOnInput,
+    bracketMatching,
+    foldGutter,
+    foldKeymap,
+    indentUnit,
+    HighlightStyle,
+  } from "@codemirror/language";
   import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
-  import { autocompletion, completionKeymap, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
-  import { linter, lintGutter, lintKeymap, type Diagnostic } from "@codemirror/lint";
+  import {
+    autocompletion,
+    completionKeymap,
+    type CompletionContext,
+    type CompletionResult,
+  } from "@codemirror/autocomplete";
+  import {
+    linter,
+    lintGutter,
+    lintKeymap,
+    openLintPanel,
+    closeLintPanel,
+    type Diagnostic,
+  } from "@codemirror/lint";
   import { tags } from "@lezer/highlight";
   import { load as parseYaml, YAMLException } from "js-yaml";
   import {
@@ -17,7 +58,12 @@
     parseKubeconformOutput,
     kubeconformToDiagnostics,
   } from "./yaml-lint";
-  import { getYamlPathAtOffset, formatYamlPath, formatYamlPathDot, type PathSegment } from "./yaml-path";
+  import {
+    getYamlPathAtOffset,
+    formatYamlPath,
+    formatYamlPathDot,
+    type PathSegment,
+  } from "./yaml-path";
   import { parseYamlDocuments, getDocumentAtOffset, type YamlDocumentInfo } from "./yaml-documents";
   import { getFieldDoc, extractFieldAtPosition } from "./yaml-k8s-schema";
   import { execCli } from "$shared/api/cli";
@@ -86,23 +132,23 @@
   });
 
   const rozoomHighlight = HighlightStyle.define([
-    { tag: tags.propertyName, color: "#7dd3fc" },      // sky-300 - YAML keys
-    { tag: tags.string, color: "#fde68a" },              // amber-200 - string values
-    { tag: tags.number, color: "#c4b5fd" },              // violet-300 - numbers
-    { tag: tags.bool, color: "#f9a8d4" },                // pink-300 - booleans
-    { tag: tags.null, color: "#94a3b8" },                  // slate-400 - null
-    { tag: tags.comment, color: "#6ee7b7" },             // emerald-300 - comments
-    { tag: tags.keyword, color: "#93c5fd" },             // blue-300 - keywords
-    { tag: tags.operator, color: "#cbd5e1" },            // slate-300 - operators
-    { tag: tags.punctuation, color: "#94a3b8" },         // slate-400 - punctuation
-    { tag: tags.meta, color: "#94a3b8" },                // slate-400 - directives
+    { tag: tags.propertyName, color: "#7dd3fc" }, // sky-300 - YAML keys
+    { tag: tags.string, color: "#fde68a" }, // amber-200 - string values
+    { tag: tags.number, color: "#c4b5fd" }, // violet-300 - numbers
+    { tag: tags.bool, color: "#f9a8d4" }, // pink-300 - booleans
+    { tag: tags.null, color: "#94a3b8" }, // slate-400 - null
+    { tag: tags.comment, color: "#6ee7b7" }, // emerald-300 - comments
+    { tag: tags.keyword, color: "#93c5fd" }, // blue-300 - keywords
+    { tag: tags.operator, color: "#cbd5e1" }, // slate-300 - operators
+    { tag: tags.punctuation, color: "#94a3b8" }, // slate-400 - punctuation
+    { tag: tags.meta, color: "#94a3b8" }, // slate-400 - directives
   ]);
 
   const rozoomTheme = EditorView.theme({
     "&": {
       height: "100%",
       fontSize: "12px",
-      backgroundColor: "#020617",                       // slate-950
+      backgroundColor: "#020617", // slate-950
     },
     ".cm-content": {
       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
@@ -113,26 +159,26 @@
       borderLeftColor: "#e2e8f0",
     },
     ".cm-gutters": {
-      backgroundColor: "#0f172a80",                      // slate-900/50
-      borderRight: "1px solid #1e293b",                  // slate-800
-      color: "#64748b",                                  // slate-500
+      backgroundColor: "#0f172a80", // slate-900/50
+      borderRight: "1px solid #1e293b", // slate-800
+      color: "#64748b", // slate-500
       minWidth: "48px",
     },
     ".cm-activeLineGutter": {
-      backgroundColor: "#1e293b60",                      // slate-800/40
-      color: "#94a3b8",                                  // slate-400
+      backgroundColor: "#1e293b60", // slate-800/40
+      color: "#94a3b8", // slate-400
     },
     ".cm-activeLine": {
-      backgroundColor: "#1e293b40",                      // slate-800/25
+      backgroundColor: "#1e293b40", // slate-800/25
     },
     ".cm-selectionBackground": {
-      backgroundColor: "#334155 !important",              // slate-700
+      backgroundColor: "#334155 !important", // slate-700
     },
     "&.cm-focused .cm-selectionBackground": {
       backgroundColor: "#334155 !important",
     },
     ".cm-searchMatch": {
-      backgroundColor: "#fbbf2440",                      // amber-400/25
+      backgroundColor: "#fbbf2440", // amber-400/25
       outline: "1px solid #fbbf2460",
     },
     ".cm-searchMatch.cm-searchMatch-selected": {
@@ -370,7 +416,11 @@
   const K8S_ANNOTATION_KEYS = [
     { label: "kubernetes.io/ingress.class", type: "property", detail: "Ingress class" },
     { label: "kubernetes.io/change-cause", type: "property", detail: "Change cause" },
-    { label: "kubectl.kubernetes.io/last-applied-configuration", type: "property", detail: "Last applied" },
+    {
+      label: "kubectl.kubernetes.io/last-applied-configuration",
+      type: "property",
+      detail: "Last applied",
+    },
     { label: "prometheus.io/scrape", type: "property", detail: "Enable scraping" },
     { label: "prometheus.io/port", type: "property", detail: "Scrape port" },
     { label: "prometheus.io/path", type: "property", detail: "Scrape path" },
@@ -415,7 +465,8 @@
       label: "container",
       type: "text",
       detail: "Container block",
-      apply: "- name: app\n  image: nginx:latest\n  ports:\n    - containerPort: 80\n  resources:\n    requests:\n      cpu: 100m\n      memory: 128Mi\n    limits:\n      cpu: 500m\n      memory: 256Mi",
+      apply:
+        "- name: app\n  image: nginx:latest\n  ports:\n    - containerPort: 80\n  resources:\n    requests:\n      cpu: 100m\n      memory: 128Mi\n    limits:\n      cpu: 500m\n      memory: 256Mi",
     },
     {
       label: "volume-mount",
@@ -427,25 +478,29 @@
       label: "env-secret",
       type: "text",
       detail: "Env from Secret",
-      apply: "- name: SECRET_KEY\n  valueFrom:\n    secretKeyRef:\n      name: my-secret\n      key: key",
+      apply:
+        "- name: SECRET_KEY\n  valueFrom:\n    secretKeyRef:\n      name: my-secret\n      key: key",
     },
     {
       label: "env-configmap",
       type: "text",
       detail: "Env from ConfigMap",
-      apply: "- name: CONFIG_VAL\n  valueFrom:\n    configMapKeyRef:\n      name: my-config\n      key: key",
+      apply:
+        "- name: CONFIG_VAL\n  valueFrom:\n    configMapKeyRef:\n      name: my-config\n      key: key",
     },
     {
       label: "liveness-http",
       type: "text",
       detail: "HTTP liveness probe",
-      apply: "livenessProbe:\n  httpGet:\n    path: /healthz\n    port: 8080\n  initialDelaySeconds: 15\n  periodSeconds: 10",
+      apply:
+        "livenessProbe:\n  httpGet:\n    path: /healthz\n    port: 8080\n  initialDelaySeconds: 15\n  periodSeconds: 10",
     },
     {
       label: "readiness-http",
       type: "text",
       detail: "HTTP readiness probe",
-      apply: "readinessProbe:\n  httpGet:\n    path: /ready\n    port: 8080\n  initialDelaySeconds: 5\n  periodSeconds: 5",
+      apply:
+        "readinessProbe:\n  httpGet:\n    path: /ready\n    port: 8080\n  initialDelaySeconds: 5\n  periodSeconds: 5",
     },
     {
       label: "volume-emptydir",
@@ -469,13 +524,15 @@
       label: "toleration",
       type: "text",
       detail: "Node toleration",
-      apply: "- key: node-role.kubernetes.io/control-plane\n  operator: Exists\n  effect: NoSchedule",
+      apply:
+        "- key: node-role.kubernetes.io/control-plane\n  operator: Exists\n  effect: NoSchedule",
     },
     {
       label: "security-restricted",
       type: "text",
       detail: "Restricted security context",
-      apply: "securityContext:\n  runAsNonRoot: true\n  allowPrivilegeEscalation: false\n  capabilities:\n    drop:\n      - ALL\n  seccompProfile:\n    type: RuntimeDefault",
+      apply:
+        "securityContext:\n  runAsNonRoot: true\n  allowPrivilegeEscalation: false\n  capabilities:\n    drop:\n      - ALL\n  seccompProfile:\n    type: RuntimeDefault",
     },
   ];
 
@@ -517,7 +574,8 @@
     const doc = context.state.doc.toString();
     const kind = detectDocumentKind(doc, context.pos);
 
-    let options: { label: string; type: string; detail: string; apply?: string; boost?: number }[] = [...K8S_SNIPPETS];
+    let options: { label: string; type: string; detail: string; apply?: string; boost?: number }[] =
+      [...K8S_SNIPPETS];
 
     if (indent === 0) {
       options = [...K8S_TOP_LEVEL, ...K8S_SNIPPETS];
@@ -525,32 +583,66 @@
       const linesBefore = doc.slice(0, context.pos).split("\n");
       for (let i = linesBefore.length - 1; i >= 0; i--) {
         const l = linesBefore[i].trimEnd();
-        if (l === "metadata:") { options = [...K8S_METADATA, ...K8S_SNIPPETS]; break; }
+        if (l === "metadata:") {
+          options = [...K8S_METADATA, ...K8S_SNIPPETS];
+          break;
+        }
         if (/^\s*labels:/.test(l) || /^\s*annotations:/.test(l)) {
           options = l.includes("annotations:") ? [...K8S_ANNOTATION_KEYS] : [...K8S_LABEL_KEYS];
           break;
         }
         if (l === "spec:" || l.endsWith("template:")) {
           // Context-aware spec: use kind to pick the right completions
-          if (kind === "Service") { options = [...K8S_SPEC_SERVICE, ...K8S_SNIPPETS]; break; }
-          if (kind === "Ingress") { options = [...K8S_SPEC_INGRESS, ...K8S_SNIPPETS]; break; }
-          if (kind === "Deployment" || kind === "StatefulSet" || kind === "DaemonSet" || kind === "ReplicaSet") {
-            options = [...K8S_SPEC_WORKLOAD, ...K8S_SPEC_POD, ...K8S_SNIPPETS]; break;
+          if (kind === "Service") {
+            options = [...K8S_SPEC_SERVICE, ...K8S_SNIPPETS];
+            break;
           }
-          options = [...K8S_SPEC_POD, ...K8S_SNIPPETS]; break;
+          if (kind === "Ingress") {
+            options = [...K8S_SPEC_INGRESS, ...K8S_SNIPPETS];
+            break;
+          }
+          if (
+            kind === "Deployment" ||
+            kind === "StatefulSet" ||
+            kind === "DaemonSet" ||
+            kind === "ReplicaSet"
+          ) {
+            options = [...K8S_SPEC_WORKLOAD, ...K8S_SPEC_POD, ...K8S_SNIPPETS];
+            break;
+          }
+          options = [...K8S_SPEC_POD, ...K8S_SNIPPETS];
+          break;
         }
-        if (/^\s*-\s+name:/.test(l) || l.includes("containers:")) { options = [...K8S_SPEC_CONTAINER, ...K8S_SNIPPETS]; break; }
-        if (l === "  resources:" || l === "    resources:") { options = [...K8S_RESOURCES, ...K8S_SNIPPETS]; break; }
+        if (/^\s*-\s+name:/.test(l) || l.includes("containers:")) {
+          options = [...K8S_SPEC_CONTAINER, ...K8S_SNIPPETS];
+          break;
+        }
+        if (l === "  resources:" || l === "    resources:") {
+          options = [...K8S_RESOURCES, ...K8S_SNIPPETS];
+          break;
+        }
         if (/^\S/.test(l) && l !== "") break;
       }
     } else {
       const linesBefore = doc.slice(0, context.pos).split("\n");
       for (let i = linesBefore.length - 1; i >= 0; i--) {
         const l = linesBefore[i].trimEnd();
-        if (/labels:|matchLabels:/.test(l)) { options = [...K8S_LABEL_KEYS]; break; }
-        if (/annotations:/.test(l)) { options = [...K8S_ANNOTATION_KEYS]; break; }
-        if (/containers:|initContainers:/.test(l)) { options = [...K8S_SPEC_CONTAINER, ...K8S_SNIPPETS]; break; }
-        if (/resources:/.test(l)) { options = [...K8S_RESOURCES, ...K8S_SNIPPETS]; break; }
+        if (/labels:|matchLabels:/.test(l)) {
+          options = [...K8S_LABEL_KEYS];
+          break;
+        }
+        if (/annotations:/.test(l)) {
+          options = [...K8S_ANNOTATION_KEYS];
+          break;
+        }
+        if (/containers:|initContainers:/.test(l)) {
+          options = [...K8S_SPEC_CONTAINER, ...K8S_SNIPPETS];
+          break;
+        }
+        if (/resources:/.test(l)) {
+          options = [...K8S_RESOURCES, ...K8S_SNIPPETS];
+          break;
+        }
         if (/^\s{0,2}\S/.test(l) && l !== "") break;
       }
     }
@@ -712,8 +804,10 @@
       await writeTextFile(tmpFile, doc);
 
       const result = await execCli("kubeconform", [
-        "-output", "json",
-        "-schema-location", "default",
+        "-output",
+        "json",
+        "-schema-location",
+        "default",
         "-strict",
         tmpFile,
       ]);
@@ -744,7 +838,9 @@
   const setKubeconformResults = StateEffect.define<Diagnostic[]>();
 
   const kubeconformField = StateField.define<Diagnostic[]>({
-    create() { return []; },
+    create() {
+      return [];
+    },
     update(current, tr) {
       for (const effect of tr.effects) {
         if (effect.is(setKubeconformResults)) return effect.value;
@@ -765,6 +861,26 @@
       effects: EditorView.scrollIntoView(line.from, { y: "center" }),
     });
     view.focus();
+  }
+
+  let lintPanelOpen = $state(false);
+
+  export function copyPathAtCursor(): boolean {
+    if (!view) return false;
+    return copyYamlPath(view);
+  }
+
+  export function toggleLintPanel(): boolean {
+    if (!view) return false;
+    if (lintPanelOpen) {
+      closeLintPanel(view);
+      lintPanelOpen = false;
+    } else {
+      openLintPanel(view);
+      lintPanelOpen = true;
+    }
+    view.focus();
+    return true;
   }
 
   function buildExtensions(): Extension[] {
@@ -794,10 +910,7 @@
       }),
       linter(yamlLinter, { delay: 500 }),
       kubeconformField,
-      linter(
-        (editorView) => editorView.state.field(kubeconformField),
-        { delay: 100 },
-      ),
+      linter((editorView) => editorView.state.field(kubeconformField), { delay: 100 }),
       lintGutter(),
       hoverTooltip(k8sHoverTooltip, { hoverTime: 300 }),
       keymap.of([
