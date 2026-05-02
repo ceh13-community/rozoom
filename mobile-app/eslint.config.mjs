@@ -19,13 +19,6 @@ export default tseslint.config(
     languageOptions: { parserOptions: { parser: tseslint.parser } },
   },
   {
-    ignores: [
-      "build/",
-      ".svelte-kit/",
-      "node_modules/",
-      "e2e/",
-      "*.config.*",
-      "*.cjs",
-    ],
+    ignores: ["build/", ".svelte-kit/", "node_modules/", "e2e/", "*.config.*", "*.cjs"],
   },
 );
