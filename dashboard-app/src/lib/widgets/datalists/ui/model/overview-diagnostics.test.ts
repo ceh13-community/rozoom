@@ -7,6 +7,9 @@ import {
   buildOverviewTopRisks,
   buildPrimaryAlert,
   captureOverviewHealthHistoryEntry,
+  humanizeClusterError,
+  isAuthError,
+  isConnectionError,
 } from "./overview-diagnostics";
 
 function makeChecks(overrides?: Partial<ClusterHealthChecks>): ClusterHealthChecks {
@@ -203,5 +206,124 @@ describe("overview-diagnostics", () => {
     const actions = buildOverviewSafeActions({ checks: makeChecks(), warningItems: [] });
     expect(actions.some((action) => action.id === "failing-pods")).toBe(true);
     expect(actions.some((action) => action.id === "inspect-kube-system")).toBe(true);
+  });
+
+  describe("isAuthError", () => {
+    it("flags Rancher-style unauthenticated response", () => {
+      expect(
+        isAuthError(
+          'Error from server (Forbidden): ...User "system:unauthenticated" cannot get resource "clusters"',
+        ),
+      ).toBe(true);
+    });
+
+    it("flags cloud-provider expired token messages", () => {
+      expect(isAuthError("error: You must be logged in to the server (Unauthorized)")).toBe(true);
+      expect(isAuthError("invalid bearer token")).toBe(true);
+      expect(isAuthError("the provided token has expired")).toBe(true);
+      expect(isAuthError("expired credentials in kubeconfig")).toBe(true);
+    });
+
+    it("flags raw HTTP 401/403 codes", () => {
+      expect(isAuthError("server returned status 401")).toBe(true);
+      expect(isAuthError("HTTP 403 from API")).toBe(true);
+    });
+
+    it("does not flag network-level failures", () => {
+      expect(isAuthError("ECONNREFUSED 127.0.0.1:6443")).toBe(false);
+      expect(isAuthError("no route to host")).toBe(false);
+      expect(isAuthError("getaddrinfo ENOTFOUND")).toBe(false);
+      expect(isAuthError("certificate has expired")).toBe(false);
+      expect(isAuthError("")).toBe(false);
+    });
+
+    it("does not flag digits 401/403 appearing inside other numbers", () => {
+      // Log line numbers, byte counts, durations embedding 401/403 should
+      // not trigger auth classification. Word boundaries prevent match.
+      expect(isAuthError("read 4017 bytes from pipe")).toBe(false);
+      expect(isAuthError("stream offset 12403 reached")).toBe(false);
+      expect(isAuthError("stderr line 1403: kubectl: ...")).toBe(false);
+      expect(isAuthError("duration 4.01s (403ms overhead)")).toBe(false);
+    });
+
+    it("does not flag 'exit status 255' inside unrelated context", () => {
+      // exit status 255 as a standalone token is an exec-plugin signal.
+      expect(isAuthError("plugin exited with exit status 255")).toBe(true);
+      // but should not match strings like "status 2554" (the combined suite
+      // count showed up in our logs).
+      expect(isAuthError("status 2554 ok")).toBe(false);
+    });
+  });
+
+  describe("isConnectionError includes auth errors", () => {
+    it("returns true for both network and auth failures", () => {
+      expect(isConnectionError("ECONNREFUSED 127.0.0.1:6443")).toBe(true);
+      expect(isConnectionError('User "system:unauthenticated" cannot get resource')).toBe(true);
+      expect(isConnectionError("the provided token has expired")).toBe(true);
+    });
+
+    it("returns false for generic cluster issues", () => {
+      expect(isConnectionError("pod is in CrashLoopBackOff")).toBe(false);
+      expect(isConnectionError("")).toBe(false);
+    });
+  });
+
+  describe("humanizeClusterError", () => {
+    it("labels auth errors distinctly", () => {
+      expect(humanizeClusterError("HTTP 403 Forbidden").title).toBe("Authentication failed");
+      expect(humanizeClusterError("Unauthorized").title).toBe("Authentication failed");
+    });
+
+    it("labels network errors distinctly", () => {
+      expect(humanizeClusterError("ECONNREFUSED").title).toBe("Cluster unreachable");
+      expect(humanizeClusterError("no route to host").title).toBe("Cluster unreachable");
+    });
+
+    it("labels HTTP status codes", () => {
+      expect(humanizeClusterError("server returned 429 too many requests").title).toBe(
+        "API server rate-limited",
+      );
+      expect(humanizeClusterError("HTTP 503 service unavailable").title).toBe(
+        "API server unavailable",
+      );
+      expect(humanizeClusterError("502 bad gateway from proxy").title).toBe("API gateway error");
+      expect(humanizeClusterError("HTTP 500 internal server error").title).toBe("API server error");
+    });
+  });
+
+  describe("isAuthError exec-plugin patterns", () => {
+    it("recognizes AWS EKS authenticator failures", () => {
+      expect(isAuthError("aws-iam-authenticator: process-credentials")).toBe(true);
+      expect(
+        isAuthError("Unable to locate credentials. You can configure credentials by running"),
+      ).toBe(true);
+      expect(
+        isAuthError("The security token included in the request is expired (ExpiredToken)"),
+      ).toBe(true);
+      expect(isAuthError("SSO session has expired. Run aws sso login")).toBe(true);
+    });
+
+    it("recognizes GKE auth plugin failures", () => {
+      expect(isAuthError("gke-gcloud-auth-plugin exited with code 1")).toBe(true);
+      expect(isAuthError("reauthentication is needed. Run gcloud auth login")).toBe(true);
+      expect(isAuthError("Application Default Credentials are not available")).toBe(true);
+    });
+
+    it("recognizes Azure/kubelogin failures", () => {
+      expect(isAuthError("AADSTS700082: The refresh token has expired due to inactivity")).toBe(
+        true,
+      );
+      expect(isAuthError("kubelogin: no cached token")).toBe(true);
+    });
+
+    it("recognizes generic exec-plugin envelopes", () => {
+      expect(isAuthError("getting credentials: exec: executable not found")).toBe(true);
+      expect(isAuthError("exec plugin: invalid apiVersion")).toBe(true);
+    });
+
+    it("recognizes OIDC flows", () => {
+      expect(isAuthError("oidc: token is expired")).toBe(true);
+      expect(isAuthError("could not find client credentials")).toBe(true);
+    });
   });
 });
