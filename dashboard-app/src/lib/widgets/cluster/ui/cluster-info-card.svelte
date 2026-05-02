@@ -1198,7 +1198,7 @@
 
         {#if !lastCheck && isRefreshLoading}
           {#each { length: 4 } as _}
-            <div class="h-4 w-full animate-pulse rounded-full bg-gray-300 mb-2"></div>
+            <div class="h-4 w-full animate-pulse rounded-full bg-muted mb-2"></div>
           {/each}
         {:else if lastCheck}
           <div>
