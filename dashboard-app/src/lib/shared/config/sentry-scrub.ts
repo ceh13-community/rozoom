@@ -158,7 +158,7 @@ export function scrubEvent(event: Event): Event | null {
             ...ex.stacktrace,
             frames: ex.stacktrace.frames?.map((f) => ({
               ...f,
-              vars: f.vars ? scrubValue(f.vars) : f.vars,
+              vars: f.vars ? (scrubValue(f.vars)) : f.vars,
               pre_context: f.pre_context?.map(scrubString),
               context_line: f.context_line ? scrubString(f.context_line) : f.context_line,
               post_context: f.post_context?.map(scrubString),
