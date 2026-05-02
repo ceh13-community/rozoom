@@ -14,6 +14,12 @@ export interface HelmChartInfo {
   latest: string | null;
   status: HelmChartStatus;
   repoUrl?: string;
+  /** Full chart path like "bitnami/nginx" (repoName/chartName) when resolvable. */
+  chartPath?: string;
+  /** Repository name component of chartPath (e.g. "bitnami"). */
+  repoName?: string;
+  /** Chart name component of chartPath (e.g. "nginx"). */
+  chartName?: string;
   error?: string;
 }
 

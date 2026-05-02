@@ -57,4 +57,34 @@ describe("in-app-browser", () => {
     openSpy.mockRestore();
     vi.resetModules();
   });
+
+  describe("isLoopbackUrl", () => {
+    it("accepts standard loopback targets", async () => {
+      const { isLoopbackUrl } = await import("./in-app-browser");
+      expect(isLoopbackUrl("https://localhost:18080")).toBe(true);
+      expect(isLoopbackUrl("http://127.0.0.1:3000/ui")).toBe(true);
+      expect(isLoopbackUrl("https://[::1]:443")).toBe(true);
+      expect(isLoopbackUrl("http://localhost")).toBe(true);
+    });
+
+    it("rejects public, private, and non-http schemes", async () => {
+      const { isLoopbackUrl } = await import("./in-app-browser");
+      expect(isLoopbackUrl("https://example.com")).toBe(false);
+      expect(isLoopbackUrl("https://evil.com/localhost")).toBe(false);
+      expect(isLoopbackUrl("https://192.168.1.10:9000")).toBe(false);
+      expect(isLoopbackUrl("https://10.0.0.1")).toBe(false);
+      expect(isLoopbackUrl("https://127.0.0.2")).toBe(false);
+      expect(isLoopbackUrl("file:///etc/passwd")).toBe(false);
+      expect(isLoopbackUrl("")).toBe(false);
+      expect(isLoopbackUrl("not a url")).toBe(false);
+    });
+
+    it("is not fooled by URL tricks that encode loopback in the path or credentials", async () => {
+      const { isLoopbackUrl } = await import("./in-app-browser");
+      expect(isLoopbackUrl("https://evil.com/127.0.0.1")).toBe(false);
+      expect(isLoopbackUrl("https://evil.com#@localhost")).toBe(false);
+      expect(isLoopbackUrl("https://localhost@evil.com")).toBe(false);
+      expect(isLoopbackUrl("https://127.0.0.1.evil.com")).toBe(false);
+    });
+  });
 });
