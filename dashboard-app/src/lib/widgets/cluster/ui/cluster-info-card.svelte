@@ -86,7 +86,7 @@
   import { Button } from "$shared/ui/button";
   import { Checkbox } from "$shared/ui/checkbox";
   import type { AppClusterConfig } from "$entities/config/";
-  import { getClusterPlatformLabel, resolveClusterDisplayName } from "$shared/ui/cluster-platform";
+  import { getClusterPlatformLabel } from "$shared/ui/cluster-platform";
   import * as Popover from "$shared/ui/popover";
   import { markClusterRefreshHintSeen } from "$features/cluster-manager";
   import { stopAllBackgroundPollers } from "$shared/lib/background-pollers";
@@ -132,7 +132,6 @@
     return lastCheck;
   });
   const platformLabel = $derived.by(() => getClusterPlatformLabel(cluster.name));
-  const displayName = $derived(resolveClusterDisplayName(cluster));
   const checkState = $derived($clusterStates[cluster.uuid] || { loading: false, error: null });
   const isClustersListRoute = $derived($page.url.pathname === "/dashboard");
   const nameSpaacesList = $derived(
@@ -911,10 +910,9 @@
         role="button"
         class="truncate"
         title={cluster.name}
-        aria-label={cluster.name}
         onclick={goToCluster}
         onkeydown={(e) => handleKeypress(e, goToCluster)}
-        tabindex="0">{displayName}</span
+        tabindex="0">{cluster.name}</span
       >
       {#if cluster.status !== "error" && !isRefreshLoading && !lastCheck?.errors}
         <Button class="hover:bg-transparent ml-auto" variant="ghost" onclick={goToCluster}>
