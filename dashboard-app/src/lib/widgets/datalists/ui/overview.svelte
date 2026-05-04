@@ -1287,12 +1287,11 @@
 
   function scheduleNextOverviewSync(token: RefreshRunToken, clusterId: string) {
     if (!isRefreshTokenActive(token, clusterId)) return;
-    overviewSyncTimeout = setTimeout(
-      async () => {
-        overviewSyncTimeout = null;
-        await refreshOverviewSnapshot({ token });
-        scheduleNextOverviewSync(token, clusterId);
-      },
+    overviewSyncTimeout = setTimeout(async () => {
+      overviewSyncTimeout = null;
+      await refreshOverviewSnapshot({ token });
+      scheduleNextOverviewSync(token, clusterId);
+    },
       normalizeOverviewSyncSeconds(overviewSyncSeconds) * 1000,
     );
   }
