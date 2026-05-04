@@ -19,6 +19,7 @@
     type CloudScope,
   } from "$features/cluster-manager/api/cloud-import";
   import { addClustersFromText } from "$features/cluster-manager";
+  import { detectedCloudConfigs } from "$features/cluster-finder/model/cli-store";
   import { Button } from "$shared/ui/button";
 
   type ConnectMethod = "oidc" | "cloud" | "vault" | "certificate" | "token" | null;
@@ -47,6 +48,13 @@
   let cloudClusters = $state<CloudCluster[]>([]);
   let cloudLoading = $state(false);
   let cloudErrors = $state<Array<{ scope: string; error: string }>>([]);
+
+  // ── Auto-detect state ──
+  let autoClusters = $state<CloudCluster[]>([]);
+  let autoErrors = $state<Array<{ scope: string; error: string }>>([]);
+  let autoLoading = $state(false);
+  let autoScanned = $state(false);
+  let autoSelected = $state<Set<string>>(new Set());
 
   // ── Vault state ──
   let vaultAddress = $state("");
