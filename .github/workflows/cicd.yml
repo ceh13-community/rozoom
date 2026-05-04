@@ -83,6 +83,12 @@ jobs:
           path: dashboard-app/playwright-report
           if-no-files-found: ignore
 
+  # mobile-app CI is handled separately in .github/workflows/mobile-ci.yml
+  # (path-triggered on mobile-app/** changes). Android Tauri build is excluded
+  # from this workflow — build time is 60+ min and requires Android SDK setup
+  # which is not worth running on every dashboard-app PR.
+  # TODO(#57): revisit if mobile-app and dashboard-app PRs need joint validation.
+
   # android_checks:
   #   name: Android validation (PR)
   #   if: github.event_name == 'pull_request'
