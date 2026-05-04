@@ -56,6 +56,7 @@ export type OverviewSnapshot = {
   cpuReservedCores: number | null;
   memoryReservedBytes: number | null;
   coreMetricsUnavailable: boolean | null;
+  usageMetricsMode: "actual" | "requested" | null;
   podCapacity: number | null;
   providerIds: string[];
   usageMetricsLastLoadedAt: number;
@@ -238,6 +239,10 @@ export function parseOverviewSnapshot(raw: string | null, ttlMs: number): Overvi
         typeof parsed.memoryReservedBytes === "number" ? parsed.memoryReservedBytes : null,
       coreMetricsUnavailable:
         typeof parsed.coreMetricsUnavailable === "boolean" ? parsed.coreMetricsUnavailable : null,
+      usageMetricsMode:
+        parsed.usageMetricsMode === "actual" || parsed.usageMetricsMode === "requested"
+          ? parsed.usageMetricsMode
+          : null,
       podCapacity: typeof parsed.podCapacity === "number" ? parsed.podCapacity : null,
       providerIds: parsed.providerIds.filter((value): value is string => typeof value === "string"),
       usageMetricsLastLoadedAt:
