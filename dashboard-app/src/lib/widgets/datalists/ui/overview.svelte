@@ -1050,8 +1050,7 @@
     certificatesInFlightTokenId = token.id;
     certificatesLoading = true;
     if (certificatesWatchdog) clearTimeout(certificatesWatchdog);
-    certificatesWatchdog = setTimeout(
-      () => {
+    certificatesWatchdog = setTimeout(() => {
         if (!certificatesInFlight || certificatesInFlightTokenId !== token.id) return;
         certificatesInFlight = false;
         certificatesInFlightTokenId = null;
