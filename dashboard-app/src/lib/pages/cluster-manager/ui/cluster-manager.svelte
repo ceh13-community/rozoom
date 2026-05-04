@@ -12,7 +12,13 @@
     kubeConfigSuccess,
     isKubeConfigLoading,
   } from "$features/cluster-finder";
-  import { detectedClis, detectedOsTools, detectedCloudConfigs, isCliDetectionLoading, loadDetectedClis } from "$features/cluster-finder/model/cli-store";
+  import {
+    detectedClis,
+    detectedOsTools,
+    detectedCloudConfigs,
+    isCliDetectionLoading,
+    loadDetectedClis,
+  } from "$features/cluster-finder/model/cli-store";
   import {
     clustersList,
     isClustersConfigLoading,
@@ -32,7 +38,12 @@
     toggleClusterPin,
     clearClustersConfigMessages,
   } from "$features/cluster-manager";
-  import { detectClusterProvider, getProviderCategory, type ClusterProvider, type ClusterProviderCategory } from "$shared/lib/provider-detection";
+  import {
+    detectClusterProvider,
+    getProviderCategory,
+    type ClusterProvider,
+    type ClusterProviderCategory,
+  } from "$shared/lib/provider-detection";
   import { compareClustersByEnv } from "$shared/lib/env-sort-priority";
   import { Button } from "$shared/ui/button";
   import { Textarea } from "$shared/ui/textarea";
@@ -50,11 +61,23 @@
     safeDialogOpen,
     safeReadTextFile,
   } from "$shared/lib/tauri-runtime";
-  import { probeClusterConnection, type ConnectionProbeResult } from "$features/cluster-manager/api/probe-connection";
-  import { listCloudClusters, importCloudCluster, getSupportedCloudProviders, type CloudCluster } from "$features/cluster-manager/api/cloud-import";
+  import {
+    probeClusterConnection,
+    type ConnectionProbeResult,
+  } from "$features/cluster-manager/api/probe-connection";
+  import {
+    listCloudClusters,
+    importCloudCluster,
+    getSupportedCloudProviders,
+    type CloudCluster,
+  } from "$features/cluster-manager/api/cloud-import";
   import { recordAudit } from "$features/cluster-manager/model/audit-trail";
-  import { detectAuthMethod, type AuthMethodInfo } from "$features/cluster-manager/model/auth-detection";
+  import {
+    detectAuthMethod,
+    type AuthMethodInfo,
+  } from "$features/cluster-manager/model/auth-detection";
   import ConnectClusterWizard from "./connect-cluster-wizard.svelte";
+  import LoadingDots from "$shared/ui/loading-dots.svelte";
 
   type DetectedCluster = {
     name: string;
@@ -105,6 +128,18 @@
   let managedSearch = $state("");
   let probeResults = $state<Record<string, ConnectionProbeResult>>({});
   let isProbing = $state(false);
+  let hasEverScanned = $state(false);
+  let lastScanAt = $state<number | null>(null);
+  const lastScanLabel = $derived.by(() => {
+    if (lastScanAt === null) return "";
+    const ageMs = Math.max(0, Date.now() - lastScanAt);
+    const ageSec = Math.floor(ageMs / 1000);
+    if (ageSec < 60) return `${ageSec}s ago`;
+    const ageMin = Math.floor(ageSec / 60);
+    if (ageMin < 60) return `${ageMin}m ago`;
+    const ageHours = Math.floor(ageMin / 60);
+    return `${ageHours}h ago`;
+  });
 
   // Cloud import state
   let cloudClusters = $state<CloudCluster[]>([]);
@@ -161,6 +196,12 @@
     await Promise.all([loadClusters(), loadKubeconfig()]);
     void loadDetectedClis();
     void probeDetectedClusters();
+    hasEverScanned = true;
+    lastScanAt = Date.now();
+  }
+
+  async function handleManualRefresh() {
+    await loadData();
   }
 
   async function probeDetectedClusters() {
@@ -362,7 +403,9 @@
       $kubeConfigFile?.clusters?.map((cluster) => {
         const contextName = contextsByCluster.get(cluster.name) ?? null;
         const context = $kubeConfigFile?.contexts?.find((c) => c.context.cluster === cluster.name);
-        const user = context ? $kubeConfigFile?.users?.find((u) => u.name === context.context.user) : null;
+        const user = context
+          ? $kubeConfigFile?.users?.find((u) => u.name === context.context.user)
+          : null;
 
         const detection = detectClusterProvider({
           clusterName: cluster.name,
@@ -428,7 +471,10 @@
   const detectedProviderGroups = $derived.by(() => {
     if (!detectedClusters.length) return [];
 
-    const groups = new Map<string, { provider: string; category: ClusterProviderCategory; clusters: DetectedCluster[] }>();
+    const groups = new Map<
+      string,
+      { provider: string; category: ClusterProviderCategory; clusters: DetectedCluster[] }
+    >();
     for (const cluster of detectedClusters) {
       const key = cluster.provider;
       if (!groups.has(key)) {
@@ -455,7 +501,10 @@
   const managedProviders = $derived.by(() => {
     const providers = new Set(
       $clustersList
-        .map((cluster) => cluster.provider || detectClusterProvider({ clusterName: cluster.name }).provider)
+        .map(
+          (cluster) =>
+            cluster.provider || detectClusterProvider({ clusterName: cluster.name }).provider,
+        )
         .filter(Boolean),
     );
 
@@ -485,7 +534,8 @@
 
     return [...$clustersList]
       .map((cluster) => {
-        const provider = cluster.provider || detectClusterProvider({ clusterName: cluster.name }).provider;
+        const provider =
+          cluster.provider || detectClusterProvider({ clusterName: cluster.name }).provider;
         const env = cluster.env || inferEnv(cluster.name);
         const displayName = cluster.displayName || cluster.name;
         const tags = cluster.tags?.length ? cluster.tags : buildTags(provider, env, null, []);
@@ -569,7 +619,11 @@
     return "shared";
   }
 
-  function inferWarnings(name: string, insecureSkipTls?: boolean, user?: { hasToken?: boolean; hasCertAuth?: boolean } | null): string[] {
+  function inferWarnings(
+    name: string,
+    insecureSkipTls?: boolean,
+    user?: { hasToken?: boolean; hasCertAuth?: boolean } | null,
+  ): string[] {
     const warnings: string[] = [];
     const hint = name.toLowerCase();
 
@@ -740,32 +794,58 @@
       {/if}
 
       {#if showPageInfo}
-        <div class="mb-5 rounded-xl border border-indigo-200 dark:border-indigo-800/40 bg-indigo-50/50 dark:bg-indigo-950/20 p-4 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+        <div
+          class="mb-5 rounded-xl border border-indigo-200 dark:border-indigo-800/40 bg-indigo-50/50 dark:bg-indigo-950/20 p-4 text-sm text-slate-600 dark:text-slate-300 leading-relaxed"
+        >
           <div class="flex items-start justify-between gap-3">
             <div class="space-y-2">
               <p class="font-medium text-slate-800 dark:text-slate-100">
                 ROZOOM is a self-contained K8s fleet IDE
               </p>
               <p>
-                All CLI tools are <strong>bundled inside the app</strong> &mdash; no system installs needed.
-                The app discovers your kubeconfig files, detects cloud provider credentials, and validates
-                cluster access before adding them to the dashboard.
+                All CLI tools are <strong>bundled inside the app</strong> &mdash; no system installs
+                needed. The app discovers your kubeconfig files, detects cloud provider credentials,
+                and validates cluster access before adding them to the dashboard.
               </p>
-              <ul class="list-disc list-inside space-y-0.5 text-xs text-slate-500 dark:text-slate-400">
-                <li><strong>14 Bundled Tools</strong> - kubectl, helm, kustomize, kubeconform, pluto, stern, velero, yq + cloud CLIs (aws, gcloud, doctl, hcloud, oc, az)</li>
-                <li><strong>Connect Cluster</strong> - 5 auth methods: OIDC/SSO, Cloud Provider, Vault, X.509 Certificate, Bearer Token</li>
-                <li><strong>Cloud Providers</strong> - detected bundled tools, OS tools, and cloud credentials</li>
-                <li><strong>Detected kubeconfigs</strong> - auto-scanned contexts with provider, region, auth method, and security level</li>
-                <li><strong>Managed Clusters</strong> - per-cluster settings: default namespace, proxy, kubectl version, read-only mode</li>
-                <li><strong>Soft-delete</strong> - removed clusters go to trash with restore/purge options</li>
-                <li><strong>Catalog Export</strong> - share groups, tags, and display names as JSON (no secrets)</li>
-                <li><strong>Audit Trail</strong> - timestamped log of cluster management actions</li>
+              <ul
+                class="list-disc list-inside space-y-0.5 text-xs text-slate-500 dark:text-slate-400"
+              >
+                <li>
+                  <strong>14 Bundled Tools</strong> - kubectl, helm, kustomize, kubeconform, pluto, stern,
+                  velero, yq + cloud CLIs (aws, gcloud, doctl, hcloud, oc, az)
+                </li>
+                <li>
+                  <strong>Connect Cluster</strong> - 5 auth methods: OIDC/SSO, Cloud Provider, Vault,
+                  X.509 Certificate, Bearer Token
+                </li>
+                <li>
+                  <strong>Cloud Providers</strong> - detected bundled tools, OS tools, and cloud credentials
+                </li>
+                <li>
+                  <strong>Detected kubeconfigs</strong> - auto-scanned contexts with provider, region,
+                  auth method, and security level
+                </li>
+                <li>
+                  <strong>Managed Clusters</strong> - per-cluster settings: default namespace, proxy,
+                  kubectl version, read-only mode
+                </li>
+                <li>
+                  <strong>Soft-delete</strong> - removed clusters go to trash with restore/purge options
+                </li>
+                <li>
+                  <strong>Catalog Export</strong> - share groups, tags, and display names as JSON (no
+                  secrets)
+                </li>
+                <li>
+                  <strong>Audit Trail</strong> - timestamped log of cluster management actions
+                </li>
               </ul>
             </div>
             <button
               onclick={() => (showPageInfo = false)}
               class="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg leading-none"
-            >&times;</button>
+              >&times;</button
+            >
           </div>
         </div>
       {/if}
@@ -794,11 +874,17 @@
 
       <!-- Cloud Providers panel -->
       {#if $detectedClis.length > 0 || $detectedCloudConfigs.length > 0}
-        <details class="mb-6 group rounded-xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-800/60 shadow-sm">
-          <summary class="flex items-center gap-2.5 cursor-pointer select-none px-5 py-3.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+        <details
+          class="mb-6 group rounded-xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-800/60 shadow-sm"
+        >
+          <summary
+            class="flex items-center gap-2.5 cursor-pointer select-none px-5 py-3.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+          >
             <span class="text-[10px] transition-transform group-open:rotate-90">▶</span>
             Cloud Providers
-            <span class="ml-auto flex items-center gap-3 text-[11px] font-normal text-slate-400 dark:text-slate-500">
+            <span
+              class="ml-auto flex items-center gap-3 text-[11px] font-normal text-slate-400 dark:text-slate-500"
+            >
               <span>{$detectedClis.filter((c) => c.available).length} bundled</span>
               <span class="w-px h-3 bg-slate-300 dark:bg-slate-600"></span>
               <span>{$detectedOsTools.filter((o) => o.available).length} OS</span>
@@ -810,15 +896,21 @@
           <div class="px-5 pb-4 space-y-4">
             <!-- Bundled CLIs -->
             <div>
-              <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest">Bundled Tools</p>
+              <p
+                class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest"
+              >
+                Bundled Tools
+              </p>
               <div class="flex flex-wrap gap-1.5">
                 {#each $detectedClis as cli (cli.tool)}
-                  <div class="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors
+                  <div
+                    class="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors
                     {cli.available
                       ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
                       : cli.planned
                         ? 'border-amber-500/20 bg-amber-500/5 text-amber-600 dark:text-amber-400/70'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500'}">
+                        : 'border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500'}"
+                  >
                     <code class="text-[11px]">{cli.tool}</code>
                     {#if cli.available}
                       <span class="text-emerald-500 dark:text-emerald-400">&#10003;</span>
@@ -826,13 +918,21 @@
                       <span class="text-slate-300 dark:text-slate-600">&times;</span>
                     {/if}
                     {#if cli.planned}
-                      <span class="rounded-full bg-amber-100 dark:bg-amber-900/30 px-1.5 py-px text-[9px] font-medium">planned</span>
+                      <span
+                        class="rounded-full bg-amber-100 dark:bg-amber-900/30 px-1.5 py-px text-[9px] font-medium"
+                        >planned</span
+                      >
                     {/if}
                     {#if cli.version}
-                      <span class="text-[10px] font-normal text-slate-400 dark:text-slate-500">{cli.version}</span>
+                      <span class="text-[10px] font-normal text-slate-400 dark:text-slate-500"
+                        >{cli.version}</span
+                      >
                     {/if}
                     {#if cli.provider}
-                      <span class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-[9px] text-indigo-600 dark:text-indigo-400">{cli.provider}</span>
+                      <span
+                        class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-[9px] text-indigo-600 dark:text-indigo-400"
+                        >{cli.provider}</span
+                      >
                     {/if}
                   </div>
                 {/each}
@@ -842,13 +942,19 @@
             <!-- OS Tools (system PATH) -->
             {#if $detectedOsTools.length > 0}
               <div>
-                <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest">OS Tools (system PATH)</p>
+                <p
+                  class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest"
+                >
+                  OS Tools (system PATH)
+                </p>
                 <div class="flex flex-wrap gap-1.5">
                   {#each $detectedOsTools as os (os.tool)}
-                    <div class="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors
+                    <div
+                      class="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors
                       {os.available
                         ? 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-400'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500'}">
+                        : 'border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500'}"
+                    >
                       <code class="text-[11px]">{os.tool}</code>
                       {#if os.available}
                         <span class="text-sky-500 dark:text-sky-400">&#10003;</span>
@@ -856,15 +962,23 @@
                         <span class="text-slate-300 dark:text-slate-600">&times;</span>
                       {/if}
                       {#if os.version}
-                        <span class="text-[10px] font-normal text-slate-400 dark:text-slate-500">{os.version}</span>
+                        <span class="text-[10px] font-normal text-slate-400 dark:text-slate-500"
+                          >{os.version}</span
+                        >
                       {/if}
                       {#if os.path}
-                        <span class="text-[10px] font-normal text-slate-400 dark:text-slate-600 truncate max-w-[180px]" title={os.path}>
+                        <span
+                          class="text-[10px] font-normal text-slate-400 dark:text-slate-600 truncate max-w-[180px]"
+                          title={os.path}
+                        >
                           {os.path}
                         </span>
                       {/if}
                       {#if os.provider}
-                        <span class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-[9px] text-indigo-600 dark:text-indigo-400">{os.provider}</span>
+                        <span
+                          class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-[9px] text-indigo-600 dark:text-indigo-400"
+                          >{os.provider}</span
+                        >
                       {/if}
                     </div>
                   {/each}
@@ -875,15 +989,32 @@
             <!-- Cloud Configs -->
             {#if $detectedCloudConfigs.length > 0}
               <div>
-                <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest">Detected Credentials &amp; Configs</p>
+                <p
+                  class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest"
+                >
+                  Detected Credentials &amp; Configs
+                </p>
                 <div class="flex flex-wrap gap-1.5">
                   {#each $detectedCloudConfigs as config (config.configPath)}
-                    <div class="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs">
+                    <div
+                      class="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs"
+                    >
                       <span class="text-emerald-500 text-[10px]">&#9919;</span>
-                      <span class="font-medium text-emerald-700 dark:text-emerald-400">{config.label}</span>
-                      <span class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-[9px] text-indigo-600 dark:text-indigo-400">{config.provider}</span>
-                      <span class="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[180px]" title={config.configPath}>
-                        {config.configPath.replace(/^\/home\/[^/]+\//, "~/").replace(/^\/Users\/[^/]+\//, "~/").replace(/^C:\\Users\\[^\\]+\\/, "~\\")}
+                      <span class="font-medium text-emerald-700 dark:text-emerald-400"
+                        >{config.label}</span
+                      >
+                      <span
+                        class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-[9px] text-indigo-600 dark:text-indigo-400"
+                        >{config.provider}</span
+                      >
+                      <span
+                        class="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[180px]"
+                        title={config.configPath}
+                      >
+                        {config.configPath
+                          .replace(/^\/home\/[^/]+\//, "~/")
+                          .replace(/^\/Users\/[^/]+\//, "~/")
+                          .replace(/^C:\\Users\\[^\\]+\\/, "~\\")}
                       </span>
                     </div>
                   {/each}
@@ -894,41 +1025,69 @@
             <!-- Cloud Import -->
             {#if $detectedCloudConfigs.length > 0}
               <div>
-                <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest">Import from Cloud</p>
+                <p
+                  class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest"
+                >
+                  Import from Cloud
+                </p>
                 <div class="flex flex-wrap gap-1.5 mb-2">
                   {#each getSupportedCloudProviders() as provider (provider)}
-                    {@const hasConfig = $detectedCloudConfigs.some(c => c.provider === provider)}
+                    {@const hasConfig = $detectedCloudConfigs.some((c) => c.provider === provider)}
                     <Button
                       size="sm"
                       variant={cloudImportProvider === provider ? "default" : "outline"}
                       class="text-xs h-7 {hasConfig ? '' : 'opacity-60'}"
                       disabled={cloudListLoading || cloudImportLoading}
-                      onclick={() => cloudImportProvider === provider ? closeCloudImport() : listClouds(provider)}
+                      onclick={() =>
+                        cloudImportProvider === provider
+                          ? closeCloudImport()
+                          : listClouds(provider)}
                     >
-                      {cloudListLoading && cloudImportProvider === provider ? "Scanning" : `List ${provider} clusters`}
+                      {cloudListLoading && cloudImportProvider === provider
+                        ? "Scanning"
+                        : `List ${provider} clusters`}
                     </Button>
                   {/each}
                 </div>
 
                 {#if cloudImportError}
-                  <div class="text-xs text-rose-500 bg-rose-500/10 border border-rose-500/30 rounded px-2 py-1 mb-2">{cloudImportError}</div>
+                  <div
+                    class="text-xs text-rose-500 bg-rose-500/10 border border-rose-500/30 rounded px-2 py-1 mb-2"
+                  >
+                    {cloudImportError}
+                  </div>
                 {/if}
                 {#if cloudImportSuccess}
-                  <div class="text-xs text-emerald-500 bg-emerald-500/10 border border-emerald-500/30 rounded px-2 py-1 mb-2">{cloudImportSuccess}</div>
+                  <div
+                    class="text-xs text-emerald-500 bg-emerald-500/10 border border-emerald-500/30 rounded px-2 py-1 mb-2"
+                  >
+                    {cloudImportSuccess}
+                  </div>
                 {/if}
 
                 {#if cloudClusters.length > 0}
-                  <p class="text-[10px] text-slate-400 mb-1">{cloudClusters.length} cluster{cloudClusters.length === 1 ? "" : "s"} found</p>
+                  <p class="text-[10px] text-slate-400 mb-1">
+                    {cloudClusters.length} cluster{cloudClusters.length === 1 ? "" : "s"} found
+                  </p>
                   <div class="space-y-1">
                     {#each cloudClusters as cluster (`${cluster.provider}:${cluster.region}:${cluster.name}`)}
-                      <div class="flex items-center justify-between gap-2 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/40 px-3 py-1.5 text-xs">
+                      <div
+                        class="flex items-center justify-between gap-2 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/40 px-3 py-1.5 text-xs"
+                      >
                         <div class="flex items-center gap-2 min-w-0">
-                          <span class="font-medium text-slate-800 dark:text-slate-200 truncate">{cluster.name}</span>
+                          <span class="font-medium text-slate-800 dark:text-slate-200 truncate"
+                            >{cluster.name}</span
+                          >
                           <span class="text-[10px] text-slate-400">{cluster.region}</span>
                           {#if cluster.resourceGroup}
-                            <span class="text-[10px] text-slate-400">rg:{cluster.resourceGroup}</span>
+                            <span class="text-[10px] text-slate-400"
+                              >rg:{cluster.resourceGroup}</span
+                            >
                           {/if}
-                          <span class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-[9px] text-indigo-600 dark:text-indigo-400">{cluster.provider}</span>
+                          <span
+                            class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-[9px] text-indigo-600 dark:text-indigo-400"
+                            >{cluster.provider}</span
+                          >
                         </div>
                         <Button
                           size="sm"
@@ -1111,19 +1270,36 @@
                               <div
                                 class="flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-300"
                               >
-                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] {
-                                  cluster.authInfo.securityLevel === 'high' ? 'bg-emerald-500/10 text-emerald-400' :
-                                  cluster.authInfo.securityLevel === 'medium' ? 'bg-amber-500/10 text-amber-400' :
-                                  cluster.authInfo.securityLevel === 'low' ? 'bg-rose-500/10 text-rose-400' :
-                                  'bg-slate-500/10 text-slate-400'
-                                }" title="{cluster.authInfo.description}">
-                                  {cluster.authInfo.securityLevel === 'high' ? '🛡' : cluster.authInfo.securityLevel === 'low' ? '⚠' : ''}
+                                <span
+                                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] {cluster
+                                    .authInfo.securityLevel === 'high'
+                                    ? 'bg-emerald-500/10 text-emerald-400'
+                                    : cluster.authInfo.securityLevel === 'medium'
+                                      ? 'bg-amber-500/10 text-amber-400'
+                                      : cluster.authInfo.securityLevel === 'low'
+                                        ? 'bg-rose-500/10 text-rose-400'
+                                        : 'bg-slate-500/10 text-slate-400'}"
+                                  title={cluster.authInfo.description}
+                                >
+                                  {cluster.authInfo.securityLevel === "high"
+                                    ? "🛡"
+                                    : cluster.authInfo.securityLevel === "low"
+                                      ? "⚠"
+                                      : ""}
                                   {cluster.authInfo.label}
                                 </span>
                                 {#if cluster.authInfo.tokenExpired}
-                                  <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 animate-pulse">Token expired</span>
+                                  <span
+                                    class="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 animate-pulse"
+                                    >Token expired</span
+                                  >
                                 {:else if cluster.authInfo.tokenExpiresInHours != null && cluster.authInfo.tokenExpiresInHours < 24}
-                                  <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400">Expires {Math.round(cluster.authInfo.tokenExpiresInHours)}h</span>
+                                  <span
+                                    class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400"
+                                    >Expires {Math.round(
+                                      cluster.authInfo.tokenExpiresInHours,
+                                    )}h</span
+                                  >
                                 {/if}
                                 <span>Env: {cluster.env}</span>
                                 {#if cluster.contextName}
@@ -1158,7 +1334,9 @@
                               </div>
 
                               {#if cluster.importWarnings.length}
-                                <div class="rounded-md border border-rose-200 bg-rose-50/80 px-3 py-2 text-xs text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100">
+                                <div
+                                  class="rounded-md border border-rose-200 bg-rose-50/80 px-3 py-2 text-xs text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100"
+                                >
                                   {#each cluster.importWarnings as warning}
                                     <p>{warning}</p>
                                   {/each}
@@ -1254,7 +1432,8 @@
           </div>
           {#if clustersCount !== 0}
             <p class="text-gray-600 dark:text-gray-300 mb-4 text-sm">
-              {clustersCount} Clusters added to ROZOOM - K8s Linter IDE with status, tags, and trust signals
+              {clustersCount} Clusters added to ROZOOM - K8s Linter IDE with status, tags, and trust
+              signals
             </p>
           {/if}
           <div class="space-y-3 mb-4">
@@ -1354,7 +1533,10 @@
                     : 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700'}"
                 >
                   <div class="flex items-start gap-2.5">
-                    <Checkbox checked={selectedManagedClusters[cluster.uuid]} class="mt-1 shrink-0" />
+                    <Checkbox
+                      checked={selectedManagedClusters[cluster.uuid]}
+                      class="mt-1 shrink-0"
+                    />
                     <div class="min-w-0 flex-1">
                       <div class="flex items-start justify-between gap-2">
                         <div class="min-w-0 flex-1 group">
@@ -1364,85 +1546,163 @@
                             role="button"
                             tabindex="0"
                             onclick={async () => {
-                              const newName = prompt("Rename cluster context:", cluster.displayName);
-                              if (newName && newName.trim() && newName.trim() !== cluster.displayName) {
+                              const newName = prompt(
+                                "Rename cluster context:",
+                                cluster.displayName,
+                              );
+                              if (
+                                newName &&
+                                newName.trim() &&
+                                newName.trim() !== cluster.displayName
+                              ) {
                                 const trimmed = newName.trim();
                                 await renameClusterContext(cluster.uuid, trimmed);
                               }
                             }}
-                            onkeydown={(e) => { if (e.key === "Enter") e.currentTarget.click(); }}
-                          >{cluster.displayName} <span class="opacity-0 group-hover:opacity-50 text-[10px] transition-opacity">&#9998;</span></p>
+                            onkeydown={(e) => {
+                              if (e.key === "Enter") e.currentTarget.click();
+                            }}
+                          >
+                            {cluster.displayName}
+                            <span
+                              class="opacity-0 group-hover:opacity-50 text-[10px] transition-opacity"
+                              >&#9998;</span
+                            >
+                          </p>
                           {#if cluster.displayName !== cluster.name}
-                            <p class="text-[11px] text-gray-400 dark:text-gray-500 truncate" title={cluster.name}>{cluster.name}</p>
+                            <p
+                              class="text-[11px] text-gray-400 dark:text-gray-500 truncate"
+                              title={cluster.name}
+                            >
+                              {cluster.name}
+                            </p>
                           {/if}
                         </div>
                         <div class="flex items-center gap-1 shrink-0">
-                          <Button onclick={() => handleTogglePin(cluster.uuid)} variant="outline" size="sm" class="text-[11px] h-7 px-2 dark:text-white !bg-transparent border-gray-200 dark:border-slate-500" disabled={isLoading}>
+                          <Button
+                            onclick={() => handleTogglePin(cluster.uuid)}
+                            variant="outline"
+                            size="sm"
+                            class="text-[11px] h-7 px-2 dark:text-white !bg-transparent border-gray-200 dark:border-slate-500"
+                            disabled={isLoading}
+                          >
                             {cluster.pinned ? "Unpin" : "📌"}
                           </Button>
-                          <Button onclick={() => handleToggleConnection(cluster.uuid)} variant={cluster?.offline ? "outline" : "default"} size="sm" class="text-[11px] h-7 px-2 dark:text-white" disabled={isLoading}>
+                          <Button
+                            onclick={() => handleToggleConnection(cluster.uuid)}
+                            variant={cluster?.offline ? "outline" : "default"}
+                            size="sm"
+                            class="text-[11px] h-7 px-2 dark:text-white"
+                            disabled={isLoading}
+                          >
                             {cluster?.offline ? "Offline" : "Online"}
                           </Button>
-                          <Button onclick={() => handleRemoveCluster(cluster.uuid, cluster.name)} disabled={isLoading} variant="ghost" size="sm" class="text-red-500 hover:text-red-600 h-7 w-7 p-0">
+                          <Button
+                            onclick={() => handleRemoveCluster(cluster.uuid, cluster.name)}
+                            disabled={isLoading}
+                            variant="ghost"
+                            size="sm"
+                            class="text-red-500 hover:text-red-600 h-7 w-7 p-0"
+                          >
                             <Trash class="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </div>
                       <div class="flex flex-wrap items-center gap-1 mt-1">
-                        <span class="text-[11px] px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200">{cluster.provider}</span>
-                        <span class="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-600/60 dark:text-slate-200">{cluster.env}</span>
+                        <span
+                          class="text-[11px] px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200"
+                          >{cluster.provider}</span
+                        >
+                        <span
+                          class="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-600/60 dark:text-slate-200"
+                          >{cluster.env}</span
+                        >
                         {#if cluster.readOnly}
-                          <span class="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700 dark:bg-slate-500/30 dark:text-slate-300">Read-only</span>
+                          <span
+                            class="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700 dark:bg-slate-500/30 dark:text-slate-300"
+                            >Read-only</span
+                          >
                         {/if}
                         {#if cluster.proxyUrl}
-                          <span class="text-[11px] px-1.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300" title={cluster.proxyUrl}>Proxy</span>
+                          <span
+                            class="text-[11px] px-1.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300"
+                            title={cluster.proxyUrl}>Proxy</span
+                          >
                         {/if}
                         {#if cluster.pinnedKubectlVersion}
-                          <span class="text-[11px] px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">kubectl {cluster.pinnedKubectlVersion}</span>
+                          <span
+                            class="text-[11px] px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300"
+                            >kubectl {cluster.pinnedKubectlVersion}</span
+                          >
                         {/if}
                         {#if cluster.pinned}
-                          <span class="text-[11px] px-1.5 py-0.5 rounded-full bg-yellow-50 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-200">Pinned</span>
+                          <span
+                            class="text-[11px] px-1.5 py-0.5 rounded-full bg-yellow-50 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-200"
+                            >Pinned</span
+                          >
                         {/if}
                         <span class="text-[10px] text-gray-400 ml-1">
-                          {new Date(cluster.addedAt).toLocaleDateString()} · {cluster.offline ? `Last: ${new Date(cluster.lastSeen).toLocaleDateString()}` : "Online"}
+                          {new Date(cluster.addedAt).toLocaleDateString()} · {cluster.offline
+                            ? `Last: ${new Date(cluster.lastSeen).toLocaleDateString()}`
+                            : "Online"}
                         </span>
                       </div>
                       {#if cluster.tags.length > 0}
                         <div class="flex flex-wrap gap-1 mt-1">
                           {#each cluster.tags as tag}
-                            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-600/40 dark:text-slate-400">#{tag}</span>
+                            <span
+                              class="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-600/40 dark:text-slate-400"
+                              >#{tag}</span
+                            >
                           {/each}
                         </div>
                       {/if}
                       <div class="flex items-center gap-3 mt-1.5 flex-wrap">
                         <div class="flex items-center gap-1">
-                          <span class="text-[10px] text-slate-400 dark:text-slate-500 shrink-0">Default ns:</span>
+                          <span class="text-[10px] text-slate-400 dark:text-slate-500 shrink-0"
+                            >Default ns:</span
+                          >
                           <input
                             type="text"
                             class="h-5 text-[11px] px-1.5 py-0 rounded border border-slate-200 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-300 w-24 placeholder:text-slate-300 dark:placeholder:text-slate-600"
                             placeholder="all"
                             value={cluster.defaultNamespace ?? ""}
-                            onchange={(e) => updateClusterMeta(cluster.uuid, { defaultNamespace: (e.currentTarget as HTMLInputElement).value || undefined })}
+                            onchange={(e) =>
+                              updateClusterMeta(cluster.uuid, {
+                                defaultNamespace:
+                                  (e.currentTarget as HTMLInputElement).value || undefined,
+                              })}
                           />
                         </div>
                         <div class="flex items-center gap-1">
-                          <span class="text-[10px] text-slate-400 dark:text-slate-500 shrink-0">Proxy:</span>
+                          <span class="text-[10px] text-slate-400 dark:text-slate-500 shrink-0"
+                            >Proxy:</span
+                          >
                           <input
                             type="text"
                             class="h-5 text-[11px] px-1.5 py-0 rounded border border-slate-200 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-300 w-32 placeholder:text-slate-300 dark:placeholder:text-slate-600"
                             placeholder="none"
                             value={cluster.proxyUrl ?? ""}
-                            onchange={(e) => updateClusterMeta(cluster.uuid, { proxyUrl: (e.currentTarget as HTMLInputElement).value || undefined })}
+                            onchange={(e) =>
+                              updateClusterMeta(cluster.uuid, {
+                                proxyUrl: (e.currentTarget as HTMLInputElement).value || undefined,
+                              })}
                           />
                         </div>
                         <div class="flex items-center gap-1">
-                          <span class="text-[10px] text-slate-400 dark:text-slate-500 shrink-0">kubectl:</span>
+                          <span class="text-[10px] text-slate-400 dark:text-slate-500 shrink-0"
+                            >kubectl:</span
+                          >
                           <input
                             type="text"
                             class="h-5 text-[11px] px-1.5 py-0 rounded border border-slate-200 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-300 w-20 placeholder:text-slate-300 dark:placeholder:text-slate-600"
                             placeholder="bundled"
                             value={cluster.pinnedKubectlVersion ?? ""}
-                            onchange={(e) => updateClusterMeta(cluster.uuid, { pinnedKubectlVersion: (e.currentTarget as HTMLInputElement).value || undefined })}
+                            onchange={(e) =>
+                              updateClusterMeta(cluster.uuid, {
+                                pinnedKubectlVersion:
+                                  (e.currentTarget as HTMLInputElement).value || undefined,
+                              })}
                           />
                         </div>
                         <label class="flex items-center gap-1 cursor-pointer">
@@ -1450,9 +1710,14 @@
                             type="checkbox"
                             class="w-3 h-3 rounded border-slate-400 accent-amber-500"
                             checked={cluster.readOnly ?? false}
-                            onchange={(e) => updateClusterMeta(cluster.uuid, { readOnly: (e.currentTarget as HTMLInputElement).checked })}
+                            onchange={(e) =>
+                              updateClusterMeta(cluster.uuid, {
+                                readOnly: (e.currentTarget as HTMLInputElement).checked,
+                              })}
                           />
-                          <span class="text-[10px] text-slate-400 dark:text-slate-500">Read-only</span>
+                          <span class="text-[10px] text-slate-400 dark:text-slate-500"
+                            >Read-only</span
+                          >
                         </label>
                       </div>
                     </div>
@@ -1537,13 +1802,18 @@
           Catalog Export / Import
         </h2>
         <p class="text-gray-600 dark:text-gray-300 mb-4 text-sm">
-          Export cluster groups, tags, and display names as JSON (no secrets). Import on another machine.
+          Export cluster groups, tags, and display names as JSON (no secrets). Import on another
+          machine.
         </p>
         <div class="flex gap-2">
           <Button
             onclick={async () => {
-              const { exportCatalog } = await import("$features/cluster-manager/model/catalog-export");
-              const { loadGroups, loadGroupMembership } = await import("$shared/lib/cluster-groups");
+              const { exportCatalog } = await import(
+                "$features/cluster-manager/model/catalog-export"
+              );
+              const { loadGroups, loadGroupMembership } = await import(
+                "$shared/lib/cluster-groups"
+              );
               const groups = await loadGroups();
               const membership = await loadGroupMembership();
               const catalog = exportCatalog($clustersList, groups, membership);
@@ -1561,10 +1831,17 @@
             onclick={async () => {
               const json = prompt("Paste catalog JSON:");
               if (!json?.trim()) return;
-              const { importCatalog } = await import("$features/cluster-manager/model/catalog-export");
+              const { importCatalog } = await import(
+                "$features/cluster-manager/model/catalog-export"
+              );
               const result = importCatalog(json);
-              if (result.error) { toast.error("Import failed: " + result.error); return; }
-              toast.success(`Catalog loaded: ${result.catalog!.clusters.length} clusters, ${result.catalog!.groups.length} groups. Apply metadata manually.`);
+              if (result.error) {
+                toast.error("Import failed: " + result.error);
+                return;
+              }
+              toast.success(
+                `Catalog loaded: ${result.catalog!.clusters.length} clusters, ${result.catalog!.groups.length} groups. Apply metadata manually.`,
+              );
             }}
             disabled={isLoading}
             variant="outline"
@@ -1689,21 +1966,34 @@
 
     <!-- Removed Clusters (Trash) -->
     {#if $removedClustersList.length > 0}
-      <div class="mt-6 bg-white border border-slate-200 dark:bg-slate-800/60 dark:border-slate-700/60 rounded-xl shadow-sm p-6">
+      <div
+        class="mt-6 bg-white border border-slate-200 dark:bg-slate-800/60 dark:border-slate-700/60 rounded-xl shadow-sm p-6"
+      >
         <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-3">
           Recently Removed ({$removedClustersList.length})
         </h2>
-        <p class="text-xs text-slate-400 dark:text-slate-500 mb-3">Clusters moved to trash. Restore or permanently delete.</p>
+        <p class="text-xs text-slate-400 dark:text-slate-500 mb-3">
+          Clusters moved to trash. Restore or permanently delete.
+        </p>
         <div class="space-y-1.5">
           {#each $removedClustersList as cluster (cluster.uuid)}
-            <div class="flex items-center justify-between gap-3 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30 px-3 py-2 text-sm">
+            <div
+              class="flex items-center justify-between gap-3 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30 px-3 py-2 text-sm"
+            >
               <div class="flex items-center gap-2 min-w-0">
-                <span class="font-medium text-slate-700 dark:text-slate-300 truncate">{cluster.displayName || cluster.name}</span>
+                <span class="font-medium text-slate-700 dark:text-slate-300 truncate"
+                  >{cluster.displayName || cluster.name}</span
+                >
                 {#if cluster.provider}
-                  <span class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-[9px] text-indigo-600 dark:text-indigo-400">{cluster.provider}</span>
+                  <span
+                    class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-[9px] text-indigo-600 dark:text-indigo-400"
+                    >{cluster.provider}</span
+                  >
                 {/if}
                 {#if cluster.removedAt}
-                  <span class="text-[10px] text-slate-400">removed {new Date(cluster.removedAt).toLocaleDateString()}</span>
+                  <span class="text-[10px] text-slate-400"
+                    >removed {new Date(cluster.removedAt).toLocaleDateString()}</span
+                  >
                 {/if}
               </div>
               <div class="flex items-center gap-1.5 shrink-0">
@@ -1711,7 +2001,13 @@
                   size="sm"
                   variant="outline"
                   class="text-xs h-6 px-2 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-700 dark:hover:bg-emerald-900/20"
-                  onclick={async () => { await restoreCluster(cluster.uuid); void recordAudit("cluster-restored", { clusterName: cluster.name, clusterUuid: cluster.uuid }); }}
+                  onclick={async () => {
+                    await restoreCluster(cluster.uuid);
+                    void recordAudit("cluster-restored", {
+                      clusterName: cluster.name,
+                      clusterUuid: cluster.uuid,
+                    });
+                  }}
                 >
                   Restore
                 </Button>
@@ -1720,8 +2016,17 @@
                   variant="outline"
                   class="text-xs h-6 px-2 text-rose-600 border-rose-300 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-700 dark:hover:bg-rose-900/20"
                   onclick={async () => {
-                    const yes = await safeDialogAsk(`Permanently delete "${cluster.displayName || cluster.name}"? This cannot be undone.`, { title: "Purge cluster", kind: "warning" });
-                    if (yes) { await purgeCluster(cluster.uuid); void recordAudit("cluster-purged", { clusterName: cluster.name, clusterUuid: cluster.uuid }); }
+                    const yes = await safeDialogAsk(
+                      `Permanently delete "${cluster.displayName || cluster.name}"? This cannot be undone.`,
+                      { title: "Purge cluster", kind: "warning" },
+                    );
+                    if (yes) {
+                      await purgeCluster(cluster.uuid);
+                      void recordAudit("cluster-purged", {
+                        clusterName: cluster.name,
+                        clusterUuid: cluster.uuid,
+                      });
+                    }
                   }}
                 >
                   Delete
@@ -1733,22 +2038,33 @@
       </div>
     {/if}
     <!-- Audit Trail -->
-    {#await import("$features/cluster-manager/model/audit-trail").then(m => m.loadAuditTrail()) then trail}
+    {#await import("$features/cluster-manager/model/audit-trail").then( (m) => m.loadAuditTrail(), ) then trail}
       {#if trail.length > 0}
-        <div class="mt-6 bg-white border border-slate-200 dark:bg-slate-800/60 dark:border-slate-700/60 rounded-xl shadow-sm p-6">
+        <div
+          class="mt-6 bg-white border border-slate-200 dark:bg-slate-800/60 dark:border-slate-700/60 rounded-xl shadow-sm p-6"
+        >
           <details>
-            <summary class="text-lg font-semibold text-slate-800 dark:text-slate-100 cursor-pointer">
+            <summary
+              class="text-lg font-semibold text-slate-800 dark:text-slate-100 cursor-pointer"
+            >
               Audit Trail ({trail.length})
             </summary>
             <div class="mt-3 space-y-1 max-h-64 overflow-y-auto">
               {#each trail.slice(0, 50) as entry (entry.id)}
-                <div class="flex items-center gap-2 text-xs text-slate-400 py-0.5 border-b border-slate-100 dark:border-slate-700/40">
-                  <span class="text-[10px] font-mono text-slate-500 shrink-0 w-36">{new Date(entry.timestamp).toLocaleString()}</span>
-                  <span class="px-1.5 py-0.5 rounded text-[9px] font-medium
-                    {entry.action.includes('removed') || entry.action.includes('purged') ? 'bg-rose-500/10 text-rose-400' :
-                     entry.action.includes('restored') || entry.action.includes('added') ? 'bg-emerald-500/10 text-emerald-400' :
-                     'bg-slate-500/10 text-slate-400'}"
-                  >{entry.action}</span>
+                <div
+                  class="flex items-center gap-2 text-xs text-slate-400 py-0.5 border-b border-slate-100 dark:border-slate-700/40"
+                >
+                  <span class="text-[10px] font-mono text-slate-500 shrink-0 w-36"
+                    >{new Date(entry.timestamp).toLocaleString()}</span
+                  >
+                  <span
+                    class="px-1.5 py-0.5 rounded text-[9px] font-medium
+                    {entry.action.includes('removed') || entry.action.includes('purged')
+                      ? 'bg-rose-500/10 text-rose-400'
+                      : entry.action.includes('restored') || entry.action.includes('added')
+                        ? 'bg-emerald-500/10 text-emerald-400'
+                        : 'bg-slate-500/10 text-slate-400'}">{entry.action}</span
+                  >
                   {#if entry.clusterName}
                     <span class="text-slate-300 truncate">{entry.clusterName}</span>
                   {/if}
