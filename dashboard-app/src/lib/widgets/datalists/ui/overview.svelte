@@ -1050,8 +1050,7 @@
     certificatesInFlightTokenId = token.id;
     certificatesLoading = true;
     if (certificatesWatchdog) clearTimeout(certificatesWatchdog);
-    certificatesWatchdog = setTimeout(
-      () => {
+    certificatesWatchdog = setTimeout(() => {
         if (!certificatesInFlight || certificatesInFlightTokenId !== token.id) return;
         certificatesInFlight = false;
         certificatesInFlightTokenId = null;
@@ -1288,12 +1287,11 @@
 
   function scheduleNextOverviewSync(token: RefreshRunToken, clusterId: string) {
     if (!isRefreshTokenActive(token, clusterId)) return;
-    overviewSyncTimeout = setTimeout(
-      async () => {
-        overviewSyncTimeout = null;
-        await refreshOverviewSnapshot({ token });
-        scheduleNextOverviewSync(token, clusterId);
-      },
+    overviewSyncTimeout = setTimeout(async () => {
+      overviewSyncTimeout = null;
+      await refreshOverviewSnapshot({ token });
+      scheduleNextOverviewSync(token, clusterId);
+    },
       normalizeOverviewSyncSeconds(overviewSyncSeconds) * 1000,
     );
   }
