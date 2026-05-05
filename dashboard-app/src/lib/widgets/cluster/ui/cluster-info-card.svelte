@@ -857,10 +857,6 @@
         refreshInterval = `${storedInterval}`;
       }
       linterEnabled = await loadClusterLinterEnabled(cluster.uuid);
-      if (credRisk === null) {
-        const report = await loadCredentialReport(cluster.uuid, cluster.name);
-        credRisk = report;
-      }
       const savedSections = await loadClusterCardSections(cluster.uuid);
       if (savedSections) {
         for (const key of Object.keys(sectionOpen) as Array<keyof typeof sectionOpen>) {

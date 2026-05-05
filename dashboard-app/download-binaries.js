@@ -7,6 +7,7 @@ import https from "https";
 import os from "os";
 import process from "process";
 import crypto from "crypto";
+import { setTimeout as sleep } from "timers/promises";
 import extractZip from "extract-zip";
 import console from "console";
 
@@ -112,11 +113,26 @@ async function fetchText(url, headers = UA_HEADERS, maxRedirects = 8) {
  * Best-effort fetch: returns null on non-200 (after redirects).
  */
 async function fetchLatestGitHubTag(repo) {
-  const json = await fetchText(
-    `https://api.github.com/repos/${repo}/releases/latest`,
-    getGitHubHeaders(),
-  );
-  return JSON.parse(json).tag_name;
+  const delays = [3000, 8000, 15000];
+  let lastErr;
+  for (let i = 0; i <= delays.length; i++) {
+    try {
+      const json = await fetchText(
+        `https://api.github.com/repos/${repo}/releases/latest`,
+        getGitHubHeaders(),
+      );
+      return JSON.parse(json).tag_name;
+    } catch (err) {
+      if (i < delays.length && /HTTP (403|429)/.test(String(err.message))) {
+        lastErr = err;
+        console.warn(`⚠ GitHub API rate limit (${repo}), retry in ${delays[i] / 1000}s…`);
+        await sleep(delays[i]);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
 }
 
 /**
@@ -129,19 +145,34 @@ async function fetchLatestGitHubTag(repo) {
  * but fetching or parsing it fails - we never want to silently proceed.
  */
 async function fetchReleaseChecksum(repo, tag, assetName) {
-  const json = await fetchText(
-    `https://api.github.com/repos/${repo}/releases/tags/${tag}`,
-    getGitHubHeaders(),
-  );
-  const rel = JSON.parse(json);
-  const assets = rel.assets || [];
-  const checksumAsset = assets.find((a) =>
-    /checksums?(\.txt)?$|sha256sums?(\.txt)?$/i.test(String(a?.name || "")),
-  );
-  if (!checksumAsset?.browser_download_url) return null;
+  const delays = [3000, 8000, 15000];
+  let lastErr;
+  for (let i = 0; i <= delays.length; i++) {
+    try {
+      const json = await fetchText(
+        `https://api.github.com/repos/${repo}/releases/tags/${tag}`,
+        getGitHubHeaders(),
+      );
+      const rel = JSON.parse(json);
+      const assets = rel.assets || [];
+      const checksumAsset = assets.find((a) =>
+        /checksums?(\.txt)?$|sha256sums?(\.txt)?$/i.test(String(a?.name || "")),
+      );
+      if (!checksumAsset?.browser_download_url) return null;
 
-  const text = await fetchText(checksumAsset.browser_download_url, UA_HEADERS);
-  return parseShaFromText(text, assetName);
+      const text = await fetchText(checksumAsset.browser_download_url, UA_HEADERS);
+      return parseShaFromText(text, assetName);
+    } catch (err) {
+      if (i < delays.length && /HTTP (403|429)/.test(String(err.message))) {
+        lastErr = err;
+        console.warn(`⚠ GitHub API rate limit (${repo} ${tag}), retry in ${delays[i] / 1000}s…`);
+        await sleep(delays[i]);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
 }
 
 async function fetchTextOptional(url, headers = UA_HEADERS, maxRedirects = 8) {
@@ -1963,7 +1994,8 @@ async function installWebsocat() {
 
 async function installTcping() {
   const platform = os.platform();
-  const arch = os.arch() === "x64" ? "amd64" : "arm64";
+  // cloverstd/tcping only publishes darwin-amd64; on Apple Silicon, Rosetta 2 runs it fine
+  const arch = os.arch() === "x64" || platform === "darwin" ? "amd64" : "arm64";
   const ext = platform === "win32" ? ".exe" : "";
   const osName = platform === "win32" ? "windows" : platform === "darwin" ? "darwin" : "linux";
 
