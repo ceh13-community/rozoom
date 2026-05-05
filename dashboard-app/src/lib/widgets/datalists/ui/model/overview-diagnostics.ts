@@ -407,8 +407,16 @@ export function humanizeClusterError(raw: string): { title: string; detail: stri
 
 export function buildPrimaryAlert(
   checks: ClusterHealthChecks | ClusterCheckError | null,
+  options?: { loading?: boolean },
 ): OverviewPrimaryAlert {
   if (!checks) {
+    if (options?.loading) {
+      return {
+        severity: "info",
+        title: "Loading...",
+        detail: "Checking cluster health.",
+      };
+    }
     return {
       severity: "info",
       title: "No diagnostics yet",

@@ -185,6 +185,14 @@ export type CertificatesReport = {
   summary: CertificatesSummary;
   certificates: CertificateItem[];
   kubeletRotation: KubeletRotationItem[];
+  /**
+   * True when a kube-apiserver static pod was found in kube-system (i.e.
+   * a kubeadm-style cluster). When false, the control plane is managed
+   * (Rancher / RKE2 / GKE / EKS etc.) and the kubeadm cert check is not
+   * applicable - callers should surface TLS/cert-manager data instead
+   * of flagging this as a failure.
+   */
+  controlPlaneDetected?: boolean;
   errors?: string;
   updatedAt: number;
 };
