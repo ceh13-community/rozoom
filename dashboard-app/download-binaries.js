@@ -2088,7 +2088,9 @@ async function installTrivy() {
   const tmp = path.join(TARGET_DIR, archiveName);
   const extractDir = path.join(TARGET_DIR, "trivy-extract");
   try {
-    const expected = await fetchReleaseChecksum("aquasecurity/trivy", tag, archiveName);
+    const checksumUrl = `https://github.com/aquasecurity/trivy/releases/download/${tag}/trivy_${ver}_checksums.txt`;
+    const checksumText = await fetchTextOptional(checksumUrl, UA_HEADERS);
+    const expected = checksumText ? parseShaFromText(checksumText, archiveName) : null;
     await download(url, tmp, UA_HEADERS);
     if (expected) {
       const actual = await sha256(tmp);
