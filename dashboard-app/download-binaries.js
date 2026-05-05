@@ -2094,7 +2094,7 @@ async function installTrivy() {
       const text = await fetchText(trivyChecksumUrl, UA_HEADERS);
       expected = parseShaFromText(text, archiveName);
     } catch {
-      expected = await fetchReleaseChecksum("aquasecurity/trivy", tag, archiveName);
+      // Direct CDN fetch unavailable — skip checksum, avoid GitHub API rate limit
     }
     await download(url, tmp, UA_HEADERS);
     if (expected) {
