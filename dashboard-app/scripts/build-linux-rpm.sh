@@ -73,19 +73,7 @@ cp -a "${PAYLOAD_DIR}/." "%{buildroot}/"
 
 %files
 %defattr(-,root,root,-)
-/usr/bin/rozoom-az-cli
-/usr/bin/rozoom-doctl
-/usr/bin/rozoom-hcloud
-/usr/bin/rozoom-helm
-/usr/bin/rozoom-k8s-linter-ide
-/usr/bin/rozoom-kubeconform
-/usr/bin/rozoom-kubectl
-/usr/bin/rozoom-kustomize
-/usr/bin/rozoom-oc
-/usr/bin/rozoom-pluto
-/usr/bin/rozoom-stern
-/usr/bin/rozoom-velero
-/usr/bin/rozoom-yq
+/usr/bin/rozoom-*
 /usr/lib/ROZOOM_K8s_Linter_IDE
 /usr/share/applications/ROZOOM_K8s_Linter_IDE.desktop
 /usr/share/icons/hicolor/32x32/apps/rozoom-k8s-linter-ide.png
