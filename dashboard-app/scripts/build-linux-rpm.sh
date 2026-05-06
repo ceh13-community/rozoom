@@ -48,6 +48,9 @@ mkdir -p "${TOPDIR}/BUILD" "${TOPDIR}/BUILDROOT" "${TOPDIR}/RPMS" "${TOPDIR}/SOU
 mkdir -p "${RPM_BUNDLE_DIR}"
 
 cat >"${SPECFILE}" <<EOF
+%define _build_id_links none
+%define _missing_build_ids_terminate_build 0
+
 Name: ${PACKAGE_NAME}
 Version: ${VERSION}
 Release: ${RELEASE}%{?dist}
