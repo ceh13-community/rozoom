@@ -155,7 +155,7 @@ export const WORKLOAD_LABEL_OVERRIDES: Record<string, string> = {
   authsecurity: "Auth & Credentials",
   plugins: "Plugin Marketplace",
   visualizer: "Workload Map",
-  resourcemap: "Service Chains",
+  resourcemap: "Resource Map",
 };
 
 export const CLUSTER_SWITCH_PREFETCH_WORKLOADS: WorkloadType[] = [
