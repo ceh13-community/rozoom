@@ -198,9 +198,6 @@ export function buildExecBlock(config: ExecPluginConfig): {
         throw new Error("aws-iam requires cluster name");
       }
       const args = ["token", "-i", config.primary.trim()];
-      if (config.extra?.trim()) {
-        args.push("--profile", config.extra.trim());
-      }
       return { apiVersion, command: "aws-iam-authenticator", args };
     }
     case "gke-auth": {
@@ -221,15 +218,14 @@ export function buildExecBlock(config: ExecPluginConfig): {
       return { apiVersion, command: "kubelogin", args };
     }
     case "oc-login": {
-      return { apiVersion, command: "oc", args: ["get-token"] };
+      return { apiVersion, command: "oc", args: ["whoami", "-t"] };
     }
     case "generic": {
-      const cmd = config.primary?.trim() || config.command?.trim();
-      if (!cmd) {
+      if (!config.command?.trim()) {
         throw new Error("generic requires a command");
       }
       const args = config.args ?? (config.extra?.trim() ? config.extra.trim().split(/\s+/) : []);
-      return { apiVersion, command: cmd, args };
+      return { apiVersion, command: config.command.trim(), args };
     }
   }
 }
