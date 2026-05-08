@@ -17,6 +17,8 @@
     runBackupAudit,
     startBackupAuditPolling,
     stopBackupAuditPolling,
+    loadClusterBackupEnabled,
+    saveClusterBackupEnabled,
     type BackupCatalogItem,
     type BackupRun,
     type BackupScopeMode,
@@ -52,12 +54,18 @@
 
   const { clusterId, offline = false }: Props = $props();
 
+  let backupPolicyEnabled = $state(false);
+  let isPrefsLoaded = $state(false);
+  let policyFormInitialized = $state(false);
+  let veleroAdvancedExpanded = $state(false);
+
   const auditState = $derived($backupAuditState[clusterId]);
   const summary = $derived(auditState?.summary ?? null);
   const history = $derived(auditState?.history ?? []);
   const latestRun = $derived(history[0] ?? null);
   const config = $derived($backupPolicyConfig);
   let actionMessage = $state<string | null>(null);
+  let actionTitle = $state<string | null>(null);
   let actionError = $state<string | null>(null);
   let helmActionError = $state<string | null>(null);
   let helmActionMessage = $state<string | null>(null);
@@ -94,10 +102,14 @@
   let pageVisible = $state(true);
   let restoreBackupName = $state("");
   let restoreSourceNamespace = $state("default");
-  let restoreTargetNamespace = $state("default");
+  let restoreTargetNamespace = $state("");
   let restoreBackups = $state<BackupCatalogItem[]>([]);
   let restoreScanLoading = $state(false);
   let restoreScanError = $state<string | null>(null);
+  let dismissedBackupFailed = $state(false);
+  let dismissedBackupUnverifiable = $state(false);
+  let dismissedBackupWarnings = $state(false);
+  let dismissedBackupErrors = $state(false);
   let policyMaxAgeHours = $state(24);
   let policyRetentionDays = $state(30);
   let policyCacheTtlMinutes = $state(10);
@@ -111,7 +123,7 @@
   let availableNamespaces = $state<string[]>([]);
   let selectedNamespace = $state("");
   let selectedNamespaces = $state<string[]>([]);
-  let credentialsTestResult = $state<{ ok: boolean; message: string } | null>(null);
+  let credentialsTestResult = $state<{ ok: boolean | "info"; message: string } | null>(null);
   let credentialsTesting = $state(false);
   let restorePreview = $state<{
     backupName: string;
@@ -147,6 +159,19 @@
     missing: "bg-rose-600",
     failed: "bg-rose-600",
     unverifiable: "bg-slate-500",
+  };
+
+  const statusLabels: Record<string, string> = {
+    ok: "OK",
+    outdated: "Outdated",
+    missing: "Missing",
+    failed: "Failed",
+    unverifiable: "Cannot verify",
+  };
+
+  const sourceLabels: Record<string, string> = {
+    auto: "Auto",
+    manual: "Manual",
   };
 
   const providerOptions: Array<{ value: VeleroCloudProvider; label: string }> = [
@@ -196,6 +221,7 @@
   }
 
   function formatRunDuration(run: BackupRun): string {
+    if (run.metadata?.phase === "InProgress") return "Running…";
     const start = run.metadata?.createdAt ?? run.runAt;
     const end = run.metadata?.completedAt ?? null;
     if (!start || !end) return "-";
@@ -331,24 +357,6 @@
     veleroError = null;
     veleroInstallSession.start();
     try {
-      const profile = await writeVeleroInstallProfile(clusterId, {
-        namespace: veleroNamespaceDraft,
-        provider,
-        bucket,
-        region,
-        s3Url,
-        forcePathStyle,
-        awsIamRoleArn,
-        azureResourceGroup,
-        azureStorageAccount,
-        azureSubscriptionId,
-        azureStorageAccountUri,
-        azureCloudName,
-        gcpProject,
-        gcpServiceAccount,
-      });
-      veleroNamespaceDraft = profile.namespace;
-
       if (provider === "aws") {
         if (!bucket.trim() || !region.trim()) {
           throw new Error("For AWS install, both S3 bucket and region are required.");
@@ -391,6 +399,24 @@
       if (provider === "gcp" && !bucket.trim()) {
         throw new Error("For CKE/GKE install, provide GCS bucket.");
       }
+
+      const profile = await writeVeleroInstallProfile(clusterId, {
+        namespace: veleroNamespaceDraft,
+        provider,
+        bucket,
+        region,
+        s3Url,
+        forcePathStyle,
+        awsIamRoleArn,
+        azureResourceGroup,
+        azureStorageAccount,
+        azureSubscriptionId,
+        azureStorageAccountUri,
+        azureCloudName,
+        gcpProject,
+        gcpServiceAccount,
+      });
+      veleroNamespaceDraft = profile.namespace;
 
       const result = await installVelero(
         clusterId,
@@ -450,8 +476,10 @@
     checking = true;
     actionError = null;
     actionMessage = null;
+    actionTitle = null;
     try {
       await runBackupAudit(clusterId, { force: true, source: "manual" });
+      actionTitle = "Status refreshed";
       actionMessage = `Backup status refreshed at ${new Date().toLocaleTimeString()}`;
     } catch (error) {
       actionError = error instanceof Error ? error.message : "Failed to check backup status";
@@ -492,6 +520,7 @@
       });
 
       const storageLocation = nextSummary.storage ?? "default";
+      actionTitle = "Backup created";
       actionMessage =
         `Velero backup created. Metadata snapshot saved to ~/Downloads/${filename}. ` +
         `Backup data is stored in Velero BackupStorageLocation "${storageLocation}" ` +
@@ -545,18 +574,17 @@
       actionError = "Select source namespace.";
       return;
     }
-    if (!restoreTargetNamespace.trim()) {
-      actionError = "Target namespace is required.";
-      return;
-    }
-    const overwriting = availableNamespaces.includes(restoreTargetNamespace.trim());
+    const snapshotBackupName = restoreBackupName;
+    const snapshotSourceNs = restoreSourceNamespace;
+    const snapshotTargetNs = restoreTargetNamespace.trim() || snapshotSourceNs;
+    const overwriting = availableNamespaces.includes(snapshotTargetNs);
     const confirmed = await confirmAction(
-      `Restore namespace "${restoreSourceNamespace}" from backup "${restoreBackupName}"\n` +
-        `into "${restoreTargetNamespace}"?\n\n` +
+      `Restore namespace "${snapshotSourceNs}" from backup "${snapshotBackupName}"\n` +
+        `into "${snapshotTargetNs}"?\n\n` +
         (overwriting
-          ? `"${restoreTargetNamespace}" already exists in this cluster. Velero will merge / overwrite ` +
+          ? `"${snapshotTargetNs}" already exists in this cluster. Velero will merge / overwrite ` +
             `existing resources there. Running workloads may restart.`
-          : `"${restoreTargetNamespace}" will be created if it does not exist.`) +
+          : `"${snapshotTargetNs}" will be created if it does not exist.`) +
         "\n\nThis cannot be undone from here (you would need another backup to revert).",
       "Confirm restore",
     );
@@ -565,13 +593,15 @@
     restoring = true;
     actionError = null;
     actionMessage = null;
+    actionTitle = null;
     try {
       await restoreNamespaceFromBackup(clusterId, {
-        backupName: restoreBackupName,
-        sourceNamespace: restoreSourceNamespace,
-        targetNamespace: restoreTargetNamespace,
+        backupName: snapshotBackupName,
+        sourceNamespace: snapshotSourceNs,
+        targetNamespace: snapshotTargetNs,
       });
-      actionMessage = `Restore created from backup "${restoreBackupName}" (${restoreSourceNamespace} -> ${restoreTargetNamespace}).`;
+      actionTitle = "Restore initiated";
+      actionMessage = `Restore created from backup "${snapshotBackupName}" (${snapshotSourceNs} -> ${snapshotTargetNs}).`;
       restorePreview = null;
     } catch (error) {
       actionError = error instanceof Error ? error.message : "Namespace restore failed";
@@ -674,9 +704,9 @@
         }
       } else {
         credentialsTestResult = {
-          ok: true,
+          ok: "info",
           message:
-            "Pre-install connectivity test is only available for S3-compatible providers (AWS, DO, Hetzner). For Azure/GCP the credentials will be validated by Velero on install.",
+            "Connection test is for S3-compatible providers only (AWS, DO, Hetzner). For Azure/GCP, Velero will validate credentials on install.",
         };
       }
     } finally {
@@ -724,20 +754,40 @@
       syncPageVisibility();
     };
     document.addEventListener("visibilitychange", handleVisibility);
+    void loadClusterBackupEnabled(clusterId).then((saved) => {
+      backupPolicyEnabled = saved;
+      isPrefsLoaded = true;
+    });
     return () => {
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   });
 
   $effect(() => {
+    latestRun;
+    dismissedBackupFailed = false;
+    dismissedBackupUnverifiable = false;
+    dismissedBackupWarnings = false;
+    dismissedBackupErrors = false;
+  });
+
+  $effect(() => {
+    if (policyFormInitialized) return;
     policyMaxAgeHours = config.maxAgeHours;
     policyRetentionDays = config.retentionDays;
     policyCacheTtlMinutes = Math.max(1, Math.round(config.cacheTtlMs / 60000));
     policyAutoCreateEnabled = config.autoCreateEnabled;
+    policyFormInitialized = true;
   });
 
   $effect(() => {
     if (!clusterId) return;
+    if (!isPrefsLoaded) return;
+
+    if (!backupPolicyEnabled) {
+      stopBackupAuditPolling(clusterId);
+      return;
+    }
 
     if (offline) {
       stopBackupAuditPolling(clusterId);
@@ -783,7 +833,7 @@
         </h2>
         {#if summary}
           <Badge class="text-white {statusStyles[summary.status]}">
-            {summary.status}
+            {statusLabels[summary.status] ?? summary.status}
           </Badge>
         {/if}
         <Popover.Root>
@@ -831,7 +881,41 @@
           </Popover.Content>
         </Popover.Root>
       </div>
-      <div class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap items-center gap-3">
+        <label
+          class="inline-flex cursor-pointer items-center gap-2 text-sm select-none"
+          title="Enable or disable backup monitoring and auto-audit for this cluster"
+        >
+          <button
+            type="button"
+            role="switch"
+            aria-checked={backupPolicyEnabled}
+            aria-label="Toggle backup monitoring"
+            class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {backupPolicyEnabled
+              ? 'bg-emerald-600'
+              : 'bg-slate-600'}"
+            onclick={() => {
+              backupPolicyEnabled = !backupPolicyEnabled;
+              void saveClusterBackupEnabled(clusterId, backupPolicyEnabled);
+            }}
+          >
+            <span
+              class="pointer-events-none block h-4 w-4 rounded-full bg-white shadow-sm ring-0 transition-transform {backupPolicyEnabled
+                ? 'translate-x-4'
+                : 'translate-x-0'}"
+            ></span>
+          </button>
+          <span class="text-muted-foreground"
+            >{backupPolicyEnabled ? "Monitoring on" : "Monitoring off"}</span
+          >
+        </label>
+        {#if !backupPolicyEnabled && summary}
+          <span
+            class="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-400"
+          >
+            Monitoring is off - data shown may be stale
+          </span>
+        {/if}
         <Button
           variant="outline"
           onclick={runNow}
@@ -846,7 +930,10 @@
           onclick={createBackup}
           loading={creating}
           loadingLabel="Starting backup"
-          disabled={checking || !hasVeleroInstalled}
+          disabled={offline || checking || !hasVeleroInstalled}
+          title={!hasVeleroInstalled
+            ? "Install Velero above to enable backup creation"
+            : "Immediately create a Velero backup using the current scope settings (Full Cluster or selected namespaces)"}
         >
           <span>Create backup now</span>
         </Button>
@@ -923,14 +1010,30 @@
       </div>
       {#if credentialsTestResult}
         <div
-          class={`mt-2 rounded border px-2 py-1.5 text-[11px] ${
-            credentialsTestResult.ok
+          class={`mt-2 flex items-start justify-between gap-2 rounded border px-2 py-1.5 text-[11px] ${
+            credentialsTestResult.ok === true
               ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-              : "border-rose-500/40 bg-rose-500/10 text-rose-300"
+              : credentialsTestResult.ok === "info"
+                ? "border-sky-500/40 bg-sky-500/10 text-sky-300"
+                : "border-rose-500/40 bg-rose-500/10 text-rose-300"
           }`}
         >
-          <span class="font-semibold">{credentialsTestResult.ok ? "✓" : "✗"}</span>
-          {credentialsTestResult.message}
+          <div>
+            <span class="font-semibold"
+              >{credentialsTestResult.ok === true
+                ? "✓"
+                : credentialsTestResult.ok === "info"
+                  ? "ℹ"
+                  : "✗"}</span
+            >
+            {credentialsTestResult.message}
+          </div>
+          <button
+            type="button"
+            class="shrink-0 opacity-60 hover:opacity-100"
+            aria-label="Dismiss"
+            onclick={() => (credentialsTestResult = null)}>✕</button
+          >
         </div>
       {/if}
       {#if !veleroRelease}
@@ -975,29 +1078,9 @@
                   ? "Region (datacenter), e.g. fsn1, nbg1, hel1"
                   : "Region, e.g. us-east-2"}
             />
-            <input
-              class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2"
-              bind:value={s3Url}
-              placeholder={provider === "do"
-                ? "Endpoint (required), e.g. https://nyc3.digitaloceanspaces.com"
-                : provider === "hetzner"
-                  ? "Endpoint (required), e.g. https://fsn1.your-objectstorage.com"
-                  : "S3 URL (optional), e.g. https://s3.us-east-2.amazonaws.com"}
-            />
-            <label
-              class="inline-flex items-center gap-2 text-xs text-muted-foreground md:col-span-2"
-            >
-              <input type="checkbox" bind:checked={forcePathStyle} />
-              Force path-style S3 (for MinIO/compat endpoints)
-            </label>
           {/if}
 
           {#if showAwsAuth}
-            <input
-              class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2"
-              bind:value={awsIamRoleArn}
-              placeholder="IRSA role ARN, e.g. arn:aws:iam::123456789012:role/velero-irsa"
-            />
             <input
               class="h-9 rounded-md border border-input bg-background px-3 text-sm"
               bind:value={awsAccessKeyId}
@@ -1051,29 +1134,19 @@
               placeholder="Subscription ID, e.g. 11111111-2222-3333-4444-555555555555"
             />
             <input
-              class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2"
-              bind:value={azureStorageAccountUri}
-              placeholder="Storage account URI (optional), e.g. https://velerostore01.blob.core.windows.net"
-            />
-            <input
-              class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2"
-              bind:value={azureCloudName}
-              placeholder="Cloud name, e.g. AzurePublicCloud"
-            />
-            <input
               class="h-9 rounded-md border border-input bg-background px-3 text-sm"
               bind:value={azureClientId}
-              placeholder="Client ID (optional, not saved)"
+              placeholder="Client ID (not saved)"
             />
             <input
               class="h-9 rounded-md border border-input bg-background px-3 text-sm"
               bind:value={azureTenantId}
-              placeholder="Tenant ID (optional, not saved)"
+              placeholder="Tenant ID (not saved)"
             />
             <input
               class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2"
               bind:value={azureClientSecret}
-              placeholder="Client secret (optional, not saved)"
+              placeholder="Client secret (not saved)"
               type="password"
             />
           {/if}
@@ -1084,36 +1157,130 @@
               bind:value={bucket}
               placeholder="GCS bucket, e.g. velero-cluster-backups"
             />
-            <input
-              class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-              bind:value={gcpProject}
-              placeholder="Project ID (optional), e.g. my-prod-project"
-            />
-            <input
-              class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2"
-              bind:value={gcpServiceAccount}
-              placeholder="Workload identity service account (optional), e.g. velero@my-prod-project.iam.gserviceaccount.com"
-            />
-            <textarea
-              class="min-h-[96px] rounded-md border border-input bg-background px-3 py-2 text-sm md:col-span-2"
-              bind:value={gcpCredentialsJson}
-              placeholder="Service account JSON (optional, not saved), e.g. type=service_account, project_id=my-prod-project"
-            ></textarea>
           {/if}
         </div>
+
+        <button
+          type="button"
+          class="mt-2 text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+          onclick={() => (veleroAdvancedExpanded = !veleroAdvancedExpanded)}
+        >
+          {veleroAdvancedExpanded
+            ? "Hide advanced options"
+            : "Advanced options (IRSA, custom endpoint, GCP service account…)"}
+        </button>
+
+        {#if veleroAdvancedExpanded}
+          <div class="mt-2 grid gap-2 md:grid-cols-2 rounded-md border border-border/50 p-3">
+            <p class="text-[11px] text-muted-foreground md:col-span-2">
+              Advanced — optional fields. Leave empty if not needed.
+            </p>
+            {#if showS3Inputs}
+              <input
+                class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2"
+                bind:value={s3Url}
+                placeholder={provider === "do"
+                  ? "Endpoint URL, e.g. https://nyc3.digitaloceanspaces.com"
+                  : provider === "hetzner"
+                    ? "Endpoint URL, e.g. https://fsn1.your-objectstorage.com"
+                    : "S3 custom endpoint (optional), e.g. https://s3.us-east-2.amazonaws.com"}
+              />
+              <label
+                class="inline-flex items-center gap-2 text-xs text-muted-foreground md:col-span-2"
+              >
+                <input type="checkbox" bind:checked={forcePathStyle} />
+                Force path-style S3 (for MinIO/compat endpoints)
+              </label>
+            {/if}
+            {#if showAwsAuth}
+              <input
+                class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2"
+                bind:value={awsIamRoleArn}
+                placeholder="IRSA role ARN (alternative to keys), e.g. arn:aws:iam::123456789012:role/velero-irsa"
+              />
+            {/if}
+            {#if showAzureInputs}
+              <input
+                class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2"
+                bind:value={azureStorageAccountUri}
+                placeholder="Storage account URI (optional)"
+              />
+              <input
+                class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2"
+                bind:value={azureCloudName}
+                placeholder="Cloud name, e.g. AzurePublicCloud"
+              />
+            {/if}
+            {#if showGcpInputs}
+              <input
+                class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                bind:value={gcpProject}
+                placeholder="Project ID (optional)"
+              />
+              <input
+                class="h-9 rounded-md border border-input bg-background px-3 text-sm md:col-span-2"
+                bind:value={gcpServiceAccount}
+                placeholder="Workload identity service account (optional)"
+              />
+              <textarea
+                class="min-h-[96px] rounded-md border border-input bg-background px-3 py-2 text-sm md:col-span-2"
+                bind:value={gcpCredentialsJson}
+                placeholder="Service account JSON (optional, not saved)"
+              ></textarea>
+            {/if}
+          </div>
+        {/if}
       {/if}
       {#if veleroError}
-        <p class="mt-2 text-xs text-rose-600">{veleroError}</p>
+        {@const veleroErrorHumanized = humanizeVeleroError(veleroError)}
+        <div
+          class="mt-2 flex items-start justify-between gap-2 rounded border border-rose-500/40 bg-rose-500/10 px-2 py-1.5 text-xs text-rose-300"
+        >
+          <div class="min-w-0 flex-1">
+            <p class="font-semibold">{veleroErrorHumanized.title}</p>
+            {#if veleroErrorHumanized.hint}
+              <p class="mt-0.5">{veleroErrorHumanized.hint}</p>
+            {/if}
+          </div>
+          <button
+            type="button"
+            class="shrink-0 opacity-60 hover:opacity-100"
+            aria-label="Dismiss"
+            onclick={() => (veleroError = null)}>✕</button
+          >
+        </div>
       {/if}
       {#if helmActionMessage}
-        <p class="mt-2 text-xs text-emerald-600">{helmActionMessage}</p>
+        <div
+          class="mt-2 flex items-start justify-between gap-2 rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-300"
+        >
+          <span>{helmActionMessage}</span>
+          <button
+            type="button"
+            class="shrink-0 opacity-60 hover:opacity-100"
+            aria-label="Dismiss"
+            onclick={() => (helmActionMessage = null)}>✕</button
+          >
+        </div>
       {/if}
       {#if helmActionError}
-        <p class="mt-2 text-xs text-rose-600">{helmActionError}</p>
+        <div
+          class="mt-2 flex items-start justify-between gap-2 rounded border border-rose-500/40 bg-rose-500/10 px-2 py-1.5 text-xs text-rose-300"
+        >
+          <span>{helmActionError}</span>
+          <button
+            type="button"
+            class="shrink-0 opacity-60 hover:opacity-100"
+            aria-label="Dismiss"
+            onclick={() => (helmActionError = null)}>✕</button
+          >
+        </div>
       {/if}
-      <div class="mt-2">
-        <CommandConsole session={veleroInstallSession} label="Velero" />
-      </div>
+      {#if !hasVeleroInstalled || veleroInstalling}
+        <div class="mt-2">
+          <CommandConsole session={veleroInstallSession} label="Velero" />
+        </div>
+      {/if}
     </div>
 
     {#if hasVeleroInstalled}
@@ -1203,101 +1370,20 @@
         {/if}
 
         {#if namespaceError}
-          <p class="text-xs text-rose-600">{namespaceError}</p>
-        {/if}
-      </div>
-    {/if}
-
-    {#if summary?.status === "failed"}
-      <Alert.Root variant="destructive">
-        <Alert.Title>Backup failed</Alert.Title>
-        <Alert.Description>
-          {summary?.message ?? "Backup job failed."}
-          {#if latestRun?.metadata?.validationErrors?.length}
-            <div class="mt-2 text-xs">
-              {latestRun.metadata.validationErrors[0]}
+          <Alert.Root variant="destructive">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0 flex-1">
+                <Alert.Description>{namespaceError}</Alert.Description>
+              </div>
+              <button
+                type="button"
+                class="shrink-0 text-muted-foreground hover:text-foreground"
+                aria-label="Dismiss"
+                onclick={() => (namespaceError = null)}>✕</button
+              >
             </div>
-          {/if}
-        </Alert.Description>
-      </Alert.Root>
-    {:else if summary?.status === "unverifiable"}
-      <Alert.Root variant="default">
-        <Alert.Title>Unable to verify backup</Alert.Title>
-        <Alert.Description>Check cluster connectivity or backup storage.</Alert.Description>
-      </Alert.Root>
-    {/if}
-    {#if actionMessage}
-      <Alert.Root variant="default">
-        <Alert.Title>Status</Alert.Title>
-        <Alert.Description>{actionMessage}</Alert.Description>
-      </Alert.Root>
-    {/if}
-    {#if actionError}
-      {@const humanized = humanizeVeleroError(actionError)}
-      <Alert.Root variant="destructive">
-        <Alert.Title>{humanized.title}</Alert.Title>
-        <Alert.Description>
-          {#if humanized.hint}
-            <p class="mb-1">{humanized.hint}</p>
-          {/if}
-          <pre class="whitespace-pre-wrap text-[11px] opacity-80">{actionError}</pre>
-        </Alert.Description>
-      </Alert.Root>
-    {/if}
-    {#if summary?.warnings?.length}
-      <Alert.Root>
-        <Alert.Title>Warnings</Alert.Title>
-        <Alert.Description>
-          <ul class="list-disc pl-4 text-xs">
-            {#each summary.warnings as warning}
-              <li>{warning}</li>
-            {/each}
-          </ul>
-        </Alert.Description>
-      </Alert.Root>
-    {/if}
-    {#if summary?.errors?.length}
-      <Alert.Root variant="destructive">
-        <Alert.Title>Source errors</Alert.Title>
-        <Alert.Description>
-          <ul class="list-disc pl-4 text-xs">
-            {#each summary.errors as err}
-              <li>{err}</li>
-            {/each}
-          </ul>
-        </Alert.Description>
-      </Alert.Root>
-    {/if}
-
-    {#if backupFreshness.ageHours !== null && backupFreshness.severity !== "ok"}
-      <div
-        class={`rounded-md border px-3 py-2 text-xs ${
-          backupFreshness.severity === "critical"
-            ? "border-rose-500/40 bg-rose-500/10 text-rose-300"
-            : "border-amber-500/40 bg-amber-500/10 text-amber-300"
-        }`}
-      >
-        <div class="flex items-center justify-between gap-2">
-          <div>
-            <span class="font-semibold">
-              {backupFreshness.severity === "critical"
-                ? "Backup is past its max-age policy"
-                : "Backup is approaching max-age"}:
-            </span>
-            {Math.round(backupFreshness.ageHours)}h old of {policyMaxAgeHours}h limit ({Math.round(
-              backupFreshness.percent * 100,
-            )}%).
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            class="h-6 text-[11px]"
-            onclick={createBackup}
-            disabled={creating || !hasVeleroInstalled}
-          >
-            {creating ? "Creating…" : "Create backup now"}
-          </Button>
-        </div>
+          </Alert.Root>
+        {/if}
       </div>
     {/if}
 
@@ -1334,91 +1420,158 @@
       </DiagnosticSummaryCard>
     </div>
 
-    <div class="grid gap-4 md:grid-cols-2">
-      <DiagnosticSummaryCard title="Backup policy">
-        <div class="flex items-center gap-2 text-xs text-muted-foreground">
-          <Clock4 class="h-4 w-4" />
-        </div>
-        <div class="mt-2 grid gap-2">
-          <div class="grid grid-cols-3 gap-2">
-            <div class="space-y-1">
-              <label for="policy-max-age" class="block text-[11px] text-muted-foreground">
-                Max age (hours)
-              </label>
-              <input
-                id="policy-max-age"
-                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                type="number"
-                min="1"
-                bind:value={policyMaxAgeHours}
-                title="Warn / auto-create a new backup when the latest one is older than this. Example: 24 = tolerate up to 1-day RPO."
-              />
-            </div>
-            <div class="space-y-1">
-              <label for="policy-retention" class="block text-[11px] text-muted-foreground">
-                Retention (days)
-              </label>
-              <input
-                id="policy-retention"
-                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                type="number"
-                min="1"
-                bind:value={policyRetentionDays}
-                title="Velero TTL: backups older than this are deleted by the Velero GC controller. Backup objects remain in the cluster until the TTL elapses."
-              />
-            </div>
-            <div class="space-y-1">
-              <label for="policy-cache-ttl" class="block text-[11px] text-muted-foreground">
-                Audit cache (min)
-              </label>
-              <input
-                id="policy-cache-ttl"
-                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                type="number"
-                min="1"
-                bind:value={policyCacheTtlMinutes}
-                title="How often ROZOOM re-reads Velero state. Larger value = less API pressure; smaller value = fresher status on this page."
-              />
-            </div>
-          </div>
-          <label class="inline-flex items-center gap-2 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              bind:checked={policyAutoCreateEnabled}
-              disabled={!hasVeleroInstalled}
-            />
-            Auto-create backup when current status is not OK (while app is running)
-          </label>
-          {#if !hasVeleroInstalled}
-            <p class="text-xs text-muted-foreground">
-              Auto-create stays inactive until a Velero Helm release is installed.
-            </p>
-          {/if}
-          <div class="flex items-center gap-2">
-            <Button variant="outline" onclick={saveBackupPolicy} disabled={policySaving}>
-              {#if policySaving}
-                <span>Saving policy</span><LoadingDots />
-              {:else}
-                <span>Save policy</span>
+    {#if summary?.status === "failed" && !dismissedBackupFailed}
+      <Alert.Root variant="destructive">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <Alert.Title>Backup failed</Alert.Title>
+            <Alert.Description>
+              {summary?.message ?? "Backup job failed."}
+              {#if latestRun?.metadata?.validationErrors?.length}
+                <div class="mt-2 text-xs">
+                  {latestRun.metadata.validationErrors[0]}
+                </div>
               {/if}
-            </Button>
-            <p class="text-xs text-muted-foreground">Source: {summary?.source ?? "none"}</p>
+            </Alert.Description>
           </div>
-          {#if policyMessage}
-            <p class="text-xs text-emerald-600">{policyMessage}</p>
-          {/if}
-          {#if policyError}
-            <p class="text-xs text-rose-600">{policyError}</p>
-          {/if}
+          <button
+            type="button"
+            class="shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Dismiss"
+            onclick={() => (dismissedBackupFailed = true)}>✕</button
+          >
         </div>
-      </DiagnosticSummaryCard>
-      <DiagnosticSummaryCard title="Status">
-        <p class="text-sm font-semibold text-foreground">{summary?.message ?? "Backup unknown"}</p>
-        <p class="text-xs text-muted-foreground">
-          Last backup timestamp: {formatDate(summary?.lastBackupAt ?? null)}
-        </p>
-      </DiagnosticSummaryCard>
-    </div>
+      </Alert.Root>
+    {:else if summary?.status === "unverifiable" && !dismissedBackupUnverifiable}
+      <Alert.Root variant="default">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <Alert.Title>Unable to verify backup</Alert.Title>
+            <Alert.Description>Check cluster connectivity or backup storage.</Alert.Description>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Dismiss"
+            onclick={() => (dismissedBackupUnverifiable = true)}>✕</button
+          >
+        </div>
+      </Alert.Root>
+    {/if}
+    {#if actionMessage}
+      <Alert.Root variant="default">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <Alert.Title>{actionTitle ?? "Done"}</Alert.Title>
+            <Alert.Description>{actionMessage}</Alert.Description>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Dismiss"
+            onclick={() => (actionMessage = null)}>✕</button
+          >
+        </div>
+      </Alert.Root>
+    {/if}
+    {#if actionError}
+      {@const humanized = humanizeVeleroError(actionError)}
+      <Alert.Root variant="destructive">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <Alert.Title>{humanized.title}</Alert.Title>
+            <Alert.Description>
+              {#if humanized.hint}
+                <p class="mb-1">{humanized.hint}</p>
+              {/if}
+              <pre class="whitespace-pre-wrap text-[11px] opacity-80">{actionError}</pre>
+            </Alert.Description>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Dismiss"
+            onclick={() => (actionError = null)}>✕</button
+          >
+        </div>
+      </Alert.Root>
+    {/if}
+    {#if summary?.warnings?.length && !dismissedBackupWarnings}
+      <Alert.Root>
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <Alert.Title>Warnings</Alert.Title>
+            <Alert.Description>
+              <ul class="list-disc pl-4 text-xs">
+                {#each summary.warnings as warning}
+                  <li>{warning}</li>
+                {/each}
+              </ul>
+            </Alert.Description>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Dismiss"
+            onclick={() => (dismissedBackupWarnings = true)}>✕</button
+          >
+        </div>
+      </Alert.Root>
+    {/if}
+    {#if summary?.errors?.length && !dismissedBackupErrors}
+      <Alert.Root variant="destructive">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <Alert.Title>Source errors</Alert.Title>
+            <Alert.Description>
+              <ul class="list-disc pl-4 text-xs">
+                {#each summary.errors as err}
+                  <li>{err}</li>
+                {/each}
+              </ul>
+            </Alert.Description>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Dismiss"
+            onclick={() => (dismissedBackupErrors = true)}>✕</button
+          >
+        </div>
+      </Alert.Root>
+    {/if}
+
+    {#if backupFreshness.ageHours !== null && backupFreshness.severity !== "ok"}
+      <div
+        class={`rounded-md border px-3 py-2 text-xs ${
+          backupFreshness.severity === "critical"
+            ? "border-rose-500/40 bg-rose-500/10 text-rose-300"
+            : "border-amber-500/40 bg-amber-500/10 text-amber-300"
+        }`}
+      >
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <span class="font-semibold">
+              {backupFreshness.severity === "critical"
+                ? "Backup is past its max-age policy"
+                : "Backup is approaching max-age"}:
+            </span>
+            {Math.round(backupFreshness.ageHours)}h old of {policyMaxAgeHours}h limit ({Math.round(
+              backupFreshness.percent * 100,
+            )}%).
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-6 text-[11px]"
+            onclick={createBackup}
+            disabled={creating || !hasVeleroInstalled}
+          >
+            {creating ? "Creating…" : "Create backup now"}
+          </Button>
+        </div>
+      </div>
+    {/if}
 
     <div class="space-y-3">
       <h3 class="text-sm font-semibold text-foreground">Recent backups</h3>
@@ -1477,7 +1630,7 @@
                   >
                   <Table.TableCell>
                     <Badge class="text-white {statusStyles[run.status]}">
-                      {run.status}
+                      {statusLabels[run.status] ?? run.status}
                     </Badge>
                   </Table.TableCell>
                   <Table.TableCell class="max-w-[180px] truncate" title={run.metadata?.name ?? ""}>
@@ -1498,7 +1651,7 @@
                       <span class="block truncate text-xs">{details || "-"}</span>
                     {/if}
                   </Table.TableCell>
-                  <Table.TableCell>{run.source}</Table.TableCell>
+                  <Table.TableCell>{sourceLabels[run.source] ?? run.source}</Table.TableCell>
                 </Table.TableRow>
               {/each}
             {/if}
@@ -1507,14 +1660,19 @@
       </TableSurface>
     </div>
 
-    <div class="rounded-lg border border-border p-4 space-y-3">
+    <div class="rounded-lg border border-border p-4 space-y-4">
       <h3 class="text-sm font-semibold text-foreground">Restore Namespace From Backup</h3>
-      <div class="flex flex-wrap items-center gap-2">
+
+      <div class="space-y-1">
+        <p class="text-xs font-medium text-muted-foreground">Step 1 - Load available backups</p>
         <Button
           variant="outline"
           onclick={scanBackupsForRestore}
           loading={restoreScanLoading}
           disabled={!hasVeleroInstalled}
+          title={!hasVeleroInstalled
+            ? "Install Velero above to enable restore"
+            : "Fetch the list of Velero backups from the cluster"}
         >
           {#if restoreScanLoading}
             <span>Scanning backups</span><LoadingDots />
@@ -1522,79 +1680,114 @@
             <span>Scan backups</span>
           {/if}
         </Button>
+        {#if !hasVeleroInstalled}
+          <p class="mt-1 text-xs text-muted-foreground/70">
+            Install Velero in the section above to enable backup restore.
+          </p>
+        {/if}
+        {#if restoreScanError}
+          <div class="flex items-center gap-2 text-xs text-rose-400">
+            <span>{restoreScanError}</span>
+            <button
+              type="button"
+              class="shrink-0 opacity-60 hover:opacity-100"
+              aria-label="Dismiss"
+              onclick={() => (restoreScanError = null)}>✕</button
+            >
+          </div>
+        {/if}
       </div>
 
-      <div class="grid gap-2 md:grid-cols-3">
-        <div class="space-y-1">
-          <label for="restore-backup-select" class="text-xs text-muted-foreground">Backup</label>
-          <select
-            id="restore-backup-select"
-            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            bind:value={restoreBackupName}
-            onchange={() => syncRestoreSourceFromSelection()}
-          >
-            <option value="" disabled>Select backup</option>
-            {#each restoreBackups as backup}
-              <option value={backup.name}>
-                {backup.name} ({backup.phase}, {formatDate(backup.createdAt)})
-              </option>
-            {/each}
-          </select>
-        </div>
+      <div class="space-y-2 {restoreBackups.length === 0 ? 'pointer-events-none opacity-50' : ''}">
+        <p class="text-xs font-medium text-muted-foreground">
+          Step 2 - Select backup and namespaces
+        </p>
+        {#if restoreBackups.length === 0}
+          <p class="text-[11px] text-muted-foreground/60">
+            Scan backups in Step 1 to unlock selection.
+          </p>
+        {/if}
+        <div class="grid gap-2 md:grid-cols-3">
+          <div class="space-y-1">
+            <label for="restore-backup-select" class="text-xs text-muted-foreground">Backup</label>
+            <select
+              id="restore-backup-select"
+              class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              bind:value={restoreBackupName}
+              onchange={() => syncRestoreSourceFromSelection()}
+            >
+              <option value="" disabled>Select backup</option>
+              {#each restoreBackups as backup}
+                <option value={backup.name}>
+                  {backup.name} ({backup.phase}, {formatDate(backup.createdAt)})
+                </option>
+              {/each}
+            </select>
+          </div>
 
-        <div class="space-y-1">
-          <label for="restore-source-namespace" class="text-xs text-muted-foreground"
-            >Source namespace</label
-          >
-          <select
-            id="restore-source-namespace"
-            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            bind:value={restoreSourceNamespace}
-          >
-            <option value="" disabled>Select source namespace</option>
-            {#each getRestoreSourceOptions(restoreBackupName) as ns}
-              <option value={ns}>{ns}</option>
-            {/each}
-          </select>
-        </div>
+          <div class="space-y-1">
+            <label for="restore-source-namespace" class="text-xs text-muted-foreground"
+              >Source namespace</label
+            >
+            <select
+              id="restore-source-namespace"
+              class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              bind:value={restoreSourceNamespace}
+            >
+              <option value="" disabled>Select source namespace</option>
+              {#each getRestoreSourceOptions(restoreBackupName) as ns}
+                <option value={ns}>{ns}</option>
+              {/each}
+            </select>
+          </div>
 
-        <div class="space-y-1">
-          <label for="restore-target-namespace" class="text-xs text-muted-foreground">
-            Target namespace
-          </label>
-          <input
-            id="restore-target-namespace"
-            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            bind:value={restoreTargetNamespace}
-            placeholder="Target namespace"
-          />
+          <div class="space-y-1">
+            <label for="restore-target-namespace" class="text-xs text-muted-foreground">
+              Target namespace
+            </label>
+            <input
+              id="restore-target-namespace"
+              class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              bind:value={restoreTargetNamespace}
+              placeholder="Target namespace (defaults to source)"
+            />
+          </div>
         </div>
       </div>
 
-      {#if restoreScanError}
-        <p class="text-xs text-rose-600">{restoreScanError}</p>
-      {/if}
-
-      <div class="flex items-center gap-2">
-        <Button
-          variant="outline"
-          onclick={() => void previewRestore()}
-          disabled={!restoreBackupName || restoring}
-          title="Show the backup manifest that will be used as the source"
-        >
-          Preview backup
-        </Button>
-        <Button
-          variant="outline"
-          onclick={restoreNamespace}
-          disabled={restoring || !restoreBackupName}
-        >
-          {#if restoring}
-            <span>Starting restore</span><LoadingDots />
-          {:else}
-            <span>Apply restore</span>
-          {/if}
-        </Button>
+      <div class="space-y-2 {restoreBackups.length === 0 ? 'pointer-events-none opacity-50' : ''}">
+        <p class="text-xs font-medium text-muted-foreground">Step 3 - Preview, then apply</p>
+        {#if restoreBackups.length === 0}
+          <p class="text-[11px] text-muted-foreground/60">
+            Complete Steps 1-2 first to unlock restore.
+          </p>
+        {/if}
+        <div class="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onclick={() => void previewRestore()}
+            disabled={!restoreBackupName || restoring}
+            title={!restoreBackupName
+              ? "Select a backup first"
+              : "Show the Velero backup object YAML (kubectl get backup -o yaml)"}
+          >
+            Preview backup manifest
+          </Button>
+          <Button
+            variant="outline"
+            onclick={restoreNamespace}
+            disabled={restoring || !restoreBackupName || !restoreSourceNamespace}
+            title={!restoreBackupName || !restoreSourceNamespace
+              ? "Select backup and source namespace first"
+              : `Restore namespace "${restoreSourceNamespace}" into "${restoreTargetNamespace || restoreSourceNamespace}"`}
+          >
+            {#if restoring}
+              <span>Starting restore</span><LoadingDots />
+            {:else}
+              <span>Apply restore</span>
+            {/if}
+          </Button>
+        </div>
       </div>
       {#if restorePreview}
         <div class="mt-2 rounded-md border border-border bg-muted/30 p-3">
@@ -1624,6 +1817,113 @@
           {/if}
         </div>
       {/if}
+    </div>
+
+    <div class="grid gap-4">
+      <DiagnosticSummaryCard title="Backup policy">
+        <div class="-mt-1 mb-2 flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock4 class="h-4 w-4" />
+            <span>Backup policy settings</span>
+          </div>
+        </div>
+        <div class="grid gap-2 {backupPolicyEnabled ? '' : 'pointer-events-none opacity-40'}">
+          <div class="grid grid-cols-3 gap-2">
+            <div class="space-y-1">
+              <label for="policy-max-age" class="block text-[11px] text-muted-foreground">
+                Max age (hours)
+              </label>
+              <input
+                id="policy-max-age"
+                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                type="number"
+                min="1"
+                bind:value={policyMaxAgeHours}
+                title="Warn / auto-create a new backup when the latest one is older than this. Example: 24 = tolerate up to 1-day RPO."
+              />
+            </div>
+            <div class="space-y-1">
+              <label for="policy-retention" class="block text-[11px] text-muted-foreground">
+                Retention (days)
+              </label>
+              <input
+                id="policy-retention"
+                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                type="number"
+                min="1"
+                bind:value={policyRetentionDays}
+                title="Velero TTL: backups older than this are deleted by the Velero GC controller. Backup objects remain in the cluster until the TTL elapses."
+              />
+            </div>
+            <div class="space-y-1">
+              <label for="policy-cache-ttl" class="block text-[11px] text-muted-foreground">
+                Audit cache (min)
+              </label>
+              <input
+                id="policy-cache-ttl"
+                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                type="number"
+                min="1"
+                bind:value={policyCacheTtlMinutes}
+                title="How often the app re-reads Velero state. Larger = less API pressure; smaller = fresher status."
+              />
+            </div>
+          </div>
+          <label class="inline-flex items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              bind:checked={policyAutoCreateEnabled}
+              disabled={!hasVeleroInstalled}
+            />
+            Auto-create backup when current status is not OK (while app is running)
+          </label>
+          {#if !hasVeleroInstalled}
+            <p class="text-xs text-muted-foreground">
+              Auto-create stays inactive until a Velero Helm release is installed.
+            </p>
+          {/if}
+          <div class="flex items-center gap-2">
+            <Button variant="outline" onclick={saveBackupPolicy} disabled={policySaving}>
+              {#if policySaving}
+                <span>Saving policy</span><LoadingDots />
+              {:else}
+                <span>Save policy</span>
+              {/if}
+            </Button>
+            <p class="text-xs text-muted-foreground">Source: {summary?.source ?? "none"}</p>
+          </div>
+          {#if policyMessage}
+            <Alert.Root variant="default">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0 flex-1">
+                  <Alert.Description>{policyMessage}</Alert.Description>
+                </div>
+                <button
+                  type="button"
+                  class="shrink-0 text-muted-foreground hover:text-foreground"
+                  aria-label="Dismiss"
+                  onclick={() => (policyMessage = null)}>✕</button
+                >
+              </div>
+            </Alert.Root>
+          {/if}
+          {#if policyError}
+            <Alert.Root variant="destructive">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0 flex-1">
+                  <Alert.Description>{policyError}</Alert.Description>
+                </div>
+                <button
+                  type="button"
+                  class="shrink-0 text-muted-foreground hover:text-foreground"
+                  aria-label="Dismiss"
+                  onclick={() => (policyError = null)}>✕</button
+                >
+              </div>
+            </Alert.Root>
+          {/if}
+        </div>
+      </DiagnosticSummaryCard>
     </div>
   </Card.Content>
 </Card.Root>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import "../app.css";
+  import { browser } from "$app/environment";
   import { page } from "$app/state";
   import { theme } from "$stores/theme";
 
@@ -16,9 +17,8 @@
     return page.url.pathname.startsWith(href);
   }
 
-  // Apply theme on mount
   $effect(() => {
-    document.documentElement.setAttribute("data-theme", $theme);
+    if (browser) document.documentElement.setAttribute("data-theme", $theme);
   });
 </script>
 

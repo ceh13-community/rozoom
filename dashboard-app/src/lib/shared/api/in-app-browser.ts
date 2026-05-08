@@ -9,7 +9,7 @@ export async function openExternalUrl(url: string): Promise<void> {
     console.warn("[open-external] openUrl rejected:", msg, "url:", url);
     try {
       const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("plugin:opener|open_url", { path: url });
+      await invoke("plugin:opener|open_url", { url });
       console.info("[open-external] fallback invoke succeeded");
       return;
     } catch (invokeErr) {

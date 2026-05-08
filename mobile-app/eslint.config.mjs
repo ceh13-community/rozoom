@@ -21,7 +21,6 @@ export default tseslint.config(
     languageOptions: { parserOptions: { parser: tseslint.parser } },
   },
   {
-    // No base path configured — svelte/no-navigation-without-resolve is a false positive.
     rules: {
       "svelte/no-navigation-without-resolve": "off",
     },

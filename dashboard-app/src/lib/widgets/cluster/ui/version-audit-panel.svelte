@@ -23,7 +23,9 @@
   import * as Table from "$shared/ui/table";
   import { Clock4, Info, Refresh } from "$shared/ui/icons";
   import * as Alert from "$shared/ui/alert";
+  import LoadingDots from "$shared/ui/loading-dots.svelte";
   import TableSurface from "$shared/ui/table-surface.svelte";
+  import TableEmptyState from "$shared/ui/table-empty-state.svelte";
   import DiagnosticSummaryCard from "$shared/ui/diagnostic-summary-card.svelte";
   import { CommandConsole, createConsoleSession } from "$shared/ui/command-console";
 
@@ -152,6 +154,18 @@
     failures: string[];
   } | null>(null);
   const autoDiagnosticsEnabled = $derived(shouldAutoRunDiagnostics($dashboardDataProfile));
+  let dismissedFreshnessWarning = $state(false);
+  let dismissedUnreachable = $state(false);
+  let dismissedAuditErrors = $state(false);
+  let dismissedChartErrors = $state(false);
+
+  $effect(() => {
+    summary?.lastRunAt;
+    dismissedFreshnessWarning = false;
+    dismissedUnreachable = false;
+    dismissedAuditErrors = false;
+    dismissedChartErrors = false;
+  });
 
   function chartKey(c: HelmChartInfo): string {
     return `${c.namespace}/${c.name}`;
@@ -268,6 +282,13 @@
     unreachable: "bg-slate-500",
   };
 
+  const k8sStatusLabels: Record<string, string> = {
+    ok: "OK",
+    outdated: "Outdated",
+    unsupported: "Unsupported",
+    unreachable: "Unreachable",
+  };
+
   const chartStatusStyles: Record<string, string> = {
     "up-to-date": "bg-emerald-500",
     outdated: "bg-amber-500",
@@ -367,7 +388,7 @@
         </h2>
         {#if summary}
           <Badge class="text-white {k8sStatusStyles[summary.k8sStatus]}">
-            {summary.k8sStatus}
+            {k8sStatusLabels[summary.k8sStatus] ?? summary.k8sStatus}
           </Badge>
         {/if}
         <Popover.Root>
@@ -425,46 +446,76 @@
     </p>
   </Card.Header>
   <Card.Content class="space-y-6">
-    {#if summary?.k8sStatus === "unreachable"}
+    {#if summary?.k8sStatus === "unreachable" && !dismissedUnreachable}
       <Alert.Root variant="destructive">
-        <Alert.Title>Cluster unreachable</Alert.Title>
-        <Alert.Description>{summary?.message ?? "Unable to fetch /version."}</Alert.Description>
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <Alert.Title>Cluster unreachable</Alert.Title>
+            <Alert.Description>{summary?.message ?? "Unable to fetch /version."}</Alert.Description>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Dismiss"
+            onclick={() => (dismissedUnreachable = true)}>✕</button
+          >
+        </div>
       </Alert.Root>
     {/if}
 
-    {#if summary?.errors?.length}
+    {#if summary?.errors?.length && !dismissedAuditErrors}
       <Alert.Root variant="destructive">
-        <Alert.Title>Audit errors</Alert.Title>
-        <Alert.Description>
-          <ul class="list-disc pl-4 text-xs">
-            {#each summary.errors as err}
-              <li>{err}</li>
-            {/each}
-          </ul>
-        </Alert.Description>
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <Alert.Title>Audit errors</Alert.Title>
+            <Alert.Description>
+              <ul class="list-disc pl-4 text-xs">
+                {#each summary.errors as err}
+                  <li>{err}</li>
+                {/each}
+              </ul>
+            </Alert.Description>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Dismiss"
+            onclick={() => (dismissedAuditErrors = true)}>✕</button
+          >
+        </div>
       </Alert.Root>
     {/if}
 
-    {#if chartsWithErrors.length > 0}
+    {#if chartsWithErrors.length > 0 && !dismissedChartErrors}
       <Alert.Root variant="destructive">
-        <Alert.Title>
-          {chartsWithErrors.length} chart{chartsWithErrors.length === 1 ? "" : "s"} have lookup or state
-          errors
-        </Alert.Title>
-        <Alert.Description>
-          <ul class="list-disc pl-4 text-xs">
-            {#each chartsWithErrors as chart}
-              <li>
-                <span class="font-medium">{chart.namespace}/{chart.name}:</span>
-                {chart.error}
-              </li>
-            {/each}
-          </ul>
-        </Alert.Description>
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <Alert.Title>
+              {chartsWithErrors.length} chart{chartsWithErrors.length === 1 ? "" : "s"} have lookup or
+              state errors
+            </Alert.Title>
+            <Alert.Description>
+              <ul class="list-disc pl-4 text-xs">
+                {#each chartsWithErrors as chart}
+                  <li>
+                    <span class="font-medium">{chart.namespace}/{chart.name}:</span>
+                    {chart.error}
+                  </li>
+                {/each}
+              </ul>
+            </Alert.Description>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Dismiss"
+            onclick={() => (dismissedChartErrors = true)}>✕</button
+          >
+        </div>
       </Alert.Root>
     {/if}
 
-    {#if cacheFreshness.isExpiringSoon || cacheFreshness.isStale}
+    {#if (cacheFreshness.isExpiringSoon || cacheFreshness.isStale) && !dismissedFreshnessWarning}
       <div
         class="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300"
       >
@@ -474,15 +525,23 @@
               ? "Audit data is stale - cache expired. Re-run to get current state."
               : `Audit cache is ${Math.round(cacheFreshness.percent * 100)}% through its TTL - data may be drifting.`}
           </span>
-          <Button
-            variant="outline"
-            size="sm"
-            class="h-6 text-[11px]"
-            onclick={runNow}
-            disabled={refreshing}
-          >
-            {refreshing ? "Refreshing…" : "Refresh now"}
-          </Button>
+          <div class="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              class="h-6 text-[11px]"
+              onclick={runNow}
+              disabled={refreshing}
+            >
+              {refreshing ? "Refreshing…" : "Refresh now"}
+            </Button>
+            <button
+              type="button"
+              class="shrink-0 opacity-60 hover:opacity-100"
+              aria-label="Dismiss"
+              onclick={() => (dismissedFreshnessWarning = true)}>✕</button
+            >
+          </div>
         </div>
       </div>
     {/if}
@@ -493,20 +552,25 @@
       </DiagnosticSummaryCard>
       <DiagnosticSummaryCard title="Minimum supported">
         <p class="text-sm font-semibold text-foreground">{summary?.minSupported ?? "-"}</p>
+        <p class="mt-1 text-xs text-muted-foreground">
+          Oldest K8s version still under active support.
+        </p>
       </DiagnosticSummaryCard>
       <DiagnosticSummaryCard title="Outdated charts">
-        <p class="text-2xl font-semibold text-foreground">{summary?.outdatedCharts ?? 0}</p>
+        <p class="text-2xl font-semibold text-foreground">
+          {summary ? summary.outdatedCharts : "-"}
+        </p>
+        {#if !summary}<p class="text-xs text-muted-foreground">Run audit to populate</p>{/if}
       </DiagnosticSummaryCard>
       <DiagnosticSummaryCard title="Total charts">
-        <p class="text-2xl font-semibold text-foreground">{summary?.totalCharts ?? 0}</p>
+        <p class="text-2xl font-semibold text-foreground">
+          {summary ? summary.totalCharts : "-"}
+        </p>
       </DiagnosticSummaryCard>
     </div>
 
     <div class="grid gap-4 md:grid-cols-2">
       <DiagnosticSummaryCard title="Last audit">
-        <div class="flex items-center gap-2 text-sm text-muted-foreground">
-          <Clock4 class="h-4 w-4" /> Last audit
-        </div>
         <p class="text-sm font-medium text-foreground">{formatDate(summary?.lastRunAt ?? null)}</p>
         <p class="text-xs text-muted-foreground">
           Cached for {formatDuration(config.cacheTtlMs)} · Auto-run every
@@ -521,7 +585,9 @@
           {summary?.message ?? "Audit unavailable"}
         </p>
         <p class="text-xs text-muted-foreground">
-          Charts status: {summary?.chartStatus ?? "unknown"}
+          Charts: {summary
+            ? (chartStatusLabels[summary.chartStatus] ?? summary.chartStatus)
+            : "Not yet run"}
         </p>
       </DiagnosticSummaryCard>
     </div>
@@ -532,29 +598,37 @@
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div class="flex items-center gap-2">
           <h3 class="text-sm font-semibold text-foreground">Installed Helm charts</h3>
-          <Badge class="text-white {k8sStatusStyles[summary?.k8sStatus ?? 'unreachable']}">
-            {summary?.k8sStatus ?? "unreachable"}
-          </Badge>
         </div>
-        {#if patchOnly.length > 0}
-          <div class="flex items-center gap-2">
-            {#if bulkProgress}
-              <span class="text-xs text-amber-400">
-                Upgrading {bulkProgress.current ?? "…"} ({bulkProgress.done}/{bulkProgress.total})
-              </span>
-            {/if}
-            <Button
-              variant="outline"
-              size="sm"
-              class="h-7 text-xs"
-              onclick={() => void bulkUpgradePatch()}
-              disabled={Boolean(bulkProgress) || Boolean(upgradingKey)}
-              title={`Run helm upgrade to latest for ${patchOnly.length} patch-level outdated chart(s)`}
-            >
-              Upgrade {patchOnly.length} patch version{patchOnly.length === 1 ? "" : "s"}
-            </Button>
-          </div>
-        {/if}
+        <div class="flex flex-col items-end gap-1">
+          {#if patchOnly.length > 0}
+            <div class="flex items-center gap-2">
+              {#if bulkProgress}
+                <span class="text-xs text-amber-400">
+                  Upgrading {bulkProgress.current ?? "…"} ({bulkProgress.done}/{bulkProgress.total})
+                </span>
+              {/if}
+              <Button
+                variant="outline"
+                size="sm"
+                class="h-7 text-xs"
+                onclick={() => void bulkUpgradePatch()}
+                disabled={Boolean(bulkProgress) || Boolean(upgradingKey)}
+                title={`Auto-upgrade only patch-level updates (x.y.Z). Major/minor updates require manual review.`}
+              >
+                {#if bulkProgress}
+                  <LoadingDots />
+                {:else}
+                  Upgrade {patchOnly.length} patch{patchOnly.length === 1 ? "" : "es"} (safe)
+                {/if}
+              </Button>
+            </div>
+          {/if}
+          {#if outdatedCharts.length > 0}
+            <p class="text-[11px] text-muted-foreground">
+              Patch auto-upgrade only. Major/minor updates require manual review per chart.
+            </p>
+          {/if}
+        </div>
       </div>
       <TableSurface maxHeightClass="">
         <Table.Table>
@@ -573,12 +647,18 @@
             {#if charts.length === 0}
               <Table.TableRow>
                 <Table.TableCell colspan={7} class="py-4 text-center text-xs text-muted-foreground">
-                  No Helm releases detected on this cluster. Install a chart from the
-                  <a
-                    href="?workload=helmcatalog"
-                    class="text-sky-400 hover:underline"
-                    data-sveltekit-preload-data="hover">Helm Catalog</a
-                  > or via the Helm page.
+                  {#if refreshing && !summary}
+                    Detecting Helm charts…
+                  {:else if !summary}
+                    Run the audit to detect installed Helm charts.
+                  {:else}
+                    No Helm releases detected on this cluster. Install a chart from the
+                    <a
+                      href="?workload=helmcatalog"
+                      class="text-sky-400 hover:underline"
+                      data-sveltekit-preload-data="hover">Helm Catalog</a
+                    > or via the Helm page.
+                  {/if}
                 </Table.TableCell>
               </Table.TableRow>
             {:else}
@@ -591,7 +671,10 @@
                   <Table.TableCell class="font-medium">
                     {chart.name}
                     {#if newFlag}
-                      <Badge class="ml-1 bg-rose-600 text-white text-[9px]">NEW</Badge>
+                      <Badge
+                        class="ml-1 bg-rose-600 text-white text-[10px]"
+                        title="Newly detected as outdated since the previous audit run">NEW</Badge
+                      >
                     {/if}
                   </Table.TableCell>
                   <Table.TableCell>{chart.namespace}</Table.TableCell>
@@ -599,7 +682,16 @@
                   <Table.TableCell class="font-mono text-xs">{chart.latest ?? "-"}</Table.TableCell>
                   <Table.TableCell>
                     {#if chart.status === "outdated"}
-                      <Badge class="text-white text-[10px] {severityStyles[sev]}">
+                      <Badge
+                        class="text-white text-[10px] {severityStyles[sev]}"
+                        title={sev === "major"
+                          ? "Major: APIs or behaviour may break. Review changelog before upgrading."
+                          : sev === "minor"
+                            ? "Minor: new features added. Low breakage risk but review values."
+                            : sev === "patch"
+                              ? "Patch: bug fixes only. Safe to auto-upgrade."
+                              : "Version gap unknown - run 'helm search repo' to fetch latest versions."}
+                      >
                         {severityLabels[sev]}
                       </Badge>
                     {:else}
@@ -634,21 +726,79 @@
                           Repo
                         </a>
                       {/if}
-                      {#if chart.status === "outdated" && chart.chartPath}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          class="h-7 text-xs"
-                          onclick={() => void upgradeChart(chart)}
-                          disabled={Boolean(bulkProgress) ||
-                            (Boolean(upgradingKey) && !rowUpgrading)}
-                          title={`helm upgrade ${chart.name} -n ${chart.namespace} --version ${chart.latest ?? "latest"}`}
-                        >
-                          {rowUpgrading ? "Upgrading…" : "Upgrade"}
-                        </Button>
+                      {#if chart.status === "outdated"}
+                        {#if chart.chartPath}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            class="h-7 text-xs"
+                            onclick={() => void upgradeChart(chart)}
+                            disabled={Boolean(bulkProgress) ||
+                              (Boolean(upgradingKey) && !rowUpgrading)}
+                            title={`helm upgrade ${chart.name} -n ${chart.namespace} --version ${chart.latest ?? "latest"}`}
+                          >
+                            {#if rowUpgrading}<LoadingDots />{:else}Upgrade{/if}
+                          </Button>
+                        {:else if ahUrl ?? chart.repoUrl}
+                          <a
+                            class="text-xs text-amber-400 hover:underline"
+                            href={ahUrl ?? chart.repoUrl}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            title="Chart path not resolved — upgrade manually via Helm page or ArtifactHub"
+                          >
+                            Manual upgrade
+                          </a>
+                        {:else}
+                          <span
+                            class="text-xs text-amber-400/50 cursor-not-allowed"
+                            title="No repository URL available — check helm repo list or search ArtifactHub manually"
+                          >
+                            Manual upgrade
+                          </span>
+                        {/if}
                       {/if}
                     </div>
                   </Table.TableCell>
+                </Table.TableRow>
+              {/each}
+            {/if}
+          </Table.TableBody>
+        </Table.Table>
+      </TableSurface>
+    </div>
+    <div class="space-y-3">
+      <h3 class="text-sm font-semibold text-foreground">Audit history</h3>
+      <TableSurface maxHeightClass="max-h-60">
+        <Table.Table>
+          <Table.TableHeader>
+            <Table.TableRow>
+              <Table.TableHead>Run time</Table.TableHead>
+              <Table.TableHead>K8s status</Table.TableHead>
+              <Table.TableHead>Outdated</Table.TableHead>
+              <Table.TableHead>Total charts</Table.TableHead>
+              <Table.TableHead>Source</Table.TableHead>
+            </Table.TableRow>
+          </Table.TableHeader>
+          <Table.TableBody>
+            {#if history.length === 0}
+              <Table.TableRow>
+                <Table.TableCell colspan={5} class="text-center">
+                  <TableEmptyState message="No audit history yet. Run the audit to populate." />
+                </Table.TableCell>
+              </Table.TableRow>
+            {:else}
+              {#each history as run (run.id)}
+                <Table.TableRow>
+                  <Table.TableCell>{formatDate(run.runAt)}</Table.TableCell>
+                  <Table.TableCell>
+                    <Badge class="text-white {k8sStatusStyles[run.k8s.status] ?? 'bg-slate-500'}">
+                      {k8sStatusLabels[run.k8s.status] ?? run.k8s.status}
+                    </Badge>
+                  </Table.TableCell>
+                  <Table.TableCell>{run.outdatedCharts}</Table.TableCell>
+                  <Table.TableCell>{run.charts.length}</Table.TableCell>
+                  <Table.TableCell>{run.source === "auto" ? "Auto" : "Manual"}</Table.TableCell>
                 </Table.TableRow>
               {/each}
             {/if}
