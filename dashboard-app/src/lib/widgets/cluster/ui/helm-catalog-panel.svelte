@@ -66,6 +66,14 @@
       clusterId: string,
       onOutput?: (chunk: string) => void,
     ) => Promise<{ success: boolean; error?: string }>;
+    /**
+     * Default YAML values passed via helm `--values <tmpfile>` when the chart
+     * is installed through the generic path (no installFn). Used for charts
+     * that refuse to boot with chart defaults alone - cert-manager needs
+     * installCRDs=true, loki 6+ needs a minimal SingleBinary storage config,
+     * etc. Kept empty string when no override needed.
+     */
+    defaultValuesYaml?: string;
   }
 
   type PresetId = "monitoring" | "security" | "observability-lite";
@@ -210,6 +218,11 @@
       category: "Security & Compliance",
       description: "Automated TLS certificate management with Let's Encrypt and other issuers.",
       scoring: "TLS coverage, certificate expiry checks. Core for 95+ score.",
+      // Without installCRDs=true the chart installs but no Certificate /
+      // ClusterIssuer CRDs are created - controller is non-functional.
+      // Jetstack docs require either this flag or a separate CRD apply.
+      defaultValuesYaml: "installCRDs: true\n",
+      docsUrl: "https://cert-manager.io/docs/",
     },
     {
       id: "falco",
@@ -262,6 +275,7 @@
       description: "Backup and disaster recovery for cluster resources and persistent volumes.",
       scoring: "Backup Audit checks, disaster recovery readiness. Core for 95+ score.",
       installFn: (cid, onOutput) => installVelero(cid, undefined, undefined, onOutput),
+      docsUrl: "https://velero.io/docs/",
     },
     {
       id: "reloader",
@@ -288,6 +302,43 @@
       description:
         "Log aggregation system by Grafana. Lightweight alternative to ELK, pairs with Prometheus.",
       scoring: "Log collection, error correlation, audit trail.",
+      // Loki chart v6+ rejects the default config: SingleBinary mode needs an
+      // explicit storage + schema block, and the scalable replicas must be
+      // zeroed out. This is the minimum working config for kick-the-tyres
+      // installs; production deployments should customise via the Helm page.
+      defaultValuesYaml: `deploymentMode: SingleBinary
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem
+  schemaConfig:
+    configs:
+      - from: "2024-01-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+singleBinary:
+  replicas: 1
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+test:
+  enabled: false
+lokiCanary:
+  enabled: false
+`,
     },
     {
       id: "promtail",
@@ -367,6 +418,7 @@
       description:
         "Event-driven autoscaling for K8s workloads - scale on HTTP traffic, queues, cron, custom metrics.",
       scoring: "Autoscaling coverage, event-driven scaling, resource efficiency.",
+      docsUrl: "https://keda.sh/docs/",
     },
     {
       id: "descheduler",
@@ -400,7 +452,10 @@
       releaseName: "external-secrets",
       namespace: "external-secrets",
       repoName: "external-secrets",
-      repoUrl: "https://charts.external-secrets.io",
+      // charts.external-secrets.io 302-redirects to external-secrets.io.
+      // Modern helm follows it, but pinning the canonical endpoint avoids
+      // corp proxies that drop redirects.
+      repoUrl: "https://external-secrets.io",
       chart: "external-secrets/external-secrets",
       category: "Security & Compliance",
       description:
@@ -421,17 +476,35 @@
       scoring: "Distributed tracing, metrics pipeline, log forwarding.",
     },
     {
-      id: "ingress-nginx",
-      name: "ingress-nginx",
-      releaseName: "ingress-nginx",
-      namespace: "ingress-nginx",
-      repoName: "ingress-nginx",
-      repoUrl: "https://kubernetes.github.io/ingress-nginx",
-      chart: "ingress-nginx/ingress-nginx",
+      id: "nginx-ingress",
+      name: "nginx-ingress",
+      releaseName: "nginx-ingress",
+      namespace: "nginx-ingress",
+      repoName: "nginx-stable",
+      // F5/NGINX official Helm repo (NGINX Ingress Controller by NGINX Inc).
+      // Note this is a different project from the CNCF community
+      // kubernetes/ingress-nginx - F5 ships their own supported controller
+      // with commercial options and the official chart lives here.
+      repoUrl: "https://helm.nginx.com/stable",
+      chart: "nginx-stable/nginx-ingress",
       category: "Networking",
       description:
-        "Production-grade Ingress controller powered by NGINX. Most widely used K8s ingress.",
-      scoring: "Traffic routing, TLS termination, rate limiting.",
+        "Official F5 NGINX Ingress Controller. Production-grade, commercially supported, same codebase as NGINX Plus.",
+      scoring: "Traffic routing, TLS termination, rate limiting, commercial support path.",
+    },
+    {
+      id: "traefik",
+      name: "traefik",
+      releaseName: "traefik",
+      namespace: "traefik",
+      repoName: "traefik",
+      repoUrl: "https://traefik.github.io/charts",
+      chart: "traefik/traefik",
+      category: "Networking",
+      description:
+        "Cloud-native reverse proxy and Ingress / Gateway API controller. Dynamic configuration, Let's Encrypt integration, dashboard UI.",
+      scoring: "Traffic routing, TLS termination, Gateway API support, dashboard visibility.",
+      docsUrl: "https://doc.traefik.io/traefik/",
     },
     {
       id: "argocd",
@@ -445,6 +518,7 @@
       description:
         "Declarative GitOps continuous delivery for K8s. Sync cluster state from Git repositories.",
       scoring: "GitOps adoption, deployment automation, drift detection.",
+      docsUrl: "https://argo-cd.readthedocs.io/en/stable/",
     },
     {
       id: "fluxcd",
@@ -487,7 +561,9 @@
   let isLoading = $state(false);
   let hasLoaded = $state(false);
   let actionInFlight = $state<string | null>(null);
-  let actionNotice = $state<{ type: "success" | "error"; text: string } | null>(null);
+  let actionNotice = $state<{ type: "success" | "error"; title?: string; text: string } | null>(
+    null,
+  );
   // Shared console for install/uninstall runs. Only one action is in flight
   // at a time (actionInFlight gate), so a single session is safe to reuse.
   const session = createConsoleSession();
@@ -522,6 +598,7 @@
   let chartVersionsCache = $state<Record<string, HelmChartVersion[]>>({});
   let loadingVersionsFor = $state<Set<string>>(new Set());
   let openingUiFor = $state<string | null>(null);
+  let portForwardErrorFor = $state<{ chartId: string; message: string } | null>(null);
 
   const STORAGE_KEY_COLLAPSED = "helm-catalog:collapsed-categories:v1";
   const STORAGE_KEY_VERSIONS = "helm-catalog:chart-versions:v1";
@@ -535,6 +612,8 @@
         collapsedCategories = new Set(
           parsed.filter((c): c is CatalogCategory => CATEGORIES.includes(c as CatalogCategory)),
         );
+      } else {
+        collapsedCategories = new Set(CATEGORIES.slice(1));
       }
     } catch {
       // ignore
@@ -749,6 +828,7 @@
     const svc = resolveServiceName(ui, release?.name ?? chart.releaseName);
     const key = uiForwardKey(chart, ui, release);
     openingUiFor = chart.id;
+    portForwardErrorFor = null;
     try {
       const existing = $activePortForwards[key];
       if (!existing || !existing.isRunning) {
@@ -761,7 +841,9 @@
           uniqueKey: key,
         });
         if (!result.success) {
-          toast.error(`Port-forward failed: ${result.error?.slice(0, 200) ?? "unknown"}`);
+          const msg = result.error?.slice(0, 200) ?? "Port-forward failed";
+          portForwardErrorFor = { chartId: chart.id, message: msg };
+          toast.error(`Port-forward failed: ${msg}`);
           return;
         }
         startedForwards.add(key);
@@ -838,7 +920,7 @@
       ...valuesDialog,
       loadingDefaults: false,
       defaults,
-      yaml: defaults,
+      yaml: valuesDialog.yaml || defaults,
       error: null,
     };
   }
@@ -847,8 +929,13 @@
     valuesDialog = null;
   }
 
-  function resetValuesToDefaults() {
+  async function resetValuesToDefaults() {
     if (!valuesDialog) return;
+    const confirmed = await confirmAction(
+      "Reset values to chart defaults? Your edits will be lost.",
+      "Reset to defaults",
+    );
+    if (!confirmed) return;
     valuesDialog = { ...valuesDialog, yaml: valuesDialog.defaults };
   }
 
@@ -857,6 +944,8 @@
     const chart = valuesDialog.chart;
     const yaml = valuesDialog.yaml;
     valuesDialog = { ...valuesDialog, installing: true, error: null };
+    currentActionLabel = `Installing ${chart.name} with custom values`;
+    session.start();
     try {
       const version = (chartVersions[chart.id] ?? "").trim();
       const result = await installOrUpgradeHelmRelease(clusterId, {
@@ -868,6 +957,7 @@
         valuesYaml: yaml.trim() ? yaml : undefined,
         repoName: chart.repoName,
         repoUrl: chart.repoUrl,
+        onOutput: (chunk) => session.append(chunk),
       });
       if (!result.success) {
         valuesDialog = {
@@ -875,10 +965,16 @@
           installing: false,
           error: result.error ?? "Install failed",
         };
+        session.fail();
         return;
       }
       valuesDialog = null;
-      actionNotice = { type: "success", text: `${chart.name} installed with custom values` };
+      actionNotice = {
+        type: "success",
+        title: `${chart.name} installed`,
+        text: `Installed with custom values in namespace "${chart.namespace}".`,
+      };
+      session.succeed();
       await refreshReleases();
     } catch (err) {
       if (valuesDialog) {
@@ -888,6 +984,7 @@
           error: err instanceof Error ? err.message : String(err),
         };
       }
+      session.fail();
     }
   }
 
@@ -909,6 +1006,7 @@
       chartVersion: version || undefined,
       repoName: chart.repoName,
       repoUrl: chart.repoUrl,
+      valuesYaml: chart.defaultValuesYaml,
       onOutput,
     });
   }
@@ -977,19 +1075,23 @@
         repoUrl: chart.repoUrl,
       });
       if (!result.success) {
-        previewDialog = {
-          ...previewDialog,
-          loading: false,
-          error: result.error ?? "Dry-run failed",
-        };
+        if (previewDialog) {
+          previewDialog = {
+            ...previewDialog,
+            loading: false,
+            error: result.error ?? "Dry-run failed",
+          };
+        }
         return;
       }
-      previewDialog = {
-        ...previewDialog,
-        output: (result.output ?? "").trim() || "(empty)",
-        loading: false,
-        error: null,
-      };
+      if (previewDialog) {
+        previewDialog = {
+          ...previewDialog,
+          output: (result.output ?? "").trim() || "(empty)",
+          loading: false,
+          error: null,
+        };
+      }
     } finally {
       actionInFlight = null;
     }
@@ -1001,9 +1103,9 @@
 
   async function confirmInstallFromPreview() {
     if (!previewDialog) return;
+    if (actionInFlight) return;
     const chart = previewDialog.chart;
     closePreview();
-    if (actionInFlight) return;
     actionInFlight = chart.id;
     actionNotice = null;
     try {
@@ -1050,11 +1152,15 @@
     // chart reset between iterations does not open a window for concurrent
     // clicks from other buttons.
     actionInFlight = `preset:${preset.id}`;
+    currentActionLabel = `Installing preset: ${preset.title}`;
+    session.start();
+    const onOutput = (chunk: string) => session.append(chunk);
     try {
       for (const chart of targets) {
         presetProgress = { ...presetProgress, current: chart.name };
+        session.append(`\n--- ${chart.name} (ns: ${chart.namespace}) ---\n`);
         try {
-          const result = await runInstall(chart);
+          const result = await runInstall(chart, onOutput);
           if (!result.success) {
             presetProgress = {
               ...presetProgress,
@@ -1070,13 +1176,16 @@
       }
       await refreshReleases();
       const fails = presetProgress.failures;
-      actionNotice =
-        fails.length === 0
-          ? { type: "success", text: `Preset "${preset.title}" installed.` }
-          : {
-              type: "error",
-              text: `Preset "${preset.title}" installed with ${fails.length} failure(s). First: ${fails[0]}`,
-            };
+      if (fails.length === 0) {
+        actionNotice = { type: "success", text: `Preset "${preset.title}" installed.` };
+        session.succeed();
+      } else {
+        actionNotice = {
+          type: "error",
+          text: `Preset "${preset.title}" installed with ${fails.length} failure(s). First: ${fails[0]}`,
+        };
+        session.fail();
+      }
     } finally {
       presetProgress = null;
       actionInFlight = null;
@@ -1164,10 +1273,8 @@
       <div class="min-w-0 flex-1">
         <Card.Title class="text-base font-semibold">Helm Catalog</Card.Title>
         <Card.Description class="text-xs text-muted-foreground">
-          Curated charts to improve cluster health. Each entry shows a
-          <span class="text-sky-400">ROZOOM:</span> note explaining which diagnostics it unlocks (e.g.
-          Prometheus stack enables the metrics and latency dashboards). Install with one click, or customise
-          version and preview before applying.
+          Curated charts for monitoring, security, and infrastructure. Install with one click or
+          customise values before applying.
         </Card.Description>
       </div>
       <div class="flex shrink-0 items-center gap-2">
@@ -1250,17 +1357,34 @@
         </div>
       </Card.Content>
     </Card.Root>
+  {:else}
+    <p class="text-xs text-muted-foreground/70 px-1">
+      Install presets are hidden while searching.
+      <button class="ml-1 text-sky-400 hover:underline" onclick={() => (searchQuery = "")}>
+        Clear search
+      </button>
+    </p>
   {/if}
 
   <CommandConsole {session} label={currentActionLabel} />
 
   {#if actionNotice}
     <div
-      class="rounded-md border px-3 py-2 text-xs {actionNotice.type === 'success'
+      class="flex items-start justify-between gap-2 rounded-md border px-3 py-2 text-xs {actionNotice.type ===
+      'success'
         ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
         : 'border-rose-500/30 bg-rose-500/10 text-rose-400'}"
     >
-      {actionNotice.text}
+      <div class="min-w-0">
+        {#if actionNotice.title}<p class="font-semibold">{actionNotice.title}</p>{/if}
+        <p>{actionNotice.text}</p>
+      </div>
+      <button
+        type="button"
+        class="shrink-0 opacity-60 hover:opacity-100"
+        aria-label="Dismiss"
+        onclick={() => (actionNotice = null)}>✕</button
+      >
     </div>
   {/if}
 
@@ -1328,13 +1452,6 @@
                           >
                             Detected
                           </Badge>
-                        {:else}
-                          <Badge
-                            variant="outline"
-                            class="border-slate-500/40 bg-slate-500/10 text-slate-400 text-[10px] px-1.5 py-0"
-                          >
-                            Not installed
-                          </Badge>
                         {/if}
                         <Badge
                           variant="outline"
@@ -1347,20 +1464,34 @@
                       <p class="mt-0.5 text-xs text-muted-foreground">{chart.description}</p>
                       <p
                         class="mt-0.5 text-[11px] text-sky-400/80"
-                        title="Diagnostics that become available in ROZOOM once this chart is installed"
+                        title="Monitoring and diagnostics unlocked once this chart is installed"
                       >
-                        ROZOOM: {chart.scoring}
+                        Enables: {chart.scoring}
                       </p>
                       <div class="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
-                        <a
-                          href={chart.repoUrl}
-                          class="text-sky-400/70 hover:text-sky-300 hover:underline"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title={`Open ${chart.repoName} repository`}
-                        >
-                          {chart.repoName} repo
-                        </a>
+                        {#if chart.repoUrl}
+                          <a
+                            href={chart.repoUrl}
+                            class="text-sky-400/70 hover:text-sky-300 hover:underline"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`Open ${chart.repoName} repository`}
+                          >
+                            {chart.repoName} repo
+                          </a>
+                        {/if}
+                        {#if chart.docsUrl}
+                          <span class="text-muted-foreground/60">·</span>
+                          <a
+                            href={chart.docsUrl}
+                            class="text-sky-400/70 hover:text-sky-300 hover:underline"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Open official documentation"
+                          >
+                            Docs
+                          </a>
+                        {/if}
                         <span class="text-muted-foreground/60">·</span>
                         <span
                           class="text-muted-foreground"
@@ -1427,8 +1558,7 @@
                                 disabled={!!actionInFlight || offline || openingUiFor === chart.id}
                                 title={`Port-forward svc/${resolveServiceName(chartUi, installedRelease?.name ?? chart.releaseName)}:${chartUi.remotePort} (ns ${resolveUiNamespace(chartUi, installedRelease, chart)}) and open in the built-in browser`}
                               >
-                                {#if openingUiFor === chart.id}<LoadingDots
-                                  />{:else}{chartUi.label}{/if}
+                                {#if openingUiFor === chart.id}Connecting…{:else}{chartUi.label}{/if}
                               </Button>
                               <Button
                                 variant="ghost"
@@ -1453,6 +1583,17 @@
                               </Button>
                             {/if}
                           </div>
+                          {#if portForwardErrorFor?.chartId === chart.id}
+                            <div class="flex items-center gap-1 text-xs text-rose-400">
+                              <span>{portForwardErrorFor.message}</span>
+                              <button
+                                type="button"
+                                class="shrink-0 opacity-60 hover:opacity-100"
+                                aria-label="Dismiss"
+                                onclick={() => (portForwardErrorFor = null)}>✕</button
+                              >
+                            </div>
+                          {/if}
                         {/if}
                         <div class="flex gap-1.5">
                           <Button
@@ -1478,6 +1619,75 @@
                             {#if isBusy}<LoadingDots />{:else}Uninstall{/if}
                           </Button>
                         </div>
+                      {:else if detected}
+                        <div class="flex flex-col items-end gap-1.5">
+                          <div class="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              list={`versions-${chart.id}`}
+                              class="h-6 w-28 rounded border border-border bg-background px-1.5 text-[11px]"
+                              placeholder="latest"
+                              aria-label={`${chart.name} version`}
+                              value={chartVersions[chart.id] ?? ""}
+                              oninput={(e) => {
+                                const v = e.currentTarget.value;
+                                chartVersions = { ...chartVersions, [chart.id]: v };
+                                persistVersions();
+                              }}
+                              onfocus={() => void ensureVersionsLoaded(chart)}
+                              title="Pin a chart version for Adopt. Leave empty for latest."
+                            />
+                            <datalist id={`versions-${chart.id}`}>
+                              {#each chartVersionsCache[chart.id] ?? [] as v (v.version)}
+                                <option value={v.version}
+                                  >{v.version}{v.appVersion ? ` (app ${v.appVersion})` : ""}</option
+                                >
+                              {/each}
+                            </datalist>
+                            {#if loadingVersionsFor.has(chart.id)}
+                              <span class="text-[10px] text-muted-foreground">loading…</span>
+                            {/if}
+                          </div>
+                          <p
+                            class="text-[11px] text-amber-400/80"
+                            title="Detected in cluster but not managed by Helm - install via Helm to enable upgrades and rollbacks"
+                          >
+                            Not Helm-managed
+                          </p>
+                          <div class="flex gap-1.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              class="h-7 text-xs"
+                              onclick={() => handlePreview(chart)}
+                              disabled={!!actionInFlight || offline}
+                              title="Render chart with --dry-run without touching the cluster"
+                            >
+                              {#if actionInFlight === `preview:${chart.id}`}<LoadingDots
+                                />{:else}Preview{/if}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              class="h-7 text-xs"
+                              onclick={() => openValuesEditor(chart)}
+                              disabled={!!actionInFlight || offline}
+                              title="Edit values.yaml before adopting (starts from helm show values defaults)"
+                            >
+                              Edit values
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              class="h-7 text-xs text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+                              onclick={() => handleInstall(chart)}
+                              disabled={!!actionInFlight || offline}
+                              title="Adopt this chart into Helm management (helm upgrade --install)"
+                            >
+                              {#if actionInFlight === chart.id}<LoadingDots />{:else}Adopt with Helm{/if}
+                            </Button>
+                          </div>
+                        </div>
                       {:else if !installed}
                         <div class="flex gap-1.5">
                           <Button
@@ -1502,7 +1712,7 @@
                             disabled={!!actionInFlight || offline}
                             title="Edit values.yaml (starts from helm show values defaults)"
                           >
-                            Customize
+                            Edit values
                           </Button>
                           <Button
                             variant="outline"
@@ -1574,6 +1784,19 @@
     <div class="flex items-center justify-end gap-2 border-t px-4 py-3">
       <Button variant="outline" size="sm" onclick={closePreview}>Cancel</Button>
       <Button
+        variant="outline"
+        size="sm"
+        disabled={previewDialog.loading}
+        onclick={() => {
+          const chart = previewDialog!.chart;
+          closePreview();
+          void openValuesEditor(chart);
+        }}
+        title="Edit values.yaml before installing"
+      >
+        Edit values
+      </Button>
+      <Button
         size="sm"
         class="bg-emerald-600 text-white hover:bg-emerald-700"
         disabled={previewDialog.loading || Boolean(previewDialog.error)}
@@ -1598,7 +1821,7 @@
     <div class="flex items-center justify-between border-b px-4 py-3">
       <div class="min-w-0 flex-1">
         <div class="text-sm font-semibold">
-          Customize values: {valuesDialog.chart.name}
+          Edit values: {valuesDialog.chart.name}
           <span class="text-xs font-normal text-muted-foreground">
             ({valuesDialog.version}) · ns {valuesDialog.chart.namespace}
           </span>
@@ -1608,7 +1831,12 @@
           <code>--values &lt;tmpfile&gt;</code>.
         </div>
       </div>
-      <Button variant="ghost" size="sm" onclick={closeValuesEditor}>Close</Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onclick={closeValuesEditor}
+        disabled={valuesDialog.installing}>Close</Button
+      >
     </div>
     <div class="min-h-0 flex-1 overflow-auto p-4">
       {#if valuesDialog.loadingDefaults}
@@ -1616,6 +1844,13 @@
           <LoadingDots /> Loading chart defaults…
         </div>
       {:else}
+        {#if valuesDialog.installing}
+          <div
+            class="mb-2 flex items-center gap-2 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300"
+          >
+            <LoadingDots /> Installing with custom values…
+          </div>
+        {/if}
         {#if valuesDialog.error && !valuesDialog.installing}
           <div
             class="mb-2 rounded border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300"
@@ -1638,7 +1873,7 @@
       <Button
         variant="ghost"
         size="sm"
-        onclick={resetValuesToDefaults}
+        onclick={() => void resetValuesToDefaults()}
         disabled={valuesDialog.loadingDefaults || valuesDialog.installing}
         title="Reset to chart defaults"
       >
@@ -1660,7 +1895,7 @@
           onclick={() => void installWithCustomValues()}
         >
           {#if valuesDialog.installing}<LoadingDots />{/if}
-          Install with these values
+          Install
         </Button>
       </div>
     </div>

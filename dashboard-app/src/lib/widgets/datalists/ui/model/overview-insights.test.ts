@@ -5,6 +5,7 @@ import {
   buildMetricsUnavailableMessage,
   buildOverviewResourceInsights,
   buildUsageCards,
+  calculateResourcePressure,
   detectManagedProvider,
   parseCpuQuantityToCores,
   parseMemoryQuantityToBytes,
@@ -309,7 +310,7 @@ describe("overview-insights", () => {
     });
   });
 
-  it("marks self-managed scheduler and controller manager as unavailable when neither probes nor pods are visible", () => {
+  it("marks self-managed scheduler and controller manager as ok when API server is healthy but pods are not visible", () => {
     const controlPlaneChecks = buildControlPlaneChecks({
       checks: makeChecks({
         apiServerHealth: {
@@ -324,10 +325,12 @@ describe("overview-insights", () => {
     });
 
     expect(controlPlaneChecks.find((item) => item.id === "scheduler")).toMatchObject({
-      severity: "unavailable",
+      severity: "ok",
+      detail: "Not visible as pods (may run as system containers). API server is healthy.",
     });
     expect(controlPlaneChecks.find((item) => item.id === "controller-manager")).toMatchObject({
-      severity: "unavailable",
+      severity: "ok",
+      detail: "Not visible as pods (may run as system containers). API server is healthy.",
     });
   });
 
@@ -336,5 +339,110 @@ describe("overview-insights", () => {
     expect(parseCpuQuantityToCores("2")).toBe(2);
     expect(parseMemoryQuantityToBytes("1Gi")).toBe(1024 ** 3);
     expect(parseMemoryQuantityToBytes("512Mi")).toBe(512 * 1024 ** 2);
+  });
+
+  it("calculates resource pressure from pod requests vs node allocatable", () => {
+    const nodes = [{ status: { allocatable: { cpu: "4", memory: "8Gi" } } }];
+    const pods = [
+      {
+        status: { phase: "Running" },
+        spec: {
+          containers: [
+            { resources: { requests: { cpu: "500m", memory: "1Gi" } } },
+            { resources: { requests: { cpu: "500m", memory: "1Gi" } } },
+          ],
+        },
+      },
+      {
+        status: { phase: "Pending" },
+        spec: {
+          containers: [{ resources: { requests: { cpu: "1", memory: "2Gi" } } }],
+        },
+      },
+    ];
+    const result = calculateResourcePressure(nodes, pods);
+    expect(result.cpuPercent).toBe(50);
+    expect(result.memoryPercent).toBe(50);
+    expect(result.cpuRequestedCores).toBe(2);
+    expect(result.memoryRequestedBytes).toBe(4 * 1024 ** 3);
+  });
+
+  it("skips non-running/pending pods in resource pressure", () => {
+    const nodes = [{ status: { allocatable: { cpu: "2", memory: "4Gi" } } }];
+    const pods = [
+      {
+        status: { phase: "Running" },
+        spec: { containers: [{ resources: { requests: { cpu: "500m", memory: "1Gi" } } }] },
+      },
+      {
+        status: { phase: "Succeeded" },
+        spec: { containers: [{ resources: { requests: { cpu: "1", memory: "2Gi" } } }] },
+      },
+      {
+        status: { phase: "Failed" },
+        spec: { containers: [{ resources: { requests: { cpu: "500m", memory: "1Gi" } } }] },
+      },
+    ];
+    const result = calculateResourcePressure(nodes, pods);
+    expect(result.cpuPercent).toBe(25);
+    expect(result.memoryPercent).toBe(25);
+  });
+
+  it("returns null percentages when no nodes are available", () => {
+    const result = calculateResourcePressure([], []);
+    expect(result.cpuPercent).toBeNull();
+    expect(result.memoryPercent).toBeNull();
+  });
+
+  it("handles pods without resource requests", () => {
+    const nodes = [{ status: { allocatable: { cpu: "4", memory: "8Gi" } } }];
+    const pods = [
+      { status: { phase: "Running" }, spec: { containers: [{}] } },
+      { status: { phase: "Running" }, spec: { containers: [{ resources: {} }] } },
+    ];
+    const result = calculateResourcePressure(nodes, pods);
+    expect(result.cpuPercent).toBe(0);
+    expect(result.memoryPercent).toBe(0);
+  });
+
+  it("aggregates allocatable across multiple nodes", () => {
+    const nodes = [
+      { status: { allocatable: { cpu: "2", memory: "4Gi" } } },
+      { status: { allocatable: { cpu: "2", memory: "4Gi" } } },
+    ];
+    const pods = [
+      {
+        status: { phase: "Running" },
+        spec: { containers: [{ resources: { requests: { cpu: "2", memory: "4Gi" } } }] },
+      },
+    ];
+    const result = calculateResourcePressure(nodes, pods);
+    expect(result.cpuPercent).toBe(50);
+    expect(result.memoryPercent).toBe(50);
+  });
+
+  it("shows requested labels in usage cards when mode is requested", () => {
+    const cards = buildUsageCards({
+      cpuAveragePercent: 30,
+      memoryAveragePercent: 40,
+      podCount: 10,
+      podCapacity: 100,
+      mode: "requested",
+    });
+    expect(cards.find((c) => c.id === "cpu")?.title).toBe("CPU requested");
+    expect(cards.find((c) => c.id === "memory")?.title).toBe("Memory requested");
+    expect(cards.find((c) => c.id === "cpu")?.hint).toContain("Install metrics-server");
+  });
+
+  it("shows usage labels in usage cards when mode is actual", () => {
+    const cards = buildUsageCards({
+      cpuAveragePercent: 30,
+      memoryAveragePercent: 40,
+      podCount: 10,
+      podCapacity: 100,
+      mode: "actual",
+    });
+    expect(cards.find((c) => c.id === "cpu")?.title).toBe("CPU usage");
+    expect(cards.find((c) => c.id === "memory")?.title).toBe("Memory usage");
   });
 });

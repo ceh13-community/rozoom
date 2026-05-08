@@ -12,6 +12,7 @@ export {
   stopBackupAuditPolling,
 } from "./model/store";
 export { readVeleroInstallProfile, writeVeleroInstallProfile } from "./model/velero-profile";
+export { loadClusterBackupEnabled, saveClusterBackupEnabled } from "./model/backup-preferences";
 export type { VeleroInstallProfile } from "./model/velero-profile";
 export type {
   BackupCatalogItem,
