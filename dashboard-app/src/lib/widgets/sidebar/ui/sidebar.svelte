@@ -13,6 +13,7 @@
     ShieldCheck,
     ShieldOff,
     SquareChevronRight,
+    MessageSquareCode,
   } from "$shared/ui/icons";
   import { LightSwitch } from "$shared/ui/light-switch";
   import { BUNDLED_TOOLS } from "$shared/config/tooling";
@@ -28,6 +29,9 @@
     showRuntimeDiagnostics,
     loadShowRuntimeDiagnostics,
     saveShowRuntimeDiagnostics,
+    showCliNotifications,
+    loadShowCliNotifications,
+    saveShowCliNotifications,
   } from "$features/check-health/model/runtime-diagnostics-preferences";
   import {
     appNotifications,
@@ -53,8 +57,10 @@
   let toolVersions = $state<Record<string, string | null>>({});
   let linterEnabled = $state(true);
   let diagnosticsEnabled = $state(false);
+  let cliNotificationsEnabled = $state(false);
   globalLinterEnabled.subscribe((v) => (linterEnabled = v));
   showRuntimeDiagnostics.subscribe((v) => (diagnosticsEnabled = v));
+  showCliNotifications.subscribe((v) => (cliNotificationsEnabled = v));
 
   function toggleLinter() {
     const next = !linterEnabled;
@@ -66,9 +72,14 @@
     void saveShowRuntimeDiagnostics(!diagnosticsEnabled);
   }
 
+  function toggleCliNotifications() {
+    void saveShowCliNotifications(!cliNotificationsEnabled);
+  }
+
   onMount(async () => {
     await loadGlobalLinterEnabled();
     await loadShowRuntimeDiagnostics();
+    await loadShowCliNotifications();
     const manifest = await loadManifest();
     const tools = manifest.tools ?? {};
     const versions: Record<string, string | null> = {};
@@ -283,6 +294,23 @@
         {/if}
         <span class={cn(sidebarOpen ? "block" : "hidden")}>
           Runtime {diagnosticsEnabled ? "on" : "off"}
+        </span>
+      </button>
+      <button
+        class={cn(
+          "flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium",
+          cliNotificationsEnabled
+            ? "bg-sky-600/20 text-sky-400 hover:bg-sky-600/30"
+            : "bg-slate-600/20 text-slate-400 hover:bg-slate-600/30",
+        )}
+        onclick={toggleCliNotifications}
+        title={cliNotificationsEnabled
+          ? "CLI toasts shown - click to hide"
+          : "CLI toasts hidden - click to show"}
+      >
+        <MessageSquareCode class={cn("h-4 w-4", !cliNotificationsEnabled && "opacity-50")} />
+        <span class={cn(sidebarOpen ? "block" : "hidden")}>
+          Toasts {cliNotificationsEnabled ? "on" : "off"}
         </span>
       </button>
     </nav>

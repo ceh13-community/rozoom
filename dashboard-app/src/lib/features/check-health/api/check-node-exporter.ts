@@ -185,7 +185,6 @@ const tryServiceProxy = async (
   // Every API-server hop here is best-effort: a failure must yield null so
   // the caller can try pod-proxy next instead of dragging the whole check
   // into the outer catch-all error path.
-  //
   // Set-based selectors (e.g. "name in (a,b)") contain spaces and are tokenized
   // by kubectlRawFront; use two equality-based calls instead.
   type SvcPort = { name?: string; port?: number };

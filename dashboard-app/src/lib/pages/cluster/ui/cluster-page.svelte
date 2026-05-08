@@ -17,6 +17,7 @@
   import { Badge } from "$shared/ui/badge";
   import { Skeleton } from "$shared/ui/skeleton";
   import { Button } from "$shared/ui/button";
+  import LoadingDots from "$shared/ui/loading-dots.svelte";
   import * as Popover from "$shared/ui/popover";
   import { confirmAction } from "$shared/lib/confirm-action";
   import { getTimeDifference, timeAgo } from "$shared/lib/timeFormatters";
@@ -172,7 +173,6 @@
   // ── Command Palette ────────────────────────────────────────────
   let commandPaletteOpen = $state(false);
   const paletteCommands = $derived(buildAllCommands(cluster));
-  const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
 
   $effect(() => {
     const disposers: Array<() => void> = [];
@@ -1571,7 +1571,7 @@
           >
             <kbd
               class="rounded border border-indigo-500/40 bg-indigo-950/60 px-1.5 py-0.5 font-mono text-[10px] text-indigo-300 group-hover:border-indigo-400/60 group-hover:bg-indigo-900/60"
-              >{isMac ? "⌘" : "Ctrl"}</kbd
+              >Ctrl</kbd
             >
             <kbd
               class="rounded border border-indigo-500/40 bg-indigo-950/60 px-1.5 py-0.5 font-mono text-[10px] text-indigo-300 group-hover:border-indigo-400/60 group-hover:bg-indigo-900/60"
@@ -1668,7 +1668,7 @@
                     class="inline-block h-2 w-2 animate-spin rounded-full border-2 border-current border-t-transparent"
                     aria-hidden="true"
                   ></span>
-                  Updating
+                  Updating…
                 </span>
               {:else if headerSyncDisplayText === "updated"}
                 <span

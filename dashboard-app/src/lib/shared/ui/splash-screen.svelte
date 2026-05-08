@@ -10,7 +10,7 @@
       setTimeout(() => {
         visible = false;
       }, 600);
-    }, 0);
+    }, 3000);
     return () => clearTimeout(timer);
   });
 </script>
@@ -25,36 +25,75 @@
         <svg class="inline-wheel" viewBox="-140 -140 280 280" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <linearGradient id="sw" x1="0.2" y1="0" x2="0.8" y2="1">
-              <stop offset="0%" stop-color="#c8e4ff"/>
-              <stop offset="18%" stop-color="#5daaf6"/>
-              <stop offset="55%" stop-color="#1555cc"/>
-              <stop offset="100%" stop-color="#0a3098"/>
+              <stop offset="0%" stop-color="#c8e4ff" />
+              <stop offset="18%" stop-color="#5daaf6" />
+              <stop offset="55%" stop-color="#1555cc" />
+              <stop offset="100%" stop-color="#0a3098" />
             </linearGradient>
             <radialGradient id="sh" cx="40%" cy="35%" r="65%">
-              <stop offset="0%" stop-color="#4888d8"/>
-              <stop offset="100%" stop-color="#0b2880"/>
+              <stop offset="0%" stop-color="#4888d8" />
+              <stop offset="100%" stop-color="#0b2880" />
             </radialGradient>
           </defs>
           <g class="wheel-spin">
-            <line x1="0" y1="-110" x2="0" y2="110" stroke="url(#sw)" stroke-width="16" stroke-linecap="round"/>
-            <line x1="-110" y1="0" x2="110" y2="0" stroke="url(#sw)" stroke-width="16" stroke-linecap="round"/>
-            <line x1="-78" y1="-78" x2="78" y2="78" stroke="url(#sw)" stroke-width="16" stroke-linecap="round"/>
-            <line x1="78" y1="-78" x2="-78" y2="78" stroke="url(#sw)" stroke-width="16" stroke-linecap="round"/>
-            <circle r="95" fill="none" stroke="url(#sw)" stroke-width="22"/>
-            <circle cx="0" cy="-118" r="9" fill="url(#sw)"/>
-            <circle cx="0" cy="118" r="9" fill="url(#sw)"/>
-            <circle cx="-118" cy="0" r="9" fill="url(#sw)"/>
-            <circle cx="118" cy="0" r="9" fill="url(#sw)"/>
-            <circle cx="-84" cy="-84" r="9" fill="url(#sw)"/>
-            <circle cx="84" cy="-84" r="9" fill="url(#sw)"/>
-            <circle cx="-84" cy="84" r="9" fill="url(#sw)"/>
-            <circle cx="84" cy="84" r="9" fill="url(#sw)"/>
+            <line
+              x1="0"
+              y1="-110"
+              x2="0"
+              y2="110"
+              stroke="url(#sw)"
+              stroke-width="16"
+              stroke-linecap="round"
+            />
+            <line
+              x1="-110"
+              y1="0"
+              x2="110"
+              y2="0"
+              stroke="url(#sw)"
+              stroke-width="16"
+              stroke-linecap="round"
+            />
+            <line
+              x1="-78"
+              y1="-78"
+              x2="78"
+              y2="78"
+              stroke="url(#sw)"
+              stroke-width="16"
+              stroke-linecap="round"
+            />
+            <line
+              x1="78"
+              y1="-78"
+              x2="-78"
+              y2="78"
+              stroke="url(#sw)"
+              stroke-width="16"
+              stroke-linecap="round"
+            />
+            <circle r="95" fill="none" stroke="url(#sw)" stroke-width="22" />
+            <circle cx="0" cy="-118" r="9" fill="url(#sw)" />
+            <circle cx="0" cy="118" r="9" fill="url(#sw)" />
+            <circle cx="-118" cy="0" r="9" fill="url(#sw)" />
+            <circle cx="118" cy="0" r="9" fill="url(#sw)" />
+            <circle cx="-84" cy="-84" r="9" fill="url(#sw)" />
+            <circle cx="84" cy="-84" r="9" fill="url(#sw)" />
+            <circle cx="-84" cy="84" r="9" fill="url(#sw)" />
+            <circle cx="84" cy="84" r="9" fill="url(#sw)" />
           </g>
           <!-- Hub (static) -->
-          <circle r="38" fill="url(#sh)"/>
-          <circle r="38" fill="none" stroke="#6aaaee" stroke-width="2" opacity="0.5"/>
-          <circle r="25" fill="#0a1e60"/>
-          <text y="5" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="15" font-weight="700" fill="#2468d8">k8s</text>
+          <circle r="38" fill="url(#sh)" />
+          <circle r="38" fill="none" stroke="#6aaaee" stroke-width="2" opacity="0.5" />
+          <circle r="25" fill="#0a1e60" />
+          <text
+            y="5"
+            text-anchor="middle"
+            font-family="'JetBrains Mono',monospace"
+            font-size="15"
+            font-weight="700"
+            fill="#2468d8">k8s</text
+          >
         </svg>
 
         <span class="letter">ZOOM</span>
@@ -125,7 +164,14 @@
     font-size: 72px;
     font-weight: 900;
     line-height: 1;
-    background: linear-gradient(180deg, #d8eeff 0%, #88c4fa 18%, #2578e8 50%, #1040b8 82%, #0820a0 100%);
+    background: linear-gradient(
+      180deg,
+      #d8eeff 0%,
+      #88c4fa 18%,
+      #2578e8 50%,
+      #1040b8 82%,
+      #0820a0 100%
+    );
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -206,7 +252,9 @@
   }
 
   @keyframes pulse {
-    0%, 80%, 100% {
+    0%,
+    80%,
+    100% {
       opacity: 0.3;
       transform: scale(0.8);
     }
