@@ -854,6 +854,7 @@ async function buildRun(
   clusterId: string,
   config: DeprecationScanConfig,
   source: "auto" | "manual",
+  options?: { forcePluto?: boolean },
 ) {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -882,7 +883,7 @@ async function buildRun(
   let fullScanIssues: DeprecationIssue[] = [];
   let helmIssues: DeprecationIssue[] = [];
 
-  if (config.enableFullScan && config.usePlutoForFullScan) {
+  if (options?.forcePluto || (config.enableFullScan && config.usePlutoForFullScan)) {
     const fullScan = await runPlutoScan(clusterId, normalizedTarget, "fullScan");
     fullScanIssues = fullScan.findings;
     sourceSummaries.push(fullScan.summary);
@@ -1004,7 +1005,7 @@ function ensureState(
 
 export async function runDeprecationScan(
   clusterId: string,
-  options?: { force?: boolean; source?: "auto" | "manual" },
+  options?: { force?: boolean; source?: "auto" | "manual"; forcePluto?: boolean },
 ): Promise<DeprecationScanSummary> {
   const inFlight = inFlightScans.get(clusterId);
   if (inFlight) {
@@ -1045,6 +1046,7 @@ export async function runDeprecationScan(
       clusterId,
       config,
       options?.source ?? "auto",
+      { forcePluto: options?.forcePluto },
     );
 
     if (!run) {

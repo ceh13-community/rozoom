@@ -32,7 +32,7 @@
   </Alert.Root>
 {:else}
   {#if loading}
-    <div class="mb-2 text-xs text-muted-foreground">Updating events…</div>
+    <div class="mb-2 text-xs text-muted-foreground">Updating events<LoadingDots /></div>
   {/if}
   {#if error}
     <Alert.Root variant="destructive" class="mb-3">
@@ -40,10 +40,5 @@
       <Alert.Description>{error}</Alert.Description>
     </Alert.Root>
   {/if}
-  <DataTable
-    data={rows}
-    columns={columns}
-    filterColumnId="reason"
-    filterPlaceholder="Filter events..."
-  />
+  <DataTable data={rows} {columns} filterColumnId="reason" filterPlaceholder="Filter events..." />
 {/if}
