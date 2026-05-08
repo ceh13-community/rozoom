@@ -136,7 +136,7 @@ describe("check-tls-certificates", () => {
         items: [
           {
             metadata: { name: "web-cert", namespace: "web" },
-            spec: { dnsNames: ["example.com"], issuerRef: { name: "le" } },
+            spec: { dnsNames: ["example.com"], issuerRef: { name: "le" }, secretName: "web-cert" },
             status: {
               notAfter: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
               conditions: [{ type: "Ready", status: "True" }],
