@@ -10,7 +10,6 @@ export interface TlsCertInfo {
   status: "ok" | "warning" | "critical" | "unknown";
   issuer: string | null;
   renewAction: string | null;
-  secretName?: string;
 }
 
 export interface TlsCertScanResult {
@@ -138,13 +137,12 @@ async function scanTlsSecrets(
     const isCertManager = Boolean(
       annotations["cert-manager.io/certificate-name"] || annotations["cert-manager.io/issuer-name"],
     );
-    const dnsNames = extractDnsNames(annotations, certData);
 
     certs.push({
       name,
       namespace,
       type: isCertManager ? "cert-manager" : "tls-secret",
-      dnsNames,
+      dnsNames: [],
       notAfter,
       daysLeft: days,
       status: computeStatus(days),
@@ -154,45 +152,6 @@ async function scanTlsSecrets(
   }
 
   return { certs, errors };
-}
-
-/**
- * Pull dnsNames for a TLS Secret from whichever source is cheapest.
- * Order of preference (most authoritative first):
- *   1. cert-manager.io/alt-names annotation (comma-separated SANs)
- *   2. cert-manager.io/common-name annotation
- *   3. Subject CN parsed out of the PEM-decoded X.509 header
- * Returns a de-duplicated list preserving order.
- */
-function extractDnsNames(
-  annotations: Record<string, string | undefined>,
-  certData: string | undefined,
-): string[] {
-  const out: string[] = [];
-  const push = (value: string | undefined | null) => {
-    if (!value) return;
-    const trimmed = value.trim();
-    if (!trimmed) return;
-    if (!out.includes(trimmed)) out.push(trimmed);
-  };
-
-  const altNames = annotations["cert-manager.io/alt-names"];
-  if (altNames) {
-    for (const part of altNames.split(",")) push(part);
-  }
-  push(annotations["cert-manager.io/common-name"]);
-
-  if (out.length === 0 && certData) {
-    try {
-      const pem = atob(certData);
-      const cnMatch = pem.match(/Subject:[^\n]*CN\s*=\s*([^,\n\r]+)/i);
-      if (cnMatch) push(cnMatch[1]);
-    } catch {
-      // ignore; atob failure means we just have fewer names.
-    }
-  }
-
-  return out;
 }
 
 async function scanCertManagerCerts(clusterId: string): Promise<{
@@ -206,11 +165,7 @@ async function scanCertManagerCerts(clusterId: string): Promise<{
   const result = await kubectlJson<{
     items?: Array<{
       metadata?: { name?: string; namespace?: string };
-      spec?: {
-        dnsNames?: string[];
-        issuerRef?: { name?: string; kind?: string };
-        secretName?: string;
-      };
+      spec?: { dnsNames?: string[]; issuerRef?: { name?: string; kind?: string } };
       status?: {
         notAfter?: string;
         conditions?: Array<{ type?: string; status?: string; message?: string }>;
@@ -253,7 +208,6 @@ async function scanCertManagerCerts(clusterId: string): Promise<{
       status,
       issuer: item.spec?.issuerRef?.name ?? null,
       renewAction: `kubectl cert-manager renew ${name} -n ${namespace}`,
-      secretName: item.spec?.secretName,
     });
   }
 
@@ -274,14 +228,9 @@ export async function scanTlsCertificates(
     scanCertManagerCerts(clusterId),
   ]);
 
-  // Use spec.secretName as the dedup key: cert-manager Certificate resources create
-  // a TLS Secret with that name, so the TLS Secret and the Certificate row refer to
-  // the same underlying credential and must not both appear in the table.
-  const certManagerSecretKeys = new Set(
-    cmResult.certs.filter((c) => c.secretName).map((c) => `${c.namespace}/${c.secretName}`),
-  );
+  const certManagerNames = new Set(cmResult.certs.map((c) => `${c.namespace}/${c.name}`));
   const dedupedTls = tlsResult.certs.filter(
-    (c) => !certManagerSecretKeys.has(`${c.namespace}/${c.name}`),
+    (c) => !certManagerNames.has(`${c.namespace}/${c.name}`),
   );
 
   const result: TlsCertScanResult = {
