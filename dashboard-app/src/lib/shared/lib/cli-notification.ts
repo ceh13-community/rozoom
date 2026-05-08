@@ -8,9 +8,15 @@ type CliNotification = {
 };
 
 const listeners = new Set<(n: CliNotification) => void>();
+let suppressed = true;
 
 export function emitCliNotification(n: CliNotification) {
+  if (suppressed) return;
   for (const listener of listeners) listener(n);
+}
+
+export function suppressCliNotifications(value: boolean) {
+  suppressed = value;
 }
 
 const MUTATING_SUBCOMMANDS = new Set([

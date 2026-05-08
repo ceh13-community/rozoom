@@ -19,7 +19,7 @@
   import { Button } from "$shared/ui/button";
   import * as Popover from "$shared/ui/popover";
   import * as Table from "$shared/ui/table";
-  import { Check, Clock4, Info, Refresh } from "$shared/ui/icons";
+  import { Info, Refresh } from "$shared/ui/icons";
   import * as Alert from "$shared/ui/alert";
   import TableSurface from "$shared/ui/table-surface.svelte";
   import TableEmptyState from "$shared/ui/table-empty-state.svelte";
@@ -56,6 +56,24 @@
   let fullScanRunning = $state(false);
   let scanActionMessage = $state<string | null>(null);
   let scanActionError = $state<string | null>(null);
+  let dismissedScanErrors = $state(false);
+  let dismissedScanWarnings = $state(false);
+  let dismissedUnavailable = $state(false);
+  let dismissedNeedsConfig = $state(false);
+
+  $effect(() => {
+    if (!scanActionMessage || scanActionMessage.startsWith("Starting")) return;
+    const t = setTimeout(() => (scanActionMessage = null), 6000);
+    return () => clearTimeout(t);
+  });
+
+  $effect(() => {
+    latestRun;
+    dismissedScanErrors = false;
+    dismissedScanWarnings = false;
+    dismissedUnavailable = false;
+    dismissedNeedsConfig = false;
+  });
   let pageVisible = $state(true);
   let scanRequestId = 0;
   let fullScanRequestId = 0;
@@ -80,6 +98,16 @@
   const issueStatusStyles: Record<string, string> = {
     deprecated: "bg-amber-500",
     removed: "bg-rose-600",
+  };
+
+  const issueStatusLabels: Record<string, string> = {
+    deprecated: "Deprecated",
+    removed: "Removed",
+  };
+
+  const sourceLabels: Record<string, string> = {
+    auto: "Auto",
+    manual: "Manual",
   };
 
   const scopeStyles: Record<string, string> = {
@@ -140,7 +168,11 @@
     scanActionError = null;
     scanActionMessage = "Starting full Pluto scan";
     try {
-      await runDeprecationScan(activeClusterId, { force: true, source: "manual" });
+      await runDeprecationScan(activeClusterId, {
+        force: true,
+        source: "manual",
+        forcePluto: true,
+      });
       if (requestId !== fullScanRequestId || activeClusterId !== clusterId) return;
       scanActionMessage = `Full scan completed at ${new Date().toLocaleTimeString()}`;
     } catch (error) {
@@ -213,8 +245,11 @@
           <Badge class="text-white {statusStyles[summary.status]}">
             {statusLabels[summary.status]}
           </Badge>
-          <Badge class="text-white {trustStyles[summary.trustLevel]}">
-            {getTrustLevelLabel(summary.trustLevel)}
+          <Badge
+            class="text-white {trustStyles[summary.trustLevel]}"
+            title="Scan confidence: full = Pluto scanned all manifests; mixed = Pluto + observed metrics; observed = live API metrics only; limited = partial data"
+          >
+            Confidence: {getTrustLevelLabel(summary.trustLevel)}
           </Badge>
         {/if}
         <Popover.Root>
@@ -269,100 +304,183 @@
           loading={scanRunning}
           loadingLabel="Refreshing"
           disabled={fullScanRunning}
+          title="Re-run the last scan using cached Helm data (fast)"
         >
           <Refresh class="mr-2 h-4 w-4" />
-          <span>Refresh status</span>
+          <span>Quick refresh</span>
         </Button>
         <Button
-          variant="outline"
+          class="bg-emerald-600 text-white hover:bg-emerald-700"
           onclick={runFullScanNow}
           loading={fullScanRunning}
-          loadingLabel="Running full scan"
+          loadingLabel="Scanning"
           disabled={scanRunning}
+          title="Force Pluto to scan all rendered manifests regardless of settings - slower but catches all deprecated API usage"
         >
-          <Check class="mr-2 h-4 w-4" />
-          <span>Run full scan (Pluto)</span>
+          <Refresh class="mr-2 h-4 w-4" />
+          <span>Full Pluto scan</span>
         </Button>
       </div>
     </div>
     <p class="text-sm text-muted-foreground">
-      Primary source: live observed API requests. Preferred source: full Pluto scan for object-level
-      upgrade readiness.
+      Detects deprecated and removed Kubernetes API usage. Use
+      <span class="text-foreground">Quick refresh</span> for cached results,
+      <span class="text-foreground">Full Pluto scan</span> for a deep manifest scan.
     </p>
     {#if scanActionMessage}
-      <p
-        class="inline-flex w-fit items-center rounded-md border border-emerald-300/60 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+      <div
+        class="inline-flex w-fit items-center gap-2 rounded-md border border-emerald-300/60 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
       >
-        {scanActionMessage}{#if scanActionMessage.startsWith("Starting")}<LoadingDots />{/if}
-      </p>
+        <span
+          >{scanActionMessage}{#if scanActionMessage.startsWith("Starting")}<LoadingDots
+            />{/if}</span
+        >
+        <button
+          type="button"
+          class="opacity-60 hover:opacity-100"
+          aria-label="Dismiss"
+          onclick={() => (scanActionMessage = null)}>✕</button
+        >
+      </div>
     {/if}
     {#if scanActionError}
-      <p class="text-xs text-rose-600">{scanActionError}</p>
+      <div class="flex items-center gap-2">
+        <p class="text-xs text-rose-600">{scanActionError}</p>
+        <button
+          type="button"
+          class="text-xs text-muted-foreground hover:text-foreground"
+          aria-label="Dismiss error"
+          onclick={() => (scanActionError = null)}>✕</button
+        >
+      </div>
     {/if}
   </Card.Header>
   <Card.Content class="space-y-6">
-    {#if summary?.status === "unavailable"}
+    {#if summary?.status === "ok" && sortedIssues.length === 0}
+      <div
+        class="flex items-center gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400"
+      >
+        <span class="text-base">✓</span>
+        <span
+          >No deprecated APIs detected. Cluster is clean against target version {summary.targetVersion}.</span
+        >
+      </div>
+    {/if}
+
+    {#if summary?.status === "unavailable" && !dismissedUnavailable}
       <Alert.Root variant="destructive">
-        <Alert.Title>Scan unavailable</Alert.Title>
-        <Alert.Description>{summary?.message ?? "Unable to run scan sources."}</Alert.Description>
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <Alert.Title>Scan unavailable</Alert.Title>
+            <Alert.Description
+              >{summary?.message ?? "Unable to run scan sources."}</Alert.Description
+            >
+          </div>
+          <button
+            type="button"
+            class="shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Dismiss"
+            onclick={() => (dismissedUnavailable = true)}>✕</button
+          >
+        </div>
       </Alert.Root>
-    {:else if summary?.status === "needsConfig"}
+    {:else if summary?.status === "needsConfig" && !dismissedNeedsConfig}
       <Alert.Root variant="default">
-        <Alert.Title>Need configuration</Alert.Title>
-        <Alert.Description>
-          Set a target Kubernetes version to enable deprecation scanning.
-        </Alert.Description>
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <Alert.Title>Configuration required</Alert.Title>
+            <Alert.Description>
+              The target Kubernetes version could not be detected automatically. Try running
+              <span class="font-medium text-foreground">Full Pluto scan</span> - it will re-read the
+              cluster version. If the cluster is offline or unreachable, check the connection first.
+            </Alert.Description>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Dismiss"
+            onclick={() => (dismissedNeedsConfig = true)}>✕</button
+          >
+        </div>
       </Alert.Root>
     {/if}
 
-    {#if summary?.errors?.length}
+    {#if summary?.errors?.length && !dismissedScanErrors}
       <Alert.Root variant="destructive">
-        <Alert.Title>Source errors</Alert.Title>
-        <Alert.Description>
-          <ul class="list-disc pl-4 text-xs">
-            {#each summary.errors as err}
-              <li>{err}</li>
-            {/each}
-          </ul>
-        </Alert.Description>
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <Alert.Title>Source errors</Alert.Title>
+            <Alert.Description>
+              <ul class="list-disc pl-4 text-xs">
+                {#each summary.errors as err}
+                  <li>{err}</li>
+                {/each}
+              </ul>
+            </Alert.Description>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Dismiss"
+            onclick={() => (dismissedScanErrors = true)}>✕</button
+          >
+        </div>
       </Alert.Root>
     {/if}
 
-    {#if summary?.warnings?.length}
+    {#if summary?.warnings?.length && !dismissedScanWarnings}
       <Alert.Root>
-        <Alert.Title>Coverage warnings</Alert.Title>
-        <Alert.Description>
-          <ul class="list-disc pl-4 text-xs">
-            {#each summary.warnings as warning}
-              <li>{warning}</li>
-            {/each}
-          </ul>
-        </Alert.Description>
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <Alert.Title>Coverage warnings</Alert.Title>
+            <Alert.Description>
+              <ul class="list-disc pl-4 text-xs">
+                {#each summary.warnings as warning}
+                  <li>{warning}</li>
+                {/each}
+              </ul>
+            </Alert.Description>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Dismiss"
+            onclick={() => (dismissedScanWarnings = true)}>✕</button
+          >
+        </div>
       </Alert.Root>
     {/if}
 
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <DiagnosticSummaryCard title="Resources with deprecated API">
-        <p class="text-2xl font-semibold text-foreground">{summary?.deprecatedCount ?? 0}</p>
+        <p class="text-2xl font-semibold text-foreground">
+          {summary ? summary.deprecatedCount : "-"}
+        </p>
+        {#if !summary}
+          <p class="text-xs text-muted-foreground">Run a scan to populate</p>
+        {/if}
       </DiagnosticSummaryCard>
       <DiagnosticSummaryCard title="Helm charts with deprecated API">
-        <p class="text-2xl font-semibold text-foreground">{summary?.helmDeprecatedCount ?? 0}</p>
+        <p class="text-2xl font-semibold text-foreground">
+          {summary ? summary.helmDeprecatedCount : "-"}
+        </p>
       </DiagnosticSummaryCard>
       <DiagnosticSummaryCard title="Critical (removed by target)">
-        <p class="text-2xl font-semibold text-foreground">{summary?.criticalCount ?? 0}</p>
+        <p class="text-2xl font-semibold text-foreground">
+          {summary ? summary.criticalCount : "-"}
+        </p>
       </DiagnosticSummaryCard>
       <DiagnosticSummaryCard title="Target Kubernetes version">
         <p class="text-sm font-semibold text-foreground">{summary?.targetVersion ?? "-"}</p>
         <p class="mt-1 text-xs text-muted-foreground">Auto-detected from cluster version.</p>
-        <p class="text-xs text-muted-foreground">Cluster version: {summary?.clusterVersion ?? "Unknown"}</p>
+        <p class="text-xs text-muted-foreground">
+          Cluster version: {summary?.clusterVersion ?? "Unknown"}
+        </p>
       </DiagnosticSummaryCard>
     </div>
 
     <div class="grid gap-4 md:grid-cols-2">
       <DiagnosticSummaryCard title="Last scan">
-        <div class="flex items-center gap-2 text-sm text-muted-foreground">
-          <Clock4 class="h-4 w-4" /> Last scan
-        </div>
         <p class="text-sm font-medium text-foreground">{formatDate(summary?.lastRunAt ?? null)}</p>
         <p class="text-xs text-muted-foreground">
           Cached for {formatDuration(config.cacheTtlMs)} · Auto-run every
@@ -396,7 +514,11 @@
             {#if !summary?.sourceSummaries?.length}
               <Table.TableRow>
                 <Table.TableCell colspan={4} class="text-center">
-                  <TableEmptyState message="No results for the current filter." />
+                  <TableEmptyState
+                    message={summary
+                      ? "No source data returned by the last scan."
+                      : "Run a full Pluto scan to populate source health."}
+                  />
                 </Table.TableCell>
               </Table.TableRow>
             {:else}
@@ -404,7 +526,9 @@
                 <Table.TableRow>
                   <Table.TableCell>{source.label}</Table.TableCell>
                   <Table.TableCell>
-                    <Badge class="text-white {statusStyles[source.status]}">{statusLabels[source.status]}</Badge>
+                    <Badge class="text-white {statusStyles[source.status]}"
+                      >{statusLabels[source.status]}</Badge
+                    >
                   </Table.TableCell>
                   <Table.TableCell>{source.findings}</Table.TableCell>
                   <Table.TableCell>{source.message}</Table.TableCell>
@@ -417,12 +541,7 @@
     </div>
 
     <div class="space-y-3">
-      <div class="flex items-center justify-between">
-        <h3 class="text-sm font-semibold text-foreground">Findings</h3>
-        <Badge class="text-white {statusStyles[summary?.status ?? "unavailable"]}">
-          {statusLabels[summary?.status ?? "unavailable"]}
-        </Badge>
-      </div>
+      <h3 class="text-sm font-semibold text-foreground">Findings</h3>
       <TableSurface maxHeightClass="">
         <Table.Table>
           <Table.TableHeader>
@@ -430,9 +549,12 @@
               <Table.TableHead>Kind</Table.TableHead>
               <Table.TableHead>Namespace</Table.TableHead>
               <Table.TableHead>Name</Table.TableHead>
-              <Table.TableHead>apiVersion</Table.TableHead>
+              <Table.TableHead>API version</Table.TableHead>
               <Table.TableHead>Scope</Table.TableHead>
-              <Table.TableHead>Requests</Table.TableHead>
+              <Table.TableHead
+                title="Number of API calls observed in audit logs for this deprecated resource"
+                >API calls</Table.TableHead
+              >
               <Table.TableHead>Replacement version</Table.TableHead>
               <Table.TableHead>Status</Table.TableHead>
             </Table.TableRow>
@@ -441,7 +563,11 @@
             {#if sortedIssues.length === 0}
               <Table.TableRow>
                 <Table.TableCell colspan={8} class="text-center">
-                  <TableEmptyState message="No results for the current filter." />
+                  <TableEmptyState
+                    message={summary
+                      ? "No deprecated APIs found - your cluster looks clean."
+                      : "Run a scan first to see deprecated API findings."}
+                  />
                 </Table.TableCell>
               </Table.TableRow>
             {:else}
@@ -452,15 +578,26 @@
                   <Table.TableCell>{issue.name}</Table.TableCell>
                   <Table.TableCell>{issue.apiVersion}</Table.TableCell>
                   <Table.TableCell>
-                    <span class="inline-flex rounded px-2 py-0.5 text-xs {scopeStyles[issue.scope]}">
+                    <span
+                      class="inline-flex rounded px-2 py-0.5 text-xs {scopeStyles[issue.scope]}"
+                    >
                       {scopeLabels[issue.scope]}
                     </span>
                   </Table.TableCell>
-                  <Table.TableCell>{issue.requestCount ?? "-"}</Table.TableCell>
+                  <Table.TableCell>
+                    <span
+                      title={issue.requestCount == null
+                        ? issue.scope === "observed"
+                          ? "No API call data yet — metrics may not have been collected for this resource"
+                          : "N/A — detected by static scan, not live API metrics"
+                        : `${issue.requestCount} API calls recorded for this resource`}
+                      >{issue.requestCount ?? "-"}</span
+                    >
+                  </Table.TableCell>
                   <Table.TableCell>{issue.replacementVersion}</Table.TableCell>
                   <Table.TableCell>
                     <Badge class="text-white {issueStatusStyles[issue.status]}">
-                      {issue.status}
+                      {issueStatusLabels[issue.status] ?? issue.status}
                     </Badge>
                   </Table.TableCell>
                 </Table.TableRow>
@@ -489,7 +626,7 @@
             {#if history.length === 0}
               <Table.TableRow>
                 <Table.TableCell colspan={6} class="text-center">
-                  <TableEmptyState message="No results for the current filter." />
+                  <TableEmptyState message="No scans have been run yet." />
                 </Table.TableCell>
               </Table.TableRow>
             {:else}
@@ -501,10 +638,14 @@
                       {statusLabels[run.status]}
                     </Badge>
                   </Table.TableCell>
-                  <Table.TableCell>{getTrustLevelLabel(run.trustLevel)}</Table.TableCell>
+                  <Table.TableCell>
+                    <Badge class="text-white {trustStyles[run.trustLevel]}">
+                      {getTrustLevelLabel(run.trustLevel)}
+                    </Badge>
+                  </Table.TableCell>
                   <Table.TableCell>{run.deprecatedCount + run.helmDeprecatedCount}</Table.TableCell>
                   <Table.TableCell>{run.criticalCount}</Table.TableCell>
-                  <Table.TableCell>{run.source}</Table.TableCell>
+                  <Table.TableCell>{sourceLabels[run.source] ?? run.source}</Table.TableCell>
                 </Table.TableRow>
               {/each}
             {/if}

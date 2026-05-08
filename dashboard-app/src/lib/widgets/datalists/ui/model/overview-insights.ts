@@ -159,43 +159,18 @@ export function calculateResourcePressure(
       status?: { phase?: string };
       spec?: {
         containers?: Array<{ resources?: { requests?: { cpu?: string; memory?: string } } }>;
-        initContainers?: Array<{
-          resources?: { requests?: { cpu?: string; memory?: string } };
-        }>;
       };
     };
     const phase = pod.status?.phase;
     if (phase !== "Running" && phase !== "Pending") continue;
-
-    let podContainerCpu = 0;
-    let podContainerMem = 0;
     const containers = pod.spec?.containers;
-    if (Array.isArray(containers)) {
-      for (const container of containers) {
-        const cpuReq = parseCpuQuantityToCores(container.resources?.requests?.cpu ?? null);
-        const memReq = parseMemoryQuantityToBytes(container.resources?.requests?.memory ?? null);
-        if (cpuReq !== null && cpuReq > 0) podContainerCpu += cpuReq;
-        if (memReq !== null && memReq > 0) podContainerMem += memReq;
-      }
+    if (!Array.isArray(containers)) continue;
+    for (const container of containers) {
+      const cpuReq = parseCpuQuantityToCores(container.resources?.requests?.cpu ?? null);
+      const memReq = parseMemoryQuantityToBytes(container.resources?.requests?.memory ?? null);
+      if (cpuReq !== null && cpuReq > 0) requestedCpu += cpuReq;
+      if (memReq !== null && memReq > 0) requestedMem += memReq;
     }
-
-    // Kubernetes effective pod requests = max(max(initContainer.requests), sum(container.requests)).
-    // Init containers run one at a time before regular containers, so the scheduler reserves the
-    // largest single init-container request rather than the sum.
-    let podInitCpuMax = 0;
-    let podInitMemMax = 0;
-    const initContainers = pod.spec?.initContainers;
-    if (Array.isArray(initContainers)) {
-      for (const container of initContainers) {
-        const cpuReq = parseCpuQuantityToCores(container.resources?.requests?.cpu ?? null);
-        const memReq = parseMemoryQuantityToBytes(container.resources?.requests?.memory ?? null);
-        if (cpuReq !== null && cpuReq > podInitCpuMax) podInitCpuMax = cpuReq;
-        if (memReq !== null && memReq > podInitMemMax) podInitMemMax = memReq;
-      }
-    }
-
-    requestedCpu += Math.max(podContainerCpu, podInitCpuMax);
-    requestedMem += Math.max(podContainerMem, podInitMemMax);
   }
 
   const cpuPercent =
@@ -292,6 +267,7 @@ function buildComponentCheck(params: {
   podFallback?: { status: "ok" | "warning" | "critical"; message: string };
   isManagedCluster: boolean;
   managedDetail?: string;
+  apiServerOk?: boolean;
 }): ControlPlaneCheck {
   const readyzEvidence = parseReadyzEvidence(params.readyOutput, params.probes);
 
@@ -316,13 +292,29 @@ function buildComponentCheck(params: {
     };
   }
 
+  if (readyzEvidence) {
+    return {
+      id: params.id,
+      title: params.title,
+      severity: "unavailable",
+      detail: `No visible kube-system control-plane pods. ${readyzEvidence}`,
+    };
+  }
+
+  if (params.apiServerOk) {
+    return {
+      id: params.id,
+      title: params.title,
+      severity: "ok",
+      detail: "Not visible as pods (may run as system containers). API server is healthy.",
+    };
+  }
+
   return {
     id: params.id,
     title: params.title,
     severity: "unavailable",
-    detail: readyzEvidence
-      ? `No visible kube-system control-plane pods. ${readyzEvidence}`
-      : "No visible kube-system control-plane pods and no provider-managed fallback.",
+    detail: "No visible kube-system control-plane pods and no provider-managed fallback.",
   };
 }
 
@@ -362,12 +354,15 @@ export function buildOverviewResourceInsights(
       const podIssues = checks?.podIssues;
       const crashLoop = podIssues?.crashLoopCount ?? 0;
       const pending = podIssues?.pendingCount ?? 0;
+      const podStatus = podIssues?.status;
       const severity =
         crashLoop > 0
           ? "critical"
           : pending > 0
             ? "warning"
-            : severityFromGlobalStatus(podIssues?.status);
+            : podStatus === "ok" || (crashLoop === 0 && pending === 0 && checks !== null)
+              ? "ok"
+              : severityFromGlobalStatus(podStatus);
       const reason =
         crashLoop > 0
           ? `${crashLoop} CrashLoopBackOff pod(s).`
@@ -704,6 +699,7 @@ export function buildControlPlaneChecks(params: {
         podFallback: controlPlaneComponents?.scheduler,
         isManagedCluster: params.isManagedCluster,
         managedDetail,
+        apiServerOk: apiStatus === "ok",
       }),
     },
     {
@@ -715,6 +711,7 @@ export function buildControlPlaneChecks(params: {
         podFallback: controlPlaneComponents?.controllerManager,
         isManagedCluster: params.isManagedCluster,
         managedDetail,
+        apiServerOk: apiStatus === "ok",
       }),
     },
     etcdCheck,

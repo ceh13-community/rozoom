@@ -27,27 +27,13 @@
   <div class="setting-item">
     <span class="setting-label">Add Cluster</span>
     <span style="color: var(--text-dim);">
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"><polyline points="9 18 15 12 9 6" /></svg
-      >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
     </span>
   </div>
   <div class="setting-item">
     <span class="setting-label">Import Kubeconfig</span>
     <span style="color: var(--text-dim);">
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"><polyline points="9 18 15 12 9 6" /></svg
-      >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
     </span>
   </div>
 </div>
