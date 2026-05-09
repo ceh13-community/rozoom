@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>ROZOOM — Mobile Fleet</title>
+<link rel="stylesheet" href="../../colors_and_type.css" />
+<style>
+  html, body { margin: 0; padding: 0; min-height: 100%; background: #0a1224; color: white; font-family: var(--font-sans); }
+  .stage { display: flex; gap: 28px; padding: 36px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+
+  /* phone frame */
+  .phone {
+    width: 390px; height: 844px;
+    background: #0c0e14;
+    border-radius: 56px;
+    padding: 12px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6), inset 0 0 0 2px rgba(255,255,255,0.08);
+    position: relative;
+  }
+  .screen {
+    width: 100%; height: 100%;
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    background: var(--shell-bg);
+    display: flex; flex-direction: column;
+    font-family: var(--font-sans-mobile);
+    color: hsl(var(--foreground));
+  }
+  .notch { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 120px; height: 32px; background: #000; border-radius: 20px; z-index: 5; }
+
+  .statusbar { padding: 16px 28px 0; display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 600; }
+  .statusbar svg { width: 16px; height: 16px; }
+
+  /* tab-bar 78 + FAB 52 + safe-area gap = ~150 */
+  .content { flex: 1; padding: 14px 16px 150px; overflow-y: auto; }
+
+  .header { padding: 8px 4px 14px; display: flex; align-items: flex-end; justify-content: space-between; }
+  .header h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.015em; line-height: 1; }
+  .header .sub { font-size: 13px; color: hsl(var(--muted-foreground)); margin-top: 4px; }
+
+  .search { display: flex; align-items: center; gap: 8px; background: hsl(var(--muted)); padding: 10px 12px; border-radius: 12px; margin-bottom: 14px; }
+  .search input { flex: 1; background: transparent; border: 0; outline: 0; font-size: 15px; color: hsl(var(--foreground)); font-family: inherit; }
+  .search svg { color: hsl(var(--muted-foreground)); width: 16px; height: 16px; }
+
+  .card-list { display: flex; flex-direction: column; gap: 10px; }
+  .card {
+    display: flex; align-items: center; gap: 12px;
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: 14px;
+    padding: 12px 14px;
+    box-shadow: var(--card-shadow);
+  }
+  .card:active { transform: scale(0.98); }
+  .score { position: relative; width: 50px; height: 50px; border-radius: 12px; display: grid; place-items: center; font-family: var(--font-mono); font-weight: 700; font-size: 17px; flex-shrink: 0; }
+  .score.ok { background: hsl(var(--status-ok) / 0.18); color: hsl(var(--status-ok)); }
+  .score.warn { background: hsl(var(--status-warn) / 0.18); color: hsl(var(--status-warn)); }
+  .score.bad { background: hsl(var(--status-bad) / 0.18); color: hsl(var(--status-bad)); }
+  .score .glyph { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; background: hsl(var(--card)); border: 1.5px solid currentColor; display: grid; place-items: center; font-family: var(--font-sans); font-size: 10px; font-weight: 700; line-height: 1; }
+  .info { flex: 1; min-width: 0; }
+  .info .nm { font-weight: 600; font-size: 16px; }
+  .info .meta { font-family: var(--font-mono); font-size: 11px; color: hsl(var(--muted-foreground)); margin-top: 2px; }
+  .info .stats { display: flex; gap: 12px; margin-top: 5px; font-size: 11px; color: hsl(var(--muted-foreground)); }
+  .info .stats b { color: hsl(var(--foreground)); font-weight: 600; }
+  .chev { color: hsl(var(--muted-foreground)); }
+
+  .fab { position: absolute; right: 18px; bottom: 90px; width: 52px; height: 52px; border-radius: 50%; background: hsl(var(--primary)); color: white; display: grid; place-items: center; box-shadow: 0 10px 24px hsl(var(--primary) / 0.45); z-index: 4; border: 0; cursor: pointer; }
+
+  .tabbar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 78px;
+    border-top: 1px solid hsl(var(--border));
+    background: hsl(var(--card) / 0.85);
+    backdrop-filter: blur(20px);
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    padding-bottom: 18px;
+  }
+  .tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 10px; color: hsl(var(--muted-foreground)); font-weight: 500; }
+  .tab.active { color: hsl(var(--primary)); }
+  .tab svg { width: 22px; height: 22px; }
+
+  .label { padding: 12px 8px; font-size: 10px; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
+
+  /* SECOND PHONE (cluster detail) */
+  .detail-back { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; color: hsl(var(--primary)); padding: 4px 0 8px; font-weight: 500; }
+  .detail-back svg { width: 14px; height: 14px; }
+  .pill { padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; }
+  .pill.ok { background: hsl(var(--status-ok) / 0.15); color: hsl(var(--status-ok)); }
+  .hero { text-align: center; padding: 28px 0 18px; }
+  .hero .big { font-family: var(--font-mono); font-size: 88px; font-weight: 700; line-height: 1; letter-spacing: -0.04em; color: hsl(var(--status-ok)); }
+  .hero .lbl { font-size: 12px; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; font-weight: 600; }
+  .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+  .stat-box { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 12px; padding: 12px; text-align: center; box-shadow: var(--card-shadow); }
+  .stat-box .v { font-family: var(--font-mono); font-size: 22px; font-weight: 700; color: hsl(var(--foreground)); line-height: 1; }
+  .stat-box .l { font-size: 10px; color: hsl(var(--muted-foreground)); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+  .workloads { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 14px; box-shadow: var(--card-shadow); }
+  .wl { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-bottom: 1px solid hsl(var(--border) / 0.5); font-family: var(--font-mono); font-size: 13px; }
+  .wl:last-child { border: 0; }
+  .wl .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .wl .dot.run { background: hsl(var(--status-ok)); }
+  .wl .dot.pen { background: hsl(var(--status-warn)); }
+  .wl .dot.fai { background: hsl(var(--status-bad)); }
+  .wl .ready { margin-left: auto; color: hsl(var(--muted-foreground)); }
+</style>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+</head>
+<body>
+  <div class="stage">
+
+    <!-- FLEET LIST -->
+    <div class="phone" data-theme="dark">
+      <div class="notch"></div>
+      <div class="screen">
+        <div class="statusbar">
+          <span>9:41</span>
+          <span style="display:flex; gap:6px;">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 22h2v-7H2zm5 0h2V11H7zm5 0h2V7h-2zm5 0h2V3h-2z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 5H3v3h18zm0 5H3v3h18zm-7 5H3v3h11z"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="18" height="10" rx="2"/><path d="M22 11v2"/></svg>
+          </span>
+        </div>
+        <div class="content">
+          <div class="header"><div><h1>Fleet</h1><div class="sub">5 clusters · 4 healthy</div></div></div>
+          <div class="search"><i data-lucide="search"></i><input placeholder="Search clusters..." /></div>
+
+          <div class="card-list">
+            <div class="card">
+              <div class="score ok">92<span class="glyph">✓</span></div>
+              <div class="info"><div class="nm">prod-eu-west-1</div><div class="meta">EKS · eu-west-1 · AWS</div><div class="stats"><span><b>12</b> nodes</span><span><b>148</b> pods</span><span><b>24</b> deploys</span></div></div>
+              <i data-lucide="chevron-right" class="chev"></i>
+            </div>
+            <div class="card">
+              <div class="score warn">74<span class="glyph">!</span></div>
+              <div class="info"><div class="nm">staging-us-east</div><div class="meta">GKE · us-east1 · GCP</div><div class="stats"><span><b>6</b> nodes</span><span><b>89</b> pods</span><span><b>15</b> deploys</span></div></div>
+              <i data-lucide="chevron-right" class="chev"></i>
+            </div>
+            <div class="card">
+              <div class="score bad">38<span class="glyph">×</span></div>
+              <div class="info"><div class="nm">dev-digitalocean</div><div class="meta">DOKS · fra1 · DO</div><div class="stats"><span><b>3</b> nodes</span><span><b>42</b> pods</span><span><b>8</b> deploys</span></div></div>
+              <i data-lucide="chevron-right" class="chev"></i>
+            </div>
+            <div class="card">
+              <div class="score ok">88<span class="glyph">✓</span></div>
+              <div class="info"><div class="nm">prod-hetzner-fsn1</div><div class="meta">K3s · fsn1 · Hetzner</div><div class="stats"><span><b>5</b> nodes</span><span><b>67</b> pods</span><span><b>12</b> deploys</span></div></div>
+              <i data-lucide="chevron-right" class="chev"></i>
+            </div>
+            <div class="card">
+              <div class="score ok">95<span class="glyph">✓</span></div>
+              <div class="info"><div class="nm">prod-aks-westeurope</div><div class="meta">AKS · westeurope · Azure</div><div class="stats"><span><b>8</b> nodes</span><span><b>112</b> pods</span><span><b>19</b> deploys</span></div></div>
+              <i data-lucide="chevron-right" class="chev"></i>
+            </div>
+          </div>
+        </div>
+        <button class="fab"><i data-lucide="plus"></i></button>
+        <nav class="tabbar">
+          <div class="tab active"><i data-lucide="layout-grid"></i>Fleet</div>
+          <div class="tab"><i data-lucide="alert-triangle"></i>Alerts</div>
+          <div class="tab"><i data-lucide="settings"></i>Settings</div>
+        </nav>
+      </div>
+    </div>
+
+    <!-- CLUSTER DETAIL -->
+    <div class="phone" data-theme="dark">
+      <div class="notch"></div>
+      <div class="screen">
+        <div class="statusbar">
+          <span>9:41</span>
+          <span style="display:flex; gap:6px;">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 22h2v-7H2zm5 0h2V11H7zm5 0h2V7h-2zm5 0h2V3h-2z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 5H3v3h18zm0 5H3v3h18zm-7 5H3v3h11z"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="18" height="10" rx="2"/><path d="M22 11v2"/></svg>
+          </span>
+        </div>
+        <div class="content">
+          <a class="detail-back"><i data-lucide="chevron-left"></i> Fleet</a>
+          <div class="header"><div><h1 style="font-size:24px">prod-eu-west-1</h1><div class="sub">EKS · eu-west-1 · AWS</div></div><span class="pill ok">Healthy</span></div>
+
+          <div class="hero"><div class="big">92</div><div class="lbl">Health Score</div></div>
+
+          <div class="stat-row">
+            <div class="stat-box"><div class="v">12</div><div class="l">Nodes</div></div>
+            <div class="stat-box"><div class="v">148</div><div class="l">Pods</div></div>
+            <div class="stat-box"><div class="v">24</div><div class="l">Deploys</div></div>
+          </div>
+          <div class="stat-row">
+            <div class="stat-box"><div class="v" style="color:hsl(var(--status-ok))">142</div><div class="l">Running</div></div>
+            <div class="stat-box"><div class="v" style="color:hsl(var(--status-warn))">4</div><div class="l">Pending</div></div>
+            <div class="stat-box"><div class="v" style="color:hsl(var(--status-bad))">2</div><div class="l">Failed</div></div>
+          </div>
+
+          <div class="label">Workloads</div>
+          <div class="workloads">
+            <div class="wl"><span class="dot run"></span>api-gateway<span class="ready">5/5</span></div>
+            <div class="wl"><span class="dot run"></span>auth-service<span class="ready">3/3</span></div>
+            <div class="wl"><span class="dot pen"></span>payment-processor<span class="ready">2/3</span></div>
+            <div class="wl"><span class="dot run"></span>notification-svc<span class="ready">2/2</span></div>
+            <div class="wl"><span class="dot fai"></span>cronjob-data-sync<span class="ready">0/1</span></div>
+            <div class="wl"><span class="dot run"></span>postgres-primary<span class="ready">1/1</span></div>
+          </div>
+        </div>
+        <nav class="tabbar">
+          <div class="tab active"><i data-lucide="layout-grid"></i>Fleet</div>
+          <div class="tab"><i data-lucide="alert-triangle"></i>Alerts</div>
+          <div class="tab"><i data-lucide="settings"></i>Settings</div>
+        </nav>
+      </div>
+    </div>
+
+  </div>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

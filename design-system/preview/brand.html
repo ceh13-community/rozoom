@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>ROZOOM — Brand</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { padding: 28px; margin: 0; }
+  .eyebrow { font-size: 11px; font-weight: 600; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: var(--tracking-wider); margin: 0 0 4px; }
+  .title { font-size: 24px; font-weight: 700; letter-spacing: var(--tracking-tight); margin: 0 0 22px; }
+  .section { margin-bottom: 24px; }
+  .section-h { font-size: 11px; font-weight: 600; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: var(--tracking-wider); margin: 0 0 10px; }
+
+  .lockup-light { background: hsl(0 0% 100%); border: 1px solid hsl(var(--border)); border-radius: var(--radius-2xl); padding: 28px; display: flex; align-items: center; justify-content: center; min-height: 180px; }
+  .lockup-dark  { background: hsl(222 47% 7%); border-radius: var(--radius-2xl); padding: 28px; display: flex; align-items: center; justify-content: center; min-height: 180px; }
+  .lockup-light img, .lockup-dark img { max-width: 70%; height: auto; }
+
+  .tagline-list { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  .tag {
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-xl);
+    padding: 14px 16px;
+    background: hsl(var(--card));
+    box-shadow: var(--card-shadow);
+  }
+  .tag .lbl { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: var(--tracking-wider); color: hsl(var(--muted-foreground)); margin-bottom: 4px; }
+  .tag .v { font-size: 18px; font-weight: 600; color: hsl(var(--foreground)); letter-spacing: var(--tracking-tight); }
+
+  .palette { display: flex; gap: 4px; height: 60px; border-radius: var(--radius); overflow: hidden; border: 1px solid hsl(var(--border)); }
+  .palette > div { flex: 1; }
+
+  .icon-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+  .icon-tile {
+    aspect-ratio: 1;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    color: hsl(var(--foreground));
+    background: hsl(var(--card));
+  }
+  .icon-tile svg { width: 22px; height: 22px; }
+</style>
+</head>
+<body>
+  <p class="eyebrow">Brand</p>
+  <h1 class="title">Logo, palette &amp; iconography</h1>
+
+  <div class="section">
+    <div class="section-h">Lockup · light surface</div>
+    <div class="lockup-light"><img src="../assets/rozoom-logo.svg" alt="ROZOOM logo" /></div>
+  </div>
+
+  <div class="section">
+    <div class="section-h">Lockup · dark surface (native)</div>
+    <div class="lockup-dark"><img src="../assets/rozoom-logo.svg" alt="ROZOOM logo on dark" /></div>
+  </div>
+
+  <div class="section">
+    <div class="section-h">Brand palette · navy → electric blue</div>
+    <div class="palette">
+      <div style="background:#040c1a"></div>
+      <div style="background:#082590"></div>
+      <div style="background:#0b2880"></div>
+      <div style="background:#1148b8"></div>
+      <div style="background:#1555cc"></div>
+      <div style="background:#2b7be0"></div>
+      <div style="background:#5daaf6"></div>
+      <div style="background:#92c8fa"></div>
+      <div style="background:#d8eeff"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-h">Voice</div>
+    <div class="tagline-list">
+      <div class="tag"><div class="lbl">Tagline</div><div class="v">A swiss army knife for Kubernetes.</div></div>
+      <div class="tag"><div class="lbl">Subhead</div><div class="v">All-in-one fleet IDE for platform engineers and DevOps teams.</div></div>
+      <div class="tag"><div class="lbl">Empty state</div><div class="v">No clusters connected yet — connect your first to start monitoring health.</div></div>
+      <div class="tag"><div class="lbl">Status example</div><div class="v">12 clusters, 9 healthy. 4 alerts active across fleet.</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-h">Iconography · Lucide outline</div>
+    <div class="icon-grid">
+      <div class="icon-tile" title="server"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="6" rx="2"/><rect x="2" y="15" width="20" height="6" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></div>
+      <div class="icon-tile" title="cloud"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg></div>
+      <div class="icon-tile" title="layers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></div>
+      <div class="icon-tile" title="alert"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+      <div class="icon-tile" title="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      <div class="icon-tile" title="terminal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></div>
+      <div class="icon-tile" title="grid"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></div>
+      <div class="icon-tile" title="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+    </div>
+  </div>
+</body>
+</html>

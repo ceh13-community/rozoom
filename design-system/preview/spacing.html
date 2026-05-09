@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>ROZOOM — Spacing, Radii & Shadows</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { padding: 28px; margin: 0; }
+  .eyebrow { font-size: 11px; font-weight: 600; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: var(--tracking-wider); margin: 0 0 4px; }
+  .title { font-size: 24px; font-weight: 700; letter-spacing: var(--tracking-tight); margin: 0 0 22px; }
+  .section { margin-bottom: 28px; }
+  .section-h { font-size: 12px; font-weight: 600; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: var(--tracking-wider); margin: 0 0 10px; }
+
+  /* radii */
+  .radii { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .r-card {
+    aspect-ratio: 1.4;
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: var(--card-shadow);
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 10px 12px;
+  }
+  .r-card .nm { font-family: var(--font-mono); font-size: 11px; color: hsl(var(--muted-foreground)); }
+  .r-card .vl { font-family: var(--font-mono); font-size: 14px; color: hsl(var(--foreground)); font-weight: 600; }
+
+  /* spacing */
+  .sp-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
+  .sp-row .sw { background: hsl(var(--primary)); height: 14px; border-radius: 2px; }
+  .sp-row .lb { font-family: var(--font-mono); font-size: 12px; color: hsl(var(--muted-foreground)); width: 80px; }
+  .sp-row .px { font-family: var(--font-mono); font-size: 12px; color: hsl(var(--foreground)); }
+
+  /* shadow demos */
+  .shadow-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .sh-card {
+    height: 110px;
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-2xl);
+    padding: 12px 14px;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .sh-card.elev1 { box-shadow: 0 1px 2px hsl(218 57% 52% / 0.04), 0 4px 12px hsl(218 57% 52% / 0.08); }
+  .sh-card.elev2 { box-shadow: var(--card-shadow); }
+  .sh-card .sh-lbl { font-family: var(--font-mono); font-size: 11px; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: var(--tracking-wider); }
+  .sh-card .sh-val { font-size: 14px; font-weight: 600; }
+
+  /* motion */
+  .motion-grid { display: flex; gap: 14px; flex-wrap: wrap; }
+  .m-chip { font-family: var(--font-mono); font-size: 12px; padding: 8px 12px; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+  .m-chip strong { color: hsl(var(--primary)); font-weight: 600; }
+</style>
+</head>
+<body>
+  <p class="eyebrow">Spacing · Radii · Shadows</p>
+  <h1 class="title">Foundations</h1>
+
+  <div class="section">
+    <div class="section-h">Radii</div>
+    <div class="radii">
+      <div class="r-card" style="border-radius: var(--radius-sm)"><span class="nm">--radius-sm</span><span class="vl">4px</span></div>
+      <div class="r-card" style="border-radius: var(--radius-md)"><span class="nm">--radius-md</span><span class="vl">6px</span></div>
+      <div class="r-card" style="border-radius: var(--radius-lg)"><span class="nm">--radius-lg</span><span class="vl">8px</span></div>
+      <div class="r-card" style="border-radius: var(--radius-xl)"><span class="nm">--radius-xl</span><span class="vl">12px</span></div>
+      <div class="r-card" style="border-radius: var(--radius-2xl)"><span class="nm">--radius-2xl</span><span class="vl">16px</span></div>
+      <div class="r-card" style="border-radius: var(--radius-pill)"><span class="nm">--radius-pill</span><span class="vl">9999px</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-h">Spacing — 4px base</div>
+    <div class="sp-row"><span class="lb">--space-1</span><span class="sw" style="width: 4px"></span><span class="px">4px</span></div>
+    <div class="sp-row"><span class="lb">--space-2</span><span class="sw" style="width: 8px"></span><span class="px">8px</span></div>
+    <div class="sp-row"><span class="lb">--space-3</span><span class="sw" style="width: 12px"></span><span class="px">12px</span></div>
+    <div class="sp-row"><span class="lb">--space-4</span><span class="sw" style="width: 16px"></span><span class="px">16px</span></div>
+    <div class="sp-row"><span class="lb">--space-6</span><span class="sw" style="width: 24px"></span><span class="px">24px</span></div>
+    <div class="sp-row"><span class="lb">--space-8</span><span class="sw" style="width: 32px"></span><span class="px">32px</span></div>
+    <div class="sp-row"><span class="lb">--space-12</span><span class="sw" style="width: 48px"></span><span class="px">48px</span></div>
+  </div>
+
+  <div class="section">
+    <div class="section-h">Card elevations</div>
+    <div class="shadow-grid">
+      <div class="sh-card elev1"><span class="sh-lbl">Elev 1 · subtle</span><span class="sh-val">Inline list rows, table rows</span></div>
+      <div class="sh-card elev2"><span class="sh-lbl">Elev 2 · default</span><span class="sh-val">Dashboard cluster cards</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-h">Motion</div>
+    <div class="motion-grid">
+      <span class="m-chip"><strong>120ms</strong> · fast / hover</span>
+      <span class="m-chip"><strong>200ms</strong> · base / page-enter</span>
+      <span class="m-chip"><strong>320ms</strong> · slow / accordion</span>
+      <span class="m-chip">ease-out · cubic-bezier(.16,1,.3,1)</span>
+    </div>
+  </div>
+</body>
+</html>
