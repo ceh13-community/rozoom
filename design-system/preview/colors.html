@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>ROZOOM — Color Tokens</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { padding: 28px; margin: 0; }
+  .eyebrow { font-size: 11px; font-weight: 600; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: var(--tracking-wider); margin: 0 0 4px; }
+  .title { font-size: 24px; font-weight: 700; letter-spacing: var(--tracking-tight); margin: 0 0 18px; }
+
+  .themes { display: flex; gap: 8px; margin-bottom: 22px; }
+  .pill {
+    font-family: var(--font-mono); font-size: 11px;
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--muted-foreground));
+  }
+  .pill.active { color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); border-color: hsl(var(--primary)); }
+
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+  .swatch {
+    border-radius: 10px;
+    border: 1px solid hsl(var(--border));
+    overflow: hidden;
+    background: hsl(var(--card));
+    box-shadow: var(--card-shadow);
+  }
+  .chip { height: 64px; display: flex; align-items: flex-end; padding: 8px 12px; }
+  .chip .lbl { font-family: var(--font-mono); font-size: 10px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.35); color: white; backdrop-filter: blur(4px); }
+  .meta { padding: 8px 12px 10px; font-size: 12px; color: hsl(var(--foreground)); display: flex; justify-content: space-between; gap: 8px; }
+  .meta code { font-family: var(--font-mono); font-size: 11px; color: hsl(var(--muted-foreground)); }
+
+  .section-h { font-size: 13px; font-weight: 600; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: var(--tracking-wider); margin: 22px 0 8px; }
+</style>
+</head>
+<body>
+  <p class="eyebrow">Color tokens</p>
+  <h1 class="title" id="title">Dark — operations center</h1>
+
+  <div class="themes">
+    <button class="pill" data-t="light">Light</button>
+    <button class="pill active" data-t="dark">Dark</button>
+    <button class="pill" data-t="k9s">K9s</button>
+  </div>
+
+  <div class="section-h">Surfaces</div>
+  <div class="grid">
+    <div class="swatch"><div class="chip" style="background: hsl(var(--background))"><span class="lbl">--background</span></div><div class="meta">Background <code id="t-bg">…</code></div></div>
+    <div class="swatch"><div class="chip" style="background: hsl(var(--card))"><span class="lbl">--card</span></div><div class="meta">Card <code id="t-card">…</code></div></div>
+    <div class="swatch"><div class="chip" style="background: hsl(var(--muted))"><span class="lbl">--muted</span></div><div class="meta">Muted <code id="t-muted">…</code></div></div>
+    <div class="swatch"><div class="chip" style="background: hsl(var(--border))"><span class="lbl">--border</span></div><div class="meta">Border <code id="t-border">…</code></div></div>
+  </div>
+
+  <div class="section-h">Brand</div>
+  <div class="grid">
+    <div class="swatch"><div class="chip" style="background: hsl(var(--primary))"><span class="lbl">--primary</span></div><div class="meta">Primary <code id="t-primary">…</code></div></div>
+    <div class="swatch"><div class="chip" style="background: hsl(var(--ring))"><span class="lbl">--ring</span></div><div class="meta">Ring <code id="t-ring">…</code></div></div>
+  </div>
+
+  <div class="section-h">Status</div>
+  <div class="grid">
+    <div class="swatch"><div class="chip" style="background: hsl(var(--status-ok))"><span class="lbl">--status-ok</span></div><div class="meta">Healthy / Running <code>green</code></div></div>
+    <div class="swatch"><div class="chip" style="background: hsl(var(--status-warn))"><span class="lbl">--status-warn</span></div><div class="meta">Warning / Pending <code>amber</code></div></div>
+    <div class="swatch"><div class="chip" style="background: hsl(var(--status-bad))"><span class="lbl">--status-bad</span></div><div class="meta">Critical / Failed <code>red</code></div></div>
+    <div class="swatch"><div class="chip" style="background: hsl(var(--status-info))"><span class="lbl">--status-info</span></div><div class="meta">Info <code>blue</code></div></div>
+  </div>
+
+  <script>
+    const titles = {
+      light: "Light — calm office",
+      dark:  "Dark — operations center",
+      k9s:   "K9s — terminal nostalgia",
+    };
+    function refresh() {
+      const cs = getComputedStyle(document.documentElement);
+      const ids = ["bg:background","card:card","muted:muted","border:border","primary:primary","ring:ring"];
+      ids.forEach(p => {
+        const [k,v] = p.split(":");
+        const el = document.getElementById("t-"+k);
+        if (el) el.textContent = "hsl(" + cs.getPropertyValue("--"+v).trim() + ")";
+      });
+    }
+    document.querySelectorAll(".pill").forEach(b => b.addEventListener("click", () => {
+      document.querySelectorAll(".pill").forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+      const t = b.dataset.t;
+      document.documentElement.setAttribute("data-theme", t);
+      document.getElementById("title").textContent = titles[t];
+      refresh();
+    }));
+    refresh();
+  </script>
+</body>
+</html>
