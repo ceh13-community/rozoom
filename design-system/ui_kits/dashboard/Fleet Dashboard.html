@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>ROZOOM — Desktop Fleet Dashboard</title>
+<link rel="stylesheet" href="../../colors_and_type.css" />
+<style>
+  html, body { margin: 0; padding: 0; min-height: 100%; background: #0a1224; }
+  body { padding: 32px; display: flex; align-items: flex-start; justify-content: center; }
+  .frame {
+    width: 1280px; height: 800px; overflow: hidden;
+    border-radius: 12px;
+    background: var(--shell-bg);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.55), 0 8px 24px rgba(0,0,0,0.35);
+    display: grid; grid-template-columns: 220px 1fr;
+  }
+  .titlebar {
+    grid-column: 1 / -1;
+    height: 38px; display: flex; align-items: center; gap: 8px; padding: 0 14px;
+    border-bottom: 1px solid hsl(var(--border));
+    background: hsl(var(--card) / 0.6);
+    backdrop-filter: blur(20px);
+  }
+  .tlights { display: flex; gap: 6px; }
+  .tlights span { width: 12px; height: 12px; border-radius: 50%; }
+  .tlights .r { background: #ff5f57; } .tlights .y { background: #febc2e; } .tlights .g { background: #28c840; }
+  .tl-title { flex: 1; text-align: center; font-size: 12px; color: hsl(var(--muted-foreground)); font-weight: 500; }
+
+  /* Sidebar */
+  aside {
+    border-right: 1px solid hsl(var(--border));
+    padding: 14px 10px;
+    display: flex; flex-direction: column; gap: 6px;
+    background: hsl(var(--card) / 0.4);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 14px; border-bottom: 1px solid hsl(var(--border)); margin-bottom: 8px; }
+  .brand .mark {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: linear-gradient(135deg, #2b7be0, #082590);
+    display: grid; place-items: center;
+    box-shadow: 0 4px 12px rgba(43, 123, 224, 0.4);
+  }
+  .brand .name { font-weight: 800; font-size: 16px; letter-spacing: 0.04em; color: hsl(var(--foreground)); }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: var(--radius);
+    font-size: 13px; font-weight: 500;
+    color: hsl(var(--muted-foreground));
+    cursor: pointer;
+  }
+  .nav-item:hover { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
+  .nav-item.active { background: hsl(var(--primary) / 0.15); color: hsl(var(--primary)); box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.3); }
+  .nav-item svg { width: 16px; height: 16px; }
+  .nav-section { font-size: 10px; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: 0.1em; padding: 14px 10px 6px; font-weight: 600; }
+
+  /* Main */
+  main { padding: 22px 28px; overflow: hidden; display: flex; flex-direction: column; gap: 18px; }
+  .page-h { display: flex; align-items: flex-end; justify-content: space-between; }
+  .page-h h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.015em; }
+  .page-h .sub { font-size: 13px; color: hsl(var(--muted-foreground)); margin-top: 2px; }
+  .toolbar { display: flex; align-items: center; gap: 10px; }
+  .input { font-size: 13px; padding: 7px 10px 7px 32px; background: hsl(var(--muted)); border: 1px solid hsl(var(--border)); border-radius: var(--radius); color: hsl(var(--foreground)); width: 220px; }
+  .search-wrap { position: relative; }
+  .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: hsl(var(--muted-foreground)); }
+  .btn { font-family: var(--font-sans); font-size: 13px; font-weight: 500; padding: 7px 12px; border-radius: var(--radius); display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; cursor: pointer; }
+  .btn svg { width: 14px; height: 14px; }
+  .btn-primary { background: hsl(var(--primary)); color: white; }
+  .btn-outline { border-color: hsl(var(--border)); color: hsl(var(--foreground)); background: transparent; }
+  .tabs { display: inline-flex; padding: 3px; background: hsl(var(--muted)); border-radius: var(--radius); gap: 2px; }
+  .tabs button { font-size: 12px; font-weight: 500; padding: 5px 12px; border: 0; background: transparent; color: hsl(var(--muted-foreground)); border-radius: 5px; cursor: pointer; }
+  .tabs button.active { background: hsl(var(--card)); color: hsl(var(--foreground)); box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .stat { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: var(--radius-2xl); padding: 14px 16px; box-shadow: var(--card-shadow); }
+  .stat .lbl { font-size: 11px; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+  .stat .val { font-family: var(--font-mono); font-size: 28px; font-weight: 700; color: hsl(var(--foreground)); margin-top: 4px; line-height: 1; }
+  .stat .delta { font-size: 11px; margin-top: 6px; font-family: var(--font-mono); }
+
+  /* Cluster grid */
+  .cluster-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; flex: 1; min-height: 0; overflow: auto; padding-right: 4px; }
+  .cluster {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--card-shadow);
+    padding: 14px;
+    display: flex; flex-direction: column; gap: 10px;
+    cursor: pointer;
+    transition: all var(--motion-fast);
+  }
+  .cluster:hover { border-color: hsl(var(--primary) / 0.5); transform: translateY(-1px); }
+  .cluster .head { display: flex; align-items: center; gap: 10px; }
+  .score-pill { position: relative; width: 40px; height: 40px; border-radius: var(--radius-lg); display: grid; place-items: center; font-family: var(--font-mono); font-weight: 700; font-size: 15px; flex-shrink: 0; }
+  .score-pill.ok { background: hsl(var(--status-ok) / 0.18); color: hsl(var(--status-ok)); }
+  .score-pill.warn { background: hsl(var(--status-warn) / 0.18); color: hsl(var(--status-warn)); }
+  .score-pill.bad { background: hsl(var(--status-bad) / 0.18); color: hsl(var(--status-bad)); }
+  .score-pill .glyph { position: absolute; top: -3px; right: -3px; width: 14px; height: 14px; border-radius: 50%; background: hsl(var(--card)); border: 1.5px solid currentColor; display: grid; place-items: center; font-family: var(--font-sans); font-size: 9px; font-weight: 700; line-height: 1; }
+  .cluster .nm { font-weight: 600; font-size: 14px; }
+  .cluster .meta { font-family: var(--font-mono); font-size: 11px; color: hsl(var(--muted-foreground)); }
+  .cluster .row { display: flex; gap: 12px; padding-top: 8px; border-top: 1px solid hsl(var(--border)); }
+  .cluster .kv { font-size: 11px; color: hsl(var(--muted-foreground)); }
+  .cluster .kv b { color: hsl(var(--foreground)); font-weight: 600; font-family: var(--font-mono); }
+
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; }
+  .badge .dot { width: 5px; height: 5px; border-radius: 50%; }
+  .badge.ok { background: hsl(var(--status-ok) / 0.15); color: hsl(var(--status-ok)); } .badge.ok .dot { background: hsl(var(--status-ok)); }
+  .badge.warn { background: hsl(var(--status-warn) / 0.15); color: hsl(var(--status-warn)); } .badge.warn .dot { background: hsl(var(--status-warn)); }
+  .badge.bad { background: hsl(var(--status-bad) / 0.15); color: hsl(var(--status-bad)); } .badge.bad .dot { background: hsl(var(--status-bad)); }
+
+  .theme-switch { display: flex; gap: 4px; padding: 3px; background: hsl(var(--muted)); border-radius: 999px; }
+  .theme-switch button { font-size: 11px; padding: 4px 10px; border: 0; background: transparent; border-radius: 999px; cursor: pointer; color: hsl(var(--muted-foreground)); font-family: var(--font-mono); }
+  .theme-switch button.on { background: hsl(var(--card)); color: hsl(var(--foreground)); }
+
+</style>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+</head>
+<body data-theme="dark">
+  <div class="frame">
+    <div class="titlebar">
+      <div class="tlights"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+      <div class="tl-title">ROZOOM — Fleet Dashboard</div>
+      <div class="theme-switch">
+        <button data-th="light">Light</button>
+        <button data-th="dark" class="on">Dark</button>
+        <button data-th="k9s">K9s</button>
+      </div>
+    </div>
+    <aside>
+      <div class="brand">
+        <div class="mark"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></div>
+        <div class="name">ROZOOM</div>
+      </div>
+      <div class="nav-item active"><i data-lucide="layout-grid"></i> Fleet</div>
+      <div class="nav-item"><i data-lucide="server"></i> Cluster Manager</div>
+      <div class="nav-item"><i data-lucide="boxes"></i> Workloads</div>
+      <div class="nav-item"><i data-lucide="file-code-2"></i> YAML Editor</div>
+      <div class="nav-item"><i data-lucide="alert-triangle"></i> Alerts <span style="margin-left:auto" class="badge bad">4</span></div>
+      <div class="nav-section">Tools</div>
+      <div class="nav-item"><i data-lucide="terminal"></i> Terminal</div>
+      <div class="nav-item"><i data-lucide="shield-check"></i> Backup</div>
+      <div class="nav-item"><i data-lucide="settings"></i> Settings</div>
+    </aside>
+    <main>
+      <div class="page-h">
+        <div>
+          <h1>Fleet Control Plane</h1>
+          <div class="sub">5 clusters connected · 4 healthy · last refresh 12s ago</div>
+        </div>
+        <div class="toolbar">
+          <div class="search-wrap"><i data-lucide="search"></i><input class="input" placeholder="Search clusters…" /></div>
+          <div class="tabs"><button>Compact</button><button class="active">Detailed</button><button>K9s</button></div>
+          <button class="btn btn-outline"><i data-lucide="refresh-cw"></i> Refresh</button>
+          <button class="btn btn-primary"><i data-lucide="plus"></i> Connect cluster</button>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="lbl">Clusters</div><div class="val">5</div><div class="delta" style="color: hsl(var(--status-ok))">+1 this week</div></div>
+        <div class="stat"><div class="lbl">Pods running</div><div class="val">427</div><div class="delta" style="color: hsl(var(--muted-foreground))">/ 458 desired</div></div>
+        <div class="stat"><div class="lbl">Active alerts</div><div class="val" style="color: hsl(var(--status-bad))">4</div><div class="delta" style="color: hsl(var(--status-bad))">2 critical</div></div>
+        <div class="stat"><div class="lbl">Fleet score</div><div class="val">77</div><div class="delta" style="color: hsl(var(--status-warn))">↓ 3 since 1h</div></div>
+      </div>
+
+      <div class="cluster-grid">
+        <div class="cluster">
+          <div class="head"><div class="score-pill ok">92<span class="glyph">✓</span></div><div style="flex:1"><div class="nm">prod-eu-west-1</div><div class="meta">EKS · eu-west-1 · AWS</div></div><span class="badge ok"><span class="dot"></span> Healthy</span></div>
+          <div class="row"><div class="kv"><b>12</b> nodes</div><div class="kv"><b>148</b> pods</div><div class="kv"><b>24</b> deploys</div></div>
+        </div>
+        <div class="cluster">
+          <div class="head"><div class="score-pill warn">74<span class="glyph">!</span></div><div style="flex:1"><div class="nm">staging-us-east</div><div class="meta">GKE · us-east1 · GCP</div></div><span class="badge warn"><span class="dot"></span> Warning</span></div>
+          <div class="row"><div class="kv"><b>6</b> nodes</div><div class="kv"><b>89</b> pods</div><div class="kv"><b>15</b> deploys</div></div>
+        </div>
+        <div class="cluster">
+          <div class="head"><div class="score-pill bad">38<span class="glyph">×</span></div><div style="flex:1"><div class="nm">dev-digitalocean</div><div class="meta">DOKS · fra1 · DO</div></div><span class="badge bad"><span class="dot"></span> Critical</span></div>
+          <div class="row"><div class="kv"><b>3</b> nodes</div><div class="kv"><b>42</b> pods</div><div class="kv"><b>8</b> deploys</div></div>
+        </div>
+        <div class="cluster">
+          <div class="head"><div class="score-pill ok">88<span class="glyph">✓</span></div><div style="flex:1"><div class="nm">prod-hetzner-fsn1</div><div class="meta">K3s · fsn1 · Hetzner</div></div><span class="badge ok"><span class="dot"></span> Healthy</span></div>
+          <div class="row"><div class="kv"><b>5</b> nodes</div><div class="kv"><b>67</b> pods</div><div class="kv"><b>12</b> deploys</div></div>
+        </div>
+        <div class="cluster">
+          <div class="head"><div class="score-pill ok">95<span class="glyph">✓</span></div><div style="flex:1"><div class="nm">prod-aks-westeurope</div><div class="meta">AKS · westeurope · Azure</div></div><span class="badge ok"><span class="dot"></span> Healthy</span></div>
+          <div class="row"><div class="kv"><b>8</b> nodes</div><div class="kv"><b>112</b> pods</div><div class="kv"><b>19</b> deploys</div></div>
+        </div>
+        <div class="cluster" style="border-style: dashed; align-items: center; justify-content: center; color: hsl(var(--muted-foreground)); cursor: pointer;">
+          <div style="display:flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px;"><i data-lucide="plus-circle"></i><div style="font-size:13px; font-weight:500">Add cluster</div></div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script>
+    lucide.createIcons();
+    document.querySelectorAll(".theme-switch button").forEach(b => b.addEventListener("click", () => {
+      document.querySelectorAll(".theme-switch button").forEach(x => x.classList.remove("on"));
+      b.classList.add("on");
+      document.body.setAttribute("data-theme", b.dataset.th);
+    }));
+  </script>
+</body>
+</html>

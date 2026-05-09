@@ -1,0 +1,428 @@
+/* ============================================================
+   ROZOOM Design System — Colors & Type tokens
+   ------------------------------------------------------------
+   Drop-in companion to README.md. Three themes:
+     - Light       (default in most contexts)
+     - Dark        (default app theme)
+     - K9s         (amber-on-black terminal)
+   All themes use the SAME semantic token names so components
+   never branch on theme. Toggle by setting `data-theme` on
+   <html> (or any wrapper):
+
+       <html data-theme="dark">      <- default app
+       <html data-theme="light">
+       <html data-theme="k9s">
+
+   Tokens are HSL triplets (e.g. "222 47% 7%") so callers can
+   wrap them in `hsl(var(--background) / <alpha>)`. This matches
+   the original Tailwind/shadcn convention used in dashboard-app.
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   FONT FACES — self-hosted from /fonts (latin + cyrillic ranges)
+   ------------------------------------------------------------ */
+@font-face {
+  font-family: "Source Sans 3"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("fonts/SourceSans3-400-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Source Sans 3"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("fonts/SourceSans3-400-cyrillic.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: "Source Sans 3"; font-style: normal; font-weight: 500; font-display: swap;
+  src: url("fonts/SourceSans3-500-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Source Sans 3"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url("fonts/SourceSans3-600-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Source Sans 3"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url("fonts/SourceSans3-700-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Source Sans 3"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url("fonts/SourceSans3-700-cyrillic.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("fonts/JetBrainsMono-400-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("fonts/JetBrainsMono-400-cyrillic.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: "JetBrains Mono"; font-style: normal; font-weight: 500; font-display: swap;
+  src: url("fonts/JetBrainsMono-500-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "JetBrains Mono"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url("fonts/JetBrainsMono-700-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ------------------------------------------------------------
+   FONT-FAMILY TOKENS
+   ------------------------------------------------------------ */
+:root {
+  --font-sans:
+    "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    "JetBrains Mono", "SF Mono", Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+
+  /* Mobile prefers the system stack first for native feel. */
+  --font-sans-mobile:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter",
+    "Source Sans 3", system-ui, sans-serif;
+
+  /* TYPE SCALE
+     Sized in rem; 1rem = 16px. These map to Tailwind's defaults
+     so existing dashboard-app classes (text-xs..text-3xl) line up. */
+  --text-xs:    0.75rem;   /* 12px - chip metadata, footer notes        */
+  --text-sm:    0.875rem;  /* 14px - body small, table cells            */
+  --text-base:  1rem;      /* 16px - body default                       */
+  --text-lg:    1.125rem;  /* 18px - card titles                        */
+  --text-xl:    1.25rem;   /* 20px - section labels                     */
+  --text-2xl:   1.5rem;    /* 24px - page H2                            */
+  --text-3xl:   1.875rem;  /* 30px - page H1                            */
+  --text-4xl:   2.25rem;   /* 36px - hero numerics, mobile big-score    */
+
+  /* WEIGHTS — Source Sans 3 has soft 400; we bump body to 450. */
+  --weight-regular: 450;
+  --weight-medium:  500;
+  --weight-semi:    600;
+  --weight-bold:    700;
+  --weight-black:   800;
+
+  /* LINE HEIGHTS */
+  --leading-tight:  1.15;
+  --leading-snug:   1.3;
+  --leading-normal: 1.5;
+  --leading-loose:  1.7;
+
+  /* LETTER SPACING — used sparingly on UPPERCASE pills + headings. */
+  --tracking-tight:  -0.015em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.03em;
+  --tracking-wider:  0.08em;
+
+  /* RADII (shadcn scale: sm = lg-4, md = lg-2, lg = base, xl = lg+4) */
+  --radius:    0.5rem;          /*  8px */
+  --radius-sm: calc(var(--radius) - 4px); /*  4px */
+  --radius-md: calc(var(--radius) - 2px); /*  6px */
+  --radius-lg: var(--radius);             /*  8px */
+  --radius-xl: calc(var(--radius) + 4px); /* 12px */
+  --radius-2xl: 1rem;           /* 16px - cards */
+  --radius-pill: 9999px;
+
+  /* SPACING — 4px base, mirrors Tailwind */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* DENSITY — pick one per surface, don't mix per-component */
+  --card-pad-comfortable: 14px 16px;  /* desktop dashboards            */
+  --card-pad-compact:     12px 14px;  /* mobile, dense lists           */
+  --card-pad-tight:       10px 12px;  /* table rows, sub-cards         */
+
+  /* MOTION */
+  --motion-fast:   120ms;
+  --motion-base:   200ms;
+  --motion-slow:   320ms;
+  --ease-out:      cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out:   cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ============================================================
+   LIGHT — calm office, soft blue-paper
+   ============================================================ */
+:root,
+:root[data-theme="light"] {
+  /* Surfaces */
+  --background:           210 100% 99%; /* near-white blue */
+  --foreground:           217  45% 15%;
+  --card:                   0   0% 100%;
+  --card-foreground:      217  45% 15%;
+  --popover:                0   0% 100%;
+  --popover-foreground:   217  45% 15%;
+  --muted:                210  60% 96%;
+  --muted-foreground:     217  28% 38%; /* AA on muted surface — fixed */
+  --accent:               210  60% 96%;
+  --accent-foreground:    217  45% 15%;
+  --border:               214  41% 86%;
+  --input:                214  41% 86%;
+  --ring:                 219  75% 55%;
+
+  /* Brand */
+  --primary:              219  75% 55%;
+  --primary-foreground:     0   0% 100%;
+  --secondary:            210  60% 96%;
+  --secondary-foreground: 217  45% 15%;
+
+  /* Status */
+  --status-ok:            142  71% 45%;
+  --status-warn:           45  93% 47%;
+  --status-bad:             0  72% 51%;
+  --status-info:          219  75% 55%;
+  --status-neutral:       217  24% 45%;
+  --destructive:            0  72% 51%;
+  --destructive-foreground: 0   0% 100%;
+
+  /* Mobile-companion aliases (used by mobile app CSS) */
+  --bg:        hsl(var(--background));
+  --bg-card:   hsl(var(--card));
+  --bg-raised: hsl(var(--muted));
+  --text:      hsl(var(--foreground));
+  --text-dim:  hsl(var(--muted-foreground));
+  --green:     hsl(var(--status-ok));
+  --yellow:    hsl(var(--status-warn));
+  --red:       hsl(var(--status-bad));
+  --orange:    hsl(25 95% 53%);
+
+  /* Shells use a radial-on-linear gradient, not a flat color */
+  --shell-bg:
+    radial-gradient(circle at top left, hsl(214 100% 96%) 0%, transparent 38%),
+    linear-gradient(180deg, hsl(210 100% 99%) 0%, hsl(214 60% 95%) 100%);
+
+  /* Calmer light shadows — border + surface do the hierarchy work */
+  --card-shadow:
+    0 1px 0 hsl(0 0% 100% / 0.6) inset,
+    0 1px 3px hsl(218 30% 30% / 0.06);
+
+  color-scheme: light;
+}
+
+/* ============================================================
+   DARK — operations center, midnight navy (default app theme)
+   ============================================================ */
+:root[data-theme="dark"] {
+  --background:           222  47%  7%;
+  --foreground:           210  40% 96%;
+  --card:                 222  36% 11%;
+  --card-foreground:      210  40% 96%;
+  --popover:              222  36% 11%;
+  --popover-foreground:   210  40% 96%;
+  --muted:                222  24% 16%;
+  --muted-foreground:     215  20% 55%;
+  --accent:               222  24% 16%;
+  --accent-foreground:    210  40% 96%;
+  --border:               217  24% 20%;
+  --input:                217  24% 20%;
+  --ring:                 217  91% 60%;
+
+  --primary:              217  91% 60%;
+  --primary-foreground:     0   0% 100%;
+  --secondary:            222  24% 16%;
+  --secondary-foreground: 210  40% 96%;
+
+  --status-ok:            142  71% 45%;
+  --status-warn:           48  96% 53%;
+  --status-bad:             0  84% 60%;
+  --status-info:          217  91% 60%;
+  --status-neutral:       215  20% 55%;
+  --destructive:            0  84% 60%;
+  --destructive-foreground: 0   0% 100%;
+
+  --bg:        hsl(var(--background));
+  --bg-card:   hsl(var(--card));
+  --bg-raised: hsl(var(--muted));
+  --text:      hsl(var(--foreground));
+  --text-dim:  hsl(var(--muted-foreground));
+  --green:     hsl(var(--status-ok));
+  --yellow:    hsl(var(--status-warn));
+  --red:       hsl(var(--status-bad));
+  --orange:    hsl(25 95% 53%);
+
+  --shell-bg:
+    radial-gradient(circle at top left, hsl(217 91% 22% / 0.6) 0%, transparent 42%),
+    linear-gradient(180deg, hsl(222 47%  7%) 0%, hsl(222 47% 4%) 100%);
+
+  --card-shadow:
+    0 1px 0 hsl(255 100% 100% / 0.06) inset,
+    0 1px 2px hsl(222 47% 3% / 0.4),
+    0 8px 24px hsl(222 47% 3% / 0.45);
+
+  color-scheme: dark;
+}
+
+/* ============================================================
+   K9s — terminal nostalgia, amber-on-black, CRT scanlines
+   ============================================================ */
+:root[data-theme="k9s"] {
+  --background:             0   0%  2%;
+  --foreground:            41 100% 50%; /* amber */
+  --card:                   0   0%  4%;
+  --card-foreground:       41 100% 50%;
+  --popover:                0   0%  4%;
+  --popover-foreground:    41 100% 50%;
+  --muted:                  0   0%  8%;
+  --muted-foreground:     191  88% 44%; /* cyan */
+  --accent:                 0   0% 12%;
+  --accent-foreground:    191  88% 44%;
+  --border:               191  88% 22%;
+  --input:                  0   0%  8%;
+  --ring:                  41 100% 50%;
+
+  --primary:               41 100% 50%; /* amber */
+  --primary-foreground:     0   0%  4%;
+  --secondary:              0   0% 10%;
+  --secondary-foreground: 191  88% 44%;
+
+  --status-ok:            142  71% 45%;
+  --status-warn:           41 100% 50%;
+  --status-bad:             0  84% 60%;
+  --status-info:          191  88% 44%;
+  --status-neutral:        41  30% 50%;
+  --destructive:            0  84% 60%;
+  --destructive-foreground: 0   0%  4%;
+
+  --bg:        hsl(var(--background));
+  --bg-card:   hsl(var(--card));
+  --bg-raised: hsl(var(--muted));
+  --text:      hsl(var(--foreground));
+  --text-dim:  hsl(var(--muted-foreground));
+  --green:     hsl(var(--status-ok));
+  --yellow:    hsl(var(--status-warn));
+  --red:       hsl(var(--status-bad));
+  --orange:    hsl(var(--status-warn));
+
+  /* In K9s, the entire UI uses the mono font. */
+  --font-sans: var(--font-mono);
+  --font-sans-mobile: var(--font-mono);
+
+  --shell-bg:
+    linear-gradient(180deg, hsl(0 0% 2%) 0%, hsl(0 0% 0%) 100%);
+
+  --card-shadow:
+    0 0 0 1px hsl(191 88% 44% / 0.14) inset,
+    0 0 24px hsl(41 100% 50% / 0.06);
+
+  color-scheme: dark;
+}
+
+/* CRT scanline overlay for k9s only. Apply on a wrapper if you
+   don't want it bleeding past your design frame. */
+/* Scoped scanlines: wrap your design in `.k9s-scanlines` so the
+   overlay sits BEHIND modals/tooltips/menus. z-index 1, mix-blend
+   keeps it from obscuring text. The body::after fallback uses
+   the same low z so it never fights popovers. */
+[data-theme="k9s"] .k9s-scanlines { position: relative; isolation: isolate; }
+[data-theme="k9s"] .k9s-scanlines::after,
+:root[data-theme="k9s"] body > .k9s-scanlines-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0 2px,
+    rgba(0, 0, 0, 0.06) 2px 4px
+  );
+  mix-blend-mode: overlay;
+  z-index: 1;
+}
+
+/* ============================================================
+   BASE TYPE
+   ============================================================ */
+html { font-family: var(--font-sans); }
+body {
+  font-family: var(--font-sans);
+  font-weight: var(--weight-regular);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: hsl(var(--foreground));
+  background: var(--shell-bg, hsl(var(--background)));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Source Sans 3 supports kern/liga/calt; ss01 was a no-op. */
+  font-feature-settings: "kern", "liga", "calt";
+}
+
+/* Focus rings: only on keyboard focus, never on mouse click. */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Disabled — universal */
+[disabled],
+[aria-disabled="true"],
+.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Loading — skeleton shimmer for [aria-busy] */
+@keyframes rz-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+[aria-busy="true"] .skeleton,
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 0%,
+    hsl(var(--muted-foreground) / 0.12) 50%,
+    hsl(var(--muted)) 100%
+  );
+  background-size: 200% 100%;
+  animation: rz-shimmer 1.4s linear infinite;
+  border-radius: var(--radius);
+  color: transparent;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-sans);
+  font-weight: var(--weight-semi);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-snug);
+  color: hsl(var(--foreground));
+  margin: 0;
+}
+h1 { font-size: var(--text-3xl); font-weight: var(--weight-bold); }
+h2 { font-size: var(--text-2xl); }
+h3 { font-size: var(--text-xl); }
+h4 { font-size: var(--text-lg); }
+
+code, pre, kbd, samp, .mono, [data-mono] {
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+}
+
+/* Numerics align in tables/metrics by default. */
+.tabular,
+[data-tabular],
+table td,
+table th {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Convenience helper for k9s heading glow. */
+[data-theme="k9s"] h1,
+[data-theme="k9s"] h2 {
+  text-shadow: 0 0 18px hsl(41 100% 50% / 0.35);
+}

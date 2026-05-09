@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>ROZOOM Design System</title>
+<link rel="stylesheet" href="colors_and_type.css" />
+<style>
+  body { padding: 48px 32px 80px; max-width: 980px; margin: 0 auto; }
+  .hero { display: flex; align-items: center; gap: 18px; margin-bottom: 32px; }
+  .hero .mark { width: 56px; height: 56px; border-radius: 14px; background: linear-gradient(135deg, #2b7be0, #082590); display: grid; place-items: center; box-shadow: 0 12px 28px rgba(43,123,224,0.45); }
+  .hero h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; }
+  .hero .tag { font-family: var(--font-mono); font-size: 12px; color: hsl(var(--muted-foreground)); margin-top: 4px; }
+
+  h2 { font-size: 11px; font-weight: 600; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: 0.1em; margin: 36px 0 12px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .card { display: block; padding: 16px 18px; border: 1px solid hsl(var(--border)); border-radius: var(--radius-2xl); background: hsl(var(--card)); box-shadow: var(--card-shadow); text-decoration: none; color: hsl(var(--foreground)); transition: transform var(--motion-fast), border-color var(--motion-fast); }
+  .card:hover { transform: translateY(-2px); border-color: hsl(var(--primary) / 0.5); }
+  .card .lbl { font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.1em; color: hsl(var(--muted-foreground)); }
+  .card .ttl { font-size: 16px; font-weight: 600; margin-top: 4px; }
+  .card .desc { font-size: 13px; color: hsl(var(--muted-foreground)); margin-top: 4px; line-height: 1.5; }
+  .pitch { font-size: 16px; line-height: 1.6; color: hsl(var(--muted-foreground)); max-width: 70ch; }
+  .pitch strong { color: hsl(var(--foreground)); font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="hero">
+    <div class="mark"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></div>
+    <div>
+      <h1>ROZOOM Design System</h1>
+      <div class="tag">a swiss army knife for kubernetes</div>
+    </div>
+  </div>
+
+  <p class="pitch">An operations-grade fleet IDE for Kubernetes. Cross-platform — <strong>Tauri + SvelteKit on desktop</strong>, <strong>SvelteKit on mobile</strong>. Calm midnight navy + electric blue, with an amber-on-black <strong>K9s</strong> alt-theme for terminal lovers and a soft <strong>Light</strong> theme for daytime work. This page is the entry point — all surfaces use the same semantic tokens in <code>colors_and_type.css</code>.</p>
+
+  <h2>Foundations</h2>
+  <div class="grid">
+    <a class="card" href="preview/type.html"><div class="lbl">Type</div><div class="ttl">Type Specimen</div><div class="desc">Source Sans 3 + JetBrains Mono · 8 sizes · numerics tabular by default.</div></a>
+    <a class="card" href="preview/colors.html"><div class="lbl">Colors</div><div class="ttl">Color Tokens</div><div class="desc">Light · Dark · K9s — toggle live to compare.</div></a>
+    <a class="card" href="preview/spacing.html"><div class="lbl">Spacing</div><div class="ttl">Radii &amp; Motion</div><div class="desc">4px scale · radius 4–16px · 120/200/320ms motion · card elevations.</div></a>
+  </div>
+
+  <h2>Library</h2>
+  <div class="grid">
+    <a class="card" href="preview/components.html"><div class="lbl">Components</div><div class="ttl">Atoms</div><div class="desc">Buttons, badges, cluster card, tabs, switch, table, progress, states.</div></a>
+    <a class="card" href="preview/anatomy-cluster-card.html"><div class="lbl">Anatomy</div><div class="ttl">Cluster Card</div><div class="desc">Specs, do/don't, density variants — the atomic unit of every fleet surface.</div></a>
+    <a class="card" href="preview/brand.html"><div class="lbl">Brand</div><div class="ttl">Logo, Voice &amp; Icons</div><div class="desc">Lockups, brand palette, taglines, Lucide outline icons.</div></a>
+  </div>
+
+  <h2>UI Kits</h2>
+  <div class="grid">
+    <a class="card" href="ui_kits/dashboard/Fleet Dashboard.html"><div class="lbl">Desktop</div><div class="ttl">Fleet Dashboard</div><div class="desc">Sidebar · stats · 5-cluster grid · theme switcher in titlebar.</div></a>
+    <a class="card" href="ui_kits/mobile/Mobile App.html"><div class="lbl">Mobile</div><div class="ttl">iOS Companion</div><div class="desc">Fleet list + cluster detail with workload rollup.</div></a>
+  </div>
+
+  <h2>Reference</h2>
+  <div class="grid">
+    <a class="card" href="README.md"><div class="lbl">Doc</div><div class="ttl">README.md</div><div class="desc">Full brand + visual + content fundamentals.</div></a>
+    <a class="card" href="SKILL.md"><div class="lbl">Skill</div><div class="ttl">SKILL.md</div><div class="desc">Cross-compatible skill manifest.</div></a>
+    <a class="card" href="colors_and_type.css"><div class="lbl">CSS</div><div class="ttl">colors_and_type.css</div><div class="desc">Drop-in stylesheet — set <code>data-theme</code> and go.</div></a>
+  </div>
+</body>
+</html>

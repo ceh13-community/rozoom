@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>ROZOOM — Type Scale</title>
+<link rel="stylesheet" href="../colors_and_type.css" />
+<style>
+  body { padding: 32px; max-width: 720px; margin: 0; }
+  .row {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    align-items: baseline;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+  .row:last-child { border: 0; }
+  .meta { font-family: var(--font-mono); font-size: 11px; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: var(--tracking-wider); }
+  .specimen { color: hsl(var(--foreground)); }
+  h1.eyebrow { font-size: 14px; font-weight: 600; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: var(--tracking-wider); margin-bottom: 6px; }
+  .title { font-size: 28px; font-weight: 700; letter-spacing: var(--tracking-tight); margin-bottom: 24px; }
+  .stack { font-size: 12px; font-family: var(--font-mono); color: hsl(var(--muted-foreground)); margin-top: 24px; line-height: 1.6; }
+</style>
+</head>
+<body>
+  <h1 class="eyebrow">Typography</h1>
+  <div class="title">Source Sans 3 · JetBrains Mono</div>
+
+  <div class="row"><div class="meta">36 / 700</div><div class="specimen" style="font-size:36px;font-weight:700;letter-spacing:-0.015em">12 clusters, 9 healthy</div></div>
+  <div class="row"><div class="meta">30 / 700</div><div class="specimen" style="font-size:30px;font-weight:700;letter-spacing:-0.015em">Available Kubernetes Clusters</div></div>
+  <div class="row"><div class="meta">24 / 600</div><div class="specimen" style="font-size:24px;font-weight:600">Detect Cloud Providers</div></div>
+  <div class="row"><div class="meta">20 / 600</div><div class="specimen" style="font-size:20px;font-weight:600">prod-eu-west-1</div></div>
+  <div class="row"><div class="meta">18 / 600</div><div class="specimen" style="font-size:18px;font-weight:600">Workloads</div></div>
+  <div class="row"><div class="meta">16 / 450</div><div class="specimen" style="font-size:16px;font-weight:450">No clusters connected yet — connect your first to start monitoring health.</div></div>
+  <div class="row"><div class="meta">14 / 500</div><div class="specimen" style="font-size:14px;font-weight:500">EKS · eu-west-1 · AWS</div></div>
+  <div class="row"><div class="meta">12 / 500</div><div class="specimen" style="font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.08em;color:hsl(var(--muted-foreground))">Last refresh · 12s ago</div></div>
+
+  <div class="row"><div class="meta">MONO 14</div><div class="specimen" style="font-family:var(--font-mono);font-size:14px">kubectl get pods --all-namespaces</div></div>
+  <div class="row"><div class="meta">MONO 12</div><div class="specimen" style="font-family:var(--font-mono);font-size:12px;color:hsl(var(--status-bad))">CrashLoopBackOff · restarts=14</div></div>
+
+  <div class="stack">
+    --font-sans: "Source Sans 3", system-ui, sans-serif<br/>
+    --font-mono: "JetBrains Mono", ui-monospace, monospace
+  </div>
+</body>
+</html>
