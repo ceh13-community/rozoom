@@ -2,6 +2,20 @@
 
 All notable changes to ROZOOM - K8s Linter IDE.
 
+## [0.22.0] - 2026-05-11
+
+Promotes `0.22.0-rc.3` to a final release. No runtime changes since `rc.3`;
+only the new `design-system/` brand kit was added to the repository for
+consumers of the brand assets (logo, colors, components, screenshots).
+
+### Added
+- `design-system/` — brand kit (logo, banner, font subsets, color tokens,
+  preview pages for components, anatomy, spacing) for downstream usage.
+
+### Notes
+- Runtime build is identical to `0.22.0-rc.3`. See `[0.22.0-rc.3]` below for
+  the cumulative feature/fix list shipped in this release.
+
 ## [0.22.0-rc.3] - 2026-05-09
 
 ### Added
