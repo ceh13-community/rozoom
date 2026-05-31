@@ -82,8 +82,19 @@ jobs:
 
       - name: Install Playwright browser (Chromium)
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        timeout-minutes: 6
-        run: pnpm exec playwright install chromium
+        timeout-minutes: 12
+        # cdn.playwright.dev download can stall mid-transfer; a hung
+        # connection never errors on its own, so bound each attempt with
+        # `timeout` and retry on a fresh connection.
+        run: |
+          for attempt in 1 2 3; do
+            echo "Chromium download attempt $attempt/3"
+            timeout 180 pnpm exec playwright install chromium && exit 0
+            echo "attempt $attempt stalled or failed; retrying"
+            sleep 5
+          done
+          echo "::error::Playwright chromium download failed after 3 attempts"
+          exit 1
 
       - name: Run e2e smoke
         run: pnpm run test:e2e
