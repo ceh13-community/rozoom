@@ -69,8 +69,21 @@ jobs:
       - name: Build web app
         run: pnpm run build
 
-      - name: Install Playwright (Chromium)
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('dashboard-app/pnpm-lock.yaml') }}
+
+      - name: Install Playwright system deps
+        timeout-minutes: 6
+        run: pnpm exec playwright install-deps chromium
+
+      - name: Install Playwright browser (Chromium)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 6
+        run: pnpm exec playwright install chromium
 
       - name: Run e2e smoke
         run: pnpm run test:e2e
