@@ -385,6 +385,48 @@ export function isConnectionError(raw: string): boolean {
   );
 }
 
+export type OverviewReachability = {
+  /** True when a live cluster probe failed with a connection-level error. */
+  unreachable: boolean;
+  /** The raw error that triggered the unreachable verdict, if any. */
+  error: string | null;
+  /** Human-friendly title/detail for the unreachable banner. */
+  alert: { title: string; detail: string } | null;
+};
+
+/**
+ * Pick the first connection-level error from a set of live overview probe
+ * errors (events, usage, access, ...). Cached health checks return the last
+ * stored "healthy" snapshot without an error when the cluster is unreachable,
+ * so the unreachable signal has to come from the live probes instead.
+ */
+export function pickClusterConnectionError(
+  errors: Array<string | null | undefined>,
+): string | null {
+  for (const error of errors) {
+    if (typeof error === "string" && error.length > 0 && isConnectionError(error)) {
+      return error;
+    }
+  }
+  return null;
+}
+
+/**
+ * Decide whether the cluster is unreachable from the current live probe errors,
+ * so the Overview stops presenting a stale, cached health score as if it were
+ * live state. Keeps the trust-critical verdict pure and unit-testable.
+ */
+export function buildOverviewReachability(
+  errors: Array<string | null | undefined>,
+): OverviewReachability {
+  const error = pickClusterConnectionError(errors);
+  return {
+    unreachable: error !== null,
+    error,
+    alert: error ? humanizeClusterError(error) : null,
+  };
+}
+
 export function humanizeClusterError(raw: string): { title: string; detail: string } {
   const lower = raw.toLowerCase();
   if (
