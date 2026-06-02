@@ -71,6 +71,7 @@
   import {
     buildChangeSinceLastCheck,
     buildHealthTimeline,
+    buildOverviewReachability,
     buildOverviewSafeActions,
     buildOverviewTopRisks,
     captureOverviewHealthHistoryEntry,
@@ -1716,9 +1717,37 @@
       `Sync every ${overviewSyncSeconds}s. Events and certificates refresh independently.`
     );
   });
+  // F1: a stale cached health check still reads "healthy" while the cluster is
+  // unreachable. Derive the unreachable verdict from the live probe errors so we
+  // can warn the user instead of silently presenting last-known state as live.
+  const overviewReachability = $derived(
+    buildOverviewReachability([
+      eventsError,
+      certificatesError,
+      usageMetricsError,
+      accessProfileError,
+      clusterHealthError,
+    ]),
+  );
+  const clusterUnreachableSinceLabel = $derived.by(() => {
+    const at = overviewLastUpdatedAt ?? cachedOverviewAt;
+    const rel = formatRelativeTime(at);
+    return rel ? `Showing last known state from ${rel}.` : "Showing last known state.";
+  });
 </script>
 
 {#if data.overview || showingCachedOverview}
+  {#if overviewReachability.unreachable && overviewReachability.alert}
+    <div class="mb-3" data-testid="overview-cluster-unreachable">
+      <Alert.Root variant="destructive">
+        <Alert.Title>{overviewReachability.alert.title}</Alert.Title>
+        <Alert.Description>
+          {overviewReachability.alert.detail}
+          {clusterUnreachableSinceLabel} Health below may be stale.
+        </Alert.Description>
+      </Alert.Root>
+    </div>
+  {/if}
   <div class="mb-3">
     <SectionRuntimeStatus
       sectionLabel="Overview Runtime Status"
@@ -1764,6 +1793,13 @@
       >
         Cached · {formatRelativeTime(cachedOverviewAt) ?? "just now"} · Refreshing<LoadingDots />
       </span>
+    {:else if overviewReachability.unreachable}
+      <span
+        class="rounded border border-red-300/70 bg-red-50 px-2 py-1 text-[11px] text-red-800"
+        data-testid="overview-unreachable-chip"
+      >
+        Unreachable · last known {liveUpdatedLabel ?? "—"}
+      </span>
     {:else if overviewLastUpdatedAt}
       <span
         class="rounded border border-emerald-300/70 bg-emerald-50 px-2 py-1 text-[11px] text-emerald-800"
@@ -1799,6 +1835,15 @@
         <Alert.Description>{clusterHealthError}</Alert.Description>
       </Alert.Root>
     {:else}
+      {#if overviewReachability.unreachable}
+        <div
+          class="mb-2 rounded border border-amber-300/70 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-800"
+          role="status"
+          data-testid="overview-health-stale-notice"
+        >
+          Cluster unreachable — this score reflects the last successful check, not live state.
+        </div>
+      {/if}
       <div class="grid items-start gap-4 lg:grid-cols-2">
         <ClusterHealthScore checks={clusterHealth} />
         <ClusterScore checks={clusterHealth} />

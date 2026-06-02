@@ -3,6 +3,7 @@ import type { ClusterHealthChecks } from "$features/check-health/model/types";
 import {
   buildChangeSinceLastCheck,
   buildHealthTimeline,
+  buildOverviewReachability,
   buildOverviewSafeActions,
   buildOverviewTopRisks,
   buildPrimaryAlert,
@@ -10,6 +11,7 @@ import {
   humanizeClusterError,
   isAuthError,
   isConnectionError,
+  pickClusterConnectionError,
 } from "./overview-diagnostics";
 
 function makeChecks(overrides?: Partial<ClusterHealthChecks>): ClusterHealthChecks {
@@ -355,6 +357,59 @@ describe("overview-diagnostics", () => {
     it("recognizes OIDC flows", () => {
       expect(isAuthError("oidc: token is expired")).toBe(true);
       expect(isAuthError("could not find client credentials")).toBe(true);
+    });
+  });
+
+  describe("pickClusterConnectionError", () => {
+    it("returns the first connection-level error, ignoring nullish and non-connection entries", () => {
+      expect(
+        pickClusterConnectionError([
+          null,
+          undefined,
+          "",
+          "dial tcp 10.0.0.1:6443: connect: connection refused",
+        ]),
+      ).toBe("dial tcp 10.0.0.1:6443: connect: connection refused");
+    });
+
+    it("ignores benign workload errors", () => {
+      expect(
+        pickClusterConnectionError([null, "pod is in CrashLoopBackOff", "metrics unavailable"]),
+      ).toBe(null);
+    });
+
+    it("returns null for an all-clear set", () => {
+      expect(pickClusterConnectionError([null, undefined, ""])).toBe(null);
+    });
+  });
+
+  describe("buildOverviewReachability (F1 trust-bug)", () => {
+    it("flags the cluster unreachable when a live probe reports a connection error", () => {
+      // The cached health score still reads "healthy" (clusterHealthError null),
+      // but the live events probe fails — the user must be warned, not misled.
+      const result = buildOverviewReachability([
+        "ECONNREFUSED 127.0.0.1:6443",
+        null,
+        null,
+        null,
+        null,
+      ]);
+      expect(result.unreachable).toBe(true);
+      expect(result.error).toBe("ECONNREFUSED 127.0.0.1:6443");
+      expect(result.alert?.title).toBe("Cluster unreachable");
+    });
+
+    it("does not flag unreachable for healthy/benign errors", () => {
+      const result = buildOverviewReachability([null, "pod is in CrashLoopBackOff", null]);
+      expect(result.unreachable).toBe(false);
+      expect(result.error).toBe(null);
+      expect(result.alert).toBe(null);
+    });
+
+    it("surfaces a TLS/cert failure with the matching humanized alert", () => {
+      const result = buildOverviewReachability(["x509: certificate signed by unknown authority"]);
+      expect(result.unreachable).toBe(true);
+      expect(result.alert?.title).toBe("TLS/certificate error");
     });
   });
 });
