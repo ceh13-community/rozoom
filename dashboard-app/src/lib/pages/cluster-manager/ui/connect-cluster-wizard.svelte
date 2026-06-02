@@ -749,7 +749,7 @@ users:
               <Cloud size={14} /> Auto-detected from local credentials
             </p>
             <p class="text-[10px] text-slate-500 mt-0.5">
-              Scanning {$detectedCloudConfigs.map((c) => c.provider).join(", ")}
+              Scanning {[...new Set($detectedCloudConfigs.map((c) => c.provider))].join(", ")}
               {autoLoading ? "..." : ""}
             </p>
           </div>
