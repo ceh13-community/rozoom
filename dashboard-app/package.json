@@ -1,5 +1,5 @@
 {
-  "version": "0.22.0",
+  "version": "0.22.1",
   "description": "",
   "type": "module",
   "scripts": {
@@ -123,3 +123,4 @@
     "vitest": "^4.0.15"
   }
 }
+
