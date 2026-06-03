@@ -17,8 +17,11 @@ defaults:
     working-directory: ./dashboard-app
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Scope the group by event so a push to main can't cancel a manual
+  # release build (workflow_dispatch) running on the same ref.
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  # Never auto-cancel manual release runs; only supersede push/PR runs.
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 permissions:
   contents: read
