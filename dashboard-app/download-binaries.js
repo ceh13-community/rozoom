@@ -2244,6 +2244,27 @@ async function assertSidecarsPresent() {
    Runner
 ======================= */
 
+// Flipped true only after the full provisioning run reaches the end. The
+// beforeExit guard below treats any natural process exit before this as a
+// silent half-run and fails loudly.
+let runnerCompleted = false;
+
+// Root cause of the v0.22.1 Win/Linux failures: a resource/extract install
+// (helm, aws, az, …) can leave a pending promise that never settles while every
+// active handle drains — Node then exits 0 mid-run, skipping
+// prefixSidecarBinaries()/assertSidecarsPresent() and shipping no sidecars, so
+// the tauri build later dies on a missing rozoom-<tool>-<triple>. `beforeExit`
+// fires exactly on that natural drain (never on an explicit process.exit), so
+// it is the catch-all backstop for the silent half-run.
+process.on("beforeExit", (code) => {
+  if (!runnerCompleted) {
+    console.error(
+      `❌ download-binaries exited before completion (silent stall, exit ${code}); no sidecars were provisioned.`,
+    );
+    process.exit(1);
+  }
+});
+
 (async () => {
   await fs.mkdir(TARGET_DIR, { recursive: true });
 
@@ -2255,7 +2276,12 @@ async function assertSidecarsPresent() {
     console.log("ℹ️ All tools enabled (set VITE_ROZOOM_TOOLS to limit)\n");
   }
 
-  const run = (name, fn) => (isToolEnabled(name) ? fn() : null);
+  // Bound every core install with the same timer-backed timeout used for
+  // resource steps. The live timer keeps the event loop alive (preventing the
+  // silent drain-exit), and a genuinely hung download/extract rejects loudly
+  // after the timeout → top-level catch → exit 1, instead of exiting 0 mid-run.
+  const run = (name, fn) =>
+    isToolEnabled(name) ? withTimeout(fn(), RESOURCE_STEP_TIMEOUT_MS, name) : null;
 
   await run("kubectl", installKubectl);
   await run("helm", installHelm);
@@ -2295,6 +2321,7 @@ async function assertSidecarsPresent() {
 
   await copyManifestToStatic();
 
+  runnerCompleted = true;
   console.log("\n✅ All done");
 })().catch((e) => {
   console.error("❌ Failed:", e.message);
