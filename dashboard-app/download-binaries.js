@@ -8,6 +8,7 @@ import os from "os";
 import process from "process";
 import crypto from "crypto";
 import { setTimeout as sleep } from "timers/promises";
+import { setTimeout as setTimer, clearTimeout as clearTimer } from "timers";
 import extractZip from "extract-zip";
 import console from "console";
 
@@ -2181,6 +2182,65 @@ async function prefixSidecarBinaries() {
 }
 
 /* =======================
+   Resource step resilience
+======================= */
+
+// aws-dist / az-dist are installed via extract-zip + fs.cp, which can stall
+// silently in CI. A never-settling await lets Node drain the event loop and
+// exit 0 mid-step — skipping prefixSidecarBinaries() — so the build later dies
+// on a missing `rozoom-<tool>-<triple>` sidecar. Bound these steps with a timer
+// (which keeps the loop alive) and fall back to the same stub macOS ships.
+const RESOURCE_STEP_TIMEOUT_MS = 120_000;
+
+async function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimer(() => reject(new Error(`step timed out after ${ms}ms: ${label}`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimer(timer);
+  }
+}
+
+// Run an optional resource install (aws-dist, az-dist). A failure or stall here
+// must never abort sidecar provisioning — degrade to a stub and continue.
+async function runResource(name, fn, stubDir) {
+  if (!isToolEnabled(name)) return;
+  try {
+    await withTimeout(fn(), RESOURCE_STEP_TIMEOUT_MS, name);
+  } catch (e) {
+    console.warn(
+      `⚠️ ${name} install failed (${e?.message ?? e}); falling back to stub ${stubDir}/`,
+    );
+    await ensureResourceStub(stubDir);
+  }
+}
+
+// Fail loudly at the download step (not 5 min later in cargo) if any required
+// externalBin sidecar is missing for this target triple.
+async function assertSidecarsPresent() {
+  const triple = getTargetTriple();
+  const ext = os.platform() === "win32" ? ".exe" : "";
+  const required = SIDECAR_TOOLS.filter((t) => isToolEnabled(t)).map(
+    (t) => `rozoom-${t}-${triple}${ext}`,
+  );
+  if (isToolEnabled("az")) required.push(`rozoom-az-cli-${triple}${ext}`);
+
+  const missing = [];
+  for (const f of required) {
+    if (!(await fileExists(path.join(TARGET_DIR, f)))) missing.push(f);
+  }
+  if (missing.length) {
+    console.error(`❌ Missing ${missing.length} sidecar binaries after provisioning:`);
+    for (const m of missing) console.error(`   - ${m}`);
+    process.exit(1);
+  }
+  console.log(`✓ verified ${required.length} sidecar binaries for ${triple}`);
+}
+
+/* =======================
    Runner
 ======================= */
 
@@ -2205,7 +2265,7 @@ async function prefixSidecarBinaries() {
   // gcloud SDK not bundled due to Google Cloud SDK ToS restrictions.
   // Users install gcloud separately. Only gke-gcloud-auth-plugin (Apache 2.0) is referenced.
   // await run("gcloud", installGcloudArchive);
-  await run("aws", installAws);
+  await runResource("aws", installAws, "aws-dist");
   await run("kustomize", installKustomize);
   await run("kubeconform", installKubeconform);
   await run("stern", installStern);
@@ -2213,7 +2273,7 @@ async function prefixSidecarBinaries() {
   await run("hcloud", installHcloud);
   await run("oc", installOc);
 
-  await run("az", installAzCli);
+  await runResource("az", installAzCli, "az-dist");
   await run("curl", installCurl);
   await run("doggo", installDoggo);
   await run("grpcurl", installGrpcurl);
@@ -2228,6 +2288,10 @@ async function prefixSidecarBinaries() {
 
   // Prefix all sidecar binaries with "rozoom-" to avoid /usr/bin conflicts
   await prefixSidecarBinaries();
+
+  // Hard gate: every required sidecar must exist for this triple before we hand
+  // off to the tauri build, which fails opaquely on the first missing one.
+  await assertSidecarsPresent();
 
   await copyManifestToStatic();
 
