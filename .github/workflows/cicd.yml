@@ -84,22 +84,30 @@ jobs:
         run: pnpm exec playwright install-deps chromium
 
       - name: Install Playwright browser (Chromium)
+        id: chromium_install
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         timeout-minutes: 12
         # cdn.playwright.dev download can stall mid-transfer; a hung
         # connection never errors on its own, so bound each attempt with
-        # `timeout` and retry on a fresh connection.
+        # `timeout` and retry on a fresh connection. The download failing is an
+        # infra/CDN problem, not a code regression — after 3 attempts emit a
+        # warning and skip the smoke (this job is already non-blocking) instead
+        # of a red ❌ that reads like a test failure.
         run: |
           for attempt in 1 2 3; do
             echo "Chromium download attempt $attempt/3"
-            timeout 180 pnpm exec playwright install chromium && exit 0
+            timeout 180 pnpm exec playwright install chromium && {
+              echo "available=true" >> "$GITHUB_OUTPUT"; exit 0;
+            }
             echo "attempt $attempt stalled or failed; retrying"
             sleep 5
           done
-          echo "::error::Playwright chromium download failed after 3 attempts"
-          exit 1
+          echo "::warning::Playwright chromium download failed after 3 attempts (CDN/infra); skipping e2e smoke — non-blocking."
+          echo "available=false" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Run e2e smoke
+        if: steps.chromium_install.outputs.available != 'false'
         run: pnpm run test:e2e
 
       - name: Upload Playwright report
