@@ -293,6 +293,32 @@ async function extractTarGz(source, destDir) {
   execSync(`tar -xzf "${source}" -C "${destDir}" --no-same-owner`, { stdio: "inherit" });
 }
 
+// extract-zip (yauzl) intermittently hangs on Windows CI runners — a never-
+// settling await that silently stalled sidecar provisioning (helm timed out on
+// every Windows release build). On Windows, extract via bsdtar (`tar -xf`, ships
+// on GitHub windows runners and reads .zip) — synchronous and reliable, same as
+// extractTarGz. On Linux/macOS extract-zip is fine and stays. Drop-in signature
+// match for extractZip so all call sites just swap the name.
+async function extractZipSafe(source, opts) {
+  const destDir = opts.dir;
+  await fs.mkdir(destDir, { recursive: true });
+  if (os.platform() === "win32") {
+    // bsdtar ships as tar.exe on GitHub windows runners and reads .zip. Fall
+    // back to PowerShell Expand-Archive if tar is unexpectedly unavailable —
+    // both are native and synchronous, so neither can hang like yauzl.
+    try {
+      execSync(`tar -xf "${source}" -C "${destDir}"`, { stdio: "inherit" });
+    } catch {
+      execSync(
+        `powershell -NoProfile -NonInteractive -Command "Expand-Archive -LiteralPath '${source}' -DestinationPath '${destDir}' -Force"`,
+        { stdio: "inherit" },
+      );
+    }
+    return;
+  }
+  return extractZip(source, { dir: destDir });
+}
+
 async function rmForce(p) {
   await fs.rm(p, { recursive: true, force: true }).catch(() => {});
 }
@@ -626,7 +652,7 @@ async function installHelm() {
     await rmForce(extractDir);
     await fs.mkdir(extractDir, { recursive: true });
 
-    if (ext === "zip") await extractZip(tmp, { dir: extractDir });
+    if (ext === "zip") await extractZipSafe(tmp, { dir: extractDir });
     else await extractTarGz(tmp, extractDir);
 
     const helmBin = path.join(
@@ -737,7 +763,7 @@ async function installDoctl() {
     await rmForce(extractDir);
     await fs.mkdir(extractDir, { recursive: true });
 
-    if (ext === "zip") await extractZip(tmp, { dir: extractDir });
+    if (ext === "zip") await extractZipSafe(tmp, { dir: extractDir });
     else await extractTarGz(tmp, extractDir);
 
     const candidate = path.join(extractDir, platform === "win32" ? "doctl.exe" : "doctl");
@@ -858,7 +884,7 @@ async function installPluto() {
     await fs.mkdir(extractDir, { recursive: true });
 
     if (tmp.endsWith(".zip")) {
-      await extractZip(tmp, { dir: extractDir });
+      await extractZipSafe(tmp, { dir: extractDir });
     } else {
       await extractTarGz(tmp, extractDir);
     }
@@ -1304,7 +1330,7 @@ async function installAws() {
     await rmForce(extractDir);
     await fs.mkdir(extractDir, { recursive: true });
 
-    await extractZip(tmpZip, { dir: extractDir });
+    await extractZipSafe(tmpZip, { dir: extractDir });
 
     const awsDistDir = path.join(TARGET_DIR, "aws-dist");
     await rmForce(awsDistDir);
@@ -1460,7 +1486,7 @@ async function installGhReleaseTool({
       await fs.mkdir(extractDir, { recursive: true });
 
       if (tmp.endsWith(".zip")) {
-        await extractZip(tmp, { dir: extractDir });
+        await extractZipSafe(tmp, { dir: extractDir });
       } else {
         await extractTarGz(tmp, extractDir);
       }
@@ -1839,7 +1865,7 @@ async function installDoggo() {
     }
     await rmForce(extractDir);
     await fs.mkdir(extractDir, { recursive: true });
-    if (tmp.endsWith(".zip")) await extractZip(tmp, { dir: extractDir });
+    if (tmp.endsWith(".zip")) await extractZipSafe(tmp, { dir: extractDir });
     else await extractTarGz(tmp, extractDir);
 
     const bin = await locateBinaryInExtractDir(extractDir, [`doggo${ext}`, "doggo"]);
@@ -1907,7 +1933,7 @@ async function installGrpcurl() {
     }
     await rmForce(extractDir);
     await fs.mkdir(extractDir, { recursive: true });
-    if (tmp.endsWith(".zip")) await extractZip(tmp, { dir: extractDir });
+    if (tmp.endsWith(".zip")) await extractZipSafe(tmp, { dir: extractDir });
     else await extractTarGz(tmp, extractDir);
 
     const bin = await locateBinaryInExtractDir(extractDir, [`grpcurl${ext}`, "grpcurl"]);
@@ -2106,7 +2132,7 @@ async function installTrivy() {
     }
     await rmForce(extractDir);
     await fs.mkdir(extractDir, { recursive: true });
-    if (tmp.endsWith(".zip")) await extractZip(tmp, { dir: extractDir });
+    if (tmp.endsWith(".zip")) await extractZipSafe(tmp, { dir: extractDir });
     else await extractTarGz(tmp, extractDir);
 
     const bin = await locateBinaryInExtractDir(extractDir, [`trivy${ext}`, "trivy"]);
