@@ -78,6 +78,7 @@
     "extract-zip": "^2.0.1",
     "js-yaml": "^4.1.0",
     "lodash": "^4.17.21",
+    "posthog-js": "^1.383.3",
     "tauri-plugin-cache-api": "^0.1.5",
     "unzipper": "^0.12.3"
   },
