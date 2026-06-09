@@ -11,6 +11,7 @@
   } from "$features/check-health/model/cert-notification-watcher";
   import { sweepHelmValuesTempfiles } from "$shared/api/helm";
   import { loadPluginState } from "$shared/plugins";
+  import { initAnalytics } from "$shared/analytics/wau-c";
   import SplashScreen from "$shared/ui/splash-screen.svelte";
 
   import "$lib/app/styles/index.css";
@@ -30,6 +31,9 @@
   }
 
   onMount(() => {
+    // WAU-C telemetry. No-ops without a PUBLIC_POSTHOG_KEY or when the user has
+    // opted out / sent Do Not Track — see $shared/analytics. Never throws.
+    initAnalytics();
     const cleanupCliNotifications = initCliNotifications();
     startCertNotificationWatcher();
     // Best-effort sweep of stale helm-values-*.yaml tempfiles left by crashed
