@@ -77,6 +77,11 @@ export default defineConfig(async ({ mode }) => {
         "@sentry/sveltekit": fileURLToPath(
           new URL("./src/test/mocks/sentry-sveltekit.ts", import.meta.url),
         ),
+        // $env/dynamic/public needs the kit runtime and throws under vitest;
+        // analytics modules import it transitively via kubectl-proxy.
+        "$env/dynamic/public": fileURLToPath(
+          new URL("./src/test/mocks/env-dynamic-public.ts", import.meta.url),
+        ),
       },
     },
     build: {
