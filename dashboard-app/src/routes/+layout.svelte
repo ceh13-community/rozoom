@@ -12,6 +12,7 @@
   import { sweepHelmValuesTempfiles } from "$shared/api/helm";
   import { loadPluginState } from "$shared/plugins";
   import { initAnalytics } from "$shared/analytics/wau-c";
+  import { maybeShowTelemetryNotice } from "$shared/analytics/telemetry-notice";
   import SplashScreen from "$shared/ui/splash-screen.svelte";
 
   import "$lib/app/styles/index.css";
@@ -34,6 +35,8 @@
     // WAU-C telemetry. No-ops without a PUBLIC_POSTHOG_KEY or when the user has
     // opted out / sent Do Not Track — see $shared/analytics. Never throws.
     initAnalytics();
+    // One-time disclosure that telemetry is on, with an inline opt-out.
+    maybeShowTelemetryNotice();
     const cleanupCliNotifications = initCliNotifications();
     startCertNotificationWatcher();
     // Best-effort sweep of stale helm-values-*.yaml tempfiles left by crashed

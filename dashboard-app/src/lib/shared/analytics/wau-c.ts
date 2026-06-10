@@ -36,7 +36,7 @@ export function initAnalytics(): void {
 
   try {
     posthog.init(key, {
-      api_host: env.PUBLIC_POSTHOG_HOST?.trim() || "https://eu.i.posthog.com",
+      api_host: env.PUBLIC_POSTHOG_HOST?.trim() || "https://us.i.posthog.com",
       autocapture: false,
       capture_pageview: false,
       capture_pageleave: false,
@@ -56,6 +56,9 @@ export function initAnalytics(): void {
  */
 export async function trackCoreAction(event: CoreAction, clusterId: string): Promise<void> {
   if (!initialized) return;
+  // Re-check consent on every emit so an opt-out made after init (e.g. via the
+  // first-run notice) takes effect immediately, not on the next reload.
+  if (!isTelemetryEnabled()) return;
   try {
     const installId = getInstallId();
     const userHash = await computeAnonymousHash(clusterId, installId);
