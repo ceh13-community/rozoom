@@ -28,6 +28,7 @@
   import DetailsEventsList from "../common/details-events-list.svelte";
   import DetailsExplainState from "../common/details-explain-state.svelte";
   import DetailsSheetPortal from "$shared/ui/details-sheet-portal.svelte";
+  import { trackCoreAction } from "$shared/analytics/wau-c";
 
   interface PodDetailsSheetProps {
     data: Writable<Partial<PodItem> | null>;
@@ -128,8 +129,9 @@
   function getControlledBy() {
     const metadata = ($data?.metadata as PodMetadataLike | undefined) ?? undefined;
     const owner =
-      metadata?.ownerReferences?.find((reference) => (reference as { controller?: boolean }).controller) ??
-      metadata?.ownerReferences?.[0];
+      metadata?.ownerReferences?.find(
+        (reference) => (reference as { controller?: boolean }).controller,
+      ) ?? metadata?.ownerReferences?.[0];
     if (!owner?.kind || !owner.name) return "-";
     return `${owner.kind} ${owner.name}`;
   }
@@ -137,8 +139,9 @@
   function getPodIpList() {
     const status = ($data?.status as PodStatusLike | undefined) ?? undefined;
     const ips =
-      status?.podIPs?.map((entry: { ip?: string }) => entry.ip).filter((value): value is string => Boolean(value)) ??
-      [];
+      status?.podIPs
+        ?.map((entry: { ip?: string }) => entry.ip)
+        .filter((value): value is string => Boolean(value)) ?? [];
     if (ips.length > 0) return ips;
     const primary = status?.podIP;
     return primary ? [primary] : [];
@@ -177,6 +180,19 @@
     });
   }
 
+  // WAU-C Core Action #2: fire once per sheet opening. Plain (non-reactive)
+  // flag on purpose — a $state flag read here would retrigger the effect.
+  let detailOpenTracked = false;
+  $effect(() => {
+    const open = $isOpen && Boolean($data);
+    if (open && !detailOpenTracked && clusterId) {
+      detailOpenTracked = true;
+      void trackCoreAction("rozoom_workload_detail_opened", clusterId);
+    } else if (!open) {
+      detailOpenTracked = false;
+    }
+  });
+
   $effect(() => {
     const selected = $data;
     const open = $isOpen;
@@ -208,234 +224,254 @@
 </script>
 
 {#if $isOpen && $data}
-<DetailsSheetPortal open={$isOpen} onClose={closeDetails} closeAriaLabel="Close pod details">
-      <DetailsSheetHeader
-        title="Pod"
-        name={$data.metadata?.name ?? "-"}
-        icon={Info}
-        onClose={closeDetails}
-        closeAriaLabel="Close pod details"
-        actions={[
-          {
-            id: "shell",
-            title: "Shell",
-            ariaLabel: "Open pod shell",
-            icon: Terminal,
-            onClick: () => {
-              void runAction(onShell);
-            },
+  <DetailsSheetPortal open={$isOpen} onClose={closeDetails} closeAriaLabel="Close pod details">
+    <DetailsSheetHeader
+      title="Pod"
+      name={$data.metadata?.name ?? "-"}
+      icon={Info}
+      onClose={closeDetails}
+      closeAriaLabel="Close pod details"
+      actions={[
+        {
+          id: "shell",
+          title: "Shell",
+          ariaLabel: "Open pod shell",
+          icon: Terminal,
+          onClick: () => {
+            void runAction(onShell);
           },
-          {
-            id: "attach",
-            title: "Attach pod",
-            ariaLabel: "Attach to pod",
-            icon: Plug,
-            onClick: () => {
-              void runAction(onAttach);
-            },
+        },
+        {
+          id: "attach",
+          title: "Attach pod",
+          ariaLabel: "Attach to pod",
+          icon: Plug,
+          onClick: () => {
+            void runAction(onAttach);
           },
-          {
-            id: "logs",
-            title: "Logs",
-            ariaLabel: "Open pod logs",
-            icon: ScrollText,
-            onClick: () => {
-              void runAction(onLogs);
-            },
+        },
+        {
+          id: "logs",
+          title: "Logs",
+          ariaLabel: "Open pod logs",
+          icon: ScrollText,
+          onClick: () => {
+            void runAction(onLogs);
           },
-          {
-            id: "previous-logs",
-            title: "Previous logs",
-            ariaLabel: "Open previous pod logs",
-            icon: RotateCcw,
-            onClick: () => {
-              void runAction(onPreviousLogs);
-            },
+        },
+        {
+          id: "previous-logs",
+          title: "Previous logs",
+          ariaLabel: "Open previous pod logs",
+          icon: RotateCcw,
+          onClick: () => {
+            void runAction(onPreviousLogs);
           },
-          ...(onEvents
-            ? [
-                {
-                  id: "events",
-                  title: "Events",
-                  ariaLabel: "Open pod events",
-                  icon: Activity,
-                  onClick: () => {
-                    void runAction(onEvents);
-                  },
+        },
+        ...(onEvents
+          ? [
+              {
+                id: "events",
+                title: "Events",
+                ariaLabel: "Open pod events",
+                icon: Activity,
+                onClick: () => {
+                  void runAction(onEvents);
                 },
-              ]
-            : []),
-          {
-            id: "yaml",
-            title: "Edit YAML",
-            ariaLabel: "Edit pod YAML",
-            icon: Pencil,
-            onClick: () => {
-              void runAction(onEditYaml);
-            },
+              },
+            ]
+          : []),
+        {
+          id: "yaml",
+          title: "Edit YAML",
+          ariaLabel: "Edit pod YAML",
+          icon: Pencil,
+          onClick: () => {
+            void runAction(onEditYaml);
           },
-          {
-            id: "investigate",
-            title: "Investigate",
-            ariaLabel: "Investigate pod",
-            icon: Search,
-            onClick: () => {
-              void runAction(onInvestigate);
-            },
+        },
+        {
+          id: "investigate",
+          title: "Investigate",
+          ariaLabel: "Investigate pod",
+          icon: Search,
+          onClick: () => {
+            void runAction(onInvestigate);
           },
-          {
-            id: "describe",
-            title: "Copy kubectl describe",
-            ariaLabel: "Copy kubectl describe",
-            icon: ClipboardList,
-            onClick: () => {
-              void runAction(onCopyDescribe);
-            },
+        },
+        {
+          id: "describe",
+          title: "Copy kubectl describe",
+          ariaLabel: "Copy kubectl describe",
+          icon: ClipboardList,
+          onClick: () => {
+            void runAction(onCopyDescribe);
           },
-          {
-            id: "debug-describe",
-            title: "Run debug describe",
-            ariaLabel: "Run debug describe",
-            icon: Bug,
-            onClick: () => {
-              void runAction(onRunDebugDescribe);
-            },
+        },
+        {
+          id: "debug-describe",
+          title: "Run debug describe",
+          ariaLabel: "Run debug describe",
+          icon: Bug,
+          onClick: () => {
+            void runAction(onRunDebugDescribe);
           },
-          {
-            id: "debug",
-            title: "Copy kubectl debug",
-            ariaLabel: "Copy kubectl debug",
-            icon: Copy,
-            onClick: () => {
-              void runAction(onCopyDebug);
-            },
+        },
+        {
+          id: "debug",
+          title: "Copy kubectl debug",
+          ariaLabel: "Copy kubectl debug",
+          icon: Copy,
+          onClick: () => {
+            void runAction(onCopyDebug);
           },
-          ...(onDownloadYaml
-            ? [
-                {
-                  id: "download-yaml",
-                  title: "Download YAML",
-                  ariaLabel: "Download pod YAML",
-                  icon: FileDown,
-                  onClick: () => {
-                    void runAction(onDownloadYaml);
-                  },
+        },
+        ...(onDownloadYaml
+          ? [
+              {
+                id: "download-yaml",
+                title: "Download YAML",
+                ariaLabel: "Download pod YAML",
+                icon: FileDown,
+                onClick: () => {
+                  void runAction(onDownloadYaml);
                 },
-              ]
-            : []),
-          ...(onExportIncident
-            ? [
-                {
-                  id: "export-incident",
-                  title: "Export incident",
-                  ariaLabel: "Export pod incident report",
-                  icon: TriangleAlert,
-                  onClick: () => {
-                    void runAction(onExportIncident);
-                  },
+              },
+            ]
+          : []),
+        ...(onExportIncident
+          ? [
+              {
+                id: "export-incident",
+                title: "Export incident",
+                ariaLabel: "Export pod incident report",
+                icon: TriangleAlert,
+                onClick: () => {
+                  void runAction(onExportIncident);
                 },
-              ]
-            : []),
-          {
-            id: "evict",
-            title: "Evict pod",
-            ariaLabel: "Evict pod",
-            icon: UserX,
-            onClick: () => {
-              void runAction(onEvict);
-            },
+              },
+            ]
+          : []),
+        {
+          id: "evict",
+          title: "Evict pod",
+          ariaLabel: "Evict pod",
+          icon: UserX,
+          onClick: () => {
+            void runAction(onEvict);
           },
-          {
-            id: "delete",
-            title: "Delete pod",
-            ariaLabel: "Delete pod",
-            icon: Trash,
-            destructive: true,
-            onClick: () => {
-              void runAction(onDelete);
-            },
+        },
+        {
+          id: "delete",
+          title: "Delete pod",
+          ariaLabel: "Delete pod",
+          icon: Trash,
+          destructive: true,
+          onClick: () => {
+            void runAction(onDelete);
           },
+        },
+      ]}
+    />
+
+    <div class="flex-1 overflow-y-auto p-4">
+      {#if $data.metadata?.name}
+        <ResourceMetricsBadge
+          {clusterId}
+          resourceRef={`${$data.metadata?.namespace ?? "default"}/${$data.metadata.name}`}
+          resourceType="pod"
+        />
+      {/if}
+      <ResourceTrafficChain
+        {clusterId}
+        resourceKind="Pod"
+        resourceName={$data.metadata?.name ?? ""}
+        resourceNamespace={$data.metadata?.namespace ?? "default"}
+        raw={$data as unknown as Record<string, unknown>}
+      />
+      <h3 class="mt-4 mb-2 flex items-center gap-2 font-bold">
+        <Info class="h-4 w-4 text-muted-foreground" />
+        Properties
+      </h3>
+      <DetailsMetadataGrid
+        contextKey={`${$data.metadata?.namespace ?? "default"}/${$data.metadata?.name ?? "-"}`}
+        fields={[
+          { label: "Namespace", value: $data.metadata?.namespace ?? "default" },
+          { label: "Status", value: getStringPodStatus($data as PodItem) },
+          { label: "Node", value: $data.spec?.nodeName ?? "-" },
+          { label: "Created", value: getCreatedLabel() },
+          { label: "Controlled By", value: getControlledBy() },
+          {
+            label: "Service Account",
+            value: ($data.spec as PodSpecLike | undefined)?.serviceAccountName ?? "-",
+          },
+          { label: "Pod IPs", lines: getPodIpList(), colSpan: 2 },
         ]}
+        labels={Object.entries($data.metadata?.labels ?? {})}
+        annotations={Object.entries(
+          (($data.metadata as PodMetadataLike | undefined)?.annotations ?? {}) as Record<
+            string,
+            string
+          >,
+        )}
       />
 
-      <div class="flex-1 overflow-y-auto p-4">
-        {#if $data.metadata?.name}
-          <ResourceMetricsBadge {clusterId} resourceRef={`${$data.metadata?.namespace ?? "default"}/${$data.metadata.name}`} resourceType="pod" />
-        {/if}
-        <ResourceTrafficChain
-          {clusterId}
-          resourceKind="Pod"
-          resourceName={$data.metadata?.name ?? ""}
-          resourceNamespace={$data.metadata?.namespace ?? "default"}
-          raw={$data as unknown as Record<string, unknown>}
-        />
-        <h3 class="mt-4 mb-2 flex items-center gap-2 font-bold">
-          <Info class="h-4 w-4 text-muted-foreground" />
-          Properties
-        </h3>
-        <DetailsMetadataGrid
-          contextKey={`${$data.metadata?.namespace ?? "default"}/${$data.metadata?.name ?? "-"}`}
-          fields={[
-            { label: "Namespace", value: $data.metadata?.namespace ?? "default" },
-            { label: "Status", value: getStringPodStatus($data as PodItem) },
-            { label: "Node", value: $data.spec?.nodeName ?? "-" },
-            { label: "Created", value: getCreatedLabel() },
-            { label: "Controlled By", value: getControlledBy() },
-            { label: "Service Account", value: ($data.spec as PodSpecLike | undefined)?.serviceAccountName ?? "-" },
-            { label: "Pod IPs", lines: getPodIpList(), colSpan: 2 },
-          ]}
-          labels={Object.entries($data.metadata?.labels ?? {})}
-          annotations={Object.entries((($data.metadata as PodMetadataLike | undefined)?.annotations ?? {}) as Record<string, string>)}
-        />
+      {#if metricsError}
+        <div
+          class="mt-3 rounded border border-dashed border-border px-4 py-3 text-sm text-muted-foreground"
+        >
+          {metricsError}
+        </div>
+      {/if}
 
-        {#if metricsError}
-          <div class="mt-3 rounded border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-            {metricsError}
+      <DetailsExplainState
+        sourceState={runtimeSourceState}
+        profileLabel={runtimeProfileLabel}
+        lastUpdatedLabel={runtimeLastUpdatedLabel}
+        detail={runtimeDetail}
+        reason={runtimeReason}
+        requestPath={runtimeRequestPath}
+        describeCommand={getDescribeCommand()}
+        syncError={runtimeSyncError}
+      />
+
+      <h3 class="my-4 font-bold">Containers</h3>
+      {#if getContainerRows().length === 0}
+        <div
+          class="rounded border border-dashed border-border px-4 py-3 text-sm text-muted-foreground"
+        >
+          No containers found.
+        </div>
+      {:else}
+        <div class="overflow-hidden rounded border border-border">
+          <div
+            class="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] gap-3 border-b border-border px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+          >
+            <div>Name</div>
+            <div>Image</div>
+            <div>Ready</div>
+            <div>Restarts</div>
           </div>
-        {/if}
-
-        <DetailsExplainState
-          sourceState={runtimeSourceState}
-          profileLabel={runtimeProfileLabel}
-          lastUpdatedLabel={runtimeLastUpdatedLabel}
-          detail={runtimeDetail}
-          reason={runtimeReason}
-          requestPath={runtimeRequestPath}
-          describeCommand={getDescribeCommand()}
-          syncError={runtimeSyncError}
-        />
-
-        <h3 class="my-4 font-bold">Containers</h3>
-        {#if getContainerRows().length === 0}
-          <div class="rounded border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-            No containers found.
-          </div>
-        {:else}
-          <div class="overflow-hidden rounded border border-border">
-            <div class="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] gap-3 border-b border-border px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              <div>Name</div>
-              <div>Image</div>
-              <div>Ready</div>
-              <div>Restarts</div>
+          {#each getContainerRows() as container}
+            <div
+              class="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0"
+            >
+              <div class="min-w-0 truncate font-medium text-foreground">{container.name}</div>
+              <div class="min-w-0 truncate text-muted-foreground">{container.image}</div>
+              <div class="min-w-0 truncate text-muted-foreground">{container.ready}</div>
+              <div class="min-w-0 truncate text-muted-foreground">{container.restarts}</div>
             </div>
-            {#each getContainerRows() as container}
-              <div class="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0">
-                <div class="min-w-0 truncate font-medium text-foreground">{container.name}</div>
-                <div class="min-w-0 truncate text-muted-foreground">{container.image}</div>
-                <div class="min-w-0 truncate text-muted-foreground">{container.ready}</div>
-                <div class="min-w-0 truncate text-muted-foreground">{container.restarts}</div>
-              </div>
-            {/each}
-          </div>
-        {/if}
+          {/each}
+        </div>
+      {/if}
 
-        <h3 class="my-4 font-bold">Events</h3>
-        <DetailsEventsList
-          events={podEvents}
-          loading={eventsLoading}
-          error={eventsError}
-          emptyText="No events found."
-        />
-      </div>
-</DetailsSheetPortal>
+      <h3 class="my-4 font-bold">Events</h3>
+      <DetailsEventsList
+        events={podEvents}
+        loading={eventsLoading}
+        error={eventsError}
+        emptyText="No events found."
+      />
+    </div>
+  </DetailsSheetPortal>
 {/if}

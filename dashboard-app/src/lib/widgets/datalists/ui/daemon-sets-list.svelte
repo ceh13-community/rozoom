@@ -1,6 +1,7 @@
 <script lang="ts">
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
   import DetailsSheetPortal from "$shared/ui/details-sheet-portal.svelte";
+  import { trackCoreAction } from "$shared/analytics/wau-c";
   import { onDestroy, onMount } from "svelte";
   import { path } from "@tauri-apps/api";
   import { BaseDirectory, mkdir, remove, writeTextFile } from "@tauri-apps/plugin-fs";
@@ -69,7 +70,11 @@
   import DetailsMetadataGrid from "./common/details-metadata-grid.svelte";
   import ResourceTrafficChain from "./common/resource-traffic-chain.svelte";
   import DetailsEventsList from "./common/details-events-list.svelte";
-  import { buildRolloutCommandArgs, loadRolloutCommandOutput, type RolloutCommandMode } from "./common/workload-rollout";
+  import {
+    buildRolloutCommandArgs,
+    loadRolloutCommandOutput,
+    type RolloutCommandMode,
+  } from "./common/workload-rollout";
   import {
     findDaemonSetItem,
     getFilteredDaemonSets,
@@ -233,8 +238,12 @@
   });
 
   let actionInFlight = $state(false);
-  
-  import { notifySuccess, notifyError, type ActionNotification } from "$shared/lib/action-notification";
+
+  import {
+    notifySuccess,
+    notifyError,
+    type ActionNotification,
+  } from "$shared/lib/action-notification";
   let actionNotification = $state<ActionNotification>(null);
   let yamlDownloadError = $state<string | null>(null);
   let yamlDownloadMessage = $state<string | null>(null);
@@ -264,7 +273,9 @@
   let yamlCompareSourceTabId = $state<string | null>(null);
   let yamlComparePair = $state<[string, string] | null>(null);
   let yamlCompareTargetTabId = $state<string | null>(null);
-  let pendingWorkbenchState = $state<PersistedDaemonSetsWorkbenchState | null | undefined>(undefined);
+  let pendingWorkbenchState = $state<PersistedDaemonSetsWorkbenchState | null | undefined>(
+    undefined,
+  );
   let workbenchStateRestored = $state(false);
   let logsJumpToLine = $state<number | null>(null);
   let incidentTimelineCursorId = $state<string | null>(null);
@@ -308,7 +319,8 @@
       return "Showing the last successful DaemonSet snapshot while background refresh is degraded.";
     }
     if (watcherError) return "DaemonSet sync is degraded and needs operator attention.";
-    if (watcherIsStale) return "DaemonSet data has exceeded the freshness budget and should be refreshed.";
+    if (watcherIsStale)
+      return "DaemonSet data has exceeded the freshness budget and should be refreshed.";
     if (watcherInFlight) return "Background DaemonSet refresh is currently in flight.";
     return "DaemonSet sync is operating within the current runtime budget.";
   });
@@ -505,6 +517,8 @@
     showNodeAffinitiesDetails = false;
     showTolerationsDetails = false;
     isSheetOpen.set(true);
+    // WAU-C Core Action #2: user opened workload details.
+    if (data?.slug) void trackCoreAction("rozoom_workload_detail_opened", data.slug);
   }
 
   function closeDetails() {
@@ -530,11 +544,15 @@
   }
 
   function getLabelEntries() {
-    return Object.entries((($selectedItem?.metadata?.labels ?? {}) as Record<string, string>) ?? {});
+    return Object.entries(
+      (($selectedItem?.metadata?.labels ?? {}) as Record<string, string>) ?? {},
+    );
   }
 
   function getAnnotationEntries() {
-    const metadata = $selectedItem?.metadata as { annotations?: Record<string, string> } | undefined;
+    const metadata = $selectedItem?.metadata as
+      | { annotations?: Record<string, string> }
+      | undefined;
     return Object.entries((metadata?.annotations ?? {}) as Record<string, string>);
   }
 
@@ -572,7 +590,9 @@
   }
 
   function getTolerationsCount() {
-    const templateSpec = $selectedItem?.spec?.template?.spec as { tolerations?: unknown[] } | undefined;
+    const templateSpec = $selectedItem?.spec?.template?.spec as
+      | { tolerations?: unknown[] }
+      | undefined;
     return templateSpec?.tolerations?.length ?? 0;
   }
 
@@ -645,14 +665,18 @@
     if ($selectedItem?.status?.numberReady !== undefined) {
       return `Running: ${$selectedItem.status.numberReady}`;
     }
-    const running = detailsPods.filter((pod) => pod.status.toLowerCase().includes("running")).length;
+    const running = detailsPods.filter((pod) =>
+      pod.status.toLowerCase().includes("running"),
+    ).length;
     return `Running: ${running}`;
   }
 
   function getPodStatusToneClasses(status: string) {
     const lower = status.toLowerCase();
-    if (lower.includes("running")) return { dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400" };
-    if (lower.includes("pending")) return { dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-400" };
+    if (lower.includes("running"))
+      return { dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400" };
+    if (lower.includes("pending"))
+      return { dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-400" };
     if (lower.includes("error") || lower.includes("failed") || lower.includes("crash")) {
       return { dot: "bg-red-500", text: "text-red-700 dark:text-red-400" };
     }
@@ -668,100 +692,115 @@
       detailsLoading = true;
       detailsError = null;
       try {
-      const selector = ($selectedItem.spec?.selector?.matchLabels ?? {}) as Record<string, string>;
-      const selectorQuery = Object.entries(selector)
-        .map(([key, value]) => `${key}=${value}`)
-        .join(",");
+        const selector = ($selectedItem.spec?.selector?.matchLabels ?? {}) as Record<
+          string,
+          string
+        >;
+        const selectorQuery = Object.entries(selector)
+          .map(([key, value]) => `${key}=${value}`)
+          .join(",");
 
-      const podsArgs = selectorQuery
-        ? ["get", "pods", "--namespace", namespace, "-l", selectorQuery, "-o", "json"]
-        : ["get", "pods", "--namespace", namespace, "-o", "json"];
+        const podsArgs = selectorQuery
+          ? ["get", "pods", "--namespace", namespace, "-l", selectorQuery, "-o", "json"]
+          : ["get", "pods", "--namespace", namespace, "-o", "json"];
 
-      const [podsResponse, topResponse, eventsResponse] = await Promise.all([
-        kubectlRawArgsFront(podsArgs, { clusterId: data.slug, signal }),
-        kubectlRawArgsFront(
-          ["top", "pods", "--namespace", namespace, ...(selectorQuery ? ["-l", selectorQuery] : []), "--no-headers"],
-          { clusterId: data.slug, signal },
-        ),
-        kubectlRawArgsFront(
-          [
-            "get",
-            "events",
-            "--namespace",
-            namespace,
-            "--field-selector",
-            `involvedObject.kind=DaemonSet,involvedObject.name=${name}`,
-            "--sort-by=.lastTimestamp",
-            "-o",
-            "json",
-          ],
-          { clusterId: data.slug, signal },
-        ),
-      ]);
+        const [podsResponse, topResponse, eventsResponse] = await Promise.all([
+          kubectlRawArgsFront(podsArgs, { clusterId: data.slug, signal }),
+          kubectlRawArgsFront(
+            [
+              "top",
+              "pods",
+              "--namespace",
+              namespace,
+              ...(selectorQuery ? ["-l", selectorQuery] : []),
+              "--no-headers",
+            ],
+            { clusterId: data.slug, signal },
+          ),
+          kubectlRawArgsFront(
+            [
+              "get",
+              "events",
+              "--namespace",
+              namespace,
+              "--field-selector",
+              `involvedObject.kind=DaemonSet,involvedObject.name=${name}`,
+              "--sort-by=.lastTimestamp",
+              "-o",
+              "json",
+            ],
+            { clusterId: data.slug, signal },
+          ),
+        ]);
 
-      if (!isLatest()) return;
-      if (podsResponse.errors || podsResponse.code !== 0) {
-        throw new Error(podsResponse.errors || "Failed to load daemon set pods.");
-      }
+        if (!isLatest()) return;
+        if (podsResponse.errors || podsResponse.code !== 0) {
+          throw new Error(podsResponse.errors || "Failed to load daemon set pods.");
+        }
 
-      const topByPod = new Map<string, { cpu: string; memory: string }>();
-      for (const line of (topResponse.output || "").split("\n")) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        const [podName, cpu, memory] = trimmed.split(/\s+/);
-        if (podName) topByPod.set(podName, { cpu: cpu || "-", memory: memory || "-" });
-      }
+        const topByPod = new Map<string, { cpu: string; memory: string }>();
+        for (const line of (topResponse.output || "").split("\n")) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          const [podName, cpu, memory] = trimmed.split(/\s+/);
+          if (podName) topByPod.set(podName, { cpu: cpu || "-", memory: memory || "-" });
+        }
 
-      const parsedPods = JSON.parse(podsResponse.output) as {
-        items?: Array<{
-          metadata?: { name?: string; namespace?: string };
-          spec?: { nodeName?: string };
-          status?: { phase?: string; podIP?: string; containerStatuses?: Array<{ ready?: boolean }> };
-        }>;
-      };
-      detailsPods = (parsedPods.items ?? []).map((item) => {
-        const statuses = item.status?.containerStatuses ?? [];
-        const ready = statuses.filter((status) => status.ready).length;
-        const total = statuses.length;
-        const podName = item.metadata?.name ?? "-";
-        const top = topByPod.get(podName);
-        return {
-          name: podName,
-          node: item.spec?.nodeName ?? "-",
-          podIp: item.status?.podIP ?? "-",
-          namespace: item.metadata?.namespace ?? namespace,
-          ready: `${ready} / ${total}`,
-          cpu: top?.cpu ?? "-",
-          memory: top?.memory ?? "-",
-          status: item.status?.phase ?? "Unknown",
-        };
-      });
-
-      if (!eventsResponse.errors && eventsResponse.code === 0 && eventsResponse.output) {
-        const parsedEvents = JSON.parse(eventsResponse.output) as {
+        const parsedPods = JSON.parse(podsResponse.output) as {
           items?: Array<{
-            type?: string;
-            reason?: string;
-            message?: string;
-            lastTimestamp?: string;
-            eventTime?: string;
-            firstTimestamp?: string;
+            metadata?: { name?: string; namespace?: string };
+            spec?: { nodeName?: string };
+            status?: {
+              phase?: string;
+              podIP?: string;
+              containerStatuses?: Array<{ ready?: boolean }>;
+            };
           }>;
         };
-        detailsEvents = (parsedEvents.items ?? []).map((item) => ({
-          type: item.type ?? "-",
-          reason: item.reason ?? "-",
-          message: item.message ?? "-",
-          lastTimestamp: item.lastTimestamp || item.eventTime || item.firstTimestamp || "-",
-        }));
-      } else {
-        detailsEvents = [];
-      }
+        detailsPods = (parsedPods.items ?? []).map((item) => {
+          const statuses = item.status?.containerStatuses ?? [];
+          const ready = statuses.filter((status) => status.ready).length;
+          const total = statuses.length;
+          const podName = item.metadata?.name ?? "-";
+          const top = topByPod.get(podName);
+          return {
+            name: podName,
+            node: item.spec?.nodeName ?? "-",
+            podIp: item.status?.podIP ?? "-",
+            namespace: item.metadata?.namespace ?? namespace,
+            ready: `${ready} / ${total}`,
+            cpu: top?.cpu ?? "-",
+            memory: top?.memory ?? "-",
+            status: item.status?.phase ?? "Unknown",
+          };
+        });
 
-      detailsKeyLoaded = `${namespace}/${name}`;
+        if (!eventsResponse.errors && eventsResponse.code === 0 && eventsResponse.output) {
+          const parsedEvents = JSON.parse(eventsResponse.output) as {
+            items?: Array<{
+              type?: string;
+              reason?: string;
+              message?: string;
+              lastTimestamp?: string;
+              eventTime?: string;
+              firstTimestamp?: string;
+            }>;
+          };
+          detailsEvents = (parsedEvents.items ?? []).map((item) => ({
+            type: item.type ?? "-",
+            reason: item.reason ?? "-",
+            message: item.message ?? "-",
+            lastTimestamp: item.lastTimestamp || item.eventTime || item.firstTimestamp || "-",
+          }));
+        } else {
+          detailsEvents = [];
+        }
+
+        detailsKeyLoaded = `${namespace}/${name}`;
       } catch (error) {
         if (!isLatest()) return;
-        detailsError = error instanceof Error ? error.message : "Failed to load daemon set details.";
+        detailsError =
+          error instanceof Error ? error.message : "Failed to load daemon set details.";
         detailsPods = [];
         detailsEvents = [];
       } finally {
@@ -1104,7 +1143,10 @@
       return;
     }
 
-    const { occupiedRemovedPaneCount, tabsToClose } = computeLayoutClosePlan(paneTabIds, nextPaneCount);
+    const { occupiedRemovedPaneCount, tabsToClose } = computeLayoutClosePlan(
+      paneTabIds,
+      nextPaneCount,
+    );
     if (occupiedRemovedPaneCount === 0) {
       setWorkbenchLayout(nextLayout);
       return;
@@ -1211,10 +1253,7 @@
     ].slice(0, 30);
   }
 
-  async function closeWorkbenchTab(
-    tabId: string,
-    options: { skipConfirm?: boolean } = {},
-  ) {
+  async function closeWorkbenchTab(tabId: string, options: { skipConfirm?: boolean } = {}) {
     const previousTabs = workbenchTabs;
     const index = previousTabs.findIndex((item) => item.id === tabId);
     if (index === -1) return;
@@ -1247,7 +1286,9 @@
       string | null,
     ];
     setPaneTabIdsIfChanged(nextPaneTabIds);
-    setCollapsedPaneIndexesIfChanged(collapsedPaneIndexes.filter((idx) => nextPaneTabIds[idx] !== null));
+    setCollapsedPaneIndexesIfChanged(
+      collapsedPaneIndexes.filter((idx) => nextPaneTabIds[idx] !== null),
+    );
     if (activeWorkbenchTabId !== tabId) return;
     const remaining = previousTabs.filter((item) => item.id !== tabId);
     if (remaining.length === 0) {
@@ -1280,21 +1321,40 @@
     if (!daemonSet) return;
     if (entry.kind === "logs") {
       void openLogsForDaemonSet(daemonSet);
-      if (entry.pinned) pinnedTabIds = new Set([...pinnedTabIds, `logs:${entry.target.namespace}/${entry.target.name}`]);
+      if (entry.pinned)
+        pinnedTabIds = new Set([
+          ...pinnedTabIds,
+          `logs:${entry.target.namespace}/${entry.target.name}`,
+        ]);
       return;
     }
     if (entry.kind === "events") {
       void openEventsForDaemonSet(daemonSet);
-      if (entry.pinned) pinnedTabIds = new Set([...pinnedTabIds, `events:${entry.target.namespace}/${entry.target.name}`]);
+      if (entry.pinned)
+        pinnedTabIds = new Set([
+          ...pinnedTabIds,
+          `events:${entry.target.namespace}/${entry.target.name}`,
+        ]);
       return;
     }
     if (entry.kind === "rollout-status" || entry.kind === "rollout-history") {
-      void openRolloutCommandForDaemonSet(entry.kind === "rollout-status" ? "status" : "history", daemonSet);
-      if (entry.pinned) pinnedTabIds = new Set([...pinnedTabIds, `${entry.kind}:${entry.target.namespace}/${entry.target.name}`]);
+      void openRolloutCommandForDaemonSet(
+        entry.kind === "rollout-status" ? "status" : "history",
+        daemonSet,
+      );
+      if (entry.pinned)
+        pinnedTabIds = new Set([
+          ...pinnedTabIds,
+          `${entry.kind}:${entry.target.namespace}/${entry.target.name}`,
+        ]);
       return;
     }
     void openYamlForDaemonSet(daemonSet);
-    if (entry.pinned) pinnedTabIds = new Set([...pinnedTabIds, `yaml:${entry.target.namespace}/${entry.target.name}`]);
+    if (entry.pinned)
+      pinnedTabIds = new Set([
+        ...pinnedTabIds,
+        `yaml:${entry.target.namespace}/${entry.target.name}`,
+      ]);
   }
 
   function canCompareWithSelected(tabId: string) {
@@ -1704,7 +1764,9 @@
       await writeTextFile(relativePath, tab.yamlText, { baseDir: BaseDirectory.AppData });
       const appDataPath = await path.appDataDir();
       const absolutePath = await path.join(appDataPath, relativePath);
-      const response = await kubectlRawArgsFront(["apply", "-f", absolutePath], { clusterId: data.slug });
+      const response = await kubectlRawArgsFront(["apply", "-f", absolutePath], {
+        clusterId: data.slug,
+      });
 
       if (response.errors || response.code !== 0) {
         throw new Error(response.errors || "Failed to apply daemon set YAML.");
@@ -1715,7 +1777,9 @@
         yamlSaving: false,
         yamlOriginalText: current.yamlText,
       }));
-      actionNotification = notifySuccess(`Applied YAML: ${tab.target.namespace}/${tab.target.name}`);
+      actionNotification = notifySuccess(
+        `Applied YAML: ${tab.target.namespace}/${tab.target.name}`,
+      );
       invalidateDaemonSetsSnapshotCache();
       mutationReconcile.schedule();
     } catch (error) {
@@ -1859,14 +1923,20 @@
           throw new Error(response.errors || `Failed to restart ${namespace}/${name}.`);
         }
       }
-      actionNotification = notifySuccess(`Rollout restart executed for ${items.length} daemonset${items.length === 1 ? "" : "s"}.`);
+      actionNotification = notifySuccess(
+        `Rollout restart executed for ${items.length} daemonset${items.length === 1 ? "" : "s"}.`,
+      );
       invalidateDaemonSetsSnapshotCache();
       mutationReconcile.track({
-        ids: items.map((item) => `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? ""}`),
+        ids: items.map(
+          (item) => `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? ""}`,
+        ),
         expectedEventTypes: ["MODIFIED"],
       });
     } catch (error) {
-      actionNotification = notifyError(error instanceof Error ? error.message : "Failed to restart daemonsets.");
+      actionNotification = notifyError(
+        error instanceof Error ? error.message : "Failed to restart daemonsets.",
+      );
     } finally {
       actionInFlight = false;
     }
@@ -1896,14 +1966,20 @@
       }
       selectedDaemonSetIds = new Set<string>();
       removeDaemonSetsFromSnapshot(items);
-      actionNotification = notifySuccess(`Deleted ${items.length} daemonset${items.length === 1 ? "" : "s"}.`);
+      actionNotification = notifySuccess(
+        `Deleted ${items.length} daemonset${items.length === 1 ? "" : "s"}.`,
+      );
       invalidateDaemonSetsSnapshotCache();
       mutationReconcile.track({
-        ids: items.map((item) => `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? ""}`),
+        ids: items.map(
+          (item) => `${item.metadata?.namespace ?? "default"}/${item.metadata?.name ?? ""}`,
+        ),
         expectedEventTypes: ["DELETED"],
       });
     } catch (error) {
-      actionNotification = notifyError(error instanceof Error ? error.message : "Failed to delete daemonsets.");
+      actionNotification = notifyError(
+        error instanceof Error ? error.message : "Failed to delete daemonsets.",
+      );
     } finally {
       actionInFlight = false;
     }
@@ -1967,9 +2043,7 @@
     return `${WATCHER_SETTINGS_PREFIX}:${clusterId}`;
   }
 
-  function parseWorkbenchTabId(
-    tabId: string,
-  ): {
+  function parseWorkbenchTabId(tabId: string): {
     kind: "logs" | "yaml" | "events" | "rollout-status" | "rollout-history";
     name: string;
     namespace: string;
@@ -2062,9 +2136,7 @@
           parsed.refreshSeconds ?? DEFAULT_WATCHER_SETTINGS.refreshSeconds,
         ),
         viewMode:
-          parsed.viewMode === "namespace" || parsed.viewMode === "flat"
-            ? parsed.viewMode
-            : "flat",
+          parsed.viewMode === "namespace" || parsed.viewMode === "flat" ? parsed.viewMode : "flat",
       };
     } catch {
       return DEFAULT_WATCHER_SETTINGS;
@@ -2250,8 +2322,9 @@
         );
         return daemonSet ? { tab, daemonSet } : null;
       })
-      .filter((entry): entry is { tab: PersistedDaemonSetsWorkbenchTab; daemonSet: DaemonSetItem } =>
-        Boolean(entry),
+      .filter(
+        (entry): entry is { tab: PersistedDaemonSetsWorkbenchTab; daemonSet: DaemonSetItem } =>
+          Boolean(entry),
       );
 
     for (const entry of tabsToOpen) {
@@ -2349,10 +2422,7 @@
         })),
         ...rolloutTabs.map((tab) => ({
           id: tab.id,
-          kind:
-            tab.mode === "status"
-              ? ("rollout-status" as const)
-              : ("rollout-history" as const),
+          kind: tab.mode === "status" ? ("rollout-status" as const) : ("rollout-history" as const),
           title: `${tab.mode === "status" ? "Rollout status" : "Rollout history"} ${tab.target.name}`,
           subtitle: tab.target.namespace,
         })),
@@ -2462,437 +2532,370 @@
 </script>
 
 <svelte:window onkeydown={handleWindowKeydown} />
-  <ActionNotificationBar notification={actionNotification} onDismiss={() => { actionNotification = null; }} />
-  {#if yamlDownloadError}
-    <Alert.Root variant="destructive" class="mb-4">
-      <button
-        type="button"
-        class="absolute right-2 top-2 rounded bg-rose-100/70 p-1.5 text-xs text-rose-700 transition hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:hover:bg-rose-500/30"
-        aria-label="Close notification"
-        title="Close"
-        onclick={() => {
-          yamlDownloadError = null;
-        }}
-      >
-        <X class="h-3.5 w-3.5" />
-      </button>
-      <Alert.Description>{yamlDownloadError}</Alert.Description>
-    </Alert.Root>
-  {/if}
-  {#if yamlDownloadMessage}
-    <Alert.Root class="mb-4 border-emerald-400/40 bg-emerald-100/20 text-emerald-900 dark:text-emerald-200">
-      <button
-        type="button"
-        class="absolute right-2 top-2 rounded bg-rose-100/70 p-1.5 text-xs text-rose-700 transition hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:hover:bg-rose-500/30"
-        aria-label="Close notification"
-        title="Close"
-        onclick={() => {
-          yamlDownloadMessage = null;
-        }}
-      >
-        <X class="h-3.5 w-3.5" />
-      </button>
-      <Alert.Description>{yamlDownloadMessage}</Alert.Description>
-    </Alert.Root>
-  {/if}
-
-  {#if hasWorkbenchTabs}
-    <div
-      class={`overflow-hidden bg-card pointer-events-auto ${
-        workbenchFullscreen
-          ? "fixed inset-0 z-[120] mb-0 flex h-[100dvh] w-[100vw] flex-col rounded-none border-0 shadow-none"
-          : "relative z-[100] mb-4 rounded-lg border shadow-sm"
-      }`}
+<ActionNotificationBar
+  notification={actionNotification}
+  onDismiss={() => {
+    actionNotification = null;
+  }}
+/>
+{#if yamlDownloadError}
+  <Alert.Root variant="destructive" class="mb-4">
+    <button
+      type="button"
+      class="absolute right-2 top-2 rounded bg-rose-100/70 p-1.5 text-xs text-rose-700 transition hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:hover:bg-rose-500/30"
+      aria-label="Close notification"
+      title="Close"
+      onclick={() => {
+        yamlDownloadError = null;
+      }}
     >
-      <MultiPaneWorkbench
-        tabs={orderedWorkbenchTabs}
-        activeTabId={activeWorkbenchTabId}
-        {isTabPinned}
-        onActivateTab={setActiveWorkbenchTab}
-        onTogglePin={togglePinTab}
-        onCloseTab={(tabId) => {
-          void closeWorkbenchTab(tabId, { skipConfirm: true });
-        }}
-        onReopenLastClosedTab={reopenLastClosedTab}
-        reopenDisabled={closedWorkbenchTabs.length === 0}
-        layout={workbenchLayout}
-        onLayoutChange={(nextLayout) => {
-          void requestWorkbenchLayout(nextLayout as WorkbenchLayout);
-        }}
-        fullscreen={workbenchFullscreen}
-        onToggleFullscreen={toggleWorkbenchFullscreen}
-        collapsed={workbenchCollapsed}
-        onToggleCollapse={toggleWorkbenchCollapse}
-        showTimeline={canShowIncidentTimeline && activeIncidentTimeline.length > 0}
-        timelineDensity={incidentTimelineDensity}
-        onTimelineDensityChange={(density) => {
-          incidentTimelineDensity = density;
-        }}
-        timelineMarkers={visibleIncidentTimeline}
-        activeTimelineMarkerId={incidentTimelineCursorId}
-        onTimelineMarkerClick={(marker) => jumpToIncidentMarker(marker as IncidentMarker)}
-      >
-        {#snippet tabActions(tab)}
-          {#if tab.kind === "yaml"}
-            <button
-              type="button"
-              class={`rounded p-2 text-xs ${
-                yamlCompareSourceTabId === tab.id
-                  ? "bg-sky-100 text-sky-900"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}
-              onclick={() => selectYamlForCompare(tab.id)}
-              title={yamlCompareSourceTabId === tab.id ? "Selected for compare" : "Select for compare"}
-              aria-label={yamlCompareSourceTabId === tab.id ? "Selected for compare" : "Select for compare"}
-            >
-              <Target class="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              class={`rounded p-2 text-xs ${
-                isYamlCompareTarget(tab.id)
-                  ? "bg-sky-100 text-sky-900"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              } disabled:opacity-50`}
-              disabled={!canCompareWithSelected(tab.id)}
-              onclick={() => compareYamlWithSelected(tab.id)}
-              title={
-                !yamlCompareSourceTabId
-                  ? "Set as compare source"
-                  : yamlCompareSourceTabId === tab.id
-                    ? "Clear compare source"
-                    : isYamlCompareTarget(tab.id)
-                      ? "Disable compare"
-                      : "Compare with selected"
-              }
-              aria-label="Compare with selected"
-            >
-              <GitCompareArrows class="h-4 w-4" />
-            </button>
-          {/if}
-        {/snippet}
-        {#snippet body()}
+      <X class="h-3.5 w-3.5" />
+    </button>
+    <Alert.Description>{yamlDownloadError}</Alert.Description>
+  </Alert.Root>
+{/if}
+{#if yamlDownloadMessage}
+  <Alert.Root
+    class="mb-4 border-emerald-400/40 bg-emerald-100/20 text-emerald-900 dark:text-emerald-200"
+  >
+    <button
+      type="button"
+      class="absolute right-2 top-2 rounded bg-rose-100/70 p-1.5 text-xs text-rose-700 transition hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:hover:bg-rose-500/30"
+      aria-label="Close notification"
+      title="Close"
+      onclick={() => {
+        yamlDownloadMessage = null;
+      }}
+    >
+      <X class="h-3.5 w-3.5" />
+    </button>
+    <Alert.Description>{yamlDownloadMessage}</Alert.Description>
+  </Alert.Root>
+{/if}
 
-      {#if !workbenchCollapsed && activeWorkbenchTab}
-        <div class={workbenchFullscreen ? "min-h-0 flex-1" : "h-[min(70dvh,760px)] min-h-[430px]"}>
-          {#if workbenchLayout === "single"}
-            {#if activeWorkbenchTab.kind === "logs"}
-              {@const currentLogsTab = getLogsTab(activeWorkbenchTab.id)}
-              <ResourceLogsSheet
-                embedded={true}
-                isOpen={workbenchOpen}
-                podRef={currentLogsTab ? `${currentLogsTab.target.namespace}/${currentLogsTab.target.name}` : "-"}
-                logs={currentLogsTab?.logsText ?? ""}
-                loading={currentLogsTab?.logsLoading ?? false}
-                error={currentLogsTab?.logsError ?? null}
-                isLive={currentLogsTab?.logsLive ?? false}
-                mode={currentLogsTab?.logsMode ?? "poll"}
-                lastUpdatedAt={currentLogsTab?.logsUpdatedAt ?? null}
-                previous={currentLogsTab?.logsPrevious ?? false}
-                selectedContainer={currentLogsTab?.logsSelectedContainer ?? "__all__"}
-                containerOptions={currentLogsTab?.logsContainerOptions ?? ["__all__"]}
-                bookmarks={currentLogsTab?.bookmarks ?? []}
-                onToggleLive={() => {
-                  if (!currentLogsTab) return;
-                  const nextLive = !currentLogsTab.logsLive;
-                  updateLogsTab(currentLogsTab.id, (tab) => ({ ...tab, logsLive: nextLive }));
-                  if (nextLive) startLiveLogsForTab(currentLogsTab.id);
-                  else stopLiveLogsForTab(currentLogsTab.id);
-                }}
-                onSetMode={(mode) => {
-                  if (!currentLogsTab || currentLogsTab.logsMode === mode) return;
-                  updateLogsTab(currentLogsTab.id, (tab) => ({ ...tab, logsMode: mode, logsError: null }));
-                  if (currentLogsTab.logsLive) startLiveLogsForTab(currentLogsTab.id);
-                }}
-                onTogglePrevious={() => {
-                  if (!currentLogsTab) return;
-                  updateLogsTab(currentLogsTab.id, (tab) => ({
-                    ...tab,
-                    logsPrevious: !tab.logsPrevious,
-                  }));
-                  if (currentLogsTab.logsLive) startLiveLogsForTab(currentLogsTab.id);
-                  else void loadLogsForTab(currentLogsTab.id);
-                }}
-                onSelectContainer={(container) => {
-                  if (!currentLogsTab) return;
-                  updateLogsTab(currentLogsTab.id, (tab) => ({
-                    ...tab,
-                    logsSelectedContainer: container || "__all__",
-                  }));
-                  if (currentLogsTab.logsLive) startLiveLogsForTab(currentLogsTab.id);
-                  else void loadLogsForTab(currentLogsTab.id);
-                }}
-                onRefresh={() => {
-                  if (!currentLogsTab) return;
-                  void loadLogsForTab(currentLogsTab.id);
-                }}
-                onAddBookmark={(line) => {
-                  if (!currentLogsTab) return;
-                  updateLogsTab(currentLogsTab.id, (tab) => ({
-                    ...tab,
-                    bookmarks: [
-                      ...tab.bookmarks,
-                      {
-                        id: `bookmark-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                        line,
-                        label: `Line ${line}`,
-                        createdAt: Date.now(),
-                      },
-                    ],
-                  }));
-                }}
-                onRemoveBookmark={(bookmarkId) => {
-                  if (!currentLogsTab) return;
-                  updateLogsTab(currentLogsTab.id, (tab) => ({
-                    ...tab,
-                    bookmarks: tab.bookmarks.filter((bookmark) => bookmark.id !== bookmarkId),
-                  }));
-                }}
-                jumpToLine={logsJumpToLine}
-                onJumpHandled={() => {
-                  logsJumpToLine = null;
-                }}
-              />
-            {:else if activeWorkbenchTab.kind === "yaml"}
-              {@const currentYamlTab = getYamlTab(activeWorkbenchTab.id)}
-              <ResourceYamlSheet
-                embedded={true}
-                isOpen={workbenchOpen}
-                podRef={currentYamlTab ? `${currentYamlTab.target.namespace}/${currentYamlTab.target.name}` : "-"}
-                originalYaml={currentYamlTab?.yamlOriginalText ?? ""}
-                yamlText={currentYamlTab?.yamlText ?? ""}
-                loading={currentYamlTab?.yamlLoading ?? false}
-                saving={currentYamlTab?.yamlSaving ?? false}
-                hasChanges={(currentYamlTab?.yamlText ?? "") !== (currentYamlTab?.yamlOriginalText ?? "")}
-                externalDiffLines={currentYamlTab ? getYamlCompareDiffLines(currentYamlTab.id) : []}
-                error={currentYamlTab?.yamlError ?? null}
-                onYamlChange={(value) => {
-                  if (!currentYamlTab) return;
-                  updateYamlTab(currentYamlTab.id, (tab) => ({ ...tab, yamlText: value }));
-                }}
-                onRefresh={() => {
-                  if (!currentYamlTab) return;
-                  void refreshYamlForTab(currentYamlTab.id);
-                }}
-                onSave={() => {
-                  if (!currentYamlTab) return;
-                  void saveDaemonSetYaml(currentYamlTab.id);
-                }}
-              />
-            {:else if activeWorkbenchTab.kind === "events"}
-              {@const currentEventsTab = getEventsTab(activeWorkbenchTab.id)}
-              <WorkloadEventsSheet
-                embedded={true}
-                isOpen={workbenchOpen}
-                title={`Daemon set events: ${currentEventsTab ? `${currentEventsTab.target.namespace}/${currentEventsTab.target.name}` : "-"}`}
-                targetRef={currentEventsTab ? `${currentEventsTab.target.namespace}/${currentEventsTab.target.name}` : "-"}
-                events={currentEventsTab?.events ?? []}
-                loading={currentEventsTab?.eventsLoading ?? false}
-                error={currentEventsTab?.eventsError ?? null}
-              />
-            {:else}
-              {@const currentRolloutTab = getRolloutTab(activeWorkbenchTab.id)}
-              <WorkloadCommandOutputSheet
-                embedded={true}
-                isOpen={workbenchOpen}
-                title={`${activeWorkbenchTab.kind === "rollout-status" ? "Rollout status" : "Rollout history"}: ${currentRolloutTab ? `${currentRolloutTab.target.namespace}/${currentRolloutTab.target.name}` : "-"}`}
-                collapsedLabel={currentRolloutTab?.target.name ?? "Rollout"}
-                commandLabel={
-                  currentRolloutTab
+{#if hasWorkbenchTabs}
+  <div
+    class={`overflow-hidden bg-card pointer-events-auto ${
+      workbenchFullscreen
+        ? "fixed inset-0 z-[120] mb-0 flex h-[100dvh] w-[100vw] flex-col rounded-none border-0 shadow-none"
+        : "relative z-[100] mb-4 rounded-lg border shadow-sm"
+    }`}
+  >
+    <MultiPaneWorkbench
+      tabs={orderedWorkbenchTabs}
+      activeTabId={activeWorkbenchTabId}
+      {isTabPinned}
+      onActivateTab={setActiveWorkbenchTab}
+      onTogglePin={togglePinTab}
+      onCloseTab={(tabId) => {
+        void closeWorkbenchTab(tabId, { skipConfirm: true });
+      }}
+      onReopenLastClosedTab={reopenLastClosedTab}
+      reopenDisabled={closedWorkbenchTabs.length === 0}
+      layout={workbenchLayout}
+      onLayoutChange={(nextLayout) => {
+        void requestWorkbenchLayout(nextLayout as WorkbenchLayout);
+      }}
+      fullscreen={workbenchFullscreen}
+      onToggleFullscreen={toggleWorkbenchFullscreen}
+      collapsed={workbenchCollapsed}
+      onToggleCollapse={toggleWorkbenchCollapse}
+      showTimeline={canShowIncidentTimeline && activeIncidentTimeline.length > 0}
+      timelineDensity={incidentTimelineDensity}
+      onTimelineDensityChange={(density) => {
+        incidentTimelineDensity = density;
+      }}
+      timelineMarkers={visibleIncidentTimeline}
+      activeTimelineMarkerId={incidentTimelineCursorId}
+      onTimelineMarkerClick={(marker) => jumpToIncidentMarker(marker as IncidentMarker)}
+    >
+      {#snippet tabActions(tab)}
+        {#if tab.kind === "yaml"}
+          <button
+            type="button"
+            class={`rounded p-2 text-xs ${
+              yamlCompareSourceTabId === tab.id
+                ? "bg-sky-100 text-sky-900"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+            onclick={() => selectYamlForCompare(tab.id)}
+            title={yamlCompareSourceTabId === tab.id
+              ? "Selected for compare"
+              : "Select for compare"}
+            aria-label={yamlCompareSourceTabId === tab.id
+              ? "Selected for compare"
+              : "Select for compare"}
+          >
+            <Target class="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            class={`rounded p-2 text-xs ${
+              isYamlCompareTarget(tab.id)
+                ? "bg-sky-100 text-sky-900"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            } disabled:opacity-50`}
+            disabled={!canCompareWithSelected(tab.id)}
+            onclick={() => compareYamlWithSelected(tab.id)}
+            title={!yamlCompareSourceTabId
+              ? "Set as compare source"
+              : yamlCompareSourceTabId === tab.id
+                ? "Clear compare source"
+                : isYamlCompareTarget(tab.id)
+                  ? "Disable compare"
+                  : "Compare with selected"}
+            aria-label="Compare with selected"
+          >
+            <GitCompareArrows class="h-4 w-4" />
+          </button>
+        {/if}
+      {/snippet}
+      {#snippet body()}
+        {#if !workbenchCollapsed && activeWorkbenchTab}
+          <div
+            class={workbenchFullscreen ? "min-h-0 flex-1" : "h-[min(70dvh,760px)] min-h-[430px]"}
+          >
+            {#if workbenchLayout === "single"}
+              {#if activeWorkbenchTab.kind === "logs"}
+                {@const currentLogsTab = getLogsTab(activeWorkbenchTab.id)}
+                <ResourceLogsSheet
+                  embedded={true}
+                  isOpen={workbenchOpen}
+                  podRef={currentLogsTab
+                    ? `${currentLogsTab.target.namespace}/${currentLogsTab.target.name}`
+                    : "-"}
+                  logs={currentLogsTab?.logsText ?? ""}
+                  loading={currentLogsTab?.logsLoading ?? false}
+                  error={currentLogsTab?.logsError ?? null}
+                  isLive={currentLogsTab?.logsLive ?? false}
+                  mode={currentLogsTab?.logsMode ?? "poll"}
+                  lastUpdatedAt={currentLogsTab?.logsUpdatedAt ?? null}
+                  previous={currentLogsTab?.logsPrevious ?? false}
+                  selectedContainer={currentLogsTab?.logsSelectedContainer ?? "__all__"}
+                  containerOptions={currentLogsTab?.logsContainerOptions ?? ["__all__"]}
+                  bookmarks={currentLogsTab?.bookmarks ?? []}
+                  onToggleLive={() => {
+                    if (!currentLogsTab) return;
+                    const nextLive = !currentLogsTab.logsLive;
+                    updateLogsTab(currentLogsTab.id, (tab) => ({ ...tab, logsLive: nextLive }));
+                    if (nextLive) startLiveLogsForTab(currentLogsTab.id);
+                    else stopLiveLogsForTab(currentLogsTab.id);
+                  }}
+                  onSetMode={(mode) => {
+                    if (!currentLogsTab || currentLogsTab.logsMode === mode) return;
+                    updateLogsTab(currentLogsTab.id, (tab) => ({
+                      ...tab,
+                      logsMode: mode,
+                      logsError: null,
+                    }));
+                    if (currentLogsTab.logsLive) startLiveLogsForTab(currentLogsTab.id);
+                  }}
+                  onTogglePrevious={() => {
+                    if (!currentLogsTab) return;
+                    updateLogsTab(currentLogsTab.id, (tab) => ({
+                      ...tab,
+                      logsPrevious: !tab.logsPrevious,
+                    }));
+                    if (currentLogsTab.logsLive) startLiveLogsForTab(currentLogsTab.id);
+                    else void loadLogsForTab(currentLogsTab.id);
+                  }}
+                  onSelectContainer={(container) => {
+                    if (!currentLogsTab) return;
+                    updateLogsTab(currentLogsTab.id, (tab) => ({
+                      ...tab,
+                      logsSelectedContainer: container || "__all__",
+                    }));
+                    if (currentLogsTab.logsLive) startLiveLogsForTab(currentLogsTab.id);
+                    else void loadLogsForTab(currentLogsTab.id);
+                  }}
+                  onRefresh={() => {
+                    if (!currentLogsTab) return;
+                    void loadLogsForTab(currentLogsTab.id);
+                  }}
+                  onAddBookmark={(line) => {
+                    if (!currentLogsTab) return;
+                    updateLogsTab(currentLogsTab.id, (tab) => ({
+                      ...tab,
+                      bookmarks: [
+                        ...tab.bookmarks,
+                        {
+                          id: `bookmark-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                          line,
+                          label: `Line ${line}`,
+                          createdAt: Date.now(),
+                        },
+                      ],
+                    }));
+                  }}
+                  onRemoveBookmark={(bookmarkId) => {
+                    if (!currentLogsTab) return;
+                    updateLogsTab(currentLogsTab.id, (tab) => ({
+                      ...tab,
+                      bookmarks: tab.bookmarks.filter((bookmark) => bookmark.id !== bookmarkId),
+                    }));
+                  }}
+                  jumpToLine={logsJumpToLine}
+                  onJumpHandled={() => {
+                    logsJumpToLine = null;
+                  }}
+                />
+              {:else if activeWorkbenchTab.kind === "yaml"}
+                {@const currentYamlTab = getYamlTab(activeWorkbenchTab.id)}
+                <ResourceYamlSheet
+                  embedded={true}
+                  isOpen={workbenchOpen}
+                  podRef={currentYamlTab
+                    ? `${currentYamlTab.target.namespace}/${currentYamlTab.target.name}`
+                    : "-"}
+                  originalYaml={currentYamlTab?.yamlOriginalText ?? ""}
+                  yamlText={currentYamlTab?.yamlText ?? ""}
+                  loading={currentYamlTab?.yamlLoading ?? false}
+                  saving={currentYamlTab?.yamlSaving ?? false}
+                  hasChanges={(currentYamlTab?.yamlText ?? "") !==
+                    (currentYamlTab?.yamlOriginalText ?? "")}
+                  externalDiffLines={currentYamlTab
+                    ? getYamlCompareDiffLines(currentYamlTab.id)
+                    : []}
+                  error={currentYamlTab?.yamlError ?? null}
+                  onYamlChange={(value) => {
+                    if (!currentYamlTab) return;
+                    updateYamlTab(currentYamlTab.id, (tab) => ({ ...tab, yamlText: value }));
+                  }}
+                  onRefresh={() => {
+                    if (!currentYamlTab) return;
+                    void refreshYamlForTab(currentYamlTab.id);
+                  }}
+                  onSave={() => {
+                    if (!currentYamlTab) return;
+                    void saveDaemonSetYaml(currentYamlTab.id);
+                  }}
+                />
+              {:else if activeWorkbenchTab.kind === "events"}
+                {@const currentEventsTab = getEventsTab(activeWorkbenchTab.id)}
+                <WorkloadEventsSheet
+                  embedded={true}
+                  isOpen={workbenchOpen}
+                  title={`Daemon set events: ${currentEventsTab ? `${currentEventsTab.target.namespace}/${currentEventsTab.target.name}` : "-"}`}
+                  targetRef={currentEventsTab
+                    ? `${currentEventsTab.target.namespace}/${currentEventsTab.target.name}`
+                    : "-"}
+                  events={currentEventsTab?.events ?? []}
+                  loading={currentEventsTab?.eventsLoading ?? false}
+                  error={currentEventsTab?.eventsError ?? null}
+                />
+              {:else}
+                {@const currentRolloutTab = getRolloutTab(activeWorkbenchTab.id)}
+                <WorkloadCommandOutputSheet
+                  embedded={true}
+                  isOpen={workbenchOpen}
+                  title={`${activeWorkbenchTab.kind === "rollout-status" ? "Rollout status" : "Rollout history"}: ${currentRolloutTab ? `${currentRolloutTab.target.namespace}/${currentRolloutTab.target.name}` : "-"}`}
+                  collapsedLabel={currentRolloutTab?.target.name ?? "Rollout"}
+                  commandLabel={currentRolloutTab
                     ? buildRolloutCommandArgs(currentRolloutTab.mode, {
                         resource: "daemonset",
                         name: currentRolloutTab.target.name,
                         namespace: currentRolloutTab.target.namespace,
                       }).join(" ")
-                    : null
-                }
-                output={currentRolloutTab?.output ?? ""}
-                loading={currentRolloutTab?.loading ?? false}
-                error={currentRolloutTab?.error ?? null}
-                onRefresh={() => {
-                  const daemonSet = currentRolloutTab ? findDaemonSetItem(daemonSetsSnapshot, {
-                    uid: `${currentRolloutTab.target.namespace}/${currentRolloutTab.target.name}`,
-                    name: currentRolloutTab.target.name,
-                    namespace: currentRolloutTab.target.namespace,
-                  } as DaemonSetRow) : null;
-                  if (!currentRolloutTab || !daemonSet) return;
-                  void openRolloutCommandForDaemonSet(currentRolloutTab.mode, daemonSet);
-                }}
-              />
-            {/if}
-          {:else}
-            <div class="flex h-full gap-2 p-2">
-              {#each paneIndexes as paneIndex}
-                {@const paneTab = getPaneTab(paneIndex)}
-                <div class={`${getPaneWrapperClass(paneIndex)} min-h-0 overflow-hidden rounded border`}>
-                  {#if paneTab && isPaneCollapsed(paneIndex)}
-                    {#if paneTab.kind === "yaml"}
-                      {@const paneYamlTab = getYamlTab(paneTab.id)}
-                      {#if paneYamlTab}
-                        <ResourceYamlSheet
-                          embedded={true}
-                          isOpen={workbenchOpen}
-                          podRef={`${paneYamlTab.target.namespace}/${paneYamlTab.target.name}`}
-                          originalYaml={paneYamlTab.yamlOriginalText}
-                          yamlText={paneYamlTab.yamlText}
-                          loading={paneYamlTab.yamlLoading}
-                          saving={paneYamlTab.yamlSaving}
-                          hasChanges={paneYamlTab.yamlText !== paneYamlTab.yamlOriginalText}
-                          externalDiffLines={getYamlCompareDiffLines(paneYamlTab.id)}
-                          error={paneYamlTab.yamlError}
-                          isVerticallyCollapsed
-                          canVerticalCollapse={true}
-                          onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
-                          onYamlChange={(value) => {
-                            updateYamlTab(paneYamlTab.id, (tab) => ({ ...tab, yamlText: value }));
-                          }}
-                          onRefresh={() => {
-                            refreshYamlForTab(paneYamlTab.id);
-                          }}
-                          onSave={() => {
-                            void saveDaemonSetYaml(paneYamlTab.id);
-                          }}
-                        />
-                      {/if}
-                    {:else if paneTab.kind === "events"}
-                      {@const paneEventsTab = getEventsTab(paneTab.id)}
-                      {#if paneEventsTab}
-                        <WorkloadEventsSheet
-                          embedded={true}
-                          isOpen={workbenchOpen}
-                          title={`Daemon set events: ${paneEventsTab.target.namespace}/${paneEventsTab.target.name}`}
-                          targetRef={`${paneEventsTab.target.namespace}/${paneEventsTab.target.name}`}
-                          events={paneEventsTab.events}
-                          loading={paneEventsTab.eventsLoading}
-                          error={paneEventsTab.eventsError}
-                          isVerticallyCollapsed
-                          canVerticalCollapse={true}
-                          onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
-                        />
-                      {/if}
-                    {:else if paneTab.kind === "rollout-status" || paneTab.kind === "rollout-history"}
-                      {@const paneRolloutTab = getRolloutTab(paneTab.id)}
-                      {#if paneRolloutTab}
-                        <WorkloadCommandOutputSheet
-                          embedded={true}
-                          isOpen={workbenchOpen}
-                          title={`${paneTab.kind === "rollout-status" ? "Rollout status" : "Rollout history"}: ${paneRolloutTab.target.namespace}/${paneRolloutTab.target.name}`}
-                          collapsedLabel={paneRolloutTab.target.name}
-                          commandLabel={buildRolloutCommandArgs(paneRolloutTab.mode, {
-                            resource: "daemonset",
-                            name: paneRolloutTab.target.name,
-                            namespace: paneRolloutTab.target.namespace,
-                          }).join(" ")}
-                          output={paneRolloutTab.output}
-                          loading={paneRolloutTab.loading}
-                          error={paneRolloutTab.error}
-                          isVerticallyCollapsed
-                          canVerticalCollapse={true}
-                          onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
-                          onRefresh={() => {
-                            const daemonSet = findDaemonSetItem(daemonSetsSnapshot, {
-                              uid: `${paneRolloutTab.target.namespace}/${paneRolloutTab.target.name}`,
+                    : null}
+                  output={currentRolloutTab?.output ?? ""}
+                  loading={currentRolloutTab?.loading ?? false}
+                  error={currentRolloutTab?.error ?? null}
+                  onRefresh={() => {
+                    const daemonSet = currentRolloutTab
+                      ? findDaemonSetItem(daemonSetsSnapshot, {
+                          uid: `${currentRolloutTab.target.namespace}/${currentRolloutTab.target.name}`,
+                          name: currentRolloutTab.target.name,
+                          namespace: currentRolloutTab.target.namespace,
+                        } as DaemonSetRow)
+                      : null;
+                    if (!currentRolloutTab || !daemonSet) return;
+                    void openRolloutCommandForDaemonSet(currentRolloutTab.mode, daemonSet);
+                  }}
+                />
+              {/if}
+            {:else}
+              <div class="flex h-full gap-2 p-2">
+                {#each paneIndexes as paneIndex}
+                  {@const paneTab = getPaneTab(paneIndex)}
+                  <div
+                    class={`${getPaneWrapperClass(paneIndex)} min-h-0 overflow-hidden rounded border`}
+                  >
+                    {#if paneTab && isPaneCollapsed(paneIndex)}
+                      {#if paneTab.kind === "yaml"}
+                        {@const paneYamlTab = getYamlTab(paneTab.id)}
+                        {#if paneYamlTab}
+                          <ResourceYamlSheet
+                            embedded={true}
+                            isOpen={workbenchOpen}
+                            podRef={`${paneYamlTab.target.namespace}/${paneYamlTab.target.name}`}
+                            originalYaml={paneYamlTab.yamlOriginalText}
+                            yamlText={paneYamlTab.yamlText}
+                            loading={paneYamlTab.yamlLoading}
+                            saving={paneYamlTab.yamlSaving}
+                            hasChanges={paneYamlTab.yamlText !== paneYamlTab.yamlOriginalText}
+                            externalDiffLines={getYamlCompareDiffLines(paneYamlTab.id)}
+                            error={paneYamlTab.yamlError}
+                            isVerticallyCollapsed
+                            canVerticalCollapse={true}
+                            onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
+                            onYamlChange={(value) => {
+                              updateYamlTab(paneYamlTab.id, (tab) => ({ ...tab, yamlText: value }));
+                            }}
+                            onRefresh={() => {
+                              refreshYamlForTab(paneYamlTab.id);
+                            }}
+                            onSave={() => {
+                              void saveDaemonSetYaml(paneYamlTab.id);
+                            }}
+                          />
+                        {/if}
+                      {:else if paneTab.kind === "events"}
+                        {@const paneEventsTab = getEventsTab(paneTab.id)}
+                        {#if paneEventsTab}
+                          <WorkloadEventsSheet
+                            embedded={true}
+                            isOpen={workbenchOpen}
+                            title={`Daemon set events: ${paneEventsTab.target.namespace}/${paneEventsTab.target.name}`}
+                            targetRef={`${paneEventsTab.target.namespace}/${paneEventsTab.target.name}`}
+                            events={paneEventsTab.events}
+                            loading={paneEventsTab.eventsLoading}
+                            error={paneEventsTab.eventsError}
+                            isVerticallyCollapsed
+                            canVerticalCollapse={true}
+                            onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
+                          />
+                        {/if}
+                      {:else if paneTab.kind === "rollout-status" || paneTab.kind === "rollout-history"}
+                        {@const paneRolloutTab = getRolloutTab(paneTab.id)}
+                        {#if paneRolloutTab}
+                          <WorkloadCommandOutputSheet
+                            embedded={true}
+                            isOpen={workbenchOpen}
+                            title={`${paneTab.kind === "rollout-status" ? "Rollout status" : "Rollout history"}: ${paneRolloutTab.target.namespace}/${paneRolloutTab.target.name}`}
+                            collapsedLabel={paneRolloutTab.target.name}
+                            commandLabel={buildRolloutCommandArgs(paneRolloutTab.mode, {
+                              resource: "daemonset",
                               name: paneRolloutTab.target.name,
                               namespace: paneRolloutTab.target.namespace,
-                            } as DaemonSetRow);
-                            if (!daemonSet) return;
-                            void openRolloutCommandForDaemonSet(paneRolloutTab.mode, daemonSet);
-                          }}
-                        />
-                      {/if}
-                    {:else}
-                      {@const paneLogsTab = getLogsTab(paneTab.id)}
-                      {#if paneLogsTab}
-                        <ResourceLogsSheet
-                          embedded={true}
-                          isOpen={workbenchOpen}
-                          podRef={`${paneLogsTab.target.namespace}/${paneLogsTab.target.name}`}
-                          logs={paneLogsTab.logsText}
-                          loading={paneLogsTab.logsLoading}
-                          error={paneLogsTab.logsError}
-                          isLive={paneLogsTab.logsLive}
-                          mode={paneLogsTab.logsMode}
-                          lastUpdatedAt={paneLogsTab.logsUpdatedAt}
-                          previous={paneLogsTab.logsPrevious}
-                          selectedContainer={paneLogsTab.logsSelectedContainer}
-                          containerOptions={paneLogsTab.logsContainerOptions}
-                          bookmarks={paneLogsTab.bookmarks}
-                          isVerticallyCollapsed
-                          canVerticalCollapse={true}
-                          onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
-                          onToggleLive={() => {
-                            const nextLive = !paneLogsTab.logsLive;
-                            updateLogsTab(paneLogsTab.id, (tab) => ({ ...tab, logsLive: nextLive }));
-                            if (nextLive) startLiveLogsForTab(paneLogsTab.id);
-                            else stopLiveLogsForTab(paneLogsTab.id);
-                          }}
-                          onSetMode={(mode) => {
-                            if (paneLogsTab.logsMode === mode) return;
-                            updateLogsTab(paneLogsTab.id, (tab) => ({ ...tab, logsMode: mode, logsError: null }));
-                            if (paneLogsTab.logsLive) startLiveLogsForTab(paneLogsTab.id);
-                          }}
-                          onTogglePrevious={() => {
-                            updateLogsTab(paneLogsTab.id, (tab) => ({
-                              ...tab,
-                              logsPrevious: !tab.logsPrevious,
-                            }));
-                            if (paneLogsTab.logsLive) startLiveLogsForTab(paneLogsTab.id);
-                            else void loadLogsForTab(paneLogsTab.id);
-                          }}
-                          onSelectContainer={(container) => {
-                            updateLogsTab(paneLogsTab.id, (tab) => ({
-                              ...tab,
-                              logsSelectedContainer: container || "__all__",
-                            }));
-                            if (paneLogsTab.logsLive) startLiveLogsForTab(paneLogsTab.id);
-                            else void loadLogsForTab(paneLogsTab.id);
-                          }}
-                          onRefresh={() => {
-                            void loadLogsForTab(paneLogsTab.id);
-                          }}
-                          onAddBookmark={(line) => {
-                            updateLogsTab(paneLogsTab.id, (tab) => ({
-                              ...tab,
-                              bookmarks: [
-                                ...tab.bookmarks,
-                                {
-                                  id: `bookmark-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                                  line,
-                                  label: `Line ${line}`,
-                                  createdAt: Date.now(),
-                                },
-                              ],
-                            }));
-                          }}
-                          onRemoveBookmark={(bookmarkId) => {
-                            updateLogsTab(paneLogsTab.id, (tab) => ({
-                              ...tab,
-                              bookmarks: tab.bookmarks.filter((bookmark) => bookmark.id !== bookmarkId),
-                            }));
-                          }}
-                          jumpToLine={logsJumpToLine}
-                          onJumpHandled={() => {
-                            logsJumpToLine = null;
-                          }}
-                        />
-                      {/if}
-                    {/if}
-                  {:else}
-                    <div class="flex items-center gap-2 border-b px-2 py-1.5 text-xs">
-                      <span class="text-muted-foreground">{getPaneLabel(paneIndex)}</span>
-                      <select
-                        class="h-8 min-w-0 flex-1 rounded border border-input bg-background px-2 text-xs text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        value={paneTabIds[paneIndex] ?? ""}
-                        onchange={(event) => assignTabToPane(paneIndex, event.currentTarget.value || null)}
-                      >
-                        <option value="">Select tab</option>
-                        {#each orderedWorkbenchTabs as tab}
-                          <option value={tab.id}>{tab.title} ({tab.subtitle})</option>
-                        {/each}
-                      </select>
-                    </div>
-                    {#if paneTab}
-                      {#if paneTab.kind === "logs"}
+                            }).join(" ")}
+                            output={paneRolloutTab.output}
+                            loading={paneRolloutTab.loading}
+                            error={paneRolloutTab.error}
+                            isVerticallyCollapsed
+                            canVerticalCollapse={true}
+                            onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
+                            onRefresh={() => {
+                              const daemonSet = findDaemonSetItem(daemonSetsSnapshot, {
+                                uid: `${paneRolloutTab.target.namespace}/${paneRolloutTab.target.name}`,
+                                name: paneRolloutTab.target.name,
+                                namespace: paneRolloutTab.target.namespace,
+                              } as DaemonSetRow);
+                              if (!daemonSet) return;
+                              void openRolloutCommandForDaemonSet(paneRolloutTab.mode, daemonSet);
+                            }}
+                          />
+                        {/if}
+                      {:else}
                         {@const paneLogsTab = getLogsTab(paneTab.id)}
                         {#if paneLogsTab}
                           <ResourceLogsSheet
@@ -2909,18 +2912,25 @@
                             selectedContainer={paneLogsTab.logsSelectedContainer}
                             containerOptions={paneLogsTab.logsContainerOptions}
                             bookmarks={paneLogsTab.bookmarks}
-                            canVerticalCollapse={getPaneCount() > 1}
-                            isVerticallyCollapsed={false}
+                            isVerticallyCollapsed
+                            canVerticalCollapse={true}
                             onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
                             onToggleLive={() => {
                               const nextLive = !paneLogsTab.logsLive;
-                              updateLogsTab(paneLogsTab.id, (tab) => ({ ...tab, logsLive: nextLive }));
+                              updateLogsTab(paneLogsTab.id, (tab) => ({
+                                ...tab,
+                                logsLive: nextLive,
+                              }));
                               if (nextLive) startLiveLogsForTab(paneLogsTab.id);
                               else stopLiveLogsForTab(paneLogsTab.id);
                             }}
                             onSetMode={(mode) => {
                               if (paneLogsTab.logsMode === mode) return;
-                              updateLogsTab(paneLogsTab.id, (tab) => ({ ...tab, logsMode: mode, logsError: null }));
+                              updateLogsTab(paneLogsTab.id, (tab) => ({
+                                ...tab,
+                                logsMode: mode,
+                                logsError: null,
+                              }));
                               if (paneLogsTab.logsLive) startLiveLogsForTab(paneLogsTab.id);
                             }}
                             onTogglePrevious={() => {
@@ -2959,7 +2969,9 @@
                             onRemoveBookmark={(bookmarkId) => {
                               updateLogsTab(paneLogsTab.id, (tab) => ({
                                 ...tab,
-                                bookmarks: tab.bookmarks.filter((bookmark) => bookmark.id !== bookmarkId),
+                                bookmarks: tab.bookmarks.filter(
+                                  (bookmark) => bookmark.id !== bookmarkId,
+                                ),
                               }));
                             }}
                             jumpToLine={logsJumpToLine}
@@ -2968,508 +2980,642 @@
                             }}
                           />
                         {/if}
-                      {:else if paneTab.kind === "yaml"}
-                        {@const paneYamlTab = getYamlTab(paneTab.id)}
-                        {#if paneYamlTab}
-                          <ResourceYamlSheet
-                            embedded={true}
-                            isOpen={workbenchOpen}
-                            podRef={`${paneYamlTab.target.namespace}/${paneYamlTab.target.name}`}
-                            originalYaml={paneYamlTab.yamlOriginalText}
-                            yamlText={paneYamlTab.yamlText}
-                            loading={paneYamlTab.yamlLoading}
-                            saving={paneYamlTab.yamlSaving}
-                            hasChanges={paneYamlTab.yamlText !== paneYamlTab.yamlOriginalText}
-                            externalDiffLines={getYamlCompareDiffLines(paneYamlTab.id)}
-                            error={paneYamlTab.yamlError}
-                            canVerticalCollapse={getPaneCount() > 1}
-                            isVerticallyCollapsed={false}
-                            onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
-                            onYamlChange={(value) => {
-                              updateYamlTab(paneYamlTab.id, (tab) => ({ ...tab, yamlText: value }));
-                            }}
-                            onRefresh={() => {
-                              refreshYamlForTab(paneYamlTab.id);
-                            }}
-                            onSave={() => {
-                              void saveDaemonSetYaml(paneYamlTab.id);
-                            }}
-                          />
-                        {/if}
-                      {:else if paneTab.kind === "events"}
-                        {@const paneEventsTab = getEventsTab(paneTab.id)}
-                        {#if paneEventsTab}
-                          <WorkloadEventsSheet
-                            embedded={true}
-                            isOpen={workbenchOpen}
-                            title={`Daemon set events: ${paneEventsTab.target.namespace}/${paneEventsTab.target.name}`}
-                            targetRef={`${paneEventsTab.target.namespace}/${paneEventsTab.target.name}`}
-                            events={paneEventsTab.events}
-                            loading={paneEventsTab.eventsLoading}
-                            error={paneEventsTab.eventsError}
-                            canVerticalCollapse={getPaneCount() > 1}
-                            isVerticallyCollapsed={false}
-                            onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
-                          />
-                        {/if}
-                      {:else if paneTab.kind === "rollout-status" || paneTab.kind === "rollout-history"}
-                        {@const paneRolloutTab = getRolloutTab(paneTab.id)}
-                        {#if paneRolloutTab}
-                          <WorkloadCommandOutputSheet
-                            embedded={true}
-                            isOpen={workbenchOpen}
-                            title={`${paneTab.kind === "rollout-status" ? "Rollout status" : "Rollout history"}: ${paneRolloutTab.target.namespace}/${paneRolloutTab.target.name}`}
-                            collapsedLabel={paneRolloutTab.target.name}
-                            commandLabel={buildRolloutCommandArgs(paneRolloutTab.mode, {
-                              resource: "daemonset",
-                              name: paneRolloutTab.target.name,
-                              namespace: paneRolloutTab.target.namespace,
-                            }).join(" ")}
-                            output={paneRolloutTab.output}
-                            loading={paneRolloutTab.loading}
-                            error={paneRolloutTab.error}
-                            canVerticalCollapse={getPaneCount() > 1}
-                            isVerticallyCollapsed={false}
-                            onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
-                            onRefresh={() => {
-                              const daemonSet = findDaemonSetItem(daemonSetsSnapshot, {
-                                uid: `${paneRolloutTab.target.namespace}/${paneRolloutTab.target.name}`,
-                                name: paneRolloutTab.target.name,
-                                namespace: paneRolloutTab.target.namespace,
-                              } as DaemonSetRow);
-                              if (!daemonSet) return;
-                              void openRolloutCommandForDaemonSet(paneRolloutTab.mode, daemonSet);
-                            }}
-                          />
-                        {/if}
                       {/if}
                     {:else}
-                      <div class="flex h-full items-center justify-center p-4 text-sm text-muted-foreground">
-                        Select tab for {getPaneLabel(paneIndex).toLowerCase()}
+                      <div class="flex items-center gap-2 border-b px-2 py-1.5 text-xs">
+                        <span class="text-muted-foreground">{getPaneLabel(paneIndex)}</span>
+                        <select
+                          class="h-8 min-w-0 flex-1 rounded border border-input bg-background px-2 text-xs text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          value={paneTabIds[paneIndex] ?? ""}
+                          onchange={(event) =>
+                            assignTabToPane(paneIndex, event.currentTarget.value || null)}
+                        >
+                          <option value="">Select tab</option>
+                          {#each orderedWorkbenchTabs as tab}
+                            <option value={tab.id}>{tab.title} ({tab.subtitle})</option>
+                          {/each}
+                        </select>
                       </div>
+                      {#if paneTab}
+                        {#if paneTab.kind === "logs"}
+                          {@const paneLogsTab = getLogsTab(paneTab.id)}
+                          {#if paneLogsTab}
+                            <ResourceLogsSheet
+                              embedded={true}
+                              isOpen={workbenchOpen}
+                              podRef={`${paneLogsTab.target.namespace}/${paneLogsTab.target.name}`}
+                              logs={paneLogsTab.logsText}
+                              loading={paneLogsTab.logsLoading}
+                              error={paneLogsTab.logsError}
+                              isLive={paneLogsTab.logsLive}
+                              mode={paneLogsTab.logsMode}
+                              lastUpdatedAt={paneLogsTab.logsUpdatedAt}
+                              previous={paneLogsTab.logsPrevious}
+                              selectedContainer={paneLogsTab.logsSelectedContainer}
+                              containerOptions={paneLogsTab.logsContainerOptions}
+                              bookmarks={paneLogsTab.bookmarks}
+                              canVerticalCollapse={getPaneCount() > 1}
+                              isVerticallyCollapsed={false}
+                              onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
+                              onToggleLive={() => {
+                                const nextLive = !paneLogsTab.logsLive;
+                                updateLogsTab(paneLogsTab.id, (tab) => ({
+                                  ...tab,
+                                  logsLive: nextLive,
+                                }));
+                                if (nextLive) startLiveLogsForTab(paneLogsTab.id);
+                                else stopLiveLogsForTab(paneLogsTab.id);
+                              }}
+                              onSetMode={(mode) => {
+                                if (paneLogsTab.logsMode === mode) return;
+                                updateLogsTab(paneLogsTab.id, (tab) => ({
+                                  ...tab,
+                                  logsMode: mode,
+                                  logsError: null,
+                                }));
+                                if (paneLogsTab.logsLive) startLiveLogsForTab(paneLogsTab.id);
+                              }}
+                              onTogglePrevious={() => {
+                                updateLogsTab(paneLogsTab.id, (tab) => ({
+                                  ...tab,
+                                  logsPrevious: !tab.logsPrevious,
+                                }));
+                                if (paneLogsTab.logsLive) startLiveLogsForTab(paneLogsTab.id);
+                                else void loadLogsForTab(paneLogsTab.id);
+                              }}
+                              onSelectContainer={(container) => {
+                                updateLogsTab(paneLogsTab.id, (tab) => ({
+                                  ...tab,
+                                  logsSelectedContainer: container || "__all__",
+                                }));
+                                if (paneLogsTab.logsLive) startLiveLogsForTab(paneLogsTab.id);
+                                else void loadLogsForTab(paneLogsTab.id);
+                              }}
+                              onRefresh={() => {
+                                void loadLogsForTab(paneLogsTab.id);
+                              }}
+                              onAddBookmark={(line) => {
+                                updateLogsTab(paneLogsTab.id, (tab) => ({
+                                  ...tab,
+                                  bookmarks: [
+                                    ...tab.bookmarks,
+                                    {
+                                      id: `bookmark-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                                      line,
+                                      label: `Line ${line}`,
+                                      createdAt: Date.now(),
+                                    },
+                                  ],
+                                }));
+                              }}
+                              onRemoveBookmark={(bookmarkId) => {
+                                updateLogsTab(paneLogsTab.id, (tab) => ({
+                                  ...tab,
+                                  bookmarks: tab.bookmarks.filter(
+                                    (bookmark) => bookmark.id !== bookmarkId,
+                                  ),
+                                }));
+                              }}
+                              jumpToLine={logsJumpToLine}
+                              onJumpHandled={() => {
+                                logsJumpToLine = null;
+                              }}
+                            />
+                          {/if}
+                        {:else if paneTab.kind === "yaml"}
+                          {@const paneYamlTab = getYamlTab(paneTab.id)}
+                          {#if paneYamlTab}
+                            <ResourceYamlSheet
+                              embedded={true}
+                              isOpen={workbenchOpen}
+                              podRef={`${paneYamlTab.target.namespace}/${paneYamlTab.target.name}`}
+                              originalYaml={paneYamlTab.yamlOriginalText}
+                              yamlText={paneYamlTab.yamlText}
+                              loading={paneYamlTab.yamlLoading}
+                              saving={paneYamlTab.yamlSaving}
+                              hasChanges={paneYamlTab.yamlText !== paneYamlTab.yamlOriginalText}
+                              externalDiffLines={getYamlCompareDiffLines(paneYamlTab.id)}
+                              error={paneYamlTab.yamlError}
+                              canVerticalCollapse={getPaneCount() > 1}
+                              isVerticallyCollapsed={false}
+                              onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
+                              onYamlChange={(value) => {
+                                updateYamlTab(paneYamlTab.id, (tab) => ({
+                                  ...tab,
+                                  yamlText: value,
+                                }));
+                              }}
+                              onRefresh={() => {
+                                refreshYamlForTab(paneYamlTab.id);
+                              }}
+                              onSave={() => {
+                                void saveDaemonSetYaml(paneYamlTab.id);
+                              }}
+                            />
+                          {/if}
+                        {:else if paneTab.kind === "events"}
+                          {@const paneEventsTab = getEventsTab(paneTab.id)}
+                          {#if paneEventsTab}
+                            <WorkloadEventsSheet
+                              embedded={true}
+                              isOpen={workbenchOpen}
+                              title={`Daemon set events: ${paneEventsTab.target.namespace}/${paneEventsTab.target.name}`}
+                              targetRef={`${paneEventsTab.target.namespace}/${paneEventsTab.target.name}`}
+                              events={paneEventsTab.events}
+                              loading={paneEventsTab.eventsLoading}
+                              error={paneEventsTab.eventsError}
+                              canVerticalCollapse={getPaneCount() > 1}
+                              isVerticallyCollapsed={false}
+                              onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
+                            />
+                          {/if}
+                        {:else if paneTab.kind === "rollout-status" || paneTab.kind === "rollout-history"}
+                          {@const paneRolloutTab = getRolloutTab(paneTab.id)}
+                          {#if paneRolloutTab}
+                            <WorkloadCommandOutputSheet
+                              embedded={true}
+                              isOpen={workbenchOpen}
+                              title={`${paneTab.kind === "rollout-status" ? "Rollout status" : "Rollout history"}: ${paneRolloutTab.target.namespace}/${paneRolloutTab.target.name}`}
+                              collapsedLabel={paneRolloutTab.target.name}
+                              commandLabel={buildRolloutCommandArgs(paneRolloutTab.mode, {
+                                resource: "daemonset",
+                                name: paneRolloutTab.target.name,
+                                namespace: paneRolloutTab.target.namespace,
+                              }).join(" ")}
+                              output={paneRolloutTab.output}
+                              loading={paneRolloutTab.loading}
+                              error={paneRolloutTab.error}
+                              canVerticalCollapse={getPaneCount() > 1}
+                              isVerticallyCollapsed={false}
+                              onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
+                              onRefresh={() => {
+                                const daemonSet = findDaemonSetItem(daemonSetsSnapshot, {
+                                  uid: `${paneRolloutTab.target.namespace}/${paneRolloutTab.target.name}`,
+                                  name: paneRolloutTab.target.name,
+                                  namespace: paneRolloutTab.target.namespace,
+                                } as DaemonSetRow);
+                                if (!daemonSet) return;
+                                void openRolloutCommandForDaemonSet(paneRolloutTab.mode, daemonSet);
+                              }}
+                            />
+                          {/if}
+                        {/if}
+                      {:else}
+                        <div
+                          class="flex h-full items-center justify-center p-4 text-sm text-muted-foreground"
+                        >
+                          Select tab for {getPaneLabel(paneIndex).toLowerCase()}
+                        </div>
+                      {/if}
                     {/if}
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </div>
-      {/if}
-        {/snippet}
-      </MultiPaneWorkbench>
-    </div>
-  {/if}
-
-  {#if selectedCount > 0}
-    <WorkloadSelectionBar count={selectedCount}>
-      {#snippet children()}
-        <DaemonSetBulkActions
-          mode={selectedCount === 1 ? "single" : "multi"}
-          disabled={actionInFlight}
-          onShowDetails={() => {
-            if (selectedDaemonSets.length !== 1) return;
-            openSheet(selectedDaemonSets[0]);
-          }}
-          onLogs={() => {
-            if (selectedDaemonSets.length !== 1) return;
-            void openLogsForDaemonSet(selectedDaemonSets[0]);
-          }}
-          onEvents={() => {
-            if (selectedDaemonSets.length !== 1) return;
-            void openEventsForDaemonSet(selectedDaemonSets[0]);
-          }}
-          onEditYaml={() => {
-            if (selectedDaemonSets.length !== 1) return;
-            void openYamlForDaemonSet(selectedDaemonSets[0]);
-          }}
-          onInvestigate={() => {
-            if (selectedDaemonSets.length !== 1) return;
-            void openDaemonSetInvestigationWorkspace(selectedDaemonSets[0]);
-          }}
-          onCopyDescribe={() => {
-            if (selectedDaemonSets.length !== 1) return;
-            void copyDescribeCommandForDaemonSet(selectedDaemonSets[0]);
-          }}
-          onRunDebugDescribe={() => {
-            if (selectedDaemonSets.length !== 1) return;
-            openDebugDescribeForDaemonSet(selectedDaemonSets[0]);
-          }}
-          onDownloadYaml={() => {
-            void downloadYamlForDaemonSets(selectedDaemonSets);
-          }}
-          onRolloutStatus={() => {
-            if (selectedDaemonSets.length !== 1) return;
-            void openRolloutCommandForDaemonSet("status", selectedDaemonSets[0]);
-          }}
-          onRolloutHistory={() => {
-            if (selectedDaemonSets.length !== 1) return;
-            void openRolloutCommandForDaemonSet("history", selectedDaemonSets[0]);
-          }}
-          onRestart={() => {
-            void restartDaemonSets(selectedDaemonSets);
-          }}
-          onDelete={() => {
-            void deleteDaemonSets(selectedDaemonSets);
-          }}
-        />
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={actionInFlight}
-          onclick={() => {
-            selectedDaemonSetIds = new Set<string>();
-          }}
-        >
-          Clear
-        </Button>
-      {/snippet}
-    </WorkloadSelectionBar>
-  {/if}
-
-  <ResourceSummaryStrip
-    items={[
-      { label: "Cluster", value: resolvePageClusterName(data), tone: "foreground" },
-      { label: "Namespace", value: daemonSetsNamespaceSummary },
-      { label: "Daemon Sets", value: rows.length },
-      { label: "Sync", value: daemonSetsRuntimeSourceState },
-    ]}
-    trailingItem={{
-      label: "View",
-      value: daemonSetsSummaryView,
-      valueClass: "text-foreground",
-    }}
-  />
-
-  <div class="mb-4">
-    <SectionRuntimeStatus
-      sectionLabel="Daemon Sets Runtime Status"
-      profileLabel={daemonSetsRuntimeProfileLabel}
-      sourceState={daemonSetsRuntimeSourceState}
-      mode={watcherPolicy.mode === "stream" ? "stream" : "poll"}
-      budgetSummary={`sync ${watcherPolicy.refreshSeconds}s`}
-      lastUpdatedLabel={daemonSetsRuntimeLastUpdatedLabel}
-      detail={daemonSetsRuntimeDetail}
-      secondaryActionLabel="Update"
-      secondaryActionAriaLabel="Refresh daemon sets runtime section"
-      secondaryActionLoading={watcherInFlight}
-      onSecondaryAction={() => void refreshDaemonSetsFromWatcher("manual")}
-      reason={daemonSetsRuntimeReason}
-      actionLabel={watcherEnabled ? "Pause section" : "Resume section"}
-      actionAriaLabel={watcherEnabled ? "Pause daemon sets runtime section" : "Resume daemon sets runtime section"}
-      onAction={toggleWatcher}
-    />
-  </div>
-
-  <DataTable
-    data={rows}
-    {columns}
-    isRowSelected={(row) => isDaemonSetSelected(row.uid)}
-    onToggleGroupSelection={toggleGroupSelection}
-    {watcherEnabled}
-    {watcherRefreshSeconds}
-    {watcherError}
-    viewMode={daemonSetsTableViewMode}
-    onViewModeChange={setViewMode}
-    onToggleWatcher={toggleWatcher}
-    onWatcherRefreshSecondsChange={setWatcherRefreshSeconds}
-    onResetWatcherSettings={resetWatcherSettings}
-    onCsvDownloaded={({ pathHint, rows: csvRows }) => {
-      actionNotification = null;
-      actionNotification = notifySuccess(`CSV exported: ${pathHint} (${csvRows} rows).`);
-    }}
-    onRowClick={(row) => {
-      const item = findDaemonSetItem(daemonSets, row);
-      if (item) openSheet(item);
-    }}
-  />
-
-  {#if $isSheetOpen && $selectedItem}
-  <DetailsSheetPortal open={$isSheetOpen} onClose={closeDetails} closeAriaLabel="Close daemon set details">
-        <div class="flex items-center justify-between gap-2 border-b px-4 py-3">
-          <div class="min-w-0 flex items-center gap-2">
-            <Info class="h-4 w-4 shrink-0 text-muted-foreground" />
-            <div class="truncate text-base font-semibold">DaemonSet: {$selectedItem.metadata?.name ?? "-"}</div>
-          </div>
-          <DetailsHeaderActions
-            actions={[
-              {
-                id: "download-yaml",
-                title: "Download YAML",
-                ariaLabel: "Download daemon set YAML",
-                icon: FileDown,
-                onClick: () => {
-                  const item = $selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => downloadYamlForDaemonSets([item]));
-                },
-              },
-              {
-                id: "logs",
-                title: "Logs",
-                ariaLabel: "Open daemon set logs",
-                icon: ScrollText,
-                onClick: () => {
-                  const item = $selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => openLogsForDaemonSet(item));
-                },
-              },
-              {
-                id: "events",
-                title: "Events",
-                ariaLabel: "Open daemon set events",
-                icon: Clock3,
-                onClick: () => {
-                  const item = $selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => openEventsForDaemonSet(item));
-                },
-              },
-              {
-                id: "edit-yaml",
-                title: "Edit YAML",
-                ariaLabel: "Edit daemon set YAML",
-                icon: Pencil,
-                onClick: () => {
-                  const item = $selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => openYamlForDaemonSet(item));
-                },
-              },
-              {
-                id: "restart",
-                title: "Rollout restart",
-                ariaLabel: "Rollout restart daemon set",
-                icon: RotateCcw,
-                onClick: () => {
-                  const item = $selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => restartDaemonSets([item]));
-                },
-              },
-              {
-                id: "rollout-status",
-                title: "Rollout status",
-                ariaLabel: "Open rollout status for daemon set",
-                icon: Clock3,
-                onClick: () => {
-                  const item = $selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => openRolloutCommandForDaemonSet("status", item));
-                },
-              },
-              {
-                id: "rollout-history",
-                title: "Rollout history",
-                ariaLabel: "Open rollout history for daemon set",
-                icon: ListTree,
-                onClick: () => {
-                  const item = $selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => openRolloutCommandForDaemonSet("history", item));
-                },
-              },
-              {
-                id: "investigate",
-                title: "Investigate",
-                ariaLabel: "Investigate daemon set",
-                icon: Search,
-                onClick: () => {
-                  const item = $selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => openDaemonSetInvestigationWorkspace(item));
-                },
-              },
-              {
-                id: "copy-describe",
-                title: "Copy kubectl describe",
-                ariaLabel: "Copy kubectl describe for daemon set",
-                icon: ClipboardList,
-                onClick: () => {
-                  const item = $selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => copyDescribeCommandForDaemonSet(item));
-                },
-              },
-              {
-                id: "delete",
-                title: "Delete",
-                ariaLabel: "Delete daemon set",
-                icon: Trash,
-                destructive: true,
-                onClick: () => {
-                  const item = $selectedItem;
-                  if (!item) return;
-                  void runDetailsAction(() => deleteDaemonSets([item]));
-                },
-              },
-            ]}
-            closeAriaLabel="Close details"
-            onClose={closeDetails}
-          />
-        </div>
-        <div class="flex-1 overflow-y-auto p-4">
-          <div class="text-xs text-muted-foreground">
-            Namespace: {$selectedItem.metadata?.namespace ?? "default"} · Node: {getDetailsHeaderNode()} · Pod IP:
-            {getDetailsHeaderPodIp()}
-          </div>
-          <ResourceTrafficChain
-            clusterId={data.slug}
-            resourceKind="DaemonSet"
-            resourceName={$selectedItem.metadata?.name ?? ""}
-            resourceNamespace={$selectedItem.metadata?.namespace ?? "default"}
-            raw={$selectedItem as unknown as Record<string, unknown>}
-          />
-          <h3 class="my-4 font-bold">Properties</h3>
-          <DetailsMetadataGrid
-            contextKey={`${$selectedItem.metadata?.namespace ?? "default"}/${$selectedItem.metadata?.name ?? "-"}`}
-            fields={[
-              { label: "Created", value: formatCreatedLabel() },
-              { label: "Name", value: $selectedItem.metadata?.name ?? "-" },
-              { label: "Namespace", value: $selectedItem.metadata?.namespace ?? "default" },
-            ]}
-            labels={getLabelEntries()}
-            annotations={getAnnotationEntries()}
-          />
-          <div class="mt-2 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Selector</div>
-              <div class="break-all">{getSelectorLabel()}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Node Selector</div>
-              <div class="break-all">{getNodeSelectorLabel()}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Images</div>
-              <button
-                type="button"
-                class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
-                  showImagesDetails
-                    ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-                onclick={() => (showImagesDetails = !showImagesDetails)}
-              >
-                <span>{getImages().length} Image{getImages().length === 1 ? "" : "s"}</span>
-                {#if showImagesDetails}
-                  <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
-                {:else}
-                  <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
-                {/if}
-              </button>
-              {#if showImagesDetails}
-                <div class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10">
-                  {#if getImages().length === 0}
-                    <div class="text-muted-foreground">No images found.</div>
-                  {:else}
-                    {#each getImages() as image}
-                      <div class="break-all">{image}</div>
-                    {/each}
-                  {/if}
-                </div>
-              {/if}
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Strategy Type</div>
-              <div>{getStrategyType()}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Tolerations</div>
-              <button
-                type="button"
-                class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
-                  showTolerationsDetails
-                    ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-                onclick={() => (showTolerationsDetails = !showTolerationsDetails)}
-              >
-                <span>{getTolerationsCount()}</span>
-                {#if showTolerationsDetails}
-                  <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
-                {:else}
-                  <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
-                {/if}
-              </button>
-              {#if showTolerationsDetails}
-                <div class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10">
-                  {#if getTolerationDetails().length === 0}
-                    <div class="text-muted-foreground">No tolerations.</div>
-                  {:else}
-                    {#each getTolerationDetails() as line}
-                      <div class="break-all">{line}</div>
-                    {/each}
-                  {/if}
-                </div>
-              {/if}
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Pod Status</div>
-              <div>{getPodStatusLabel()}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Node Affinities</div>
-              <button
-                type="button"
-                class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
-                  showNodeAffinitiesDetails
-                    ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-                onclick={() => (showNodeAffinitiesDetails = !showNodeAffinitiesDetails)}
-              >
-                <span>{getNodeAffinityRulesCount()} Rule{getNodeAffinityRulesCount() === 1 ? "" : "s"}</span>
-                {#if showNodeAffinitiesDetails}
-                  <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
-                {:else}
-                  <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
-                {/if}
-              </button>
-              {#if showNodeAffinitiesDetails}
-                <div class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10">
-                  {#if getNodeAffinityDetails().length === 0}
-                    <div class="text-muted-foreground">No node affinity rules.</div>
-                  {:else}
-                    {#each getNodeAffinityDetails() as line}
-                      <div class="break-all">{line}</div>
-                    {/each}
-                  {/if}
-                </div>
-              {/if}
-            </div>
-          </div>
-          <h3 class="my-4 font-bold">Pods</h3>
-          <div class="space-y-1 text-sm">
-            {#if detailsPods.length === 0}
-              <div class="text-muted-foreground">No pods found.</div>
-            {:else}
-              {#each detailsPods as pod}
-                <div class="grid grid-cols-1 gap-2 rounded border p-2 sm:grid-cols-[2fr_2fr_1fr_1fr_1fr_1fr_1fr]">
-                  <div>{pod.name}</div>
-                  <div>{pod.node}</div>
-                  <div>{pod.namespace}</div>
-                  <div>{pod.ready}</div>
-                  <div>{pod.cpu}</div>
-                  <div>{pod.memory}</div>
-                  <div class={`inline-flex items-center gap-2 ${getPodStatusToneClasses(pod.status).text}`}>
-                    <span class={`inline-block h-2 w-2 rounded-full ${getPodStatusToneClasses(pod.status).dot}`}></span>
-                    {pod.status}
                   </div>
-                </div>
-              {/each}
+                {/each}
+              </div>
             {/if}
           </div>
-          <h3 class="my-4 font-bold">Events</h3>
-          <DetailsEventsList events={detailsEvents} emptyText="No events found." />
-          {#if detailsLoading}
-            <div class="mt-3 text-sm text-muted-foreground">Loading daemon set details...</div>
-          {/if}
-          {#if detailsError}
-            <div class="mt-3 rounded border border-rose-300/80 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-500/70 dark:bg-rose-500/20 dark:text-rose-100">
-              {detailsError}
+        {/if}
+      {/snippet}
+    </MultiPaneWorkbench>
+  </div>
+{/if}
+
+{#if selectedCount > 0}
+  <WorkloadSelectionBar count={selectedCount}>
+    {#snippet children()}
+      <DaemonSetBulkActions
+        mode={selectedCount === 1 ? "single" : "multi"}
+        disabled={actionInFlight}
+        onShowDetails={() => {
+          if (selectedDaemonSets.length !== 1) return;
+          openSheet(selectedDaemonSets[0]);
+        }}
+        onLogs={() => {
+          if (selectedDaemonSets.length !== 1) return;
+          void openLogsForDaemonSet(selectedDaemonSets[0]);
+        }}
+        onEvents={() => {
+          if (selectedDaemonSets.length !== 1) return;
+          void openEventsForDaemonSet(selectedDaemonSets[0]);
+        }}
+        onEditYaml={() => {
+          if (selectedDaemonSets.length !== 1) return;
+          void openYamlForDaemonSet(selectedDaemonSets[0]);
+        }}
+        onInvestigate={() => {
+          if (selectedDaemonSets.length !== 1) return;
+          void openDaemonSetInvestigationWorkspace(selectedDaemonSets[0]);
+        }}
+        onCopyDescribe={() => {
+          if (selectedDaemonSets.length !== 1) return;
+          void copyDescribeCommandForDaemonSet(selectedDaemonSets[0]);
+        }}
+        onRunDebugDescribe={() => {
+          if (selectedDaemonSets.length !== 1) return;
+          openDebugDescribeForDaemonSet(selectedDaemonSets[0]);
+        }}
+        onDownloadYaml={() => {
+          void downloadYamlForDaemonSets(selectedDaemonSets);
+        }}
+        onRolloutStatus={() => {
+          if (selectedDaemonSets.length !== 1) return;
+          void openRolloutCommandForDaemonSet("status", selectedDaemonSets[0]);
+        }}
+        onRolloutHistory={() => {
+          if (selectedDaemonSets.length !== 1) return;
+          void openRolloutCommandForDaemonSet("history", selectedDaemonSets[0]);
+        }}
+        onRestart={() => {
+          void restartDaemonSets(selectedDaemonSets);
+        }}
+        onDelete={() => {
+          void deleteDaemonSets(selectedDaemonSets);
+        }}
+      />
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={actionInFlight}
+        onclick={() => {
+          selectedDaemonSetIds = new Set<string>();
+        }}
+      >
+        Clear
+      </Button>
+    {/snippet}
+  </WorkloadSelectionBar>
+{/if}
+
+<ResourceSummaryStrip
+  items={[
+    { label: "Cluster", value: resolvePageClusterName(data), tone: "foreground" },
+    { label: "Namespace", value: daemonSetsNamespaceSummary },
+    { label: "Daemon Sets", value: rows.length },
+    { label: "Sync", value: daemonSetsRuntimeSourceState },
+  ]}
+  trailingItem={{
+    label: "View",
+    value: daemonSetsSummaryView,
+    valueClass: "text-foreground",
+  }}
+/>
+
+<div class="mb-4">
+  <SectionRuntimeStatus
+    sectionLabel="Daemon Sets Runtime Status"
+    profileLabel={daemonSetsRuntimeProfileLabel}
+    sourceState={daemonSetsRuntimeSourceState}
+    mode={watcherPolicy.mode === "stream" ? "stream" : "poll"}
+    budgetSummary={`sync ${watcherPolicy.refreshSeconds}s`}
+    lastUpdatedLabel={daemonSetsRuntimeLastUpdatedLabel}
+    detail={daemonSetsRuntimeDetail}
+    secondaryActionLabel="Update"
+    secondaryActionAriaLabel="Refresh daemon sets runtime section"
+    secondaryActionLoading={watcherInFlight}
+    onSecondaryAction={() => void refreshDaemonSetsFromWatcher("manual")}
+    reason={daemonSetsRuntimeReason}
+    actionLabel={watcherEnabled ? "Pause section" : "Resume section"}
+    actionAriaLabel={watcherEnabled
+      ? "Pause daemon sets runtime section"
+      : "Resume daemon sets runtime section"}
+    onAction={toggleWatcher}
+  />
+</div>
+
+<DataTable
+  data={rows}
+  {columns}
+  isRowSelected={(row) => isDaemonSetSelected(row.uid)}
+  onToggleGroupSelection={toggleGroupSelection}
+  {watcherEnabled}
+  {watcherRefreshSeconds}
+  {watcherError}
+  viewMode={daemonSetsTableViewMode}
+  onViewModeChange={setViewMode}
+  onToggleWatcher={toggleWatcher}
+  onWatcherRefreshSecondsChange={setWatcherRefreshSeconds}
+  onResetWatcherSettings={resetWatcherSettings}
+  onCsvDownloaded={({ pathHint, rows: csvRows }) => {
+    actionNotification = null;
+    actionNotification = notifySuccess(`CSV exported: ${pathHint} (${csvRows} rows).`);
+  }}
+  onRowClick={(row) => {
+    const item = findDaemonSetItem(daemonSets, row);
+    if (item) openSheet(item);
+  }}
+/>
+
+{#if $isSheetOpen && $selectedItem}
+  <DetailsSheetPortal
+    open={$isSheetOpen}
+    onClose={closeDetails}
+    closeAriaLabel="Close daemon set details"
+  >
+    <div class="flex items-center justify-between gap-2 border-b px-4 py-3">
+      <div class="min-w-0 flex items-center gap-2">
+        <Info class="h-4 w-4 shrink-0 text-muted-foreground" />
+        <div class="truncate text-base font-semibold">
+          DaemonSet: {$selectedItem.metadata?.name ?? "-"}
+        </div>
+      </div>
+      <DetailsHeaderActions
+        actions={[
+          {
+            id: "download-yaml",
+            title: "Download YAML",
+            ariaLabel: "Download daemon set YAML",
+            icon: FileDown,
+            onClick: () => {
+              const item = $selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => downloadYamlForDaemonSets([item]));
+            },
+          },
+          {
+            id: "logs",
+            title: "Logs",
+            ariaLabel: "Open daemon set logs",
+            icon: ScrollText,
+            onClick: () => {
+              const item = $selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => openLogsForDaemonSet(item));
+            },
+          },
+          {
+            id: "events",
+            title: "Events",
+            ariaLabel: "Open daemon set events",
+            icon: Clock3,
+            onClick: () => {
+              const item = $selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => openEventsForDaemonSet(item));
+            },
+          },
+          {
+            id: "edit-yaml",
+            title: "Edit YAML",
+            ariaLabel: "Edit daemon set YAML",
+            icon: Pencil,
+            onClick: () => {
+              const item = $selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => openYamlForDaemonSet(item));
+            },
+          },
+          {
+            id: "restart",
+            title: "Rollout restart",
+            ariaLabel: "Rollout restart daemon set",
+            icon: RotateCcw,
+            onClick: () => {
+              const item = $selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => restartDaemonSets([item]));
+            },
+          },
+          {
+            id: "rollout-status",
+            title: "Rollout status",
+            ariaLabel: "Open rollout status for daemon set",
+            icon: Clock3,
+            onClick: () => {
+              const item = $selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => openRolloutCommandForDaemonSet("status", item));
+            },
+          },
+          {
+            id: "rollout-history",
+            title: "Rollout history",
+            ariaLabel: "Open rollout history for daemon set",
+            icon: ListTree,
+            onClick: () => {
+              const item = $selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => openRolloutCommandForDaemonSet("history", item));
+            },
+          },
+          {
+            id: "investigate",
+            title: "Investigate",
+            ariaLabel: "Investigate daemon set",
+            icon: Search,
+            onClick: () => {
+              const item = $selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => openDaemonSetInvestigationWorkspace(item));
+            },
+          },
+          {
+            id: "copy-describe",
+            title: "Copy kubectl describe",
+            ariaLabel: "Copy kubectl describe for daemon set",
+            icon: ClipboardList,
+            onClick: () => {
+              const item = $selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => copyDescribeCommandForDaemonSet(item));
+            },
+          },
+          {
+            id: "delete",
+            title: "Delete",
+            ariaLabel: "Delete daemon set",
+            icon: Trash,
+            destructive: true,
+            onClick: () => {
+              const item = $selectedItem;
+              if (!item) return;
+              void runDetailsAction(() => deleteDaemonSets([item]));
+            },
+          },
+        ]}
+        closeAriaLabel="Close details"
+        onClose={closeDetails}
+      />
+    </div>
+    <div class="flex-1 overflow-y-auto p-4">
+      <div class="text-xs text-muted-foreground">
+        Namespace: {$selectedItem.metadata?.namespace ?? "default"} · Node: {getDetailsHeaderNode()}
+        · Pod IP:
+        {getDetailsHeaderPodIp()}
+      </div>
+      <ResourceTrafficChain
+        clusterId={data.slug}
+        resourceKind="DaemonSet"
+        resourceName={$selectedItem.metadata?.name ?? ""}
+        resourceNamespace={$selectedItem.metadata?.namespace ?? "default"}
+        raw={$selectedItem as unknown as Record<string, unknown>}
+      />
+      <h3 class="my-4 font-bold">Properties</h3>
+      <DetailsMetadataGrid
+        contextKey={`${$selectedItem.metadata?.namespace ?? "default"}/${$selectedItem.metadata?.name ?? "-"}`}
+        fields={[
+          { label: "Created", value: formatCreatedLabel() },
+          { label: "Name", value: $selectedItem.metadata?.name ?? "-" },
+          { label: "Namespace", value: $selectedItem.metadata?.namespace ?? "default" },
+        ]}
+        labels={getLabelEntries()}
+        annotations={getAnnotationEntries()}
+      />
+      <div class="mt-2 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+        <div class="rounded border p-3">
+          <div class="text-xs text-muted-foreground">Selector</div>
+          <div class="break-all">{getSelectorLabel()}</div>
+        </div>
+        <div class="rounded border p-3">
+          <div class="text-xs text-muted-foreground">Node Selector</div>
+          <div class="break-all">{getNodeSelectorLabel()}</div>
+        </div>
+        <div class="rounded border p-3">
+          <div class="text-xs text-muted-foreground">Images</div>
+          <button
+            type="button"
+            class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
+              showImagesDetails
+                ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+            onclick={() => (showImagesDetails = !showImagesDetails)}
+          >
+            <span>{getImages().length} Image{getImages().length === 1 ? "" : "s"}</span>
+            {#if showImagesDetails}
+              <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
+            {:else}
+              <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
+            {/if}
+          </button>
+          {#if showImagesDetails}
+            <div
+              class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10"
+            >
+              {#if getImages().length === 0}
+                <div class="text-muted-foreground">No images found.</div>
+              {:else}
+                {#each getImages() as image}
+                  <div class="break-all">{image}</div>
+                {/each}
+              {/if}
             </div>
           {/if}
         </div>
+        <div class="rounded border p-3">
+          <div class="text-xs text-muted-foreground">Strategy Type</div>
+          <div>{getStrategyType()}</div>
+        </div>
+        <div class="rounded border p-3">
+          <div class="text-xs text-muted-foreground">Tolerations</div>
+          <button
+            type="button"
+            class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
+              showTolerationsDetails
+                ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+            onclick={() => (showTolerationsDetails = !showTolerationsDetails)}
+          >
+            <span>{getTolerationsCount()}</span>
+            {#if showTolerationsDetails}
+              <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
+            {:else}
+              <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
+            {/if}
+          </button>
+          {#if showTolerationsDetails}
+            <div
+              class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10"
+            >
+              {#if getTolerationDetails().length === 0}
+                <div class="text-muted-foreground">No tolerations.</div>
+              {:else}
+                {#each getTolerationDetails() as line}
+                  <div class="break-all">{line}</div>
+                {/each}
+              {/if}
+            </div>
+          {/if}
+        </div>
+        <div class="rounded border p-3">
+          <div class="text-xs text-muted-foreground">Pod Status</div>
+          <div>{getPodStatusLabel()}</div>
+        </div>
+        <div class="rounded border p-3">
+          <div class="text-xs text-muted-foreground">Node Affinities</div>
+          <button
+            type="button"
+            class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
+              showNodeAffinitiesDetails
+                ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+            onclick={() => (showNodeAffinitiesDetails = !showNodeAffinitiesDetails)}
+          >
+            <span
+              >{getNodeAffinityRulesCount()} Rule{getNodeAffinityRulesCount() === 1
+                ? ""
+                : "s"}</span
+            >
+            {#if showNodeAffinitiesDetails}
+              <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
+            {:else}
+              <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
+            {/if}
+          </button>
+          {#if showNodeAffinitiesDetails}
+            <div
+              class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10"
+            >
+              {#if getNodeAffinityDetails().length === 0}
+                <div class="text-muted-foreground">No node affinity rules.</div>
+              {:else}
+                {#each getNodeAffinityDetails() as line}
+                  <div class="break-all">{line}</div>
+                {/each}
+              {/if}
+            </div>
+          {/if}
+        </div>
+      </div>
+      <h3 class="my-4 font-bold">Pods</h3>
+      <div class="space-y-1 text-sm">
+        {#if detailsPods.length === 0}
+          <div class="text-muted-foreground">No pods found.</div>
+        {:else}
+          {#each detailsPods as pod}
+            <div
+              class="grid grid-cols-1 gap-2 rounded border p-2 sm:grid-cols-[2fr_2fr_1fr_1fr_1fr_1fr_1fr]"
+            >
+              <div>{pod.name}</div>
+              <div>{pod.node}</div>
+              <div>{pod.namespace}</div>
+              <div>{pod.ready}</div>
+              <div>{pod.cpu}</div>
+              <div>{pod.memory}</div>
+              <div
+                class={`inline-flex items-center gap-2 ${getPodStatusToneClasses(pod.status).text}`}
+              >
+                <span
+                  class={`inline-block h-2 w-2 rounded-full ${getPodStatusToneClasses(pod.status).dot}`}
+                ></span>
+                {pod.status}
+              </div>
+            </div>
+          {/each}
+        {/if}
+      </div>
+      <h3 class="my-4 font-bold">Events</h3>
+      <DetailsEventsList events={detailsEvents} emptyText="No events found." />
+      {#if detailsLoading}
+        <div class="mt-3 text-sm text-muted-foreground">Loading daemon set details...</div>
+      {/if}
+      {#if detailsError}
+        <div
+          class="mt-3 rounded border border-rose-300/80 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-500/70 dark:bg-rose-500/20 dark:text-rose-100"
+        >
+          {detailsError}
+        </div>
+      {/if}
+    </div>
   </DetailsSheetPortal>
-  {/if}
+{/if}

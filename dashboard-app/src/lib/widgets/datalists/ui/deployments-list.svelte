@@ -31,6 +31,7 @@
   import { renderComponent, renderSnippet } from "$shared/ui/data-table";
   import { Button, SortingButton } from "$shared/ui/button";
   import { confirmAction } from "$shared/lib/confirm-action";
+  import { trackCoreAction } from "$shared/analytics/wau-c";
   import * as Alert from "$shared/ui/alert";
   import { namespaceMatches, selectedNamespace } from "$features/namespace-management";
   import { runDebugDescribe } from "$features/resource-debug-runtime";
@@ -656,6 +657,8 @@
     isOpen = true;
     detailsKeyLoaded = null;
     showPodAntiAffinitiesDetails = false;
+    // WAU-C Core Action #2: user opened workload details.
+    void trackCoreAction("rozoom_workload_detail_opened", data.slug);
   }
 
   function openSheetByRow(row: DeploymentRow) {
