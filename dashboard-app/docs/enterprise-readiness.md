@@ -50,8 +50,11 @@ Dates: current as of **2026-04-19**.
 
 ### Data handling
 
-- **No external telemetry** beyond optional Sentry. No Posthog, Mixpanel,
-  GA, or vendor analytics.
+- **No external telemetry** beyond optional Sentry and strictly opt-in
+  usage analytics (PostHog, off by default): nothing is sent unless the
+  user accepts the first-run consent prompt, and only three anonymous
+  core-action events when they do. No autocapture, no session recording,
+  no PII, no Mixpanel/GA.
 - **All cloud API calls** go through bundled CLIs (aws/gcloud/az/etc).
   The WebView never reaches a cloud endpoint directly.
 - **Local audit trail** — cluster add/remove/restore events timestamped
