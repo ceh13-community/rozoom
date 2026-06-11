@@ -1,13 +1,22 @@
 /**
- * Telemetry consent — opt-out model with an explicit first-run notice and
- * Do Not Track support. Decision: state/wau-c-spec.md §7.1 (PM approved).
+ * Telemetry consent — strict opt-in model.
  *
- * Telemetry is ON by default for an OSS K8s tool (no forced auth), but:
- *   - users can turn it off with a single toggle (persisted), and
- *   - we always honour the browser Do Not Track signal.
+ * Decision: U_DAW 2026-06-10 (supersedes the opt-out model from
+ * state/wau-c-spec.md §7.1). Public commitment: "no telemetry beyond
+ * opt-in" — so not a single event leaves the app (including identify)
+ * until the user explicitly says yes on the first-run consent prompt.
+ *
+ * Consent has three states:
+ *   - undecided (default) — no telemetry, prompt the user on launch
+ *   - granted             — telemetry on
+ *   - denied              — telemetry off, never prompt again
+ *
+ * Do Not Track / Global Privacy Control is honoured on top: when the
+ * browser sends it we neither prompt nor track, regardless of state.
  */
-const OPT_OUT_KEY = "rozoom.telemetry_optout";
-const NOTICE_SEEN_KEY = "rozoom.telemetry_notice_seen";
+const CONSENT_KEY = "rozoom.telemetry_consent";
+
+export type TelemetryConsent = "granted" | "denied" | "undecided";
 
 /** True when the browser asks us not to track (DNT / GPC). */
 export function isDoNotTrack(): boolean {
@@ -17,33 +26,33 @@ export function isDoNotTrack(): boolean {
   return (navigator as unknown as { globalPrivacyControl?: boolean }).globalPrivacyControl === true;
 }
 
-/** Whether the user has explicitly opted out of telemetry. */
-export function hasOptedOut(): boolean {
-  if (typeof window === "undefined") return true;
-  return window.localStorage.getItem(OPT_OUT_KEY) === "true";
+/** The user's recorded consent decision, or "undecided" when none exists. */
+export function getTelemetryConsent(): TelemetryConsent {
+  if (typeof window === "undefined") return "undecided";
+  const stored = window.localStorage.getItem(CONSENT_KEY);
+  return stored === "granted" || stored === "denied" ? stored : "undecided";
 }
 
-/** Persist the user's telemetry choice. */
-export function setTelemetryOptOut(optOut: boolean): void {
+/** Persist the user's explicit consent decision. */
+export function setTelemetryConsent(consent: Exclude<TelemetryConsent, "undecided">): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(OPT_OUT_KEY, optOut ? "true" : "false");
+  window.localStorage.setItem(CONSENT_KEY, consent);
 }
 
-/** Telemetry is allowed only when DNT is off and the user hasn't opted out. */
+/** Telemetry is allowed only with explicit consent and no DNT signal. */
 export function isTelemetryEnabled(): boolean {
   if (typeof window === "undefined") return false;
   if (isDoNotTrack()) return false;
-  return !hasOptedOut();
+  return getTelemetryConsent() === "granted";
 }
 
-/** Whether the first-run telemetry notice still needs to be shown. */
-export function needsTelemetryNotice(): boolean {
+/**
+ * Whether the consent prompt should be shown: only while undecided and
+ * not under DNT. A dismissed prompt (no click) stays undecided, so it
+ * re-appears on the next launch until the user actually chooses.
+ */
+export function needsConsentPrompt(): boolean {
   if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(NOTICE_SEEN_KEY) !== "true";
-}
-
-/** Mark the first-run telemetry notice as acknowledged. */
-export function markTelemetryNoticeSeen(): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(NOTICE_SEEN_KEY, "true");
+  if (isDoNotTrack()) return false;
+  return getTelemetryConsent() === "undecided";
 }

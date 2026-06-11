@@ -11,8 +11,9 @@ import { isTelemetryEnabled } from "./consent";
  * session recording are OFF by design — DevOps audience + privacy-first.
  *
  * Identity is an anonymous install-hash = SHA-256(cluster_id + install_id),
- * no PII. Telemetry is opt-out with an explicit first-run notice and honours
- * Do Not Track — see ./consent.
+ * no PII. Telemetry is strictly opt-in (U_DAW decision 2026-06-10): nothing
+ * is initialised or sent until the user grants consent on the first-run
+ * prompt — see ./consent and ./telemetry-consent.
  */
 export type CoreAction =
   | "rozoom_dashboard_viewed"
@@ -22,9 +23,10 @@ export type CoreAction =
 let initialized = false;
 
 /**
- * Initialise PostHog once, only when telemetry is allowed and a project key
- * is configured. Safe to call on every app mount — no-ops after the first
- * successful init and when consent/key is absent. Never throws into the caller.
+ * Initialise PostHog once, only when the user has granted consent and a
+ * project key is configured. Safe to call on every app mount and again right
+ * after consent is granted — no-ops after the first successful init and while
+ * consent/key is absent. Never throws into the caller.
  */
 export function initAnalytics(): void {
   if (initialized) return;
@@ -55,9 +57,13 @@ export function initAnalytics(): void {
  * first paint. No-ops silently when analytics is not initialised.
  */
 export async function trackCoreAction(event: CoreAction, clusterId: string): Promise<void> {
+  // Lazy init: child onMount runs before the root layout's in Svelte, so a
+  // deep launch straight into a cluster route would otherwise emit before
+  // initAnalytics() ever ran. Idempotent and consent-gated, so safe here.
+  initAnalytics();
   if (!initialized) return;
-  // Re-check consent on every emit so an opt-out made after init (e.g. via the
-  // first-run notice) takes effect immediately, not on the next reload.
+  // Re-check consent on every emit so a withdrawal after init takes effect
+  // immediately, not on the next reload.
   if (!isTelemetryEnabled()) return;
   try {
     const installId = getInstallId();
