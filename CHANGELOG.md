@@ -2,6 +2,30 @@
 
 All notable changes to ROZOOM - K8s Linter IDE.
 
+## [0.22.2] - 2026-06-11
+
+### Added
+- Anonymous usage telemetry (PostHog) with strict opt-in consent: an explicit
+  prompt on first launch, and no events leave the app until consent is given.
+  Declining persists and is never re-asked; DNT/GPC browser signals disable
+  telemetry regardless of stored consent. Tracked core actions: dashboard
+  viewed, workload detail opened, resource action executed.
+
+### Fixed
+- Windows: helm install no longer hangs during sidecar provisioning (zip is
+  extracted via `bsdtar`).
+- Sidecar provisioning no longer half-runs silently when a single tool
+  download stalls or fails; failures now surface per tool.
+
+### CI
+- E2E smoke jobs skip (instead of failing) on Playwright CDN download outages.
+- Manual release builds are protected from concurrency auto-cancellation.
+
+## [0.22.1] - 2026-06-05
+
+Trust-fix release: removed dead sponsor handles from funding metadata and
+restored Apache-2.0 license detection on GitHub. No runtime changes.
+
 ## [0.22.0] - 2026-05-11
 
 Promotes `0.22.0-rc.3` to a final release. No runtime changes since `rc.3`;
