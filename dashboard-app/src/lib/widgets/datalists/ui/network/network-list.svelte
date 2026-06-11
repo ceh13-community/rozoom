@@ -4,6 +4,7 @@
   import { resolvePageClusterName, type PageData } from "$entities/cluster";
   import { runDebugDescribe } from "$features/resource-debug-runtime";
   import { confirmAction } from "$shared/lib/confirm-action";
+  import { trackCoreAction } from "$shared/analytics/wau-c";
   import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
   import {
     dashboardDataProfile,
@@ -146,6 +147,11 @@
   function openDetails(row: NetworkListRow) {
     selectedRow = row;
     detailsOpen = true;
+    // WAU-C Core Action #2: Service details count as a workload detail view.
+    // Other network kinds (endpoints, ingresses) are out of the metric's scope.
+    if (workloadKey === "services" && data?.slug) {
+      void trackCoreAction("rozoom_workload_detail_opened", data.slug);
+    }
   }
 
   function openServiceWorkbench(row: NetworkListRow) {

@@ -20,6 +20,7 @@
   import LoadingDots from "$shared/ui/loading-dots.svelte";
   import * as Popover from "$shared/ui/popover";
   import { confirmAction } from "$shared/lib/confirm-action";
+  import { trackCoreAction } from "$shared/analytics/wau-c";
   import { getTimeDifference, timeAgo } from "$shared/lib/timeFormatters";
   import {
     clustersList,
@@ -696,6 +697,10 @@
       Sentry.captureException("Cluster not found");
       return;
     }
+
+    // WAU-C Core Action #1: user viewed cluster state. Fire-and-forget; the
+    // tracker no-ops unless telemetry is initialised and consented.
+    void trackCoreAction("rozoom_dashboard_viewed", cluster);
 
     if (!$selectedNamespace) {
       const clusterConfig = findClusterByUuid(cluster);

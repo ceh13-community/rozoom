@@ -11,6 +11,8 @@ import {
 import { getBrowserInvokeFallback, isTauriAvailable } from "$shared/lib/tauri-runtime";
 import { isRuntimeDebugEnabled, writeRuntimeDebugLog } from "$shared/lib/runtime-debug";
 import { emitCliNotification, isUserFacingCommand } from "$shared/lib/cli-notification";
+import { isMutatingKubectlCommand } from "$shared/analytics/kubectl-mutation";
+import { trackCoreAction } from "$shared/analytics/wau-c";
 
 type KubectlExecResult = {
   code: number;
@@ -495,6 +497,23 @@ export async function kubectlRawArgsFront(
 
     return { output, errors, code: result.code };
   })();
+
+  // WAU-C Core Action #3: a successful mutating kubectl command means the user
+  // acted on a resource (restart/scale/delete/apply/...). Reads never count, so
+  // background pollers stay invisible to the metric. Fire-and-forget; the
+  // tracker no-ops without telemetry consent. Spec: state/wau-c-spec.md §4.
+  const trackedClusterId = options?.clusterId;
+  if (trackedClusterId && isMutatingKubectlCommand(args)) {
+    request
+      .then((result) => {
+        if (result.code === 0) {
+          void trackCoreAction("rozoom_resource_action_taken", trackedClusterId);
+        }
+      })
+      .catch(() => {
+        // Telemetry must never surface command failures.
+      });
+  }
 
   if (!dedupeKey) {
     return request;

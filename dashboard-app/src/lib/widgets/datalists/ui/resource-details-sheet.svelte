@@ -25,6 +25,7 @@
   import DetailsExplainState from "./common/details-explain-state.svelte";
   import { buildKubectlDescribeCommand } from "./common/kubectl-command-builder";
   import DetailsSheetPortal from "$shared/ui/details-sheet-portal.svelte";
+  import { trackCoreAction } from "$shared/analytics/wau-c";
 
   type ResourceItem = {
     metadata?: {
@@ -182,6 +183,9 @@
       : null;
     if (!$isOpen || !key || key === previousDetailsKey) return;
     previousDetailsKey = key;
+    // WAU-C Core Action #2: user opened workload details (statefulsets, jobs,
+    // replicasets, cronjobs — every list rendered through this sheet).
+    if (clusterId) void trackCoreAction("rozoom_workload_detail_opened", clusterId);
     showImagesDetails = false;
     showConditionsDetails = false;
     showPodAntiAffinitiesDetails = false;
@@ -308,7 +312,8 @@
     const desired = typeof spec.replicas === "number" ? spec.replicas : null;
     const current = typeof status.replicas === "number" ? status.replicas : null;
     const ready = typeof status.readyReplicas === "number" ? status.readyReplicas : null;
-    if (isReplicaSetDetails() && current !== null && desired !== null) return `${current} current / ${desired} desired`;
+    if (isReplicaSetDetails() && current !== null && desired !== null)
+      return `${current} current / ${desired} desired`;
     if (ready !== null && desired !== null) return `${ready} / ${desired}`;
     if (desired !== null) return String(desired);
     if (ready !== null) return `${ready} ready`;
@@ -342,8 +347,12 @@
     const templateSpec = getTemplateSpec();
     const affinity = asRecord(templateSpec.affinity);
     const podAntiAffinity = asRecord(affinity?.podAntiAffinity);
-    const required = asArray(podAntiAffinity?.requiredDuringSchedulingIgnoredDuringExecution).length;
-    const preferred = asArray(podAntiAffinity?.preferredDuringSchedulingIgnoredDuringExecution).length;
+    const required = asArray(
+      podAntiAffinity?.requiredDuringSchedulingIgnoredDuringExecution,
+    ).length;
+    const preferred = asArray(
+      podAntiAffinity?.preferredDuringSchedulingIgnoredDuringExecution,
+    ).length;
     const total = required + preferred;
     return `${total} Rule${total === 1 ? "" : "s"}`;
   }
@@ -482,7 +491,8 @@
       .filter((item): item is Record<string, unknown> => Boolean(item));
     const healthy = conditions.find((item) => item.status === "True");
     if (healthy && typeof healthy.type === "string") return healthy.type;
-    if (conditions.length > 0 && typeof conditions[0]?.type === "string") return String(conditions[0].type);
+    if (conditions.length > 0 && typeof conditions[0]?.type === "string")
+      return String(conditions[0].type);
     return "-";
   }
 
@@ -781,359 +791,397 @@
 </script>
 
 {#if $isOpen && $selectedItem}
-<DetailsSheetPortal open={$isOpen} onClose={closeDetails} closeAriaLabel={`Close ${getResourceLabel()} details`}>
-      <div class="flex items-center justify-between gap-2 border-b px-4 py-3">
-        <div class="min-w-0 flex items-center gap-2">
-          <Info class="h-4 w-4 shrink-0 text-muted-foreground" />
-          <div class="truncate text-base font-semibold">{title}: {$selectedItem?.metadata?.name ?? "-"}</div>
+  <DetailsSheetPortal
+    open={$isOpen}
+    onClose={closeDetails}
+    closeAriaLabel={`Close ${getResourceLabel()} details`}
+  >
+    <div class="flex items-center justify-between gap-2 border-b px-4 py-3">
+      <div class="min-w-0 flex items-center gap-2">
+        <Info class="h-4 w-4 shrink-0 text-muted-foreground" />
+        <div class="truncate text-base font-semibold">
+          {title}: {$selectedItem?.metadata?.name ?? "-"}
         </div>
-        <DetailsHeaderActions
-          actions={getHeaderActions()}
-          closeAriaLabel={`Close ${getResourceLabel()} details`}
-          onClose={closeDetails}
-        />
       </div>
-      <div class="flex-1 overflow-y-auto p-4">
-        <div class="text-xs text-muted-foreground">Namespace: {$selectedItem?.metadata?.namespace ?? "default"}</div>
-        <h3 class="my-4 font-bold">Properties</h3>
-        <DetailsMetadataGrid
-          contextKey={`${$selectedItem?.metadata?.namespace ?? "default"}/${$selectedItem?.metadata?.name ?? "-"}`}
-          fields={[
-            { label: "Created", value: getCreatedLabel() },
-            { label: "Name", value: $selectedItem?.metadata?.name ?? "-" },
-            { label: "Namespace", value: $selectedItem?.metadata?.namespace ?? "default" },
-          ]}
-          labels={getLabelEntries()}
-          annotations={getAnnotationEntries()}
-        />
-        <div class="mt-2 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-          {#if getControlledByLabel() !== "-" && !isCronJobDetails()}
-            <div class="rounded border p-3 sm:col-span-2">
-              <div class="text-xs text-muted-foreground">Controlled By</div>
-              <div>{getControlledByLabel()}</div>
-            </div>
-          {/if}
-          {#if !isCronJobDetails()}
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Selector</div>
-              {#if getSelectorLines().length === 0}
-                <div>-</div>
-              {:else}
-                <div class="mt-1 space-y-1 text-xs">
-                  {#each getSelectorLines() as line}
-                    <div class="break-all">{line}</div>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-          {/if}
-          {#if !isCronJobDetails() && !isJobDetails()}
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Node Selector</div>
-              {#if getNodeSelectorLines().length === 0}
-                <div>-</div>
-              {:else}
-                <div class="mt-1 space-y-1 text-xs">
-                  {#each getNodeSelectorLines() as line}
-                    <div class="break-all">{line}</div>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-          {/if}
-          {#if !isCronJobDetails()}
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Images</div>
-              <button
-                type="button"
-                class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
-                  showImagesDetails
-                    ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-                onclick={() => (showImagesDetails = !showImagesDetails)}
-              >
-                <span>{getImages().length} Images</span>
-                {#if showImagesDetails}
-                  <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
-                {:else}
-                  <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
-                {/if}
-              </button>
-              {#if showImagesDetails}
-                <div class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10">
-                  {#if getImages().length === 0}
-                    <div class="text-muted-foreground">No images.</div>
-                  {:else}
-                    {#each getImages() as image}
-                      <div class="break-all">{image}</div>
-                    {/each}
-                  {/if}
-                </div>
-              {/if}
-            </div>
-          {/if}
-          {#if isCronJobDetails()}
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Schedule</div>
-              <div>{getScheduleLabel()}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Active</div>
-              <div>{getCronActiveCountLabel()}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Suspend</div>
-              <div>{getSuspendLabel()}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Last schedule</div>
-              <div>{getLastScheduleLabel()}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Next execution</div>
-              <div>{getNextExecutionLabel()}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Time zone</div>
-              <div>{getTimeZoneLabel()}</div>
-            </div>
-          {:else if isJobDetails()}
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Completions</div>
-              <div>{getJobCompletionsLabel()}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Parallelism</div>
-              <div>{getParallelismLabel()}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Pod Status</div>
-              <div>{getPodStatusSummary()}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Conditions</div>
-              <button
-                type="button"
-                class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
-                  showJobConditionsDetails
-                    ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-                onclick={() => (showJobConditionsDetails = !showJobConditionsDetails)}
-              >
-                <span>{getConditionSummary()}</span>
-                {#if showJobConditionsDetails}
-                  <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
-                {:else}
-                  <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
-                {/if}
-              </button>
-              {#if showJobConditionsDetails}
-                <div class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10">
-                  {#if getConditionLines().length === 0}
-                    <div class="text-muted-foreground">No conditions.</div>
-                  {:else}
-                    {#each getConditionLines() as line}
-                      <div class="break-all">{line}</div>
-                    {/each}
-                  {/if}
-                </div>
-              {/if}
-            </div>
-          {:else if isReplicaSetDetails() || isStatefulSetDetails()}
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Replicas</div>
-              <div>{getReplicasLabel()}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Pod Status</div>
-              <div>{getPodStatusSummary()}</div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Pod Anti Affinities</div>
-              <button
-                type="button"
-                class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
-                  showPodAntiAffinitiesDetails
-                    ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-                onclick={() => (showPodAntiAffinitiesDetails = !showPodAntiAffinitiesDetails)}
-              >
-                <span>{getPodAntiAffinityRulesLabel()}</span>
-                {#if showPodAntiAffinitiesDetails}
-                  <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
-                {:else}
-                  <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
-                {/if}
-              </button>
-              {#if showPodAntiAffinitiesDetails}
-                <div class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10">
-                  {#if getPodAntiAffinityLines().length === 0}
-                    <div class="text-muted-foreground">No pod anti affinity rules.</div>
-                  {:else}
-                    {#each getPodAntiAffinityLines() as line}
-                      <div class="break-all">{line}</div>
-                    {/each}
-                  {/if}
-                </div>
-              {/if}
-            </div>
-          {:else}
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Status</div>
-              <div class={`inline-flex items-center gap-2 font-medium ${getStatusToneClasses(getStatusLabel()).text}`}>
-                <span class={`inline-block h-2.5 w-2.5 rounded-full ${getStatusToneClasses(getStatusLabel()).dot}`}></span>
-                {getStatusLabel()}
-              </div>
-            </div>
-            <div class="rounded border p-3">
-              <div class="text-xs text-muted-foreground">Tolerations</div>
-              <button
-                type="button"
-                class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
-                  showTolerationsDetails
-                    ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-                onclick={() => (showTolerationsDetails = !showTolerationsDetails)}
-              >
-                <span>{getTolerationsCountLabel()}</span>
-                {#if showTolerationsDetails}
-                  <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
-                {:else}
-                  <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
-                {/if}
-              </button>
-              {#if showTolerationsDetails}
-                <div class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10">
-                  {#if getTolerationLines().length === 0}
-                    <div class="text-muted-foreground">No tolerations.</div>
-                  {:else}
-                    {#each getTolerationLines() as line}
-                      <div class="break-all">{line}</div>
-                    {/each}
-                  {/if}
-                </div>
-              {/if}
-            </div>
-            {#if !isReplicaSetDetails()}
-              <div class="rounded border p-3">
-                <div class="text-xs text-muted-foreground">Strategy Type</div>
-                <div>{getStrategyType()}</div>
+      <DetailsHeaderActions
+        actions={getHeaderActions()}
+        closeAriaLabel={`Close ${getResourceLabel()} details`}
+        onClose={closeDetails}
+      />
+    </div>
+    <div class="flex-1 overflow-y-auto p-4">
+      <div class="text-xs text-muted-foreground">
+        Namespace: {$selectedItem?.metadata?.namespace ?? "default"}
+      </div>
+      <h3 class="my-4 font-bold">Properties</h3>
+      <DetailsMetadataGrid
+        contextKey={`${$selectedItem?.metadata?.namespace ?? "default"}/${$selectedItem?.metadata?.name ?? "-"}`}
+        fields={[
+          { label: "Created", value: getCreatedLabel() },
+          { label: "Name", value: $selectedItem?.metadata?.name ?? "-" },
+          { label: "Namespace", value: $selectedItem?.metadata?.namespace ?? "default" },
+        ]}
+        labels={getLabelEntries()}
+        annotations={getAnnotationEntries()}
+      />
+      <div class="mt-2 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+        {#if getControlledByLabel() !== "-" && !isCronJobDetails()}
+          <div class="rounded border p-3 sm:col-span-2">
+            <div class="text-xs text-muted-foreground">Controlled By</div>
+            <div>{getControlledByLabel()}</div>
+          </div>
+        {/if}
+        {#if !isCronJobDetails()}
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Selector</div>
+            {#if getSelectorLines().length === 0}
+              <div>-</div>
+            {:else}
+              <div class="mt-1 space-y-1 text-xs">
+                {#each getSelectorLines() as line}
+                  <div class="break-all">{line}</div>
+                {/each}
               </div>
             {/if}
-            <div class="rounded border p-3 sm:col-span-2">
-              <div class="text-xs text-muted-foreground">Conditions</div>
-              <button
-                type="button"
-                class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
-                  showConditionsDetails
-                    ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-                onclick={() => (showConditionsDetails = !showConditionsDetails)}
-              >
-                <span>{getConditionLines().length} Conditions</span>
-                {#if showConditionsDetails}
-                  <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
-                {:else}
-                  <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
-                {/if}
-              </button>
-              {#if showConditionsDetails}
-                <div class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10">
-                  {#if getConditionLines().length === 0}
-                    <div class="text-muted-foreground">No conditions.</div>
-                  {:else}
-                    {#each getConditionLines() as line}
-                      <div class="break-all">{line}</div>
-                    {/each}
-                  {/if}
-                </div>
-              {/if}
-            </div>
-          {/if}
-        </div>
-        {#if isStatefulSetDetails() || isReplicaSetDetails() || isJobDetails() || isCronJobDetails()}
-          <ResourceTrafficChain
-            {clusterId}
-            resourceKind={isStatefulSetDetails() ? "StatefulSet" : isReplicaSetDetails() ? "ReplicaSet" : isJobDetails() ? "Job" : "CronJob"}
-            resourceName={$selectedItem?.metadata?.name ?? ""}
-            resourceNamespace={$selectedItem?.metadata?.namespace ?? "default"}
-            raw={$selectedItem as unknown as Record<string, unknown>}
-          />
+          </div>
         {/if}
-
-        {#if !isCronJobDetails() && !isJobDetails() && !isReplicaSetDetails() && !isStatefulSetDetails() && !isNodeDetails()}
-          <h3 class="my-4 font-bold">Spec</h3>
-          <pre class="max-h-64 overflow-auto rounded-md bg-muted/40 p-3 text-xs">
-{JSON.stringify($selectedItem?.spec ?? {}, null, 2)}
-          </pre>
-          <h3 class="my-4 font-bold">Status</h3>
-          <pre class="max-h-64 overflow-auto rounded-md bg-muted/40 p-3 text-xs">
-{JSON.stringify($selectedItem?.status ?? {}, null, 2)}
-          </pre>
+        {#if !isCronJobDetails() && !isJobDetails()}
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Node Selector</div>
+            {#if getNodeSelectorLines().length === 0}
+              <div>-</div>
+            {:else}
+              <div class="mt-1 space-y-1 text-xs">
+                {#each getNodeSelectorLines() as line}
+                  <div class="break-all">{line}</div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
+        {#if !isCronJobDetails()}
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Images</div>
+            <button
+              type="button"
+              class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
+                showImagesDetails
+                  ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+              onclick={() => (showImagesDetails = !showImagesDetails)}
+            >
+              <span>{getImages().length} Images</span>
+              {#if showImagesDetails}
+                <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
+              {:else}
+                <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
+              {/if}
+            </button>
+            {#if showImagesDetails}
+              <div
+                class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10"
+              >
+                {#if getImages().length === 0}
+                  <div class="text-muted-foreground">No images.</div>
+                {:else}
+                  {#each getImages() as image}
+                    <div class="break-all">{image}</div>
+                  {/each}
+                {/if}
+              </div>
+            {/if}
+          </div>
         {/if}
         {#if isCronJobDetails()}
-          <h3 class="my-4 font-bold">Job History</h3>
-          <div class="space-y-1 text-sm">
-            {#if getCronJobHistoryRows().length === 0}
-              <div class="rounded border p-3 text-muted-foreground">No jobs found.</div>
-            {:else}
-              {#each getCronJobHistoryRows() as row}
-                <div class="grid grid-cols-1 gap-2 rounded border p-2 sm:grid-cols-[3fr_1fr]">
-                  <div class="break-all">{row.name}</div>
-                  <div class={`inline-flex items-center gap-2 ${getStatusToneClasses(row.status).text}`}>
-                    <span class={`inline-block h-2 w-2 rounded-full ${getStatusToneClasses(row.status).dot}`}></span>
-                    {row.status}
-                  </div>
-                </div>
-              {/each}
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Schedule</div>
+            <div>{getScheduleLabel()}</div>
+          </div>
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Active</div>
+            <div>{getCronActiveCountLabel()}</div>
+          </div>
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Suspend</div>
+            <div>{getSuspendLabel()}</div>
+          </div>
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Last schedule</div>
+            <div>{getLastScheduleLabel()}</div>
+          </div>
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Next execution</div>
+            <div>{getNextExecutionLabel()}</div>
+          </div>
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Time zone</div>
+            <div>{getTimeZoneLabel()}</div>
+          </div>
+        {:else if isJobDetails()}
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Completions</div>
+            <div>{getJobCompletionsLabel()}</div>
+          </div>
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Parallelism</div>
+            <div>{getParallelismLabel()}</div>
+          </div>
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Pod Status</div>
+            <div>{getPodStatusSummary()}</div>
+          </div>
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Conditions</div>
+            <button
+              type="button"
+              class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
+                showJobConditionsDetails
+                  ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+              onclick={() => (showJobConditionsDetails = !showJobConditionsDetails)}
+            >
+              <span>{getConditionSummary()}</span>
+              {#if showJobConditionsDetails}
+                <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
+              {:else}
+                <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
+              {/if}
+            </button>
+            {#if showJobConditionsDetails}
+              <div
+                class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10"
+              >
+                {#if getConditionLines().length === 0}
+                  <div class="text-muted-foreground">No conditions.</div>
+                {:else}
+                  {#each getConditionLines() as line}
+                    <div class="break-all">{line}</div>
+                  {/each}
+                {/if}
+              </div>
             {/if}
           </div>
-        {:else if !isJobDetails()}
-          <h3 class="my-4 font-bold">Pods</h3>
-          <div class="space-y-1 text-sm">
-            {#if getPodsFromStatus().length === 0}
-              <div class="rounded border p-3 text-muted-foreground">No pods found.</div>
-            {:else}
-              {#each getPodsFromStatus() as pod}
-                <div class="grid grid-cols-1 gap-2 rounded border p-2 sm:grid-cols-[2fr_2fr_1fr_1fr_1fr_1fr_1fr]">
-                  <div>{pod.name}</div>
-                  <div>{pod.node}</div>
-                  <div>{pod.namespace}</div>
-                  <div>{pod.ready}</div>
-                  <div>{pod.cpu}</div>
-                  <div>{pod.memory}</div>
-                  <div class={`inline-flex items-center gap-2 ${getStatusToneClasses(pod.status).text}`}>
-                    <span class={`inline-block h-2 w-2 rounded-full ${getStatusToneClasses(pod.status).dot}`}></span>
-                    {pod.status}
-                  </div>
-                </div>
-              {/each}
+        {:else if isReplicaSetDetails() || isStatefulSetDetails()}
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Replicas</div>
+            <div>{getReplicasLabel()}</div>
+          </div>
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Pod Status</div>
+            <div>{getPodStatusSummary()}</div>
+          </div>
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Pod Anti Affinities</div>
+            <button
+              type="button"
+              class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
+                showPodAntiAffinitiesDetails
+                  ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+              onclick={() => (showPodAntiAffinitiesDetails = !showPodAntiAffinitiesDetails)}
+            >
+              <span>{getPodAntiAffinityRulesLabel()}</span>
+              {#if showPodAntiAffinitiesDetails}
+                <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
+              {:else}
+                <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
+              {/if}
+            </button>
+            {#if showPodAntiAffinitiesDetails}
+              <div
+                class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10"
+              >
+                {#if getPodAntiAffinityLines().length === 0}
+                  <div class="text-muted-foreground">No pod anti affinity rules.</div>
+                {:else}
+                  {#each getPodAntiAffinityLines() as line}
+                    <div class="break-all">{line}</div>
+                  {/each}
+                {/if}
+              </div>
+            {/if}
+          </div>
+        {:else}
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Status</div>
+            <div
+              class={`inline-flex items-center gap-2 font-medium ${getStatusToneClasses(getStatusLabel()).text}`}
+            >
+              <span
+                class={`inline-block h-2.5 w-2.5 rounded-full ${getStatusToneClasses(getStatusLabel()).dot}`}
+              ></span>
+              {getStatusLabel()}
+            </div>
+          </div>
+          <div class="rounded border p-3">
+            <div class="text-xs text-muted-foreground">Tolerations</div>
+            <button
+              type="button"
+              class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
+                showTolerationsDetails
+                  ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+              onclick={() => (showTolerationsDetails = !showTolerationsDetails)}
+            >
+              <span>{getTolerationsCountLabel()}</span>
+              {#if showTolerationsDetails}
+                <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
+              {:else}
+                <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
+              {/if}
+            </button>
+            {#if showTolerationsDetails}
+              <div
+                class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10"
+              >
+                {#if getTolerationLines().length === 0}
+                  <div class="text-muted-foreground">No tolerations.</div>
+                {:else}
+                  {#each getTolerationLines() as line}
+                    <div class="break-all">{line}</div>
+                  {/each}
+                {/if}
+              </div>
+            {/if}
+          </div>
+          {#if !isReplicaSetDetails()}
+            <div class="rounded border p-3">
+              <div class="text-xs text-muted-foreground">Strategy Type</div>
+              <div>{getStrategyType()}</div>
+            </div>
+          {/if}
+          <div class="rounded border p-3 sm:col-span-2">
+            <div class="text-xs text-muted-foreground">Conditions</div>
+            <button
+              type="button"
+              class={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-left transition ${
+                showConditionsDetails
+                  ? "bg-sky-100/70 text-sky-900 dark:bg-sky-500/20 dark:text-sky-200"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+              onclick={() => (showConditionsDetails = !showConditionsDetails)}
+            >
+              <span>{getConditionLines().length} Conditions</span>
+              {#if showConditionsDetails}
+                <ChevronUp class="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
+              {:else}
+                <ChevronDown class="h-3.5 w-3.5 text-muted-foreground" />
+              {/if}
+            </button>
+            {#if showConditionsDetails}
+              <div
+                class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10"
+              >
+                {#if getConditionLines().length === 0}
+                  <div class="text-muted-foreground">No conditions.</div>
+                {:else}
+                  {#each getConditionLines() as line}
+                    <div class="break-all">{line}</div>
+                  {/each}
+                {/if}
+              </div>
             {/if}
           </div>
         {/if}
-        <DetailsExplainState
-          sourceState={runtimeSourceState}
-          profileLabel={runtimeProfileLabel}
-          lastUpdatedLabel={runtimeLastUpdatedLabel}
-          detail={runtimeDetail}
-          reason={runtimeReason}
-          requestPath={runtimeRequestPath}
-          describeCommand={getDescribeCommand()}
-          syncError={runtimeSyncError}
-        />
-
-        <h3 class="my-4 font-bold">Events</h3>
-        <DetailsEventsList
-          {events}
-          loading={eventsLoading}
-          error={eventsError}
-          emptyText="No events found."
-        />
       </div>
-</DetailsSheetPortal>
+      {#if isStatefulSetDetails() || isReplicaSetDetails() || isJobDetails() || isCronJobDetails()}
+        <ResourceTrafficChain
+          {clusterId}
+          resourceKind={isStatefulSetDetails()
+            ? "StatefulSet"
+            : isReplicaSetDetails()
+              ? "ReplicaSet"
+              : isJobDetails()
+                ? "Job"
+                : "CronJob"}
+          resourceName={$selectedItem?.metadata?.name ?? ""}
+          resourceNamespace={$selectedItem?.metadata?.namespace ?? "default"}
+          raw={$selectedItem as unknown as Record<string, unknown>}
+        />
+      {/if}
+
+      {#if !isCronJobDetails() && !isJobDetails() && !isReplicaSetDetails() && !isStatefulSetDetails() && !isNodeDetails()}
+        <h3 class="my-4 font-bold">Spec</h3>
+        <pre class="max-h-64 overflow-auto rounded-md bg-muted/40 p-3 text-xs">
+{JSON.stringify($selectedItem?.spec ?? {}, null, 2)}
+          </pre>
+        <h3 class="my-4 font-bold">Status</h3>
+        <pre class="max-h-64 overflow-auto rounded-md bg-muted/40 p-3 text-xs">
+{JSON.stringify($selectedItem?.status ?? {}, null, 2)}
+          </pre>
+      {/if}
+      {#if isCronJobDetails()}
+        <h3 class="my-4 font-bold">Job History</h3>
+        <div class="space-y-1 text-sm">
+          {#if getCronJobHistoryRows().length === 0}
+            <div class="rounded border p-3 text-muted-foreground">No jobs found.</div>
+          {:else}
+            {#each getCronJobHistoryRows() as row}
+              <div class="grid grid-cols-1 gap-2 rounded border p-2 sm:grid-cols-[3fr_1fr]">
+                <div class="break-all">{row.name}</div>
+                <div
+                  class={`inline-flex items-center gap-2 ${getStatusToneClasses(row.status).text}`}
+                >
+                  <span
+                    class={`inline-block h-2 w-2 rounded-full ${getStatusToneClasses(row.status).dot}`}
+                  ></span>
+                  {row.status}
+                </div>
+              </div>
+            {/each}
+          {/if}
+        </div>
+      {:else if !isJobDetails()}
+        <h3 class="my-4 font-bold">Pods</h3>
+        <div class="space-y-1 text-sm">
+          {#if getPodsFromStatus().length === 0}
+            <div class="rounded border p-3 text-muted-foreground">No pods found.</div>
+          {:else}
+            {#each getPodsFromStatus() as pod}
+              <div
+                class="grid grid-cols-1 gap-2 rounded border p-2 sm:grid-cols-[2fr_2fr_1fr_1fr_1fr_1fr_1fr]"
+              >
+                <div>{pod.name}</div>
+                <div>{pod.node}</div>
+                <div>{pod.namespace}</div>
+                <div>{pod.ready}</div>
+                <div>{pod.cpu}</div>
+                <div>{pod.memory}</div>
+                <div
+                  class={`inline-flex items-center gap-2 ${getStatusToneClasses(pod.status).text}`}
+                >
+                  <span
+                    class={`inline-block h-2 w-2 rounded-full ${getStatusToneClasses(pod.status).dot}`}
+                  ></span>
+                  {pod.status}
+                </div>
+              </div>
+            {/each}
+          {/if}
+        </div>
+      {/if}
+      <DetailsExplainState
+        sourceState={runtimeSourceState}
+        profileLabel={runtimeProfileLabel}
+        lastUpdatedLabel={runtimeLastUpdatedLabel}
+        detail={runtimeDetail}
+        reason={runtimeReason}
+        requestPath={runtimeRequestPath}
+        describeCommand={getDescribeCommand()}
+        syncError={runtimeSyncError}
+      />
+
+      <h3 class="my-4 font-bold">Events</h3>
+      <DetailsEventsList
+        {events}
+        loading={eventsLoading}
+        error={eventsError}
+        emptyText="No events found."
+      />
+    </div>
+  </DetailsSheetPortal>
 {/if}
