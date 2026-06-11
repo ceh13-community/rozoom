@@ -57,6 +57,10 @@ export function initAnalytics(): void {
  * first paint. No-ops silently when analytics is not initialised.
  */
 export async function trackCoreAction(event: CoreAction, clusterId: string): Promise<void> {
+  // Lazy init: child onMount runs before the root layout's in Svelte, so a
+  // deep launch straight into a cluster route would otherwise emit before
+  // initAnalytics() ever ran. Idempotent and consent-gated, so safe here.
+  initAnalytics();
   if (!initialized) return;
   // Re-check consent on every emit so a withdrawal after init takes effect
   // immediately, not on the next reload.
