@@ -16,11 +16,23 @@
   import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
   import ExternalLink from "@lucide/svelte/icons/external-link";
+  import DeleteConfirmDialog, { type DeleteTarget } from "$shared/ui/delete-confirm-dialog.svelte";
 
   let checkboxChecked = $state(false);
   let inputValue = $state("");
   let loadingBtn = $state(false);
   let successBtn = $state(false);
+
+  const deleteDemoTargets: DeleteTarget[] = [
+    {
+      kind: "pod",
+      name: "nginx-7c5ddbdf54-abcde",
+      namespace: "default",
+      command: "delete pod nginx-7c5ddbdf54-abcde -n default",
+    },
+  ];
+  let deleteDemoOpen = $state(false);
+  let deleteDemoResult = $state<string | null>(null);
 
   function simulateLoading() {
     loadingBtn = true;
@@ -326,6 +338,47 @@
           </div>
         {/each}
       </div>
+    </section>
+
+    <Separator />
+
+    <!-- Delete confirm dialog (E13 dry-run) -->
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-foreground">Delete confirm dialog</h2>
+      <p class="text-sm text-muted-foreground">
+        Dry-run confirmation before a destructive action: shows the exact kubectl command and what
+        will be removed. Import:
+        <code class="rounded bg-muted px-1.5 py-0.5">$shared/ui/delete-confirm-dialog.svelte</code>
+      </p>
+      <div class="flex items-center gap-3">
+        <Button
+          variant="destructive"
+          size="sm"
+          onclick={() => {
+            deleteDemoResult = null;
+            deleteDemoOpen = true;
+          }}
+        >
+          <Trash class="size-4" />
+          Delete pod…
+        </Button>
+        {#if deleteDemoResult}
+          <span class="text-sm text-muted-foreground">Last action: {deleteDemoResult}</span>
+        {/if}
+      </div>
+
+      <DeleteConfirmDialog
+        open={deleteDemoOpen}
+        targets={deleteDemoTargets}
+        onConfirm={() => {
+          deleteDemoOpen = false;
+          deleteDemoResult = "confirmed";
+        }}
+        onCancel={() => {
+          deleteDemoOpen = false;
+          deleteDemoResult = "cancelled";
+        }}
+      />
     </section>
 
     <div class="pb-8"></div>

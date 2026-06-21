@@ -28,6 +28,7 @@
   import { confirmAction } from "$shared/lib/confirm-action";
   import { kubectlRawArgsFront, kubectlRawFront } from "$shared/api/kubectl-proxy";
   import { Button } from "$shared/ui/button";
+  import DeleteConfirmDialog, { type DeleteTarget } from "$shared/ui/delete-confirm-dialog.svelte";
   import {
     dashboardDataProfile,
     getDashboardDataProfileDisplayName,
@@ -692,12 +693,45 @@
     showActionSuccess(`Opened debug describe for ${getPodRef(pod)}.`);
   }
 
+  let deleteDialogTargets = $state<DeleteTarget[]>([]);
+  let deleteDialogResolve: ((confirmed: boolean) => void) | null = null;
+  const deleteDialogOpen = $derived(deleteDialogTargets.length > 0);
+
+  function buildDeleteTarget(pod: Partial<PodItem>): DeleteTarget | null {
+    const command = buildPodDeleteCommand({
+      name: pod.metadata?.name,
+      namespace: pod.metadata?.namespace,
+    });
+    if (!command) return null;
+    return {
+      kind: "pod",
+      name: pod.metadata?.name ?? "",
+      namespace: pod.metadata?.namespace?.trim() || "default",
+      command,
+    };
+  }
+
+  function requestDeleteConfirmation(targets: DeleteTarget[]): Promise<boolean> {
+    return new Promise((resolve) => {
+      deleteDialogResolve = resolve;
+      deleteDialogTargets = targets;
+    });
+  }
+
+  function resolveDeleteDialog(confirmed: boolean) {
+    const resolve = deleteDialogResolve;
+    deleteDialogResolve = null;
+    deleteDialogTargets = [];
+    resolve?.(confirmed);
+  }
+
   async function deletePods(podsToDelete: Partial<PodItem>[]) {
     if (!data.slug || podsToDelete.length === 0) return;
-    const confirmed = await confirmAction(
-      `Delete ${podsToDelete.length} pod(s)?`,
-      "Confirm delete",
-    );
+    const targets = podsToDelete
+      .map((pod) => buildDeleteTarget(pod))
+      .filter((target): target is DeleteTarget => target !== null);
+    if (targets.length === 0) return;
+    const confirmed = await requestDeleteConfirmation(targets);
     if (!confirmed) return;
 
     for (const pod of podsToDelete) {
@@ -1239,5 +1273,12 @@
     onMetricsLoadingChange={(loading) => {
       podsMetricsLoading = loading;
     }}
+  />
+
+  <DeleteConfirmDialog
+    open={deleteDialogOpen}
+    targets={deleteDialogTargets}
+    onConfirm={() => resolveDeleteDialog(true)}
+    onCancel={() => resolveDeleteDialog(false)}
   />
 </div>
