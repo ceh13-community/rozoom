@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { evaluateTlsGate } from "./tls-gate";
+import { evaluateTlsGate, type TlsGateResult } from "./tls-gate";
+
+/** Assert the gate blocked and narrow to the blocking variant so `reason` is typed. */
+function expectBlocked(gate: TlsGateResult): { allowed: false; reason: string } {
+  expect(gate.allowed).toBe(false);
+  if (gate.allowed) throw new Error("expected TLS gate to block the connection");
+  return gate;
+}
 
 describe("evaluateTlsGate", () => {
   it("allows a remote https cluster that has a CA", () => {
@@ -17,8 +24,7 @@ describe("evaluateTlsGate", () => {
       hasCertificateAuthority: true,
       insecureSkipTlsVerify: true,
     });
-    expect(gate.allowed).toBe(false);
-    expect(gate.reason).toMatch(/insecure-skip-tls-verify|verification/i);
+    expect(expectBlocked(gate).reason).toMatch(/insecure-skip-tls-verify|verification/i);
   });
 
   it("blocks a remote https cluster with no CA", () => {
@@ -27,8 +33,7 @@ describe("evaluateTlsGate", () => {
       hasCertificateAuthority: false,
       insecureSkipTlsVerify: false,
     });
-    expect(gate.allowed).toBe(false);
-    expect(gate.reason).toMatch(/CA certificate/i);
+    expect(expectBlocked(gate).reason).toMatch(/CA certificate/i);
   });
 
   it("allows a loopback cluster without a CA (local dev)", () => {
@@ -61,8 +66,7 @@ describe("evaluateTlsGate", () => {
       hasCertificateAuthority: false,
       insecureSkipTlsVerify: false,
     });
-    expect(gate.allowed).toBe(false);
-    expect(gate.reason).toMatch(/http|HTTPS/i);
+    expect(expectBlocked(gate).reason).toMatch(/http|HTTPS/i);
   });
 
   it("blocks when the server URL is missing or unparseable", () => {
