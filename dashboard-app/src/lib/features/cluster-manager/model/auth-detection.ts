@@ -12,6 +12,13 @@
  *   - OIDC (via exec plugin or auth-provider)
  */
 
+import {
+  describeExpiry,
+  parseClientCertNotAfter,
+  parseJwtExpiry,
+  type ExpiryState,
+} from "./expiry-state";
+
 export type AuthMethod =
   | "x509-certificate"
   | "bearer-token"
@@ -33,6 +40,8 @@ export type AuthMethodInfo = {
   tokenExpiry?: string | null;
   tokenExpired?: boolean;
   tokenExpiresInHours?: number | null;
+  /** Readable expiry state for the active credential (token or client cert). */
+  expiry?: ExpiryState;
   warnings: string[];
   recommendations: string[];
 };
@@ -44,6 +53,8 @@ type KubeUserInput = {
   hasToken?: boolean;
   hasCertAuth?: boolean;
   token?: string | null;
+  /** Raw client certificate (PEM or base64 DER) for notAfter parsing. */
+  clientCertData?: string | null;
 };
 
 const OIDC_EXEC_COMMANDS = new Set(["kubelogin", "kubectl-oidc_login", "oidc-login"]);
@@ -75,29 +86,18 @@ function detectTokenExpiry(token: string | null | undefined): {
   expired: boolean;
   expiresInHours: number | null;
 } {
-  if (!token) return { expiry: null, expired: false, expiresInHours: null };
+  const expiryDate = parseJwtExpiry(token);
+  if (!expiryDate) return { expiry: null, expired: false, expiresInHours: null };
 
-  // JWT tokens have 3 base64 parts separated by dots
-  const parts = token.split(".");
-  if (parts.length !== 3) return { expiry: null, expired: false, expiresInHours: null };
+  const now = Date.now();
+  const expired = expiryDate.getTime() < now;
+  const hoursLeft = (expiryDate.getTime() - now) / (1000 * 60 * 60);
 
-  try {
-    const payload = JSON.parse(atob(parts[1])) as { exp?: number };
-    if (!payload.exp) return { expiry: null, expired: false, expiresInHours: null };
-
-    const expiryDate = new Date(payload.exp * 1000);
-    const now = Date.now();
-    const expired = expiryDate.getTime() < now;
-    const hoursLeft = (expiryDate.getTime() - now) / (1000 * 60 * 60);
-
-    return {
-      expiry: expiryDate.toISOString(),
-      expired,
-      expiresInHours: Math.round(hoursLeft * 10) / 10,
-    };
-  } catch {
-    return { expiry: null, expired: false, expiresInHours: null };
-  }
+  return {
+    expiry: expiryDate.toISOString(),
+    expired,
+    expiresInHours: Math.round(hoursLeft * 10) / 10,
+  };
 }
 
 export function detectAuthMethod(user: KubeUserInput): AuthMethodInfo {
@@ -163,6 +163,15 @@ export function detectAuthMethod(user: KubeUserInput): AuthMethodInfo {
 
   // X.509 client certificate
   if (user.hasCertAuth) {
+    const expiry = describeExpiry(parseClientCertNotAfter(user.clientCertData));
+    if (expiry.status === "expired") {
+      warnings.push("Client certificate has expired - authentication will fail");
+      recommendations.push("Re-issue the client certificate signed by the cluster CA");
+    } else if (expiry.status === "expiring-soon") {
+      warnings.push(`Client certificate ${expiry.label.toLowerCase()}`);
+      recommendations.push("Re-issue the client certificate before it expires");
+    }
+
     return {
       method: "x509-certificate",
       securityLevel: "high",
@@ -171,6 +180,7 @@ export function detectAuthMethod(user: KubeUserInput): AuthMethodInfo {
       tokenExpiry: null,
       tokenExpired: false,
       tokenExpiresInHours: null,
+      expiry,
       warnings,
       recommendations,
     };
@@ -203,6 +213,7 @@ export function detectAuthMethod(user: KubeUserInput): AuthMethodInfo {
       tokenExpiry: tokenInfo.expiry,
       tokenExpired: tokenInfo.expired,
       tokenExpiresInHours: tokenInfo.expiresInHours,
+      expiry: describeExpiry(parseJwtExpiry(user.token)),
       warnings,
       recommendations,
     };
