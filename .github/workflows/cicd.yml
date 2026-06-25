@@ -72,9 +72,15 @@ jobs:
       - name: Build web app
         run: pnpm run build
 
-      - name: Cache Playwright browsers
+      # Restore-only: we never trust the cache blindly. A previous CDN-stalled
+      # run could have *saved* an empty/partial ms-playwright dir (the install
+      # step exits 0 on the graceful-skip path), which then gets restored on
+      # every subsequent run, install gets skipped, and the browser binary is
+      # silently missing -> all e2e fail at launch. So restore here, but verify
+      # + (re)install below, and only save back a cache that actually works.
+      - name: Restore Playwright browser cache
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('dashboard-app/pnpm-lock.yaml') }}
@@ -85,17 +91,19 @@ jobs:
 
       - name: Install Playwright browser (Chromium)
         id: chromium_install
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
         timeout-minutes: 12
-        # cdn.playwright.dev download can stall mid-transfer; a hung
-        # connection never errors on its own, so bound each attempt with
-        # `timeout` and retry on a fresh connection. The download failing is an
-        # infra/CDN problem, not a code regression — after 3 attempts emit a
-        # warning and skip the smoke (this job is already non-blocking) instead
-        # of a red ❌ that reads like a test failure.
+        # Always run (no cache-hit guard): `playwright install chromium` is
+        # idempotent — a near-instant no-op when the binary is already present
+        # and valid, a download when it is missing or the cache was poisoned.
+        # cdn.playwright.dev download can stall mid-transfer; a hung connection
+        # never errors on its own, so bound each attempt with `timeout` and
+        # retry on a fresh connection. The download failing is an infra/CDN
+        # problem, not a code regression — after 3 attempts emit a warning and
+        # skip the smoke (this job is already non-blocking) instead of a red ❌
+        # that reads like a test failure.
         run: |
           for attempt in 1 2 3; do
-            echo "Chromium download attempt $attempt/3"
+            echo "Chromium install/verify attempt $attempt/3"
             timeout 180 pnpm exec playwright install chromium && {
               echo "available=true" >> "$GITHUB_OUTPUT"; exit 0;
             }
@@ -105,6 +113,16 @@ jobs:
           echo "::warning::Playwright chromium download failed after 3 attempts (CDN/infra); skipping e2e smoke — non-blocking."
           echo "available=false" >> "$GITHUB_OUTPUT"
           exit 0
+
+      # Save only a working browser. Never persist the cache from a CDN-stalled
+      # run — that is exactly what poisons it for every later run until the
+      # lockfile hash changes. Skip the save on a cache-hit (nothing changed).
+      - name: Save Playwright browser cache
+        if: steps.chromium_install.outputs.available == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.playwright-cache.outputs.cache-primary-key }}
 
       - name: Run e2e smoke
         if: steps.chromium_install.outputs.available != 'false'
