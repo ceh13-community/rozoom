@@ -8,3 +8,9 @@ export {
 } from "./model/store";
 
 export { scanKubeconfigs } from "./api/scanner";
+
+export {
+  selectLocalContexts,
+  discoverLocalClusters,
+  type DiscoveredLocalCluster,
+} from "./model/local-discovery";

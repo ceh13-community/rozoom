@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { KubeCluster, KubeConfig, KubeContext, KubeUser } from "$entities/config";
-import { selectLocalContexts } from "./local-discovery";
+import { selectLocalContexts, discoverLocalClusters } from "./local-discovery";
+
+const scanKubeconfigs = vi.hoisted(() => vi.fn());
+vi.mock("../api/scanner", () => ({ scanKubeconfigs }));
 
 function makeConfig(opts: {
   clusters: KubeCluster[];
@@ -104,5 +107,35 @@ describe("selectLocalContexts", () => {
 
   it("returns empty for an empty kubeconfig", () => {
     expect(selectLocalContexts(makeConfig({ clusters: [], contexts: [] }))).toEqual([]);
+  });
+});
+
+describe("discoverLocalClusters", () => {
+  beforeEach(() => {
+    scanKubeconfigs.mockReset();
+  });
+
+  it("returns [] when no kubeconfig is found", async () => {
+    scanKubeconfigs.mockResolvedValue(null);
+    expect(await discoverLocalClusters()).toEqual([]);
+  });
+
+  it("scans the kubeconfig and surfaces only local-runtime contexts", async () => {
+    scanKubeconfigs.mockResolvedValue(
+      makeConfig({
+        clusters: [
+          new KubeCluster("minikube", { server: "https://127.0.0.1:8443" }),
+          new KubeCluster("eks-prod", { server: "https://abc.eks.amazonaws.com" }),
+        ],
+        contexts: [
+          new KubeContext("minikube", { cluster: "minikube", user: "minikube" }),
+          new KubeContext("eks-prod", { cluster: "eks-prod", user: "eks-prod" }),
+        ],
+      }),
+    );
+
+    const result = await discoverLocalClusters();
+
+    expect(result.map((c) => c.contextName)).toEqual(["minikube"]);
   });
 });
