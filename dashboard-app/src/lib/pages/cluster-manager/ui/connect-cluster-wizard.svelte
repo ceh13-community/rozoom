@@ -24,8 +24,22 @@
     type CloudCluster,
     type CloudScope,
   } from "$features/cluster-manager/api/cloud-import";
-  import { addClustersFromText, clustersList } from "$features/cluster-manager";
+  import {
+    addClustersFromText,
+    addClustersFromKubeconfigSelection,
+    clustersList,
+  } from "$features/cluster-manager";
   import { detectedCloudConfigs } from "$features/cluster-finder/model/cli-store";
+  import {
+    scanKubeconfigs,
+    selectLocalContexts,
+    getLocalScanConsent,
+    setLocalScanConsent,
+    LOCAL_SCAN_PRIVACY_NOTE,
+    type DiscoveredLocalCluster,
+    type LocalScanConsent,
+  } from "$features/cluster-finder";
+  import type { KubeConfigFileType } from "$entities/config";
   import {
     testKubeconfig,
     type TestConnectionResult,
@@ -40,6 +54,8 @@
     TerminalSquare,
     Check,
     ShieldQuestion,
+    Container,
+    ShieldCheck,
   } from "$shared/ui/icons";
   import LoadingDots from "$shared/ui/loading-dots.svelte";
 
@@ -80,6 +96,17 @@
   let autoLoading = $state(false);
   let autoScanned = $state(false);
   let autoSelected = $state<Set<string>>(new Set());
+
+  // ── Local-discovery state (P3) ──
+  // One-click connect for local-runtime clusters (minikube / kind / k3d /
+  // docker-desktop). Gated behind an explicit opt-in: we never read the
+  // kubeconfig until the user grants consent.
+  let localConsent = $state<LocalScanConsent>("undecided");
+  let localConfig = $state<KubeConfigFileType | null>(null);
+  let localClusters = $state<DiscoveredLocalCluster[]>([]);
+  let localScanning = $state(false);
+  let localScanned = $state(false);
+  let localConnecting = $state<string | null>(null);
 
   // ── Vault state ──
   let vaultAddress = $state("");
@@ -468,6 +495,69 @@ users:
     if (failures.length > 0) error = failures.join("; ");
   }
 
+  // ── Local discovery (P3) ──
+  function localKey(c: DiscoveredLocalCluster): string {
+    return c.contextName;
+  }
+
+  /** Tell whether a discovered local cluster is already connected. */
+  function isLocalConnected(c: DiscoveredLocalCluster): boolean {
+    return $clustersList.some((entry) => entry.name === c.clusterName);
+  }
+
+  async function runLocalScan() {
+    localScanning = true;
+    localClusters = [];
+    clearMessages();
+    try {
+      const config = await scanKubeconfigs();
+      localConfig = config;
+      localClusters = config ? selectLocalContexts(config) : [];
+    } catch (e) {
+      error = `Local scan failed: ${(e as Error).message}`;
+      localClusters = [];
+    }
+    localScanning = false;
+    localScanned = true;
+  }
+
+  /** Opt-in handler: persist consent, then run the first scan. */
+  async function grantLocalScan() {
+    setLocalScanConsent(true);
+    localConsent = "granted";
+    await runLocalScan();
+  }
+
+  function declineLocalScan() {
+    setLocalScanConsent(false);
+    localConsent = "denied";
+    localClusters = [];
+    localConfig = null;
+  }
+
+  async function connectLocal(cluster: DiscoveredLocalCluster) {
+    if (!localConfig) return;
+    clearMessages();
+    localConnecting = localKey(cluster);
+    try {
+      await addClustersFromKubeconfigSelection(localConfig, localConfig.path, [
+        {
+          name: cluster.clusterName,
+          provider: cluster.provider,
+          source: "local-discovery",
+        },
+      ]);
+      if (isLocalConnected(cluster)) {
+        success = `Connected "${cluster.contextName}" (${cluster.provider}).`;
+      } else {
+        error = `Could not connect "${cluster.contextName}". It may already exist.`;
+      }
+    } catch (e) {
+      error = (e as Error).message;
+    }
+    localConnecting = null;
+  }
+
   // ── OIDC import ──
   async function importOidc() {
     clearMessages();
@@ -697,6 +787,8 @@ users:
       /* storage unavailable */
     }
     void runAutoDetect();
+    localConsent = getLocalScanConsent();
+    if (localConsent === "granted") void runLocalScan();
   });
 </script>
 
@@ -736,6 +828,102 @@ users:
           >x</button
         >
       </div>
+    {/if}
+
+    <!-- ────────── Local discovery (P3) — opt-in, read-only ────────── -->
+    {#if !method}
+      {#if localConsent !== "granted"}
+        <!-- Consent gate: nothing is scanned until the user opts in. -->
+        <div
+          class="rounded-lg border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/[0.04] p-3 space-y-2"
+        >
+          <p class="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
+            <Container size={14} /> Find local clusters
+          </p>
+          <p class="text-[11px] text-slate-400 leading-relaxed flex items-start gap-1.5">
+            <ShieldCheck size={13} class="text-emerald-400 mt-0.5 shrink-0" />
+            <span>{LOCAL_SCAN_PRIVACY_NOTE}</span>
+          </p>
+          <div class="flex gap-1.5">
+            <Button
+              size="sm"
+              class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7"
+              disabled={localScanning}
+              onclick={grantLocalScan}
+            >
+              {localScanning ? "Scanning" : "Scan local clusters"}
+            </Button>
+            {#if localConsent === "undecided"}
+              <Button size="sm" variant="outline" class="text-xs h-7" onclick={declineLocalScan}
+                >No thanks</Button
+              >
+            {/if}
+          </div>
+        </div>
+      {:else}
+        <!-- Consent granted: show discovered local-runtime clusters. -->
+        <div
+          class="rounded-lg border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/[0.04] p-3 space-y-2"
+        >
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <p class="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
+                <Container size={14} /> Local clusters {localScanning ? "..." : ""}
+              </p>
+              <p class="text-[10px] text-slate-500 mt-0.5">
+                minikube, kind, k3d, docker-desktop — one-click connect.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              class="text-xs h-7"
+              disabled={localScanning}
+              onclick={runLocalScan}
+            >
+              {localScanning ? "Scanning" : "Rescan"}
+            </Button>
+          </div>
+          {#if localClusters.length > 0}
+            <div class="space-y-1 max-h-48 overflow-y-auto">
+              {#each localClusters as cluster (localKey(cluster))}
+                <div
+                  class="flex items-center justify-between gap-2 rounded border border-slate-700 px-2.5 py-1.5 text-xs"
+                >
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="text-slate-200 font-medium truncate">{cluster.contextName}</span>
+                    <span
+                      class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/30 text-emerald-300"
+                      >{cluster.provider}</span
+                    >
+                    {#if cluster.server}
+                      <span class="text-[10px] text-slate-500 truncate">{cluster.server}</span>
+                    {/if}
+                  </div>
+                  {#if isLocalConnected(cluster)}
+                    <span class="text-[10px] text-emerald-400 flex items-center gap-1">
+                      <Check class="w-3 h-3" /> Connected
+                    </span>
+                  {:else}
+                    <Button
+                      size="sm"
+                      class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-6 px-2"
+                      disabled={localConnecting !== null}
+                      onclick={() => connectLocal(cluster)}
+                    >
+                      {localConnecting === localKey(cluster) ? "Connecting" : "Connect"}
+                    </Button>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {:else if localScanned && !localScanning}
+            <p class="text-[10px] text-slate-500">
+              No local clusters found. Start minikube/kind, or use a method below.
+            </p>
+          {/if}
+        </div>
+      {/if}
     {/if}
 
     <!-- ────────── Auto-detect ────────── -->
