@@ -14,6 +14,7 @@
  */
 import type { KubeConfigFileType } from "$entities/config";
 import { detectClusterProvider, type ClusterProvider } from "$shared/lib/provider-detection";
+import { scanKubeconfigs } from "../api/scanner";
 
 export type DiscoveredLocalCluster = {
   /** kubeconfig context name — what we connect by. */
@@ -61,4 +62,17 @@ export function selectLocalContexts(config: KubeConfigFileType): DiscoveredLocal
   }
 
   return local;
+}
+
+/**
+ * First-run entry point: scan the user's kubeconfig (via the kubectl
+ * sidecar — no Tauri fs scope needed) and return the local-runtime
+ * clusters ready for one-click connect. Returns [] when no kubeconfig is
+ * present or it has no local contexts, so the wizard can fall straight
+ * back to the manual token path.
+ */
+export async function discoverLocalClusters(): Promise<DiscoveredLocalCluster[]> {
+  const config = await scanKubeconfigs();
+  if (!config) return [];
+  return selectLocalContexts(config);
 }
