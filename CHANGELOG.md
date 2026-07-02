@@ -2,6 +2,22 @@
 
 All notable changes to ROZOOM - K8s Linter IDE.
 
+## [0.22.3] - 2026-07-02
+
+### Added
+- Local cluster auto-discovery: the connect wizard can now scan
+  `~/.kube/config` and offer detected contexts to connect in one click,
+  instead of requiring a manual kubeconfig paste. Discovery is gated behind
+  an explicit opt-in consent step — nothing reads the file until the user
+  agrees — and prioritises local-runtime contexts (minikube, kind, k3d,
+  Docker Desktop) for a low-friction first connection.
+- TLS safety gate for cluster connections: connections over plain HTTP or
+  with an untrusted certificate are surfaced before any request is sent.
+- CA certificate normalization: kubeconfig CA data is accepted as either PEM
+  or base64.
+- Readable credential expiry: client-certificate `notAfter` and JWT `exp` are
+  parsed and shown as a human-readable expiry state.
+
 ## [0.22.2] - 2026-06-11
 
 ### Added
