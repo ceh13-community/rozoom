@@ -29,6 +29,11 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   TRIVY_VERSION: "0.70.0"
+  # Pin doggo: v1.2.0 changed release asset naming from
+  # doggo_<ver>_<Os>_<arch> to doggo-<os>-<arch>, which breaks the sidecar
+  # downloader's checksum lookup. Hold at the last compatible release until
+  # the downloader is taught the new naming scheme.
+  DOGGO_VERSION: "1.1.7"
 
 jobs:
   pr_checks:
