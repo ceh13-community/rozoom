@@ -514,7 +514,10 @@ users:
       localConfig = config;
       localClusters = config ? selectLocalContexts(config) : [];
     } catch (e) {
-      error = `Local scan failed: ${(e as Error).message}`;
+      const message = (e as Error).message;
+      error = /EACCES|permission denied/i.test(message)
+        ? "Could not read ~/.kube/config — check the file permissions."
+        : `Local scan failed: ${message}`;
       localClusters = [];
     }
     localScanning = false;
@@ -870,7 +873,7 @@ users:
               <p class="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
                 <Container size={14} /> Local clusters {localScanning ? "..." : ""}
               </p>
-              <p class="text-[10px] text-slate-500 mt-0.5">
+              <p class="text-[10px] text-slate-400 mt-0.5">
                 minikube, kind, k3d, docker-desktop — one-click connect.
               </p>
             </div>
@@ -886,7 +889,7 @@ users:
           </div>
           {#if localClusters.length > 0}
             <div class="space-y-1 max-h-48 overflow-y-auto">
-              {#each localClusters as cluster (localKey(cluster))}
+              {#each localClusters as cluster, clusterIndex (localKey(cluster))}
                 <div
                   class="flex items-center justify-between gap-2 rounded border border-slate-700 px-2.5 py-1.5 text-xs"
                 >
@@ -907,11 +910,18 @@ users:
                   {:else}
                     <Button
                       size="sm"
-                      class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-6 px-2"
+                      variant={clusterIndex === 0 ? "default" : "outline"}
+                      class={clusterIndex === 0
+                        ? "bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-6 px-2"
+                        : "text-xs h-6 px-2"}
                       disabled={localConnecting !== null}
                       onclick={() => connectLocal(cluster)}
                     >
-                      {localConnecting === localKey(cluster) ? "Connecting" : "Connect"}
+                      {#if localConnecting === localKey(cluster)}
+                        Connecting<LoadingDots />
+                      {:else}
+                        Connect
+                      {/if}
                     </Button>
                   {/if}
                 </div>
