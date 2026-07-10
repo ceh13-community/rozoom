@@ -63,7 +63,10 @@ test.describe("visual regression - cluster pages", () => {
   });
 
   const pages = [
-    { workload: "overview", name: "overview" },
+    // The seeded cluster has no live agent, so the overview renders the cold
+    // state ("Unknown" health, paused metrics). A healthy-with-workloads
+    // baseline is a separate snapshot planned for the next sprint.
+    { workload: "overview", name: "overview-cold-state" },
     { workload: "pods", name: "pods" },
     { workload: "deployments", name: "deployments" },
     { workload: "helmcatalog", name: "helm-catalog" },
