@@ -84,3 +84,42 @@ test.describe("visual regression - cluster pages", () => {
     });
   }
 });
+
+test.describe("visual regression - connect cluster wizard", () => {
+  // No seeded clusters: the wizard <details> auto-expands when the cluster
+  // list is empty, which is the first-run experience we want to pin.
+  test("wizard auto-expands when no clusters exist", async ({ page }) => {
+    await page.goto("/cluster-manager");
+    // Wait for hydration first (the splash mounts with the layout); checking
+    // for splash absence straight after goto races against it appearing.
+    await expect(page.getByRole("heading", { name: "Connect Cluster" })).toBeVisible();
+    // The boot splash overlays the page for ~3.6s; with animations disabled it
+    // freezes into a "stable" frame, so wait it out before capturing.
+    await page.locator(".splash").waitFor({ state: "detached", timeout: 10_000 });
+    // The wizard sits below the cluster grid, outside the initial viewport, so
+    // capture the expanded <details> element rather than the full page.
+    const wizard = page.locator("details").filter({ hasText: "Connect Cluster" }).first();
+    await wizard.scrollIntoViewIfNeeded();
+    await expect(wizard).toHaveAttribute("open", "");
+    await page.waitForTimeout(500);
+    await expect(wizard).toHaveScreenshot("connect-wizard-open.png", {
+      maxDiffPixelRatio: 0.02,
+    });
+  });
+});
+
+test.describe("visual regression - delete confirm dialog", () => {
+  // /dev/ui-catalog is unlocked by PUBLIC_APP_ENV=staging (see
+  // playwright.config.ts webServer command) and renders the shared
+  // delete-confirm-dialog with fixed demo targets.
+  test("delete confirmation dialog renders command preview", async ({ page }) => {
+    await page.goto("/dev/ui-catalog");
+    await page.getByRole("button", { name: /Delete pod/ }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await page.waitForTimeout(500);
+    await expect(dialog).toHaveScreenshot("delete-confirm-dialog.png", {
+      maxDiffPixelRatio: 0.02,
+    });
+  });
+});
