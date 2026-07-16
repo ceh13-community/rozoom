@@ -1,6 +1,6 @@
 # ROZOOM - K8s Linter IDE
 
-**A Swiss Army Knife for Kubernetes - an all-in-one fleet IDE that gives platform engineers and DevOps teams complete visibility and control over their clusters. Built with Tauri and SvelteKit.**
+**Kubernetes clarity. Without the friction. - a desktop IDE that shows platform engineers and DevOps teams what is actually happening in their clusters, with no agent to install and no black box between them and the API server. Built with Tauri and SvelteKit.**
 
 ROZOOM delivers a lightweight, secure, and fast cross-platform desktop experience for Kubernetes engineers, combining a modern web UI with a native Rust backend.
 
