@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <strong>A Swiss Army Knife for Kubernetes</strong> — an all-in-one fleet IDE that gives platform engineers and DevOps teams complete visibility and control over their clusters.
+  <strong>Kubernetes clarity. Without the friction.</strong> — a desktop IDE that shows platform engineers and DevOps teams what is actually happening in their clusters, with no black box between them and the API server.
 </p>
 
 <p align="center">
@@ -30,12 +30,21 @@
    - **Linux** — `.deb`, `.rpm`, or `.AppImage` (x64)
    - **Windows** — `.msi` or `.exe` installer (x64)
 2. Install and launch ROZOOM. No sign-in, no cloud account.
-3. On first run, click **Connect a cluster** — ROZOOM picks up contexts from your existing `~/.kube/config` and runs an initial health check.
+3. On first run, click **Connect a cluster** and pick your path:
+   - **Local cluster** — ROZOOM auto-detects local clusters (minikube, kind, k3d, Docker Desktop) with a one-click, read-only scan, then connects in one more click.
+   - **Remote cluster** — paste the API server **URL + a service-account token**. No OIDC setup, no kubeconfig editing.
+   - **Existing kubeconfig** — contexts from `~/.kube/config` (and `$KUBECONFIG`) work as before, alongside OIDC, cloud import, exec plugins, and Vault.
 
-You're now looking at fleet health, RBAC risks, Helm releases, and triaged workloads across every cluster in your kubeconfig.
+You're now looking at fleet health, RBAC risks, Helm releases, and triaged workloads across every connected cluster.
 
 > **macOS quarantine:** if Gatekeeper blocks the unsigned `.app`, run
 > `xattr -dr com.apple.quarantine "/Applications/ROZOOM - K8s Linter IDE.app"`.
+
+---
+
+## Nothing runs on your cluster
+
+ROZOOM is **client-side only**. There is no agent, no operator, no DaemonSet, and nothing to `helm install` before you can connect. The app talks to the Kubernetes API server directly from your machine — the same way `kubectl` does — using the credentials you provide. Disconnect, and nothing is left behind.
 
 ---
 
@@ -53,6 +62,7 @@ The primary application lives in `dashboard-app/`. See the detailed developer gu
 
 ## What this project delivers
 
+- **Frictionless connection**: auto-detect local clusters or paste a URL + token for remote ones — connected in under a minute, with nothing installed on the cluster.
 - **Runtime Health Score**: shows what is failing right now across control plane, nodes, workloads, observability, and platform hygiene.
 - **Config Reliability & Security Score**: highlights configuration risks that can cause incidents.
 - **Actionable remediation**: top issues are ranked by impact with minimal fix guidance.
