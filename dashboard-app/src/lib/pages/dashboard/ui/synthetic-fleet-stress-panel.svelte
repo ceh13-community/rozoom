@@ -15,6 +15,32 @@
     SYNTHETIC_STRESS_PRESETS,
     type SyntheticStressPreset,
   } from "../model/synthetic-fleet";
+  import {
+    buildRunReport,
+    computeLiveVerdict,
+    EMPTY_RUN_REPORT,
+    formatAt,
+    formatDelta,
+    formatDuration,
+    hasPresetRegression,
+    mergeSlowCardRows,
+    percentile,
+    PRESET_REGRESSION_THRESHOLDS,
+    SATURATED_DURATION_MS,
+    withSyntheticJitter,
+    type SyntheticPresetReports,
+    type SyntheticRunReport,
+  } from "../model/synthetic-run-report";
+  import {
+    appendComparisonSnapshot,
+    clearComparisonHistoryStorage,
+    diffPresetReports,
+    persistComparisonHistory,
+    readComparisonHistory,
+    summarizeComparisonDeltas,
+    summarizeHistorySnapshot,
+    type SyntheticHistorySnapshot,
+  } from "../model/comparison-history";
   import type { ClusterHealthChecks } from "$features/check-health/model/types";
 
   let { fleetSize, clusters }: { fleetSize: number; clusters: AppClusterConfig[] } = $props();
@@ -31,120 +57,28 @@
   let currentRunDurations = $state<number[]>([]);
   let currentRunPeakQueue = $state(0);
   let currentRunSaturatedClusters = $state<string[]>([]);
-  type SyntheticPresetReport = {
-    completedAt: number | null;
-    p95Ms: number | null;
-    maxMs: number | null;
-    peakQueue: number;
-    saturatedCount: number;
-    verdict: string;
-  };
-  type SyntheticHistorySnapshot = {
-    savedAt: number;
-    fleetSize: number;
-    reports: Partial<Record<SyntheticStressPreset, SyntheticPresetReport>>;
-  };
-  type SyntheticHistoryStorage = {
-    fleetSize: number;
-    snapshots: SyntheticHistorySnapshot[];
-  };
-  let presetReports = $state<
-    Partial<Record<SyntheticStressPreset, SyntheticPresetReport>>
-  >({});
+  let presetReports = $state<SyntheticPresetReports>({});
   let comparisonHistory = $state<SyntheticHistorySnapshot[]>([]);
   let comparisonBaseline = $state<SyntheticHistorySnapshot | null>(null);
-  let lastRunReport = $state<{
-    completedAt: number | null;
-    sampleSize: number;
-    p50Ms: number | null;
-    p95Ms: number | null;
-    maxMs: number | null;
-    peakQueue: number;
-    saturatedCount: number;
-    preset?: SyntheticStressPreset;
-  }>({
-    completedAt: null,
-    sampleSize: 0,
-    p50Ms: null,
-    p95Ms: null,
-    maxMs: null,
-    peakQueue: 0,
-    saturatedCount: 0,
-    preset: undefined,
-  });
-  const PRESET_REGRESSION_THRESHOLDS = {
-    p95Ms: 2_500,
-    maxMs: 4_500,
-    peakQueue: 14,
-    saturatedCount: 18,
-  } as const;
-
-  function getHistoryStorageKey() {
-    return `synthetic-fleet-comparison-history:${fleetSize}`;
-  }
+  let lastRunReport = $state<SyntheticRunReport>(EMPTY_RUN_REPORT);
 
   function refreshTelemetry() {
     refreshToken += 1;
   }
 
-  function percentile(values: number[], p: number) {
-    if (values.length === 0) return null;
-    const sorted = [...values].sort((a, b) => a - b);
-    const index = Math.min(sorted.length - 1, Math.ceil(sorted.length * p) - 1);
-    return sorted[index] ?? null;
-  }
-
-  function formatDuration(value: number | null) {
-    if (value == null || !Number.isFinite(value)) return "n/a";
-    return `${Math.round(value)}ms`;
-  }
-
-  function formatAt(value: number | null) {
-    if (!value) return "n/a";
-    return new Date(value).toLocaleTimeString();
-  }
-
-  function formatDelta(value: number | null) {
-    if (value == null || value === 0) return "0ms";
-    const prefix = value > 0 ? "+" : "";
-    return `${prefix}${Math.round(value)}ms`;
-  }
-
-  function readComparisonHistory(): SyntheticHistorySnapshot[] {
-    if (typeof window === "undefined") return [];
-    const raw = window.localStorage.getItem(getHistoryStorageKey());
-    if (!raw) return [];
-    try {
-      const parsed = JSON.parse(raw) as SyntheticHistoryStorage | SyntheticHistorySnapshot;
-      if (!parsed || typeof parsed !== "object") return [];
-      if ("snapshots" in parsed) {
-        return parsed.fleetSize === fleetSize ? parsed.snapshots : [];
-      }
-      return parsed.fleetSize === fleetSize ? [parsed] : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function writeComparisonHistory(reports: Partial<Record<SyntheticStressPreset, SyntheticPresetReport>>) {
-    if (typeof window === "undefined") return;
+  function saveComparisonHistory(reports: SyntheticPresetReports) {
     const snapshot: SyntheticHistorySnapshot = {
       savedAt: Date.now(),
       fleetSize,
       reports,
     };
-    const nextHistory = [...comparisonHistory, snapshot].slice(-8);
-    const payload: SyntheticHistoryStorage = {
-      fleetSize,
-      snapshots: nextHistory,
-    };
-    window.localStorage.setItem(getHistoryStorageKey(), JSON.stringify(payload));
+    const nextHistory = appendComparisonSnapshot(comparisonHistory, snapshot);
+    persistComparisonHistory(fleetSize, nextHistory);
     comparisonHistory = nextHistory;
   }
 
   function clearComparisonHistory() {
-    if (typeof window === "undefined") return;
-    window.localStorage.removeItem(getHistoryStorageKey());
+    clearComparisonHistoryStorage(fleetSize);
     comparisonHistory = [];
     comparisonBaseline = null;
   }
@@ -183,9 +117,7 @@
       const latestCheck = checks[cluster.uuid];
       if (latestCheck) hydrated += 1;
       const latestHealthCheck =
-        latestCheck && !("errors" in latestCheck)
-          ? (latestCheck as ClusterHealthChecks)
-          : null;
+        latestCheck && !("errors" in latestCheck) ? (latestCheck as ClusterHealthChecks) : null;
       if (cluster.offline) {
         offline += 1;
         continue;
@@ -226,40 +158,16 @@
       pending: syntheticQueue.includes(cluster.uuid),
       loading: syntheticRunning.includes(cluster.uuid),
     }));
-    const realRows = runtimeRows
-      .map((row) => ({
-        clusterId: row.clusterId,
-        latestDurationMs: row.lastDurationMs,
-        p95DurationMs: row.lastDurationMs,
-        samples: row.lastDurationMs == null ? 0 : 1,
-        lastAt: row.lastSettledAt,
-        pending: row.pending,
-        loading: row.loading,
-      }));
-    const merged = [...syntheticRows, ...realRows].reduce<
-      Map<
-        string,
-        {
-          clusterId: string;
-          latestDurationMs: number | null;
-          p95DurationMs: number | null;
-          samples: number;
-          lastAt: number | null;
-          pending: boolean;
-          loading: boolean;
-        }
-      >
-    >((rows, row) => {
-      const current = rows.get(row.clusterId);
-      if (!current || (row.latestDurationMs ?? -1) >= (current.latestDurationMs ?? -1)) {
-        rows.set(row.clusterId, row);
-      }
-      return rows;
-    }, new Map());
-
-    return [...merged.values()]
-      .sort((left, right) => (right.latestDurationMs ?? 0) - (left.latestDurationMs ?? 0))
-      .slice(0, 8);
+    const realRows = runtimeRows.map((row) => ({
+      clusterId: row.clusterId,
+      latestDurationMs: row.lastDurationMs,
+      p95DurationMs: row.lastDurationMs,
+      samples: row.lastDurationMs == null ? 0 : 1,
+      lastAt: row.lastSettledAt,
+      pending: row.pending,
+      loading: row.loading,
+    }));
+    return mergeSlowCardRows([...syntheticRows, ...realRows]);
   });
 
   const syntheticRuntimeSummary = $derived.by(() => {
@@ -275,12 +183,13 @@
     };
   });
 
-  const syntheticVerdict = $derived.by(() => {
-    const maxDurationMs = syntheticRuntimeSummary.maxDurationMs;
-    if (syntheticQueue.length > 12 || maxDurationMs > 2_500) return "Queue bound";
-    if (syntheticRunning.length > 0 || maxDurationMs > 1_200) return "Saturated";
-    return "Healthy";
-  });
+  const syntheticVerdict = $derived(
+    computeLiveVerdict({
+      queued: syntheticQueue.length,
+      running: syntheticRunning.length,
+      maxDurationMs: syntheticRuntimeSummary.maxDurationMs,
+    }),
+  );
   const selectedPresetMeta = $derived(
     SYNTHETIC_STRESS_PRESETS.find((preset) => preset.id === selectedPreset) ??
       SYNTHETIC_STRESS_PRESETS[0],
@@ -288,27 +197,26 @@
   const presetComparisonRows = $derived.by(() =>
     SYNTHETIC_STRESS_PRESETS.map((preset) => {
       const report = presetReports[preset.id];
-      const regression =
-        (report?.p95Ms ?? 0) > PRESET_REGRESSION_THRESHOLDS.p95Ms ||
-        (report?.maxMs ?? 0) > PRESET_REGRESSION_THRESHOLDS.maxMs ||
-        (report?.peakQueue ?? 0) > PRESET_REGRESSION_THRESHOLDS.peakQueue ||
-        (report?.saturatedCount ?? 0) > PRESET_REGRESSION_THRESHOLDS.saturatedCount;
       return {
         ...preset,
         report,
-        regression,
+        regression: hasPresetRegression(report),
       };
     }),
   );
   const bestPreset = $derived.by(() => {
     const candidates = presetComparisonRows.filter((row) => row.report?.p95Ms != null);
     if (candidates.length === 0) return null;
-    return [...candidates].sort((left, right) => (left.report?.p95Ms ?? 0) - (right.report?.p95Ms ?? 0))[0];
+    return [...candidates].sort(
+      (left, right) => (left.report?.p95Ms ?? 0) - (right.report?.p95Ms ?? 0),
+    )[0];
   });
   const worstPreset = $derived.by(() => {
     const candidates = presetComparisonRows.filter((row) => row.report?.p95Ms != null);
     if (candidates.length === 0) return null;
-    return [...candidates].sort((left, right) => (right.report?.p95Ms ?? 0) - (left.report?.p95Ms ?? 0))[0];
+    return [...candidates].sort(
+      (left, right) => (right.report?.p95Ms ?? 0) - (left.report?.p95Ms ?? 0),
+    )[0];
   });
   const regressionPresetCount = $derived(
     presetComparisonRows.filter((row) => row.regression).length,
@@ -317,73 +225,20 @@
     SYNTHETIC_STRESS_PRESETS.map((preset) => {
       const previous = comparisonBaseline?.reports[preset.id];
       const current = presetReports[preset.id];
-      const p95Delta =
-        current?.p95Ms != null && previous?.p95Ms != null ? current.p95Ms - previous.p95Ms : null;
-      const maxDelta =
-        current?.maxMs != null && previous?.maxMs != null ? current.maxMs - previous.maxMs : null;
-      const queueDelta =
-        current != null && previous != null ? current.peakQueue - previous.peakQueue : null;
       return {
         preset,
         previous,
         current,
-        p95Delta,
-        maxDelta,
-        queueDelta,
+        ...diffPresetReports(current, previous),
       };
     }),
   );
-  const comparisonDeltaSummary = $derived.by(() => {
-    const rows = previousComparisonRows.filter((row) => row.current && row.previous);
-    if (rows.length === 0) return null;
-    const p95Delta = rows.reduce((sum, row) => sum + (row.p95Delta ?? 0), 0);
-    const maxDelta = rows.reduce((sum, row) => sum + (row.maxDelta ?? 0), 0);
-    const queueDelta = rows.reduce((sum, row) => sum + (row.queueDelta ?? 0), 0);
-    const regressions = rows.filter(
-      (row) =>
-        (row.current?.p95Ms ?? 0) > (row.previous?.p95Ms ?? 0) ||
-        (row.current?.maxMs ?? 0) > (row.previous?.maxMs ?? 0) ||
-        (row.current?.peakQueue ?? 0) > (row.previous?.peakQueue ?? 0),
-    ).length;
-    return {
-      samples: rows.length,
-      avgP95DeltaMs: p95Delta / rows.length,
-      avgMaxDeltaMs: maxDelta / rows.length,
-      avgQueueDelta: queueDelta / rows.length,
-      regressions,
-    };
-  });
+  const comparisonDeltaSummary = $derived(summarizeComparisonDeltas(previousComparisonRows));
   const latestSavedComparison = $derived(
     comparisonHistory.length > 0 ? comparisonHistory[comparisonHistory.length - 1] : null,
   );
   const comparisonHistoryRows = $derived.by(() =>
-    [...comparisonHistory]
-      .slice(-5)
-      .reverse()
-      .map((snapshot) => {
-        const reports = Object.values(snapshot.reports).filter(Boolean);
-        const p95Values = reports
-          .map((report) => report?.p95Ms)
-          .filter((value): value is number => value != null);
-        const maxValues = reports
-          .map((report) => report?.maxMs)
-          .filter((value): value is number => value != null);
-        const peakQueue = reports.reduce((peak, report) => Math.max(peak, report?.peakQueue ?? 0), 0);
-        const regressions = reports.filter(
-          (report) =>
-            (report?.p95Ms ?? 0) > PRESET_REGRESSION_THRESHOLDS.p95Ms ||
-            (report?.maxMs ?? 0) > PRESET_REGRESSION_THRESHOLDS.maxMs ||
-            (report?.peakQueue ?? 0) > PRESET_REGRESSION_THRESHOLDS.peakQueue ||
-            (report?.saturatedCount ?? 0) > PRESET_REGRESSION_THRESHOLDS.saturatedCount,
-        ).length;
-        return {
-          savedAt: snapshot.savedAt,
-          p95Ms: p95Values.length > 0 ? Math.max(...p95Values) : null,
-          maxMs: maxValues.length > 0 ? Math.max(...maxValues) : null,
-          peakQueue,
-          regressions,
-        };
-      }),
+    [...comparisonHistory].slice(-5).reverse().map(summarizeHistorySnapshot),
   );
 
   function clearSyntheticTelemetry() {
@@ -398,16 +253,7 @@
     currentRunPeakQueue = 0;
     currentRunSaturatedClusters = [];
     presetReports = {};
-    lastRunReport = {
-      completedAt: null,
-      sampleSize: 0,
-      p50Ms: null,
-      p95Ms: null,
-      maxMs: null,
-      peakQueue: 0,
-      saturatedCount: 0,
-      preset: undefined,
-    };
+    lastRunReport = EMPTY_RUN_REPORT;
     refreshTelemetry();
   }
 
@@ -428,9 +274,8 @@
         refreshTelemetry();
 
         const profile = resolveSyntheticRefreshProfile(cluster.uuid, selectedPreset);
-        const jitterMs = (profile.seed % 7) * 35;
-        const durationMs = profile.durationMs + jitterMs;
-        if (durationMs > 1_200) {
+        const durationMs = withSyntheticJitter(profile);
+        if (durationMs > SATURATED_DURATION_MS) {
           currentRunSaturatedClusters = Array.from(
             new Set([...currentRunSaturatedClusters, cluster.uuid]),
           );
@@ -464,33 +309,15 @@
     });
 
     await Promise.allSettled(workers);
-    const verdict =
-      currentRunPeakQueue > 12 || (currentRunDurations.length > 0 && Math.max(...currentRunDurations) > 2_500)
-        ? "Queue bound"
-        : currentRunSaturatedClusters.length > 0
-          ? "Saturated"
-          : "Healthy";
-    lastRunReport = {
-      completedAt: Date.now(),
-      sampleSize: currentRunDurations.length,
-      p50Ms: percentile(currentRunDurations, 0.5),
-      p95Ms: percentile(currentRunDurations, 0.95),
-      maxMs: currentRunDurations.length > 0 ? Math.max(...currentRunDurations) : null,
+    const { run, presetReport } = buildRunReport({
+      durations: currentRunDurations,
       peakQueue: currentRunPeakQueue,
       saturatedCount: currentRunSaturatedClusters.length,
       preset: selectedPreset,
-    };
-    presetReports = {
-      ...presetReports,
-      [selectedPreset]: {
-        completedAt: lastRunReport.completedAt,
-        p95Ms: lastRunReport.p95Ms,
-        maxMs: lastRunReport.maxMs,
-        peakQueue: lastRunReport.peakQueue,
-        saturatedCount: lastRunReport.saturatedCount,
-        verdict,
-      },
-    };
+      completedAt: Date.now(),
+    });
+    lastRunReport = run;
+    presetReports = { ...presetReports, [selectedPreset]: presetReport };
     refreshTelemetry();
   }
 
@@ -530,13 +357,14 @@
     if (autoStressRunning) return;
     autoStressRunning = true;
     const previousPreset = selectedPreset;
-    comparisonBaseline = comparisonHistory.length > 0 ? comparisonHistory[comparisonHistory.length - 1] : null;
+    comparisonBaseline =
+      comparisonHistory.length > 0 ? comparisonHistory[comparisonHistory.length - 1] : null;
     try {
       for (const preset of SYNTHETIC_STRESS_PRESETS) {
         selectedPreset = preset.id;
         await runAutoStressSequence();
       }
-      writeComparisonHistory(presetReports);
+      saveComparisonHistory(presetReports);
     } finally {
       selectedPreset = previousPreset;
       autoStressRunning = false;
@@ -545,8 +373,9 @@
   }
 
   onMount(() => {
-    comparisonHistory = readComparisonHistory();
-    comparisonBaseline = comparisonHistory.length > 0 ? comparisonHistory[comparisonHistory.length - 1] : null;
+    comparisonHistory = readComparisonHistory(fleetSize);
+    comparisonBaseline =
+      comparisonHistory.length > 0 ? comparisonHistory[comparisonHistory.length - 1] : null;
     refreshTelemetry();
     const handler = () => refreshTelemetry();
     const interval = window.setInterval(refreshTelemetry, 500);
@@ -568,7 +397,8 @@
         Synthetic Fleet Harness
       </h3>
       <p class="text-xs text-slate-700 dark:text-slate-300">
-        Stress view for {fleetSize} cards. Use this to tune dashboard rendering, cache reuse, and watcher pressure without real clusters.
+        Stress view for {fleetSize} cards. Use this to tune dashboard rendering, cache reuse, and watcher
+        pressure without real clusters.
       </p>
     </div>
     <div class="flex items-center gap-2">
@@ -687,7 +517,9 @@
       <div>
         <div class="text-xs text-muted-foreground">p50 / p95 / max</div>
         <div class="mt-1 font-semibold">
-          {formatDuration(lastRunReport.p50Ms)} / {formatDuration(lastRunReport.p95Ms)} / {formatDuration(lastRunReport.maxMs)}
+          {formatDuration(lastRunReport.p50Ms)} / {formatDuration(lastRunReport.p95Ms)} / {formatDuration(
+            lastRunReport.maxMs,
+          )}
         </div>
       </div>
       <div>
@@ -748,14 +580,17 @@
       </div>
     {:else if !comparisonDeltaSummary}
       <div class="text-sm text-muted-foreground">
-        Latest comparison saved at {formatAt(latestSavedComparison?.savedAt ?? null)}. Run preset comparison again to compute deltas.
+        Latest comparison saved at {formatAt(latestSavedComparison?.savedAt ?? null)}. Run preset
+        comparison again to compute deltas.
       </div>
     {:else}
       <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <div>
           <div class="text-xs text-muted-foreground">Previous baseline</div>
           <div class="mt-1 font-semibold">{formatAt(comparisonBaseline?.savedAt ?? null)}</div>
-          <div class="text-xs text-muted-foreground">{comparisonDeltaSummary.samples} presets compared</div>
+          <div class="text-xs text-muted-foreground">
+            {comparisonDeltaSummary.samples} presets compared
+          </div>
         </div>
         <div>
           <div class="text-xs text-muted-foreground">Avg p95 delta</div>
@@ -765,7 +600,9 @@
         <div>
           <div class="text-xs text-muted-foreground">Avg max / queue delta</div>
           <div class="mt-1 font-semibold">
-            {formatDelta(comparisonDeltaSummary.avgMaxDeltaMs)} / {Math.round(comparisonDeltaSummary.avgQueueDelta)}
+            {formatDelta(comparisonDeltaSummary.avgMaxDeltaMs)} / {Math.round(
+              comparisonDeltaSummary.avgQueueDelta,
+            )}
           </div>
           <div class="text-xs text-muted-foreground">Peak queue delta</div>
         </div>
@@ -781,9 +618,7 @@
   <div class="mt-4 overflow-auto rounded-md border border-sky-300/50 bg-background/90 p-3">
     <div class="mb-2 text-xs font-semibold text-muted-foreground">Recent comparison runs</div>
     {#if comparisonHistoryRows.length === 0}
-      <div class="text-sm text-muted-foreground">
-        No saved comparison runs yet.
-      </div>
+      <div class="text-sm text-muted-foreground">No saved comparison runs yet.</div>
     {:else}
       <table class="min-w-full text-left text-sm">
         <thead class="text-xs text-muted-foreground">
@@ -841,12 +676,19 @@
               <td class="pr-3 text-xs text-muted-foreground">
                 {preset.report?.verdict ?? "n/a"}
               </td>
-              <td class="pr-3 text-xs font-medium {preset.regression ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}">
+              <td
+                class="pr-3 text-xs font-medium {preset.regression
+                  ? 'text-amber-700 dark:text-amber-300'
+                  : 'text-emerald-700 dark:text-emerald-300'}"
+              >
                 {preset.regression ? "Yes" : "No"}
               </td>
               <td class="pr-3 text-xs text-muted-foreground">
                 {#if previousComparisonRows.find((row) => row.preset.id === preset.id)?.p95Delta != null}
-                  {formatDelta(previousComparisonRows.find((row) => row.preset.id === preset.id)?.p95Delta ?? null)}
+                  {formatDelta(
+                    previousComparisonRows.find((row) => row.preset.id === preset.id)?.p95Delta ??
+                      null,
+                  )}
                 {:else}
                   n/a
                 {/if}
