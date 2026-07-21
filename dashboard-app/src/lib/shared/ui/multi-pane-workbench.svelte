@@ -5,6 +5,7 @@
   import PinOff from "@lucide/svelte/icons/pin-off";
   import X from "@lucide/svelte/icons/x";
   import { WorkbenchHeader } from "$features/pods-workbench";
+  import { NAV_ACTIVE_CLASS } from "./nav-active";
 
   export type MultiPaneWorkbenchLayout = "single" | "dual" | "triple";
 
@@ -123,13 +124,13 @@
       : "relative z-[100] mb-4 rounded-lg border shadow-sm"
   }`}
 >
-  <WorkbenchHeader tabs={tabs}>
+  <WorkbenchHeader {tabs}>
     {#snippet renderTab(tab)}
       <button
         type="button"
         class={`inline-flex min-h-10 max-w-[24rem] shrink-0 items-center gap-2 overflow-hidden whitespace-nowrap rounded px-4 py-2.5 text-sm transition ${
           tab.id === activeTabId
-            ? "bg-background font-medium text-foreground shadow-sm"
+            ? `${NAV_ACTIVE_CLASS} font-medium shadow-sm`
             : "text-muted-foreground hover:bg-muted"
         }`}
         onclick={() => onActivateTab(tab.id)}
@@ -209,13 +210,15 @@
 
   {#if showTimeline}
     <div class="flex items-center gap-2 border-b px-2 py-1.5">
-      <span class="text-[11px] uppercase tracking-wide text-muted-foreground">Incident timeline</span>
+      <span class="text-[11px] uppercase tracking-wide text-muted-foreground"
+        >Incident timeline</span
+      >
       <div class="inline-flex items-center rounded border bg-background p-1">
         <button
           type="button"
           class={`rounded px-2 py-1.5 text-[11px] ${
             timelineDensity === "all"
-              ? "bg-primary/15 text-foreground"
+              ? NAV_ACTIVE_CLASS
               : "text-muted-foreground hover:bg-muted hover:text-foreground"
           }`}
           onclick={() => onTimelineDensityChange?.("all")}
@@ -226,7 +229,7 @@
           type="button"
           class={`rounded px-2 py-1.5 text-[11px] ${
             timelineDensity === "warnings"
-              ? "bg-primary/15 text-foreground"
+              ? NAV_ACTIVE_CLASS
               : "text-muted-foreground hover:bg-muted hover:text-foreground"
           }`}
           onclick={() => onTimelineDensityChange?.("warnings")}
@@ -243,7 +246,7 @@
               type="button"
               class={`whitespace-nowrap rounded border px-2 py-1.5 text-[11px] ${
                 activeTimelineMarkerId === marker.id
-                  ? "border-primary bg-primary/15 text-foreground"
+                  ? `border-primary ${NAV_ACTIVE_CLASS}`
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
               onclick={() => onTimelineMarkerClick?.(marker)}
