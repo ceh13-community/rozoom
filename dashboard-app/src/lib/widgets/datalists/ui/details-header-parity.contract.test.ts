@@ -29,8 +29,7 @@ describe("details header parity contract", () => {
 
   it("keeps destructive and close button styles aligned with deployments details", () => {
     const destructiveClass = "rounded p-1.5 text-destructive hover:bg-destructive/10";
-    const closeClass =
-      "rounded bg-rose-100/70 p-1.5 text-xs text-rose-700 transition hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:hover:bg-rose-500/30";
+    const closeClass = "rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground";
 
     expect(headerActionsSource).toContain(destructiveClass);
     expect(headerActionsSource).toContain(closeClass);
