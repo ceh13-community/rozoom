@@ -16,6 +16,7 @@
     MessageSquareCode,
   } from "$shared/ui/icons";
   import { LightSwitch } from "$shared/ui/light-switch";
+  import { NAV_ACTIVE_CLASS, NAV_ACTIVE_HOVER_CLASS } from "$shared/ui/nav-active";
   import { BUNDLED_TOOLS } from "$shared/config/tooling";
   const appVersion: string = __APP_VERSION__;
   import type { InstallManifest } from "$shared/config/tooling";
@@ -260,7 +261,7 @@
         class={cn(
           "flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium",
           linterEnabled
-            ? "bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30"
+            ? cn(NAV_ACTIVE_CLASS, NAV_ACTIVE_HOVER_CLASS)
             : "bg-red-600/20 text-red-400 hover:bg-red-600/30",
         )}
         onclick={toggleLinter}
@@ -279,7 +280,7 @@
         class={cn(
           "flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium",
           diagnosticsEnabled
-            ? "bg-sky-600/20 text-sky-400 hover:bg-sky-600/30"
+            ? cn(NAV_ACTIVE_CLASS, NAV_ACTIVE_HOVER_CLASS)
             : "bg-slate-600/20 text-slate-400 hover:bg-slate-600/30",
         )}
         onclick={toggleDiagnostics}
@@ -300,7 +301,7 @@
         class={cn(
           "flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium",
           cliNotificationsEnabled
-            ? "bg-sky-600/20 text-sky-400 hover:bg-sky-600/30"
+            ? cn(NAV_ACTIVE_CLASS, NAV_ACTIVE_HOVER_CLASS)
             : "bg-slate-600/20 text-slate-400 hover:bg-slate-600/30",
         )}
         onclick={toggleCliNotifications}
