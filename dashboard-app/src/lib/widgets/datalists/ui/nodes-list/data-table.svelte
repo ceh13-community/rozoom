@@ -20,7 +20,6 @@
   import TableChecklistDropdown from "../table-checklist-dropdown.svelte";
   import TableToolbarShell from "../table-toolbar-shell.svelte";
   import WatcherToolbarControls from "../watcher-toolbar-controls.svelte";
-  import Pagination from "../pagination.svelte";
   import TableSurface from "$shared/ui/table-surface.svelte";
   import TableEmptyState from "$shared/ui/table-empty-state.svelte";
   import { exportCsvArtifact } from "$shared/lib/text-export";
@@ -246,15 +245,6 @@
       {/each}
     </Table.Body>
   </Table.Root>
-
-  {#if table.getPageCount() > 1}
-    <Pagination
-      getCanNextPage={table.getCanNextPage()}
-      getCanPreviousPage={table.getCanPreviousPage()}
-      nextPage={table.nextPage}
-      previousPage={table.previousPage}
-    />
-  {/if}
 </TableSurface>
 
 <TablePagination
