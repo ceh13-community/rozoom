@@ -192,7 +192,10 @@
     return parts.length > 0 ? parts.join(" ") : "-";
   }
 
-  function formatResources(resources: Container["resources"] | undefined, type: "requests" | "limits") {
+  function formatResources(
+    resources: Container["resources"] | undefined,
+    type: "requests" | "limits",
+  ) {
     const value = resources?.[type];
     const cpu = value?.cpu ?? "-";
     const memory = value?.memory ?? "-";
@@ -213,17 +216,19 @@
 
   function getControlledBy() {
     const metadata = ($data?.metadata as PodMetadataLike | undefined) ?? undefined;
-    const owner = metadata?.ownerReferences?.find(
-      (reference) => (reference as { controller?: boolean }).controller,
-    ) ??
-      metadata?.ownerReferences?.[0];
+    const owner =
+      metadata?.ownerReferences?.find(
+        (reference) => (reference as { controller?: boolean }).controller,
+      ) ?? metadata?.ownerReferences?.[0];
     if (!owner?.kind || !owner?.name) return "-";
     return `${owner.kind} ${owner.name}`;
   }
 
   function getPodIps() {
     const status = ($data?.status as PodStatusLike | undefined) ?? undefined;
-    const ips = status?.podIPs?.map((item) => item.ip).filter((value): value is string => Boolean(value)) ?? [];
+    const ips =
+      status?.podIPs?.map((item) => item.ip).filter((value): value is string => Boolean(value)) ??
+      [];
     if (ips.length > 0) return ips.join(", ");
     return extractPodIp($data ?? {});
   }
@@ -236,7 +241,10 @@
   }
 
   function getNodeSelectorLabel() {
-    const selector = (($data?.spec as PodSpecLike | undefined)?.nodeSelector ?? {}) as Record<string, string>;
+    const selector = (($data?.spec as PodSpecLike | undefined)?.nodeSelector ?? {}) as Record<
+      string,
+      string
+    >;
     const entries = Object.entries(selector);
     if (entries.length === 0) return "-";
     return entries.map(([key, value]) => `${key}: ${value}`).join(", ");
@@ -261,7 +269,10 @@
 
   function getLabelEntries() {
     return Object.entries(
-      ((($data?.metadata as PodMetadataLike | undefined)?.labels ?? {}) as Record<string, string>) ?? {},
+      ((($data?.metadata as PodMetadataLike | undefined)?.labels ?? {}) as Record<
+        string,
+        string
+      >) ?? {},
     );
   }
 
@@ -357,13 +368,16 @@
 
   function getAnnotationEntries() {
     return Object.entries(
-      ((($data?.metadata as PodMetadataLike | undefined)?.annotations ?? {}) as Record<string, string>) ?? {},
+      ((($data?.metadata as PodMetadataLike | undefined)?.annotations ?? {}) as Record<
+        string,
+        string
+      >) ?? {},
     );
   }
 
   $effect(() => {
-    const spec = ($data?.spec as { initContainers?: PodItem["spec"]["containers"] } | undefined) ??
-      undefined;
+    const spec =
+      ($data?.spec as { initContainers?: PodItem["spec"]["containers"] } | undefined) ?? undefined;
     initContainers = spec?.initContainers ?? null;
   });
 
@@ -410,10 +424,12 @@
 </script>
 
 <Sheet.Root bind:open={$isOpen}>
-  <Sheet.Content showCloseControl={false} class="z-[140] flex h-[100dvh] w-full flex-col sm:max-w-[70vw]">
+  <Sheet.Content showCloseControl={false} class="flex h-[100dvh] w-full flex-col sm:max-w-[70vw]">
     <div class="flex-1 overflow-y-auto p-4">
       {#if $data}
-        <div class="-mx-4 mb-4 sticky top-0 z-20 border-b bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+        <div
+          class="-mx-4 mb-4 sticky top-0 z-20 border-b bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/85"
+        >
           <div class="flex items-center justify-between gap-2">
             <div class="min-w-0 flex items-center gap-2">
               <Info class="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -421,9 +437,27 @@
             </div>
             <DetailsHeaderActions
               actions={[
-                { id: "shell", title: "Shell", ariaLabel: "Shell", icon: Terminal, onClick: () => runAction(onShell) },
-                { id: "attach", title: "Attach pod", ariaLabel: "Attach pod", icon: Plug, onClick: () => runAction(onAttach) },
-                { id: "edit-yaml", title: "Edit YAML", ariaLabel: "Edit YAML", icon: Pencil, onClick: () => runAction(onEditYaml) },
+                {
+                  id: "shell",
+                  title: "Shell",
+                  ariaLabel: "Shell",
+                  icon: Terminal,
+                  onClick: () => runAction(onShell),
+                },
+                {
+                  id: "attach",
+                  title: "Attach pod",
+                  ariaLabel: "Attach pod",
+                  icon: Plug,
+                  onClick: () => runAction(onAttach),
+                },
+                {
+                  id: "edit-yaml",
+                  title: "Edit YAML",
+                  ariaLabel: "Edit YAML",
+                  icon: Pencil,
+                  onClick: () => runAction(onEditYaml),
+                },
                 {
                   id: "investigate",
                   title: "Investigate",
@@ -487,7 +521,13 @@
                   icon: Link2,
                   onClick: () => runAction(onPortForward),
                 },
-                { id: "logs", title: "Logs", ariaLabel: "Logs", icon: ScrollText, onClick: () => runAction(onLogs) },
+                {
+                  id: "logs",
+                  title: "Logs",
+                  ariaLabel: "Logs",
+                  icon: ScrollText,
+                  onClick: () => runAction(onLogs),
+                },
                 {
                   id: "delete",
                   title: "Delete",
@@ -503,7 +543,8 @@
             />
           </div>
           <div class="text-xs text-muted-foreground">
-            Namespace: {$data.metadata?.namespace || "default"} · Node: {$data.spec?.nodeName || "-"} · Pod IP:
+            Namespace: {$data.metadata?.namespace || "default"} · Node: {$data.spec?.nodeName ||
+              "-"} · Pod IP:
             {extractPodIp($data)}
           </div>
         </div>
@@ -543,7 +584,10 @@
             </Table.Row>
             <Table.Row>
               <Table.Cell>Service Account</Table.Cell>
-              <Table.Cell>{(($data.spec as PodSpecLike | undefined)?.serviceAccountName ?? "-") as string}</Table.Cell>
+              <Table.Cell
+                >{(($data.spec as PodSpecLike | undefined)?.serviceAccountName ??
+                  "-") as string}</Table.Cell
+              >
             </Table.Row>
             <Table.Row>
               <Table.Cell>QoS Class</Table.Cell>
@@ -557,7 +601,10 @@
               <Table.Cell>Node Selector</Table.Cell>
               <Table.Cell>{getNodeSelectorLabel()}</Table.Cell>
             </Table.Row>
-            <Table.Row class={`cursor-pointer transition-colors ${showTolerations ? "bg-sky-50/70 dark:bg-sky-500/10" : "hover:bg-muted/40"}`} onclick={() => (showTolerations = !showTolerations)}>
+            <Table.Row
+              class={`cursor-pointer transition-colors ${showTolerations ? "bg-sky-50/70 dark:bg-sky-500/10" : "hover:bg-muted/40"}`}
+              onclick={() => (showTolerations = !showTolerations)}
+            >
               <Table.Cell>Tolerations</Table.Cell>
               <Table.Cell>
                 <div class="flex items-center justify-between gap-2">
@@ -569,7 +616,9 @@
                   {/if}
                 </div>
                 {#if showTolerations}
-                  <div class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10">
+                  <div
+                    class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10"
+                  >
                     {#if getTolerations().length === 0}
                       <div class="text-muted-foreground">No tolerations.</div>
                     {:else}
@@ -586,37 +635,40 @@
             </Table.Row>
             <Table.Row>
               <Table.Cell>Secrets</Table.Cell>
-              <Table.Cell>{getSecretNames().length > 0 ? getSecretNames().join(", ") : "-"}</Table.Cell>
+              <Table.Cell
+                >{getSecretNames().length > 0 ? getSecretNames().join(", ") : "-"}</Table.Cell
+              >
             </Table.Row>
           </Table.Body>
         </Table.Root>
         <h3 class="my-4 font-bold">Metrics</h3>
         {#if metricsError}
           <div class="text-sm text-muted-foreground">{metricsError}</div>
+        {:else if getMetrics($data)}
+          <Table.Root>
+            <Table.Body>
+              <Table.Row>
+                <Table.Cell>CPU</Table.Cell>
+                <Table.Cell>{getMetrics($data)?.cpu ?? "-"}</Table.Cell>
+              </Table.Row>
+              <Table.Row>
+                <Table.Cell>Memory</Table.Cell>
+                <Table.Cell>{getMetrics($data)?.memory ?? "-"}</Table.Cell>
+              </Table.Row>
+            </Table.Body>
+          </Table.Root>
         {:else}
-          {#if getMetrics($data)}
-            <Table.Root>
-              <Table.Body>
-                <Table.Row>
-                  <Table.Cell>CPU</Table.Cell>
-                  <Table.Cell>{getMetrics($data)?.cpu ?? "-"}</Table.Cell>
-                </Table.Row>
-                <Table.Row>
-                  <Table.Cell>Memory</Table.Cell>
-                  <Table.Cell>{getMetrics($data)?.memory ?? "-"}</Table.Cell>
-                </Table.Row>
-              </Table.Body>
-            </Table.Root>
-          {:else}
-            <div class="text-sm text-muted-foreground">No metrics available.</div>
-          {/if}
+          <div class="text-sm text-muted-foreground">No metrics available.</div>
         {/if}
         <h3 class="my-4 font-bold">Pod Volumes</h3>
         {#if (($data?.spec as PodSpecLike | undefined)?.volumes ?? []).length > 0}
           <Table.Root>
             <Table.Body>
               {#each getVolumesByType() as [volumeType, volumes]}
-                <Table.Row class={`cursor-pointer transition-colors ${isVolumeTypeExpanded(volumeType) ? "bg-sky-50/70 dark:bg-sky-500/10" : "hover:bg-muted/40"}`} onclick={() => toggleVolumeType(volumeType)}>
+                <Table.Row
+                  class={`cursor-pointer transition-colors ${isVolumeTypeExpanded(volumeType) ? "bg-sky-50/70 dark:bg-sky-500/10" : "hover:bg-muted/40"}`}
+                  onclick={() => toggleVolumeType(volumeType)}
+                >
                   <Table.Cell>{toTitleCase(volumeType)}</Table.Cell>
                   <Table.Cell>
                     <div class="flex items-center justify-between gap-2">
@@ -628,7 +680,9 @@
                       {/if}
                     </div>
                     {#if isVolumeTypeExpanded(volumeType)}
-                      <div class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10">
+                      <div
+                        class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10"
+                      >
                         {#each volumes as volume}
                           {#each getVolumeDetailLines(volumeType, volume) as detail}
                             <div class="break-all">{detail}</div>
@@ -646,7 +700,7 @@
         {/if}
         <h3 class="my-4 font-bold">Containers</h3>
         {#if (($data?.spec as PodSpecLike | undefined)?.containers ?? []).length > 0}
-          {#each (($data.spec as PodSpecLike | undefined)?.containers ?? []) as container}
+          {#each ($data.spec as PodSpecLike | undefined)?.containers ?? [] as container}
             <h4 class="mb-2 mt-4 font-semibold">{container.name}</h4>
             <Table.Root>
               <Table.Body>
@@ -654,9 +708,14 @@
                   <Table.Cell>Status</Table.Cell>
                   <Table.Cell>
                     {@const containerStatus = getContainerStateLabel(container.name)}
-                    {@const containerTone = getStatusToneClasses(containerLabelToState(containerStatus))}
-                    <span class={`inline-flex items-center gap-2 font-medium ${containerTone.text}`}>
-                      <span class={`inline-block h-2.5 w-2.5 rounded-full ${containerTone.dot}`}></span>
+                    {@const containerTone = getStatusToneClasses(
+                      containerLabelToState(containerStatus),
+                    )}
+                    <span
+                      class={`inline-flex items-center gap-2 font-medium ${containerTone.text}`}
+                    >
+                      <span class={`inline-block h-2.5 w-2.5 rounded-full ${containerTone.dot}`}
+                      ></span>
                       {containerStatus}
                     </span>
                   </Table.Cell>
@@ -681,7 +740,10 @@
                     {/if}
                   </Table.Cell>
                 </Table.Row>
-                <Table.Row class={`cursor-pointer transition-colors ${isContainerEnvExpanded(container.name) ? "bg-sky-50/70 dark:bg-sky-500/10" : "hover:bg-muted/40"}`} onclick={() => toggleContainerEnv(container.name)}>
+                <Table.Row
+                  class={`cursor-pointer transition-colors ${isContainerEnvExpanded(container.name) ? "bg-sky-50/70 dark:bg-sky-500/10" : "hover:bg-muted/40"}`}
+                  onclick={() => toggleContainerEnv(container.name)}
+                >
                   <Table.Cell>Environment</Table.Cell>
                   <Table.Cell>
                     <div class="flex items-center justify-between gap-2">
@@ -693,11 +755,13 @@
                       {/if}
                     </div>
                     {#if isContainerEnvExpanded(container.name)}
-                      <div class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10">
+                      <div
+                        class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10"
+                      >
                         {#if (container.env ?? []).length === 0}
                           <div class="text-muted-foreground">No environment variables.</div>
                         {:else}
-                          {#each [...(container.env ?? [])].sort((a, b) => a.name.localeCompare(b.name)) as env}
+                          {#each [...(container.env ?? [])].sort( (a, b) => a.name.localeCompare(b.name), ) as env}
                             <div class="break-all">{getEnvironmentInfo(env)}</div>
                           {/each}
                         {/if}
@@ -705,7 +769,10 @@
                     {/if}
                   </Table.Cell>
                 </Table.Row>
-                <Table.Row class={`cursor-pointer transition-colors ${isContainerMountsExpanded(container.name) ? "bg-sky-50/70 dark:bg-sky-500/10" : "hover:bg-muted/40"}`} onclick={() => toggleContainerMounts(container.name)}>
+                <Table.Row
+                  class={`cursor-pointer transition-colors ${isContainerMountsExpanded(container.name) ? "bg-sky-50/70 dark:bg-sky-500/10" : "hover:bg-muted/40"}`}
+                  onclick={() => toggleContainerMounts(container.name)}
+                >
                   <Table.Cell>Mounts</Table.Cell>
                   <Table.Cell>
                     <div class="flex items-center justify-between gap-2">
@@ -717,7 +784,9 @@
                       {/if}
                     </div>
                     {#if isContainerMountsExpanded(container.name)}
-                      <div class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10">
+                      <div
+                        class="mt-2 space-y-1 rounded border border-sky-200/60 bg-sky-50/70 p-2 text-xs dark:border-sky-500/30 dark:bg-sky-500/10"
+                      >
                         {#if (container.volumeMounts ?? []).length === 0}
                           <div class="text-muted-foreground">No mounts.</div>
                         {:else}
@@ -741,7 +810,11 @@
                 </Table.Row>
                 <Table.Row>
                   <Table.Cell>Arguments</Table.Cell>
-                  <Table.Cell>{(container.args ?? []).length > 0 ? container.args?.join(" ") : "-"}</Table.Cell>
+                  <Table.Cell
+                    >{(container.args ?? []).length > 0
+                      ? container.args?.join(" ")
+                      : "-"}</Table.Cell
+                  >
                 </Table.Row>
                 <Table.Row>
                   <Table.Cell>Requests</Table.Cell>
