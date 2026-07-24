@@ -21,6 +21,39 @@ describe("shell/workbench layering contract", () => {
     expect(daemonSetsList).toContain("relative z-[100]");
   });
 
+  it("renders cluster action panels and workbench fullscreen above the shell terminal", () => {
+    const clusterPanels = [
+      "src/lib/widgets/cluster/ui/auth-security-panel.svelte",
+      "src/lib/widgets/cluster/ui/rotate-certs-panel.svelte",
+      "src/lib/widgets/cluster/ui/gitops-bootstrap-panel.svelte",
+      "src/lib/widgets/cluster/ui/helm-panel.svelte",
+      "src/lib/widgets/cluster/ui/helm-catalog-panel.svelte",
+    ];
+
+    // Shell windows sit at z-[180]; safety-critical cluster dialogs must layer above it.
+    for (const path of clusterPanels) {
+      const source = read(path);
+      expect(source, `${path} overlay must sit above shell terminal`).toContain(
+        "z-[190] bg-black/40",
+      );
+      expect(source, `${path} content must sit above shell terminal`).toContain(
+        "right-6 z-[195] flex",
+      );
+      expect(source, `${path} must not keep the old below-shell z-index`).not.toContain("z-[150]");
+      expect(source, `${path} must not keep the old below-shell z-index`).not.toContain("z-[160]");
+    }
+
+    const workbenchShell = read("src/lib/widgets/datalists/ui/common/workbench-sheet-shell.svelte");
+    expect(workbenchShell).toContain("fixed inset-3 z-[195]");
+    expect(workbenchShell).not.toContain("z-[170]");
+  });
+
+  it("dims the viewport behind the details sheet portal", () => {
+    const detailsPortal = read("src/lib/shared/ui/details-sheet-portal.svelte");
+    expect(detailsPortal).toContain("z-[190] bg-black/80");
+    expect(detailsPortal).not.toContain("bg-black/20");
+  });
+
   it("keeps debug describe in a dedicated read-only shell mode", () => {
     const shellWindow = read("src/lib/widgets/shell/ui/shell-window.svelte");
 
