@@ -34,7 +34,7 @@
   <div use:portal class="contents">
     <button
       type="button"
-      class="fixed inset-0 z-[190] bg-black/20"
+      class="fixed inset-0 z-[190] bg-black/80"
       aria-label={closeAriaLabel}
       onclick={onClose}
     ></button>
