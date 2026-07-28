@@ -2,7 +2,7 @@
   import type { PathSegment } from "./yaml-path";
   import type { YamlDocumentInfo } from "./yaml-documents";
   import { formatDocLabel } from "./yaml-documents";
-  import { NAV_ACTIVE_CLASS, NAV_ACTIVE_TEXT_CLASS } from "./nav-active";
+  import { NAV_ACTIVE_TEXT_CLASS } from "./nav-active";
 
   interface Props {
     pathSegments: PathSegment[];
@@ -41,13 +41,13 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div
-  class="yaml-breadcrumb flex items-center gap-1 border-b border-border bg-background/80 px-3 py-1 text-[11px] font-mono"
+  class="yaml-breadcrumb flex items-center gap-1 border-b border-border bg-popover/80 px-3 py-1 text-[11px] font-mono"
 >
   <!-- Multi-document navigator -->
   {#if documents.length > 1}
     <div class="relative">
       <button
-        class={`flex items-center gap-1 rounded px-1.5 py-0.5 ${NAV_ACTIVE_TEXT_CLASS} hover:bg-muted`}
+        class={`flex items-center gap-1 rounded px-1.5 py-0.5 ${NAV_ACTIVE_TEXT_CLASS} hover:bg-accent`}
         onclick={() => {
           showDocDropdown = !showDocDropdown;
         }}
@@ -65,35 +65,34 @@
         >
           {#each documents as doc, i}
             <button
-              class={`flex w-full items-center gap-2 px-3 py-1.5 text-left ${
-                i === activeDocIndex ? NAV_ACTIVE_CLASS : "text-muted-foreground hover:bg-muted"
-              }`}
+              class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-accent"
+              class:bg-accent={i === activeDocIndex}
               onclick={() => handleDocSelect(doc)}
             >
-              <span class="text-muted-foreground/70">{i + 1}.</span>
-              <span class={i === activeDocIndex ? NAV_ACTIVE_TEXT_CLASS : ""}>
+              <span class="text-muted-foreground">{i + 1}.</span>
+              <span class={i === activeDocIndex ? NAV_ACTIVE_TEXT_CLASS : "text-foreground"}>
                 {formatDocLabel(doc)}
               </span>
-              <span class="ml-auto text-[10px] text-muted-foreground/60">L{doc.startLine}</span>
+              <span class="ml-auto text-[10px] text-muted-foreground">L{doc.startLine}</span>
             </button>
           {/each}
         </div>
       {/if}
     </div>
-    <span class="text-muted-foreground/60">|</span>
+    <span class="text-muted-foreground">|</span>
   {/if}
 
   <!-- YAML path breadcrumb -->
   <div class="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden">
     {#if pathSegments.length === 0}
-      <span class="text-muted-foreground/60 italic">root</span>
+      <span class="text-muted-foreground italic">root</span>
     {:else}
       {#each pathSegments as segment, i}
         {#if i > 0}
-          <span class="text-muted-foreground/60 shrink-0">&gt;</span>
+          <span class="text-muted-foreground shrink-0">&gt;</span>
         {/if}
         <button
-          class="shrink-0 rounded px-1 py-0.5 text-muted-foreground hover:bg-muted hover:text-primary truncate max-w-[160px]"
+          class="shrink-0 rounded px-1 py-0.5 text-muted-foreground hover:bg-accent hover:text-primary truncate max-w-[160px]"
           title={segment.key}
           onclick={() => handleSegmentClick(segment)}
         >
@@ -106,7 +105,7 @@
   <!-- Copy path button -->
   {#if pathSegments.length > 0}
     <button
-      class="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+      class="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
       title="Copy YAML path (Ctrl+Shift+C)"
       onclick={() => onCopyPath?.()}
     >
