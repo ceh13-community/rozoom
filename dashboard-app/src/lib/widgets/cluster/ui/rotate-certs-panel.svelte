@@ -1180,12 +1180,12 @@
   {@const wizardProvider = distributionHint ?? "kubeadm"}
   <button
     type="button"
-    class="fixed inset-0 z-[150] bg-black/40"
+    class="fixed inset-0 z-[190] bg-black/40"
     aria-label="Close wizard"
     onclick={() => (wizardOpen = false)}
   ></button>
   <div
-    class="fixed inset-y-6 right-6 z-[160] flex w-[min(70vw,720px)] flex-col rounded-lg border bg-background shadow-2xl"
+    class="fixed inset-y-6 right-6 z-[195] flex w-[min(70vw,720px)] flex-col rounded-lg border bg-background shadow-2xl"
   >
     <div class="flex items-center justify-between border-b px-4 py-3">
       <div>

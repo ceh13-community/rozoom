@@ -44,16 +44,23 @@
   <div
     class={`flex flex-col ${
       isFullscreen
-        ? "fixed inset-3 z-[170] rounded-lg border bg-background shadow-2xl"
+        ? "fixed inset-3 z-[195] rounded-lg border bg-background shadow-2xl"
         : "h-full w-full"
     } ${isVerticallyCollapsed ? "max-w-[44px] overflow-hidden" : ""}`}
   >
     {#if isVerticallyCollapsed}
       <div class="flex h-full w-11 flex-col items-center justify-between border-r bg-muted/70 py-2">
-        <Button variant="ghost" size="icon" onclick={onToggleVerticalCollapse} title="Expand workloads panel">
+        <Button
+          variant="ghost"
+          size="icon"
+          onclick={onToggleVerticalCollapse}
+          title="Expand workloads panel"
+        >
           <PanelLeftOpen class="h-4 w-4" />
         </Button>
-        <div class="[writing-mode:vertical-rl] rotate-180 text-[11px] tracking-wide text-muted-foreground">
+        <div
+          class="[writing-mode:vertical-rl] rotate-180 text-[11px] tracking-wide text-muted-foreground"
+        >
           {collapsedLabel}
         </div>
         <div class="h-9 w-9"></div>
@@ -66,7 +73,12 @@
             {@render headerActions()}
           {/if}
           {#if canVerticalCollapse}
-            <Button variant="outline" size="icon" onclick={onToggleVerticalCollapse} title="Collapse workloads panel">
+            <Button
+              variant="outline"
+              size="icon"
+              onclick={onToggleVerticalCollapse}
+              title="Collapse workloads panel"
+            >
               <PanelLeftClose class="h-4 w-4" />
             </Button>
           {/if}
@@ -98,7 +110,10 @@
   </div>
 {:else}
   <Sheet.Root bind:open={$isOpen}>
-    <Sheet.Content withOverlay={false} class={`flex h-[100dvh] w-full flex-col ${standaloneMaxWidthClass}`}>
+    <Sheet.Content
+      withOverlay={false}
+      class={`flex h-[100dvh] w-full flex-col ${standaloneMaxWidthClass}`}
+    >
       <div class="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
         <div class="text-sm font-medium">{title}</div>
         {#if headerActions}
