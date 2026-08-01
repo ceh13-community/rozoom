@@ -312,6 +312,14 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
+      - name: Upload .deb for render smoke
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb-x64
+          path: dashboard-app/src-tauri/target/release/bundle/deb/*.deb
+          if-no-files-found: error
+
       - name: Build AppImage (best-effort, linuxdeploy plugin can be unstable)
         if: runner.os == 'Linux'
         continue-on-error: true
@@ -346,6 +354,38 @@ jobs:
           tag_name: app-v${{ env.APP_VERSION }}
           draft: true
           files: dashboard-app/src-tauri/target/release/bundle/rpm/ROZOOM_K8s_Linter_IDE_${{ env.APP_VERSION }}_x86_64.rpm
+
+  # Release gate: install the freshly built .deb in clean end-user distros and
+  # verify the window actually renders (not just that the bundle built). Added
+  # after 0.22.x shipped a .deb that launched to a blank window on Kali —
+  # nothing in build or e2e (web-only) could have caught it.
+  deb_render_smoke:
+    name: "Deb render smoke (${{ matrix.distro }})"
+    needs: publish-tauri
+    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: ["debian:12", "kalilinux/kali-rolling"]
+    container:
+      image: ${{ matrix.distro }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Download built .deb
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-deb-x64
+          path: dashboard-app/deb
+
+      - name: Install and verify window renders
+        run: bash ./scripts/deb-render-smoke.sh deb/*.deb
 
   # android-build:
   #   name: Build Android (manual)
