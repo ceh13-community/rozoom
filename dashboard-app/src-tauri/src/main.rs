@@ -121,6 +121,23 @@ mod tests {
 }
 
 fn main() {
+    #[cfg(target_os = "linux")]
+    {
+        // webkit2gtk 2.42+ has a known DMA-BUF renderer bug that produces a
+        // blank/white window on some Linux configs (observed on kali-rolling;
+        // Ubuntu LTS unaffected). Must be set before webkit2gtk initializes,
+        // which happens when Tauri creates the webview below. Only set if
+        // the user/environment hasn't already made a choice.
+        //
+        // Safety: this is the first statement in main(), before Tauri spawns
+        // any threads, so no other thread can observe env state concurrently.
+        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+            unsafe {
+                std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+            }
+        }
+    }
+
     let start = std::time::Instant::now();
     tauri::Builder::default()
         .plugin(tauri_plugin_cache::init())
