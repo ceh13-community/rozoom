@@ -35,9 +35,20 @@ apt-get install -y -qq --no-install-recommends \
 apt-get install -y -qq "$(realpath "$DEB_PATH")" || fail "deb failed to install"
 
 PKG_NAME="$(dpkg-deb -f "$DEB_PATH" Package)"
-BIN="$(dpkg -L "$PKG_NAME" | grep -m1 '^/usr/bin/' || true)"
-[ -n "$BIN" ] || fail "no /usr/bin binary found in package $PKG_NAME"
-echo "Package: $PKG_NAME, binary: $BIN"
+# The package ships sidecar CLIs (rozoom-kubectl, rozoom-doggo, ...) into
+# /usr/bin alongside the app, so "first entry in /usr/bin" picks the wrong
+# binary. The .desktop file's Exec= is the one authoritative pointer to the
+# actual app.
+DESKTOP_FILE="$(dpkg -L "$PKG_NAME" | grep -m1 '^/usr/share/applications/.*\.desktop$' || true)"
+[ -n "$DESKTOP_FILE" ] || fail "no .desktop file found in package $PKG_NAME"
+EXEC_CMD="$(sed -n 's/^Exec=//p' "$DESKTOP_FILE" | head -n1 | awk '{print $1}' | tr -d '"')"
+[ -n "$EXEC_CMD" ] || fail "no Exec= line in $DESKTOP_FILE"
+case "$EXEC_CMD" in
+  /*) BIN="$EXEC_CMD" ;;
+  *)  BIN="$(command -v "$EXEC_CMD" || true)" ;;
+esac
+[ -n "$BIN" ] && [ -x "$BIN" ] || fail "Exec target '$EXEC_CMD' from $DESKTOP_FILE not found or not executable"
+echo "Package: $PKG_NAME, desktop: $DESKTOP_FILE, binary: $BIN"
 
 Xvfb :99 -screen 0 1280x800x24 &
 XVFB_PID=$!
