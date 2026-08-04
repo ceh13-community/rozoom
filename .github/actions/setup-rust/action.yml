@@ -10,9 +10,20 @@ runs:
       # swallows apt 404s (stale mirror index) and reports success with zero
       # packages installed, surfacing the failure only later at cargo/gdk-sys.
       run: |
+        pkgs="libwebkit2gtk-4.1-dev libgtk-3-dev libappindicator3-dev librsvg2-dev patchelf"
         sudo apt-get update -o Acquire::Retries=3
-        sudo apt-get install -y -o Acquire::Retries=3 \
-          libwebkit2gtk-4.1-dev libgtk-3-dev libappindicator3-dev librsvg2-dev patchelf
+        sudo apt-get install -y -o Acquire::Retries=3 $pkgs
+        # Verify every package is actually installed: a partial mirror failure
+        # must fail this step, not surface later at cargo/gdk-sys.
+        missing=""
+        for p in $pkgs; do
+          dpkg-query -W -f='${Status}' "$p" 2>/dev/null | grep -q "install ok installed" || missing="$missing $p"
+        done
+        if [ -n "$missing" ]; then
+          echo "::error::apt packages not installed:$missing"
+          exit 1
+        fi
+        pkg-config --exists webkit2gtk-4.1 || { echo "::error::webkit2gtk-4.1.pc not found"; exit 1; }
 
     - name: Install Rust stable
       uses: dtolnay/rust-toolchain@stable
