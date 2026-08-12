@@ -25,6 +25,7 @@
   } from "$features/pod-restarts/model/history";
   import LoadingDots from "$shared/ui/loading-dots.svelte";
   import TableEmptyState from "$shared/ui/table-empty-state.svelte";
+  import TablePagination from "$shared/ui/table-pagination.svelte";
   import { Button } from "$shared/ui/button";
   import { Badge } from "$shared/ui/badge";
   import { Input } from "$shared/ui/input";
@@ -71,6 +72,8 @@
   let filterReason = $state("all");
   let filterSeverity = $state<"all" | RestartSeverity>("all");
   let searchValue = $state("");
+  let pageIndex = $state(0);
+  let pageSize = $state(50);
 
   const clusterId = $derived(data.uuid);
 
@@ -139,6 +142,14 @@
     loading = false;
   });
 
+  $effect(() => {
+    filterNamespace;
+    filterReason;
+    filterSeverity;
+    searchValue;
+    pageIndex = 0;
+  });
+
   function formatDate(value: string | null | undefined) {
     if (!value) return "-";
     return new Date(value).toLocaleString();
@@ -181,6 +192,8 @@
       );
     });
   });
+
+  const pagedRows = $derived(filteredRows.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize));
 
   const severityCounts = $derived.by(() => {
     const out: Record<RestartSeverity, number> = { stable: 0, flapping: 0, crash_loop: 0 };
@@ -282,6 +295,7 @@
     filterReason = "all";
     filterSeverity = "all";
     searchValue = "";
+    pageIndex = 0;
   }
 
   function exportCsv() {
@@ -602,7 +616,7 @@
               </tr>
             </thead>
             <tbody>
-              {#each filteredRows as r (r.namespace + "/" + r.pod + "/" + r.container)}
+              {#each pagedRows as r (r.namespace + "/" + r.pod + "/" + r.container)}
                 <tr
                   class="border-t border-border hover:bg-muted/20 {r.severity === 'crash_loop'
                     ? 'bg-rose-500/5'
@@ -705,6 +719,17 @@
               {/each}
             </tbody>
           </table>
+          <TablePagination
+            currentPage={pageIndex}
+            totalPages={Math.ceil(filteredRows.length / pageSize)}
+            totalRows={filteredRows.length}
+            {pageSize}
+            onPageChange={(p) => (pageIndex = p)}
+            onPageSizeChange={(s) => {
+              pageSize = s;
+              pageIndex = 0;
+            }}
+          />
         </div>
       {/if}
     {/if}

@@ -28,6 +28,7 @@
   import Pause from "@lucide/svelte/icons/pause";
   import ExternalLink from "@lucide/svelte/icons/external-link";
   import TableEmptyState from "$shared/ui/table-empty-state.svelte";
+  import TablePagination from "$shared/ui/table-pagination.svelte";
   import { toast } from "svelte-sonner";
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
@@ -80,6 +81,8 @@
   let namespaceFilter = $state("all");
   let concurrencyFilter = $state<string>("all");
   let activeTab = $state<TabKey>("overview");
+  let pageIndex = $state(0);
+  let pageSize = $state(50);
 
   let isRefreshing = $state(false);
   let errorMessage = $state<string | null>(null);
@@ -296,6 +299,15 @@
     return [...set].sort();
   });
 
+  $effect(() => {
+    searchQuery;
+    onlyProblematic;
+    statusFilter;
+    namespaceFilter;
+    concurrencyFilter;
+    pageIndex = 0;
+  });
+
   const filteredRows = $derived.by(() => {
     const q = searchQuery.trim().toLowerCase();
     return rows.filter((r) => {
@@ -318,6 +330,8 @@
       );
     });
   });
+
+  const pagedRows = $derived(filteredRows.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize));
 
   const counts = $derived.by(() => {
     const out = {
@@ -448,6 +462,7 @@
     namespaceFilter = "all";
     concurrencyFilter = "all";
     onlyProblematic = false;
+    pageIndex = 0;
   }
 
   function exportCsv() {
@@ -771,7 +786,7 @@
               </tr>
             </thead>
             <tbody>
-              {#each filteredRows as r (r.namespace + "/" + r.name)}
+              {#each pagedRows as r (r.namespace + "/" + r.name)}
                 <tr
                   class="border-t border-border hover:bg-muted/20 {r.status === 'critical'
                     ? 'bg-rose-500/5'
@@ -937,6 +952,17 @@
               {/each}
             </tbody>
           </table>
+          <TablePagination
+            currentPage={pageIndex}
+            totalPages={Math.ceil(filteredRows.length / pageSize)}
+            totalRows={filteredRows.length}
+            {pageSize}
+            onPageChange={(p) => (pageIndex = p)}
+            onPageSizeChange={(s) => {
+              pageSize = s;
+              pageIndex = 0;
+            }}
+          />
         </div>
       {/if}
     {/if}

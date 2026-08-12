@@ -4,14 +4,12 @@ import { describe, expect, it } from "vitest";
 
 const tanstackTableFiles = [
   "src/lib/widgets/datalists/ui/workloads-table.svelte",
-  "src/lib/widgets/datalists/ui/cronjobs-health/data-table.svelte",
   "src/lib/widgets/datalists/ui/cron-jobs-list/data-table.svelte",
   "src/lib/widgets/datalists/ui/daemon-sets-list/data-table.svelte",
   "src/lib/widgets/datalists/ui/deployments-list/data-table.svelte",
   "src/lib/widgets/datalists/ui/jobs-list/data-table.svelte",
   "src/lib/widgets/datalists/ui/nodes-list/data-table.svelte",
   "src/lib/widgets/datalists/ui/nodes-pressures/data-table.svelte",
-  "src/lib/widgets/datalists/ui/pods-restarts/data-table.svelte",
   "src/lib/widgets/datalists/ui/replica-sets-list/data-table.svelte",
   "src/lib/widgets/datalists/ui/stateful-sets-list/data-table.svelte",
 ];
