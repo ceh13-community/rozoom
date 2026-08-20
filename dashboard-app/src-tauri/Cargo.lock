@@ -3434,7 +3434,7 @@ dependencies = [
 
 [[package]]
 name = "rozoom-k8s-linter-ide"
-version = "0.22.5"
+version = "0.22.6"
 dependencies = [
  "dirs",
  "log",
