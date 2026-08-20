@@ -12,6 +12,7 @@
   } from "$shared/lib/dashboard-data-profile.svelte";
   import TableEmptyState from "$shared/ui/table-empty-state.svelte";
   import TableSummaryFilterBar from "$shared/ui/table-summary-filter-bar.svelte";
+  import TablePagination from "$shared/ui/table-pagination.svelte";
   import TableSurface from "$shared/ui/table-surface.svelte";
   import type {
     SectionDetailsBoundaryState,
@@ -56,6 +57,8 @@
 
   let { data }: Props = $props();
   let query = $state("");
+  let pageIndex = $state(0);
+  let pageSize = $state(50);
   let selectedIds = $state(new Set<string>());
   let deletingIds = $state(new Set<string>());
   let selectedRow = $state<NetworkListRow | null>(null);
@@ -76,6 +79,7 @@
   const sourceItems = $derived((Array.isArray(data.items) ? data.items : []) as GenericItem[]);
   const rows = $derived.by(() => createNetworkListRows(sourceItems, workloadKey));
   const filteredRows = $derived.by(() => filterNetworkListRows(rows, query));
+  const pagedRows = $derived(filteredRows.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize));
   const rowsByUid = $derived.by(() => {
     const next = new Map<string, GenericItem>();
     for (const item of sourceItems) {
@@ -263,6 +267,11 @@
   $effect(() => {
     pruneSelection();
   });
+
+  $effect(() => {
+    query;
+    pageIndex = 0;
+  });
 </script>
 
 <div class="grid gap-4">
@@ -367,7 +376,7 @@
       {#if filteredRows.length === 0}
         <TableEmptyState message="No results for the current filter." />
       {:else}
-        {#each filteredRows as row (row.uid)}
+        {#each pagedRows as row (row.uid)}
           <div
             class={`grid grid-cols-[auto_auto_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,2fr)_minmax(0,0.7fr)_minmax(0,0.7fr)] gap-3 border-b border-border/60 px-4 py-3 text-sm transition-colors ${selectedIds.has(row.uid) ? "bg-muted/30" : "hover:bg-muted/20"}`}
             role="button"
@@ -421,6 +430,17 @@
             <div class="min-w-0 truncate text-muted-foreground">{row.age}</div>
           </div>
         {/each}
+        <TablePagination
+          currentPage={pageIndex}
+          totalPages={Math.ceil(filteredRows.length / pageSize)}
+          totalRows={filteredRows.length}
+          {pageSize}
+          onPageChange={(p) => (pageIndex = p)}
+          onPageSizeChange={(s) => {
+            pageSize = s;
+            pageIndex = 0;
+          }}
+        />
       {/if}
     {/snippet}
   </TableSurface>
