@@ -1,5 +1,7 @@
 import { derived, get, writable } from "svelte/store";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { clusterHealthChecks } from "$features/check-health/model/cache-store";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { clustersList } from "$features/cluster-manager";
 import { computeFleetDrift } from "./compute-drift";
 import type { ClusterDriftSnapshot, FleetDriftState } from "./types";

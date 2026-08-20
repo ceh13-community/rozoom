@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { getSelectedNamespaceList } from "$features/namespace-management";
 import type { SectionSummaryItem, SectionSyncCacheBannerState } from "./contracts";
 

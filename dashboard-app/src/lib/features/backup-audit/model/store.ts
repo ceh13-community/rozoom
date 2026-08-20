@@ -5,6 +5,7 @@ import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
 import { execCli } from "$shared/api/cli";
 import { getVeleroRelease } from "$shared/api/helm";
 import { clusterKey } from "$shared/lib/cluster-key";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import {
   markFeatureCapabilityFromReason,
   shouldSkipFeatureProbe,

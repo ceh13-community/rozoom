@@ -1,9 +1,13 @@
 import { get, writable } from "svelte/store";
 import { kubectlRawFront } from "$shared/api/kubectl-proxy";
 import { getClusterNodesNames } from "$shared/api/tauri";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { checkMetricsServer } from "$features/check-health";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { checkKubeStateMetrics } from "$features/check-health";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { checkNodeExporter } from "$features/check-health";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { updateClusterCheckPartially } from "$features/check-health/model/cache-store";
 import { checkResponseStatus } from "$shared/lib/parsers";
 import {

@@ -4,6 +4,7 @@ import { KUBECTL_COMMANDS } from "$shared/config/kubectl-commands";
 import type { KubectlOptions } from "$shared/model/kubectl";
 import type { WorkloadData, WorkloadType } from "$shared/model/workloads";
 import type { PodItem } from "$shared/model/clusters";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { EMPTY_NAMESPACE_SELECTION } from "$features/namespace-management";
 import { workloadRequestScheduler } from "$shared/lib/request-scheduler";
 import { evaluateWorkloadPerfBudgets, trackWorkloadEvent } from "./workload-telemetry";

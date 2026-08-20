@@ -11,6 +11,7 @@
 
 import { extractScalars, instantQuery } from "./prometheus-client";
 import type { PrometheusEndpoint } from "./prometheus-discovery";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import {
   detectCpuThrottling,
   type CpuThrottlingReport,

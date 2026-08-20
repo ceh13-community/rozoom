@@ -1,5 +1,7 @@
 import { get, writable } from "svelte/store";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { checkWarningEvents } from "$features/check-health";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { updateClusterCheckPartially } from "$features/check-health/model/cache-store";
 import { getPrometheusStackRelease } from "$shared/api/helm";
 import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";

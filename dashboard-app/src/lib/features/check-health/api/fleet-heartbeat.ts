@@ -3,6 +3,7 @@ import { kubectlRawFront } from "$shared/api/kubectl-proxy";
 import { clusterStates, restartWatcherForCluster } from "$features/check-health/model/watchers";
 import { getFeatureCapability } from "$features/check-health/model/feature-capability-cache";
 import { writeRuntimeDebugLog } from "$shared/lib/runtime-debug";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { isAuthError } from "$widgets/datalists/ui/model/overview-diagnostics";
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
