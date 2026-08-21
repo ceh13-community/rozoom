@@ -1,5 +1,6 @@
 import { get } from "svelte/store";
 import { clusterHealthChecks } from "./cache-store";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { clustersList } from "$features/cluster-manager";
 import { emitCertNotifications } from "./cert-notification-emitter";
 import type { ClusterHealthChecks } from "./types";

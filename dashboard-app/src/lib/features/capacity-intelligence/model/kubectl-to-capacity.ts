@@ -10,6 +10,7 @@
  *   https://kubernetes.io/docs/concepts/architecture/nodes/#capacity
  */
 
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import {
   parseCpuToMillicores,
   parseMemoryToMiB,

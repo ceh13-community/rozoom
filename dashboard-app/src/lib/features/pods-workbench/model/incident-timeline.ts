@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import type { PodEvent } from "$features/pod-details";
 
 export type IncidentMarkerKind = "logs" | "events" | "restart" | "oom";

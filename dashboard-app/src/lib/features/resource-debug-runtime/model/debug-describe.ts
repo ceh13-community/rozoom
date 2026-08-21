@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { openDebugDescribeModal } from "$features/shell";
 
 export type DebugDescribeTarget = {

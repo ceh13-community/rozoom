@@ -1,4 +1,6 @@
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { resetUnreachableEntries } from "$features/check-health/model/feature-capability-cache";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { restartFailedWatchers } from "$features/check-health/model/watchers";
 import { writeRuntimeDebugLog } from "$shared/lib/runtime-debug";
 

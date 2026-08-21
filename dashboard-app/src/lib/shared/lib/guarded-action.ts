@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import type { AppClusterConfig } from "$entities/config";
 import { checkActionSafety, type DestructiveAction } from "./cluster-safety";
 import { confirmAction } from "./confirm-action";

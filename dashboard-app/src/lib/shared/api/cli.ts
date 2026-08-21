@@ -1,5 +1,6 @@
 import { Command, type IOPayload, type Child } from "@tauri-apps/plugin-shell";
 import { appDataDir } from "@tauri-apps/api/path";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { CONFIG_DIR } from "$entities/config/model/appConfig";
 
 export type CliTool =

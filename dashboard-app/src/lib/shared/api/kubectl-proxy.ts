@@ -2,6 +2,7 @@ import { Command, type Child } from "@tauri-apps/plugin-shell";
 import { appDataDir } from "@tauri-apps/api/path";
 import { error as logError } from "@tauri-apps/plugin-log";
 import type { KubectlOptions } from "../model/kubectl";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { CONFIG_DIR } from "$entities/config/model/appConfig";
 import { clusterKey } from "$shared/lib/cluster-key";
 import {

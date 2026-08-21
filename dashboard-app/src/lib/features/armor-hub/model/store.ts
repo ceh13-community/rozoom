@@ -12,7 +12,9 @@ import {
 import { installKubeArmor } from "$shared/api/helm";
 import { listHelmReleases } from "$shared/api/helm";
 import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { updateClusterCheckPartially } from "$features/check-health/model/cache-store";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import {
   shouldSkipFeatureProbe,
   markFeatureCapabilityFromReason,

@@ -1,5 +1,6 @@
 import { appDataDir } from "@tauri-apps/api/path";
 import { spawnCli } from "$shared/api/cli";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { CONFIG_DIR } from "$entities/config/model/appConfig";
 import { clusterKey } from "$shared/lib/cluster-key";
 import { getClusterNodesNames } from "$shared/api/tauri";

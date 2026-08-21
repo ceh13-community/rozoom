@@ -1,5 +1,6 @@
 import { get } from "svelte/store";
 import { goto } from "$app/navigation";
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { clustersList } from "$features/cluster-manager";
 import {
   WORKSPACE_WORKLOAD_OPTIONS,

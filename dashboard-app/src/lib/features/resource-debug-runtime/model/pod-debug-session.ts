@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { openPodDebugShellModal } from "$features/shell";
 import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
 
