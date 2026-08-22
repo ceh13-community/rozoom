@@ -1,4 +1,5 @@
 import { setMode } from "mode-watcher";
+import { readonly, writable } from "svelte/store";
 
 type BaseMode = "light" | "dark";
 
@@ -109,7 +110,14 @@ function syncThemeClasses(root: Element, theme: AppTheme) {
   }
 }
 
+const appThemeStore = writable<AppTheme>(getInitialTheme());
+
+// Reactive channel for components that must react to theme switches at
+// runtime (e.g. CodeMirror reconfiguration); applyTheme is the only writer.
+export const appTheme = readonly(appThemeStore);
+
 export function applyTheme(theme: AppTheme) {
+  appThemeStore.set(theme);
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   const definition = getThemeDefinition(theme);

@@ -32,7 +32,6 @@
     foldGutter,
     foldKeymap,
     indentUnit,
-    HighlightStyle,
   } from "@codemirror/language";
   import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
   import {
@@ -49,7 +48,6 @@
     closeLintPanel,
     type Diagnostic,
   } from "@codemirror/lint";
-  import { tags } from "@lezer/highlight";
   import { load as parseYaml, YAMLException } from "js-yaml";
   import {
     validateYamlSyntax,
@@ -67,6 +65,8 @@
   import { parseYamlDocuments, getDocumentAtOffset, type YamlDocumentInfo } from "./yaml-documents";
   import { getFieldDoc, extractFieldAtPosition } from "./yaml-k8s-schema";
   import { execCli } from "$shared/api/cli";
+  import { appTheme, type AppTheme } from "$shared/theme";
+  import { yamlSyntaxHighlight, isDarkEditorTheme } from "./yaml-editor-theme";
   import { writeTextFile, mkdir } from "@tauri-apps/plugin-fs";
   import { appDataDir } from "@tauri-apps/api/path";
 
@@ -131,51 +131,42 @@
     provide: (f) => EditorView.decorations.from(f),
   });
 
-  const rozoomHighlight = HighlightStyle.define([
-    { tag: tags.propertyName, color: "#7dd3fc" }, // sky-300 - YAML keys
-    { tag: tags.string, color: "#fde68a" }, // amber-200 - string values
-    { tag: tags.number, color: "#c4b5fd" }, // violet-300 - numbers
-    { tag: tags.bool, color: "#f9a8d4" }, // pink-300 - booleans
-    { tag: tags.null, color: "#94a3b8" }, // slate-400 - null
-    { tag: tags.comment, color: "#6ee7b7" }, // emerald-300 - comments
-    { tag: tags.keyword, color: "#93c5fd" }, // blue-300 - keywords
-    { tag: tags.operator, color: "#cbd5e1" }, // slate-300 - operators
-    { tag: tags.punctuation, color: "#94a3b8" }, // slate-400 - punctuation
-    { tag: tags.meta, color: "#94a3b8" }, // slate-400 - directives
-  ]);
-
+  // Editor chrome references the same CSS custom properties as the rest of
+  // the UI, so it follows light/dark/k9s switches without reconfiguration.
+  // Only the syntax HighlightStyle and the dark-theme facet (see
+  // themeExtensions below) need a Compartment swap.
   const rozoomTheme = EditorView.theme({
     "&": {
       height: "100%",
       fontSize: "12px",
-      backgroundColor: "#020617", // slate-950
+      backgroundColor: "hsl(var(--background))",
     },
     ".cm-content": {
       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
       padding: "12px 0",
-      caretColor: "#e2e8f0",
+      caretColor: "hsl(var(--foreground))",
     },
     ".cm-cursor": {
-      borderLeftColor: "#e2e8f0",
+      borderLeftColor: "hsl(var(--foreground))",
     },
     ".cm-gutters": {
-      backgroundColor: "#0f172a80", // slate-900/50
-      borderRight: "1px solid #1e293b", // slate-800
-      color: "#64748b", // slate-500
+      backgroundColor: "hsl(var(--card) / 0.5)",
+      borderRight: "1px solid hsl(var(--border))",
+      color: "hsl(var(--muted-foreground))",
       minWidth: "48px",
     },
     ".cm-activeLineGutter": {
-      backgroundColor: "#1e293b60", // slate-800/40
-      color: "#94a3b8", // slate-400
+      backgroundColor: "hsl(var(--accent) / 0.6)",
+      color: "hsl(var(--foreground))",
     },
     ".cm-activeLine": {
-      backgroundColor: "#1e293b40", // slate-800/25
+      backgroundColor: "hsl(var(--accent) / 0.4)",
     },
     ".cm-selectionBackground": {
-      backgroundColor: "#334155 !important", // slate-700
+      backgroundColor: "hsl(var(--primary) / 0.25) !important",
     },
     "&.cm-focused .cm-selectionBackground": {
-      backgroundColor: "#334155 !important",
+      backgroundColor: "hsl(var(--primary) / 0.25) !important",
     },
     ".cm-searchMatch": {
       backgroundColor: "#fbbf2440", // amber-400/25
@@ -186,83 +177,83 @@
     },
     ".cm-foldGutter .cm-gutterElement": {
       cursor: "pointer",
-      color: "#64748b",
+      color: "hsl(var(--muted-foreground))",
       fontSize: "11px",
     },
     ".cm-foldGutter .cm-gutterElement:hover": {
-      color: "#e2e8f0",
+      color: "hsl(var(--foreground))",
     },
     ".cm-foldPlaceholder": {
-      backgroundColor: "#1e293b",
-      border: "1px solid #334155",
-      color: "#64748b",
+      backgroundColor: "hsl(var(--muted))",
+      border: "1px solid hsl(var(--border))",
+      color: "hsl(var(--muted-foreground))",
       padding: "0 4px",
       borderRadius: "3px",
       margin: "0 2px",
     },
     ".cm-tooltip": {
-      backgroundColor: "#1e293b",
-      border: "1px solid #334155",
-      color: "#e2e8f0",
+      backgroundColor: "hsl(var(--popover))",
+      border: "1px solid hsl(var(--border))",
+      color: "hsl(var(--popover-foreground))",
     },
     ".cm-tooltip-autocomplete": {
       "& > ul > li": {
         padding: "2px 8px",
       },
       "& > ul > li[aria-selected]": {
-        backgroundColor: "#334155",
-        color: "#e2e8f0",
+        backgroundColor: "hsl(var(--accent))",
+        color: "hsl(var(--accent-foreground))",
       },
     },
     ".cm-tooltip-hover": {
-      backgroundColor: "#1e293b",
-      border: "1px solid #334155",
-      color: "#e2e8f0",
+      backgroundColor: "hsl(var(--popover))",
+      border: "1px solid hsl(var(--border))",
+      color: "hsl(var(--popover-foreground))",
       borderRadius: "6px",
       padding: "0",
       maxWidth: "400px",
       boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
     },
     ".cm-panels": {
-      backgroundColor: "#0f172a",
-      borderTop: "1px solid #1e293b",
-      color: "#e2e8f0",
+      backgroundColor: "hsl(var(--card))",
+      borderTop: "1px solid hsl(var(--border))",
+      color: "hsl(var(--card-foreground))",
     },
     ".cm-panel.cm-search": {
-      backgroundColor: "#0f172a",
+      backgroundColor: "hsl(var(--card))",
       "& input": {
-        backgroundColor: "#1e293b",
-        border: "1px solid #334155",
-        color: "#e2e8f0",
+        backgroundColor: "hsl(var(--muted))",
+        border: "1px solid hsl(var(--border))",
+        color: "hsl(var(--foreground))",
         borderRadius: "4px",
         padding: "2px 6px",
       },
       "& button": {
-        backgroundColor: "#1e293b",
-        border: "1px solid #334155",
-        color: "#e2e8f0",
+        backgroundColor: "hsl(var(--muted))",
+        border: "1px solid hsl(var(--border))",
+        color: "hsl(var(--foreground))",
         borderRadius: "4px",
         padding: "2px 8px",
       },
       "& label": {
-        color: "#94a3b8",
+        color: "hsl(var(--muted-foreground))",
       },
     },
     ".cm-panel.cm-panel-lint": {
-      backgroundColor: "#0f172a",
-      borderTop: "1px solid #1e293b",
+      backgroundColor: "hsl(var(--card))",
+      borderTop: "1px solid hsl(var(--border))",
       maxHeight: "150px",
       "& ul": {
         "& [aria-selected]": {
-          backgroundColor: "#1e293b",
+          backgroundColor: "hsl(var(--accent))",
         },
       },
     },
     ".cm-line-error": {
-      backgroundColor: "#ef444433",
+      backgroundColor: "hsl(var(--destructive) / 0.2)",
     },
     ".cm-line-diff": {
-      backgroundColor: "#0ea5e920",
+      backgroundColor: "hsl(var(--primary) / 0.12)",
     },
     ".cm-lint-marker": {
       width: "8px",
@@ -275,18 +266,27 @@
       content: "'!'",
     },
     ".cm-diagnostic-error": {
-      borderLeft: "3px solid #ef4444",
+      borderLeft: "3px solid hsl(var(--destructive))",
       paddingLeft: "8px",
     },
     ".cm-diagnostic-warning": {
-      borderLeft: "3px solid #f59e0b",
+      borderLeft: "3px solid #f59e0b", // amber-500, same as warning banners
       paddingLeft: "8px",
     },
     ".cm-diagnostic-info": {
-      borderLeft: "3px solid #3b82f6",
+      borderLeft: "3px solid #3b82f6", // blue-500, same as info banners
       paddingLeft: "8px",
     },
   });
+
+  const themeCompartment = new Compartment();
+
+  function themeExtensions(theme: AppTheme): Extension[] {
+    return [
+      syntaxHighlighting(yamlSyntaxHighlight(theme)),
+      EditorView.darkTheme.of(isDarkEditorTheme(theme)),
+    ];
+  }
 
   const K8S_TOP_LEVEL = [
     { label: "apiVersion", type: "property", detail: "API version", boost: 10 },
@@ -692,17 +692,17 @@
 
         const title = document.createElement("div");
         title.style.fontWeight = "600";
-        title.style.color = "#7dd3fc";
+        title.style.color = "hsl(var(--primary))";
         title.style.marginBottom = "4px";
         title.textContent = fieldName;
 
         const desc = document.createElement("div");
-        desc.style.color = "#cbd5e1";
+        desc.style.color = "hsl(var(--popover-foreground))";
         desc.textContent = docText;
 
         if (pathContext.length > 1) {
           const pathEl = document.createElement("div");
-          pathEl.style.color = "#64748b";
+          pathEl.style.color = "hsl(var(--muted-foreground))";
           pathEl.style.fontSize = "10px";
           pathEl.style.marginTop = "4px";
           pathEl.textContent = pathContext.join(" > ");
@@ -902,7 +902,7 @@
       scrollPastEnd(),
       indentUnit.of("  "),
       yaml(),
-      syntaxHighlighting(rozoomHighlight),
+      themeCompartment.of(themeExtensions($appTheme)),
       rozoomTheme,
       autocompletion({
         override: [k8sCompletion],
@@ -981,6 +981,14 @@
   });
 
   $effect(() => {
+    const theme = $appTheme;
+    if (!viewReady || !view) return;
+    view.dispatch({
+      effects: themeCompartment.reconfigure(themeExtensions(theme)),
+    });
+  });
+
+  $effect(() => {
     const el = errorLines;
     const dl = diffLines;
     if (!viewReady || !view) return;
@@ -1001,7 +1009,7 @@
 
 <div
   bind:this={container}
-  class="yaml-editor h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden rounded border border-slate-700"
+  class="yaml-editor h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden rounded border border-border"
 ></div>
 
 <style>
