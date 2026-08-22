@@ -68,6 +68,15 @@ export default defineConfig(
   tseslint.configs.strictTypeChecked,
   eslintConfigPrettier,
   {
+    linterOptions: {
+      // Ratchet needs both directions: catches new FSD violations (rules above)
+      // AND flags stale `eslint-disable-next-line` left behind after a fixed
+      // file is removed from the legacy allowlist, so the debt counter (44 lines,
+      // see commit a6c1ae12) can't silently drift from reality.
+      reportUnusedDisableDirectives: "error",
+    },
+  },
+  {
     languageOptions: {
       parserOptions: {
         projectService: true,

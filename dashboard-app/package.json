@@ -32,7 +32,7 @@
     "download:binaries": "node ./download-binaries.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
