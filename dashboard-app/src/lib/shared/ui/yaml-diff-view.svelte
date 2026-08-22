@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { MergeView } from "@codemirror/merge";
-  import { EditorState } from "@codemirror/state";
+  import { Compartment, EditorState, type Extension } from "@codemirror/state";
   import { EditorView, lineNumbers, highlightActiveLine, drawSelection } from "@codemirror/view";
   import { yaml } from "@codemirror/lang-yaml";
-  import { syntaxHighlighting, indentUnit, HighlightStyle } from "@codemirror/language";
-  import { tags } from "@lezer/highlight";
+  import { syntaxHighlighting, indentUnit } from "@codemirror/language";
+  import { appTheme, type AppTheme } from "$shared/theme";
+  import { yamlSyntaxHighlight, isDarkEditorTheme } from "./yaml-editor-theme";
 
   interface Props {
     original: string;
@@ -17,33 +18,22 @@
   let container = $state<HTMLDivElement | null>(null);
   let mergeView: MergeView | undefined;
 
-  const diffHighlight = HighlightStyle.define([
-    { tag: tags.propertyName, color: "#7dd3fc" },
-    { tag: tags.string, color: "#fde68a" },
-    { tag: tags.number, color: "#c4b5fd" },
-    { tag: tags.bool, color: "#f9a8d4" },
-    { tag: tags.null, color: "#94a3b8" },
-    { tag: tags.comment, color: "#6ee7b7" },
-    { tag: tags.keyword, color: "#93c5fd" },
-    { tag: tags.operator, color: "#cbd5e1" },
-    { tag: tags.punctuation, color: "#94a3b8" },
-    { tag: tags.meta, color: "#94a3b8" },
-  ]);
-
+  // Chrome follows the app theme via CSS custom properties; the syntax
+  // HighlightStyle and dark-theme facet swap through the Compartments below.
   const diffTheme = EditorView.theme({
     "&": {
       height: "100%",
       fontSize: "12px",
-      backgroundColor: "#020617",
+      backgroundColor: "hsl(var(--background))",
     },
     ".cm-content": {
       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
       padding: "12px 0",
     },
     ".cm-gutters": {
-      backgroundColor: "#0f172a80",
-      borderRight: "1px solid #1e293b",
-      color: "#64748b",
+      backgroundColor: "hsl(var(--card) / 0.5)",
+      borderRight: "1px solid hsl(var(--border))",
+      color: "hsl(var(--muted-foreground))",
       minWidth: "40px",
     },
     ".cm-changedLine": {
@@ -65,18 +55,27 @@
       backgroundColor: "#ef444430 !important",
     },
     "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
-      backgroundColor: "#334155 !important",
+      backgroundColor: "hsl(var(--primary) / 0.25) !important",
     },
   });
 
-  function sharedExtensions() {
+  const themeCompartments = [new Compartment(), new Compartment()];
+
+  function themeExtensions(theme: AppTheme): Extension[] {
+    return [
+      syntaxHighlighting(yamlSyntaxHighlight(theme)),
+      EditorView.darkTheme.of(isDarkEditorTheme(theme)),
+    ];
+  }
+
+  function sharedExtensions(themeCompartment: Compartment) {
     return [
       lineNumbers(),
       highlightActiveLine(),
       drawSelection(),
       indentUnit.of("  "),
       yaml(),
-      syntaxHighlighting(diffHighlight),
+      themeCompartment.of(themeExtensions($appTheme)),
       diffTheme,
       EditorState.readOnly.of(true),
     ];
@@ -87,11 +86,11 @@
     mergeView = new MergeView({
       a: {
         doc: original,
-        extensions: sharedExtensions(),
+        extensions: sharedExtensions(themeCompartments[0]),
       },
       b: {
         doc: modified,
-        extensions: sharedExtensions(),
+        extensions: sharedExtensions(themeCompartments[1]),
       },
       parent: container,
     });
@@ -112,6 +111,13 @@
     }
   });
 
+  $effect(() => {
+    const theme = $appTheme;
+    if (!mergeView) return;
+    mergeView.a.dispatch({ effects: themeCompartments[0].reconfigure(themeExtensions(theme)) });
+    mergeView.b.dispatch({ effects: themeCompartments[1].reconfigure(themeExtensions(theme)) });
+  });
+
   onMount(() => {
     createMergeView();
   });
@@ -123,7 +129,7 @@
 
 <div
   bind:this={container}
-  class="yaml-diff-view h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden rounded border border-slate-700"
+  class="yaml-diff-view h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden rounded border border-border"
 ></div>
 
 <style>
@@ -141,9 +147,9 @@
     overflow: auto;
   }
   .yaml-diff-view :global(.cm-mergeViewGutter) {
-    background-color: #0f172a;
-    border-left: 1px solid #1e293b;
-    border-right: 1px solid #1e293b;
+    background-color: hsl(var(--card));
+    border-left: 1px solid hsl(var(--border));
+    border-right: 1px solid hsl(var(--border));
     width: 16px;
   }
 </style>
