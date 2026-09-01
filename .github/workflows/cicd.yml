@@ -285,6 +285,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPIMAGE_EXTRACT_AND_RUN: "1"
+          # Updater artifacts (.sig + latest.json) are signed with the project
+          # minisign key. Missing secrets fail the build loudly rather than
+          # shipping an unsigned release the updater would reject.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: dashboard-app
           tagName: app-v${{ env.APP_VERSION }}
@@ -327,6 +332,8 @@ jobs:
         env:
           APPIMAGE_EXTRACT_AND_RUN: "1"
           NO_STRIP: "true"
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm tauri build --bundles appimage
 
       - name: Upload AppImage to draft release
@@ -338,7 +345,23 @@ jobs:
         with:
           tag_name: app-v${{ env.APP_VERSION }}
           draft: true
-          files: dashboard-app/src-tauri/target/release/bundle/appimage/*.AppImage
+          files: |
+            dashboard-app/src-tauri/target/release/bundle/appimage/*.AppImage
+            dashboard-app/src-tauri/target/release/bundle/appimage/*.AppImage.sig
+
+      # AppImage is the only Linux package the Tauri updater can replace, but it
+      # is built outside tauri-action, so it never lands in latest.json. Merge
+      # the linux-x86_64 entry in by hand. Best-effort like the AppImage build:
+      # a failure here leaves Linux without in-app updates, not without a release.
+      - name: Register AppImage in latest.json
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        shell: bash
+        working-directory: ./dashboard-app
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: app-v${{ env.APP_VERSION }}
+        run: bash ./scripts/register-appimage-in-latest-json.sh "$TAG"
 
       - name: Build RPM fallback artifact
         if: runner.os == 'Linux'
