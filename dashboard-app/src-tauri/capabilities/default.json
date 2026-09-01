@@ -11,6 +11,8 @@
     "log:default",
     "store:default",
     "dialog:default",
+    "updater:default",
+    "process:allow-restart",
     {
       "identifier": "shell:allow-execute",
       "allow": [

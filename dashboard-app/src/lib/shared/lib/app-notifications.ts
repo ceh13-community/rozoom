@@ -2,7 +2,13 @@ import { writable, derived } from "svelte/store";
 
 export type AppNotificationSeverity = "critical" | "warning" | "info";
 
-export type AppNotificationCategory = "certificate" | "backup" | "cluster" | "general";
+export type AppNotificationCategory = "certificate" | "backup" | "cluster" | "general" | "update";
+
+/** Inline click-through action rendered in the notification row (e.g. "Restart now"). */
+export interface AppNotificationAction {
+  label: string;
+  run: () => void | Promise<void>;
+}
 
 export interface AppNotification {
   id: string;
@@ -16,6 +22,7 @@ export interface AppNotification {
   readAt?: number;
   dismissedAt?: number;
   dedupeKey?: string;
+  action?: AppNotificationAction;
 }
 
 const notifications = writable<AppNotification[]>([]);

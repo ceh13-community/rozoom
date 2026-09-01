@@ -180,7 +180,7 @@
                 <Bell class="h-8 w-8 mx-auto text-muted-foreground/30 mb-2" />
                 <p class="text-xs text-muted-foreground">No notifications</p>
                 <p class="text-[10px] text-muted-foreground/60 mt-1">
-                  Certificate alerts will appear here
+                  Certificate and update alerts will appear here
                 </p>
               </div>
             {:else}
@@ -234,11 +234,26 @@
                           class="rounded bg-amber-500/20 px-1 py-px text-[9px] font-medium text-amber-500"
                           >cert</span
                         >
+                      {:else if notif.category === "update"}
+                        <span
+                          class="rounded bg-sky-500/20 px-1 py-px text-[9px] font-medium text-sky-400"
+                          >update</span
+                        >
                       {/if}
                       {#if !notif.readAt}
                         <span
                           class="rounded bg-sky-500/20 px-1 py-px text-[9px] font-medium text-sky-400"
                           >new</span
+                        >
+                      {/if}
+                      {#if notif.action}
+                        <button
+                          class="ml-auto text-[11px] font-medium text-sky-500 hover:text-sky-400"
+                          onclick={(e) => {
+                            e.stopPropagation();
+                            markAsRead(notif.id);
+                            void notif.action?.run();
+                          }}>{notif.action.label} &rarr;</button
                         >
                       {/if}
                     </div>
