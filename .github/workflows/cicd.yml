@@ -364,21 +364,6 @@ jobs:
           TAG: app-v${{ env.APP_VERSION }}
         run: bash ./scripts/register-appimage-in-latest-json.sh "$TAG"
 
-      - name: Build RPM fallback artifact
-        if: runner.os == 'Linux'
-        working-directory: ./dashboard-app
-        run: pnpm run build:rpm
-
-      - name: Upload RPM fallback to draft release
-        if: runner.os == 'Linux'
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: app-v${{ env.APP_VERSION }}
-          draft: true
-          files: dashboard-app/src-tauri/target/release/bundle/rpm/ROZOOM_K8s_Linter_IDE_${{ env.APP_VERSION }}_x86_64.rpm
-
   # Release gate: install the freshly built .deb in clean end-user distros and
   # verify the window actually renders (not just that the bundle built). Added
   # after 0.22.x shipped a .deb that launched to a blank window on Kali —
