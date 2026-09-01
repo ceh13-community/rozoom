@@ -4,6 +4,8 @@
 use tauri::Manager;
 use tauri_plugin_log;
 
+mod support_logs;
+
 fn is_loopback_host(host: &str) -> bool {
     matches!(host, "localhost" | "127.0.0.1" | "[::1]" | "::1")
 }
@@ -164,8 +166,19 @@ fn main() {
         )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![relax_webview_tls])
-        .setup(move |_app| {
+        .invoke_handler(tauri::generate_handler![
+            relax_webview_tls,
+            support_logs::read_recent_log_tail,
+            support_logs::open_logs_folder,
+            support_logs::logs_folder_path
+        ])
+        .on_menu_event(|app, event| support_logs::handle_menu_event(app, event))
+        .setup(move |app| {
+            // Native menu survives a dead renderer: the only path to the logs
+            // after a hard crash (spec update-2-crash-log-path.md, path B).
+            if let Err(e) = support_logs::install_help_menu(app.handle()) {
+                log::warn!("Help menu not installed: {e}");
+            }
             log::info!("App setup took: {:?}", start.elapsed());
             Ok(())
         })
