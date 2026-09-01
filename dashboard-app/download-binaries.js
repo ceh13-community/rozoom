@@ -1609,6 +1609,31 @@ async function installOc() {
    Azure CLI (DEB package extraction)
 ======================= */
 
+// The Azure CLI DEB ships CPython build-only artifacts (python.o, libpython*.a,
+// Makefile) under lib/python3.x/config-*. linuxdeploy scans every ELF in the
+// AppDir and aborts on the relocatable python.o ("wrong ELF type"), which
+// silently killed the AppImage in every release. az never reads them at runtime.
+async function pruneAzBuildArtifacts(azDistDir) {
+  const libDir = path.join(azDistDir, "lib");
+  let entries = [];
+  try {
+    entries = await fs.readdir(libDir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const full = path.join(libDir, entry.name);
+    if (entry.isFile() && /^libpython.*\.a$/.test(entry.name)) {
+      await rmForce(full);
+    }
+    if (entry.isDirectory() && /^python3\./.test(entry.name)) {
+      for (const sub of await fs.readdir(full)) {
+        if (/^config-/.test(sub)) await rmForce(path.join(full, sub));
+      }
+    }
+  }
+}
+
 async function installAzCli() {
   const platform = os.platform();
   if (platform !== "linux") {
@@ -1625,6 +1650,7 @@ async function installAzCli() {
   if (cached?.file === "az-dist/bin/az" && (await fileExists(azBin))) {
     const actual = await sha256(azBin);
     if (cached.sha256 === actual) {
+      await pruneAzBuildArtifacts(azDistDir);
       console.log(`✓ cached: az (${cached.version})`);
       return;
     }
@@ -1665,6 +1691,7 @@ async function installAzCli() {
 
     await rmForce(azDistDir);
     await fs.rename(path.join(extractDir, "opt", "az"), azDistDir);
+    await pruneAzBuildArtifacts(azDistDir);
 
     // Fix shebang (points to build-time path)
     const azScript = path.join(azDistDir, "bin", "az");
