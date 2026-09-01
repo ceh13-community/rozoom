@@ -63,6 +63,18 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE4OERBRTVBNkJBRERDQkIKUldTNzNLMXJXcTZOR0JMa0tPbjNxREc1Rk54b2dEOXM5V2hRWWNIcDZOcTUzSTBnTDRiNmoxazkK",
+      "endpoints": [
+        "https://github.com/ceh13-community/rozoom/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }
