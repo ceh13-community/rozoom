@@ -15,7 +15,7 @@ vi.mock("./tauri-runtime", () => ({
 }));
 
 function makePort(overrides: {
-  update?: { version: string; body?: string; downloadAndInstall: () => Promise<void> } | null;
+  update?: { version: string; downloadAndInstall: () => Promise<void> } | null;
   checkError?: Error;
 }) {
   const relaunch = vi.fn(async () => {});
@@ -56,7 +56,7 @@ describe("app-updater", () => {
   it("downloads silently and posts one unread 'ready' notification with a restart action", async () => {
     const downloadAndInstall = vi.fn(async () => {});
     const { port, relaunch } = makePort({
-      update: { version: "0.23.0", body: "What's new: faster pods list", downloadAndInstall },
+      update: { version: "0.23.0", downloadAndInstall },
     });
 
     await checkForUpdateSilently(port);
@@ -68,7 +68,7 @@ describe("app-updater", () => {
       severity: "info",
       category: "update",
       title: "Rozoom 0.23.0 is ready",
-      detail: "What's new: faster pods list",
+      detail: "Restart to finish updating.",
     });
     expect(list[0].readAt).toBeUndefined();
     expect(list[0].action?.label).toBe("Restart now");
