@@ -5,6 +5,7 @@
   import { buildThemeBootstrapScript } from "$shared/theme";
   import { Toaster } from "$shared/ui/sonner";
   import { initCliNotifications } from "$shared/lib/cli-notification";
+  import { checkForUpdateSilently } from "$shared/lib/app-updater";
   import {
     startCertNotificationWatcher,
     stopCertNotificationWatcher,
@@ -39,6 +40,9 @@
     maybePromptTelemetryConsent();
     const cleanupCliNotifications = initCliNotifications();
     startCertNotificationWatcher();
+    // Silent update check + background download; the only UI is a bell item
+    // once a new build is ready. Never throws, never blocks first paint.
+    void checkForUpdateSilently();
     // Best-effort sweep of stale helm-values-*.yaml tempfiles left by crashed
     // installs. Fire-and-forget; never blocks first paint.
     void sweepHelmValuesTempfiles();
