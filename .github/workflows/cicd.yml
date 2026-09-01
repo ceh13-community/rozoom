@@ -303,9 +303,7 @@ jobs:
             |----------|-------------|-----------|
             | **Windows** | x64 | `.msi`, `.exe` (NSIS) |
             | **macOS** | ARM64 (M1+) | `.dmg`, `.app.tar.gz` |
-            | **macOS** | x64 (Intel) | `.dmg`, `.app.tar.gz` |
             | **Linux** | x64 | `.deb`, `.rpm`, `.AppImage` |
-            | **Linux** | ARM64 | `.deb` |
 
             Download the package matching your OS and architecture.
 
