@@ -68,7 +68,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUcxcGJtbHphV2R1SUhCMVlteHBZeUJyWlhrNklEWTBRelkwT0RZeE5UVTBRekUyT0RFS1VsZFRRa1pyZUZaWlZXcEhXa0UxYkc5U01rNUNhVGxwUlV0Q2VUaEtSMVZ6TDJOQk4yUmtiMGR1S3l0Mk5HbGFUbFZvWlU1eFNqVUs=",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY0QzY0ODYxNTU0QzE2ODEKUldTQkZreFZZVWpHWkE1bG9SMk5CaTlpRUtCeThKR1VzL2NBN2Rkb0duKyt2NGlaTlVoZU5xSjUK",
       "endpoints": [
         "https://github.com/ceh13-community/rozoom/releases/latest/download/latest.json"
       ],
