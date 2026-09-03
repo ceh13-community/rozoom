@@ -333,12 +333,19 @@ jobs:
           NO_STRIP: "true"
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        # aws-dist ships libreadline.so.6 -> libtinfo.so.5 and resolves it from
-        # its own directory at runtime, but linuxdeploy traces it with ldd and
-        # aborts with "Could not find dependency" unless the host has it too.
+        # The vendored CLI dists (aws-dist, az-dist) resolve their private
+        # libraries (libtinfo.so.5, libffi.so.6, ...) from their own
+        # directories at runtime, but linuxdeploy traces every ELF in the
+        # AppDir and aborts with "Could not find dependency" on any of them
+        # the host distro lacks. Point LD_LIBRARY_PATH at the dist lib dirs
+        # (absolute paths: linuxdeploy runs from a different cwd) so the
+        # trace resolves them where the app actually will. --verbose because
+        # tauri otherwise swallows linuxdeploy's stderr and a red run says
+        # only "failed to run linuxdeploy".
         run: |
-          sudo apt-get install -y --no-install-recommends libtinfo5
-          pnpm tauri build --bundles appimage
+          LD_LIBRARY_PATH="$(find "$PWD/src-tauri/binaries" -name 'lib*.so*' -exec dirname {} \; | sort -u | paste -sd:)"
+          export LD_LIBRARY_PATH
+          pnpm tauri build --bundles appimage --verbose
 
       - name: Upload AppImage to draft release
         if: runner.os == 'Linux'
