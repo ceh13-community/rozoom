@@ -337,13 +337,19 @@ jobs:
         # libraries (libtinfo.so.5, libffi.so.6, ...) from their own
         # directories at runtime, but linuxdeploy traces every ELF in the
         # AppDir and aborts with "Could not find dependency" on any of them
-        # the host distro lacks. Point LD_LIBRARY_PATH at the dist lib dirs
+        # the host distro lacks. Put the dist lib dirs on LD_LIBRARY_PATH
         # (absolute paths: linuxdeploy runs from a different cwd) so the
-        # trace resolves them where the app actually will. --verbose because
-        # tauri otherwise swallows linuxdeploy's stderr and a red run says
-        # only "failed to run linuxdeploy".
+        # trace resolves them where the app actually will — but AFTER the
+        # system lib dirs: linuxdeploy's gtk plugin runs host binaries
+        # (gtk-query-immodules-3.0) with this same environment, and with the
+        # dist dirs first they load aws-dist's ancient libz.so.1 instead of
+        # the system one and die on `ZLIB_1.2.9' not found. System dirs
+        # first restores normal resolution for shared names; the dist dirs
+        # at the tail only catch libs the distro does not ship at all.
+        # --verbose because tauri otherwise swallows linuxdeploy's stderr
+        # and a red run says only "failed to run linuxdeploy".
         run: |
-          LD_LIBRARY_PATH="$(find "$PWD/src-tauri/binaries" -name 'lib*.so*' -exec dirname {} \; | sort -u | paste -sd:)"
+          LD_LIBRARY_PATH="/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:$(find "$PWD/src-tauri/binaries" -name 'lib*.so*' -exec dirname {} \; | sort -u | paste -sd:)"
           export LD_LIBRARY_PATH
           pnpm tauri build --bundles appimage --verbose
 
