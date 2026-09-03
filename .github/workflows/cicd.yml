@@ -323,20 +323,25 @@ jobs:
           path: dashboard-app/src-tauri/target/release/bundle/deb/*.deb
           if-no-files-found: error
 
-      - name: Build AppImage (best-effort, linuxdeploy plugin can be unstable)
+      # AppImage is the only Linux package the in-app updater can replace, so a
+      # failure here must fail the release, not hide behind continue-on-error.
+      - name: Build AppImage
         if: runner.os == 'Linux'
-        continue-on-error: true
         working-directory: ./dashboard-app
         env:
           APPIMAGE_EXTRACT_AND_RUN: "1"
           NO_STRIP: "true"
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm tauri build --bundles appimage
+        # aws-dist ships libreadline.so.6 -> libtinfo.so.5 and resolves it from
+        # its own directory at runtime, but linuxdeploy traces it with ldd and
+        # aborts with "Could not find dependency" unless the host has it too.
+        run: |
+          sudo apt-get install -y --no-install-recommends libtinfo5
+          pnpm tauri build --bundles appimage
 
       - name: Upload AppImage to draft release
         if: runner.os == 'Linux'
-        continue-on-error: true
         uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -347,34 +352,17 @@ jobs:
             dashboard-app/src-tauri/target/release/bundle/appimage/*.AppImage
             dashboard-app/src-tauri/target/release/bundle/appimage/*.AppImage.sig
 
-      # AppImage is the only Linux package the Tauri updater can replace, but it
-      # is built outside tauri-action, so it never lands in latest.json. Merge
-      # the linux-x86_64 entry in by hand. Best-effort like the AppImage build:
-      # a failure here leaves Linux without in-app updates, not without a release.
+      # The AppImage is built outside tauri-action, so it never lands in
+      # latest.json. Merge the linux-x86_64 entry in by hand; a failure here
+      # leaves Linux without in-app updates, so it fails the release.
       - name: Register AppImage in latest.json
         if: runner.os == 'Linux'
-        continue-on-error: true
         shell: bash
         working-directory: ./dashboard-app
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: app-v${{ env.APP_VERSION }}
         run: bash ./scripts/register-appimage-in-latest-json.sh "$TAG"
-
-      - name: Build RPM fallback artifact
-        if: runner.os == 'Linux'
-        working-directory: ./dashboard-app
-        run: pnpm run build:rpm
-
-      - name: Upload RPM fallback to draft release
-        if: runner.os == 'Linux'
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: app-v${{ env.APP_VERSION }}
-          draft: true
-          files: dashboard-app/src-tauri/target/release/bundle/rpm/ROZOOM_K8s_Linter_IDE_${{ env.APP_VERSION }}_x86_64.rpm
 
   # Release gate: install the freshly built .deb in clean end-user distros and
   # verify the window actually renders (not just that the bundle built). Added

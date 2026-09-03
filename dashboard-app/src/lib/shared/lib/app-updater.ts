@@ -13,7 +13,6 @@ const UPDATE_DEDUPE_KEY = "app-update";
 
 type UpdateHandle = {
   version: string;
-  body?: string;
   downloadAndInstall: () => Promise<void>;
 };
 
@@ -33,7 +32,6 @@ async function loadTauriUpdater(): Promise<UpdaterPort> {
       if (!update) return null;
       return {
         version: update.version,
-        body: update.body ?? undefined,
         downloadAndInstall: () => update.downloadAndInstall(),
       };
     },
@@ -92,7 +90,10 @@ async function downloadAndNotify(updater: UpdaterPort, update: UpdateHandle): Pr
     severity: "info",
     category: "update",
     title: `Rozoom ${update.version} is ready`,
-    detail: update.body?.trim() || "Restart to finish updating.",
+    // Fixed copy on purpose (Sara, 01/09): latest.json `notes` carries the
+    // CI-generated release body (artifact table + internal draft disclaimer),
+    // which must never reach the bell. Per-release "what's new" is Sprint 20.
+    detail: "Restart to finish updating.",
     dedupeKey: UPDATE_DEDUPE_KEY,
     action: { label: "Restart now", run: () => confirmAndRestart(updater) },
   });
