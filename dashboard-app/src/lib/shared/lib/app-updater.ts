@@ -1,4 +1,4 @@
-import { isTauriAvailable, safeDialogAsk } from "./tauri-runtime";
+import { isTauriAvailable, safeAppLog, safeDialogAsk } from "./tauri-runtime";
 import { pushNotification } from "./app-notifications";
 
 /**
@@ -56,6 +56,10 @@ export function checkForUpdateSilently(port?: UpdaterPort): Promise<void> {
   return inFlight;
 }
 
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 async function runUpdateCycle(port?: UpdaterPort): Promise<void> {
   let updater: UpdaterPort;
   let update: UpdateHandle | null;
@@ -64,9 +68,20 @@ async function runUpdateCycle(port?: UpdaterPort): Promise<void> {
     update = await updater.check();
   } catch (error) {
     console.debug("[updater] check skipped:", error);
+    await safeAppLog(
+      "warn",
+      `[updater] check failed on v${__APP_VERSION__}: ${describeError(error)}`,
+    );
     return;
   }
-  if (!update) return;
+  if (!update) {
+    await safeAppLog("info", `[updater] check ok: v${__APP_VERSION__} is up to date`);
+    return;
+  }
+  await safeAppLog(
+    "info",
+    `[updater] check ok: v${update.version} available (running v${__APP_VERSION__}), downloading`,
+  );
   await downloadAndNotify(updater, update);
 }
 
@@ -75,6 +90,10 @@ async function downloadAndNotify(updater: UpdaterPort, update: UpdateHandle): Pr
     await update.downloadAndInstall();
   } catch (error) {
     console.warn("[updater] download failed:", error);
+    await safeAppLog(
+      "error",
+      `[updater] download/install of v${update.version} failed: ${describeError(error)}`,
+    );
     pushNotification({
       severity: "warning",
       category: "update",
@@ -86,6 +105,10 @@ async function downloadAndNotify(updater: UpdaterPort, update: UpdateHandle): Pr
     return;
   }
 
+  await safeAppLog(
+    "info",
+    `[updater] v${update.version} downloaded and staged, waiting for restart`,
+  );
   pushNotification({
     severity: "info",
     category: "update",
@@ -105,5 +128,6 @@ async function confirmAndRestart(updater: UpdaterPort): Promise<void> {
     kind: "info",
   });
   if (!ok) return;
+  await safeAppLog("info", "[updater] restarting to apply the staged update");
   await updater.relaunch();
 }

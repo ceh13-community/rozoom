@@ -8,10 +8,14 @@ import {
 import { checkForUpdateSilently } from "./app-updater";
 
 const askMock = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
+const appLogMock = vi.hoisted(() =>
+  vi.fn<(level: "info" | "warn" | "error", message: string) => Promise<void>>(async () => {}),
+);
 
 vi.mock("./tauri-runtime", () => ({
   isTauriAvailable: () => false,
   safeDialogAsk: askMock,
+  safeAppLog: appLogMock,
 }));
 
 function makePort(overrides: {
@@ -31,6 +35,7 @@ describe("app-updater", () => {
     dismissAllNotifications();
     clearDismissedNotifications();
     askMock.mockReset();
+    appLogMock.mockClear();
     vi.spyOn(console, "debug").mockImplementation(() => {});
     vi.spyOn(console, "warn").mockImplementation(() => {});
   });
@@ -40,17 +45,23 @@ describe("app-updater", () => {
     expect(get(appNotifications)).toHaveLength(0);
   });
 
-  it("stays silent when there is no update", async () => {
+  it("stays silent when there is no update, but records the check in the app log", async () => {
     const { port, check } = makePort({ update: null });
     await checkForUpdateSilently(port);
     expect(check).toHaveBeenCalledTimes(1);
     expect(get(appNotifications)).toHaveLength(0);
+    expect(appLogMock).toHaveBeenCalledWith("info", expect.stringContaining("up to date"));
   });
 
   it("stays silent when the check itself fails (offline, deb/rpm install)", async () => {
     const { port } = makePort({ checkError: new Error("Unsupported Linux package") });
     await checkForUpdateSilently(port);
     expect(get(appNotifications)).toHaveLength(0);
+    expect(appLogMock).toHaveBeenCalledWith("warn", expect.stringContaining("check failed on v"));
+    expect(appLogMock).toHaveBeenCalledWith(
+      "warn",
+      expect.stringContaining("Unsupported Linux package"),
+    );
   });
 
   it("downloads silently and posts one unread 'ready' notification with a restart action", async () => {
@@ -72,6 +83,11 @@ describe("app-updater", () => {
     });
     expect(list[0].readAt).toBeUndefined();
     expect(list[0].action?.label).toBe("Restart now");
+    expect(appLogMock).toHaveBeenCalledWith("info", expect.stringContaining("v0.23.0 available"));
+    expect(appLogMock).toHaveBeenCalledWith(
+      "info",
+      expect.stringContaining("v0.23.0 downloaded and staged"),
+    );
 
     askMock.mockResolvedValueOnce(false);
     await list[0].action?.run();
@@ -97,6 +113,10 @@ describe("app-updater", () => {
     expect(list[0].title).toBe("Update failed");
     expect(list[0].detail).toContain("nothing broke");
     expect(list[0].action?.label).toBe("Retry");
+    expect(appLogMock).toHaveBeenCalledWith(
+      "error",
+      expect.stringContaining("download/install of v0.23.0 failed: network"),
+    );
 
     await list[0].action?.run();
 

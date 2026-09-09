@@ -67,3 +67,13 @@ export async function safeDebugLog(message: string) {
   const { debug } = await import("@tauri-apps/plugin-log");
   await debug(message);
 }
+
+export async function safeAppLog(level: "info" | "warn" | "error", message: string) {
+  if (!isTauriAvailable()) return;
+  try {
+    const log = await import("@tauri-apps/plugin-log");
+    await log[level](message);
+  } catch {
+    // Logging must never break the caller's flow.
+  }
+}
