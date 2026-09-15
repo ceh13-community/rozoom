@@ -1,3 +1,5 @@
+import { isForbiddenMessage } from "$shared/lib/forbidden-error";
+
 export interface HumanizedError {
   title: string;
   hint: string | null;
@@ -41,12 +43,7 @@ export function humanizeArmorError(raw: string): HumanizedError {
     };
   }
 
-  if (
-    lower.includes("forbidden") ||
-    lower.includes("unauthorized") ||
-    lower.includes("system:unauthenticated") ||
-    lower.includes("cannot create resource")
-  ) {
+  if (isForbiddenMessage(lower)) {
     return {
       title: "RBAC denied the install/apply",
       hint: "Helm install creates cluster-scoped resources (CRDs, ClusterRole, DaemonSet). Your kubeconfig needs cluster-admin or equivalent for the install. For day-2 ops, a reader role is enough.",

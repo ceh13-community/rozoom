@@ -1,3 +1,5 @@
+import { isForbiddenMessage } from "$shared/lib/forbidden-error";
+
 export interface HumanizedAlertError {
   title: string;
   hint: string | null;
@@ -35,12 +37,7 @@ export function humanizeAlertError(raw: string): HumanizedAlertError {
     };
   }
 
-  if (
-    lower.includes("forbidden") ||
-    lower.includes("unauthorized") ||
-    lower.includes("cannot create resource") ||
-    lower.includes("system:unauthenticated")
-  ) {
+  if (isForbiddenMessage(lower)) {
     return {
       title: "RBAC denied the alert action",
       hint: "Creating silences or reading PrometheusRule/Alertmanager CRDs requires RBAC. Grant your kubeconfig user get/list on monitoring.coreos.com/* and create on alertmanager silences endpoint.",

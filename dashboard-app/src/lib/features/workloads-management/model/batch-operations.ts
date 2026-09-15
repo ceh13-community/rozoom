@@ -5,6 +5,9 @@
  * across multiple resources with progress tracking.
  */
 
+import { runCanI, type CanIStatus } from "$shared/api/can-i";
+import { humanizeForbiddenAction } from "$shared/lib/forbidden-error";
+
 export type BatchOperationKind = "scale" | "restart" | "delete" | "label" | "annotate";
 
 export type BatchTarget = {
@@ -83,6 +86,70 @@ export function updateBatchStep(
     progressPercent: Math.round((done / steps.length) * 100),
     status: allDone ? (failed > 0 ? "failed" : "completed") : "running",
   };
+}
+
+const KIND_TO_VERB: Record<BatchOperationKind, string> = {
+  delete: "delete",
+  scale: "patch",
+  restart: "patch",
+  label: "patch",
+  annotate: "patch",
+};
+
+export type BatchGateResult = {
+  plan: BatchOperationPlan;
+  deniedSteps: number;
+  /** can-i verdicts that could not be determined; those steps stay runnable (fail open). */
+  unknownChecks: number;
+};
+
+/**
+ * Preflights RBAC for every step via `kubectl auth can-i` before anything runs.
+ * Denied steps are marked as errors with a plain-language message instead of
+ * failing mid-batch with a raw 403 from the API server.
+ */
+export async function gateBatchPlan(
+  plan: BatchOperationPlan,
+  clusterId: string,
+): Promise<BatchGateResult> {
+  const verb = KIND_TO_VERB[plan.kind];
+  const uniqueScopes = new Map<string, { resource: string; namespace: string }>();
+  for (const step of plan.steps) {
+    const resource = step.target.kind.toLowerCase();
+    uniqueScopes.set(`${resource}|${step.target.namespace}`, {
+      resource,
+      namespace: step.target.namespace,
+    });
+  }
+
+  const verdicts = new Map<string, CanIStatus>();
+  await Promise.all(
+    [...uniqueScopes.entries()].map(async ([key, scope]) => {
+      verdicts.set(key, await runCanI(clusterId, [verb, scope.resource, "-n", scope.namespace]));
+    }),
+  );
+
+  let gated = plan;
+  let deniedSteps = 0;
+  let unknownChecks = 0;
+  plan.steps.forEach((step, index) => {
+    const resource = step.target.kind.toLowerCase();
+    const verdict = verdicts.get(`${resource}|${step.target.namespace}`);
+    if (verdict === "unknown") unknownChecks += 1;
+    if (verdict !== "denied") return;
+    deniedSteps += 1;
+    gated = updateBatchStep(gated, index, {
+      status: "error",
+      error: humanizeForbiddenAction({
+        verb: plan.kind === "delete" ? "delete" : plan.kind,
+        resource,
+        name: step.target.name,
+        namespace: step.target.namespace,
+      }),
+    });
+  });
+
+  return { plan: gated, deniedSteps, unknownChecks };
 }
 
 export function buildBatchKubectlArgs(
