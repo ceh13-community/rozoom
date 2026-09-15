@@ -20,6 +20,12 @@
     type DashboardDataProfileId,
   } from "$shared/lib/dashboard-data-profile.svelte";
   import { getLogsFolderPath, openLogsFolder } from "$shared/lib/support-diagnostics";
+  import {
+    getTelemetryConsent,
+    isDoNotTrack,
+    setTelemetryConsent,
+    type TelemetryConsent,
+  } from "$shared/analytics/consent";
 
   const profileOptions = listDashboardDataProfiles();
   const effectiveBudget = $derived(resolveClusterRuntimeBudget($dashboardDataProfile));
@@ -70,6 +76,18 @@
   $effect(() => {
     void getLogsFolderPath().then((path) => (logsFolderPath = path));
   });
+
+  let telemetryConsent = $state<TelemetryConsent>("undecided");
+  let telemetryDnt = $state(false);
+  $effect(() => {
+    telemetryConsent = getTelemetryConsent();
+    telemetryDnt = isDoNotTrack();
+  });
+
+  function handleTelemetryToggle(checked: boolean) {
+    setTelemetryConsent(checked ? "granted" : "denied");
+    telemetryConsent = checked ? "granted" : "denied";
+  }
 
   async function handleOpenLogsFolder() {
     openLogsError = null;
@@ -384,6 +402,37 @@
     {#if openLogsError}
       <div class="mt-1 text-xs text-destructive">{openLogsError}</div>
     {/if}
+  </div>
+
+  <div class="mt-4 border-t border-border/60 pt-3">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div class="space-y-0.5">
+        <div class="text-xs font-semibold">Usage telemetry</div>
+        <div class="text-xs text-muted-foreground">
+          Anonymous usage counts for three core actions, keyed by an anonymous install hash. No
+          personal data, no session recording. Off unless you allow it.
+        </div>
+      </div>
+      {#if telemetryDnt}
+        <span
+          class="text-xs text-muted-foreground"
+          title="Your browser sends Do Not Track / Global Privacy Control"
+        >
+          Off (Do Not Track honored)
+        </span>
+      {:else}
+        <label class="flex items-center gap-2 text-sm">
+          <input
+            aria-label="Usage telemetry"
+            type="checkbox"
+            checked={telemetryConsent === "granted"}
+            onchange={(event) =>
+              handleTelemetryToggle((event.currentTarget as HTMLInputElement).checked)}
+          />
+          <span class="text-xs">{telemetryConsent === "granted" ? "On" : "Off"}</span>
+        </label>
+      {/if}
+    </div>
   </div>
 
   <!-- Environment Sort Priority -->
