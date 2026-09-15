@@ -1,3 +1,4 @@
+import { isForbiddenMessage } from "$shared/lib/forbidden-error";
 import { error as logError } from "@tauri-apps/plugin-log";
 import { kubectlRawFront } from "$shared/api/kubectl-proxy";
 import { isExpectedClusterProbeError } from "$shared/lib/runtime-probe-errors";
@@ -101,11 +102,7 @@ function parseJson(raw: string): unknown {
 function resolveErrorStatus(message?: string): VpaHealthStatus {
   if (!message) return "unknown";
   const normalized = message.toLowerCase();
-  if (
-    normalized.includes("forbidden") ||
-    normalized.includes("unauthorized") ||
-    normalized.includes("permission")
-  ) {
+  if (isForbiddenMessage(normalized)) {
     return "insufficient";
   }
   if (

@@ -1,3 +1,4 @@
+import { isForbiddenMessage } from "$shared/lib/forbidden-error";
 import { discoverPrometheusService } from "$shared/api/discover-prometheus";
 import { checkKubelet } from "../check-kubelet";
 import { checkMetricsServer } from "../check-metrics-server";
@@ -114,11 +115,7 @@ function normalizeCapabilityReason(reason?: string): MetricsSourceCapability["re
   ) {
     return "unsupported";
   }
-  if (
-    normalized.includes("forbidden") ||
-    normalized.includes("unauthorized") ||
-    normalized.includes("permission")
-  ) {
+  if (isForbiddenMessage(normalized)) {
     return "forbidden";
   }
   if (

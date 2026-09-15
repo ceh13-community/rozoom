@@ -1,3 +1,4 @@
+import { isForbiddenMessage } from "$shared/lib/forbidden-error";
 import { error as logError } from "@tauri-apps/plugin-log";
 import type { ClusterData, NetworkPolicyItem, PodItem } from "$shared/model/clusters";
 import { loadClusterEntities } from "./get-cluster-info";
@@ -73,11 +74,7 @@ function resolveErrorStatus(message?: string): NetworkIsolationStatus {
   ) {
     return "unsupported";
   }
-  if (
-    normalized.includes("forbidden") ||
-    normalized.includes("unauthorized") ||
-    normalized.includes("permission")
-  ) {
+  if (isForbiddenMessage(normalized)) {
     return "insufficient";
   }
   if (

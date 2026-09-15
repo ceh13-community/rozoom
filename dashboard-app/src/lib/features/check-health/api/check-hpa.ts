@@ -1,3 +1,4 @@
+import { isForbiddenMessage } from "$shared/lib/forbidden-error";
 import { error as logError } from "@tauri-apps/plugin-log";
 import { kubectlRawFront } from "$shared/api/kubectl-proxy";
 import type { ClusterData, MetaData } from "$shared/model/clusters";
@@ -174,11 +175,7 @@ function getCondition(
 function resolveErrorStatus(message?: string): HpaCheckStatus {
   if (!message) return "unknown";
   const normalized = message.toLowerCase();
-  if (
-    normalized.includes("forbidden") ||
-    normalized.includes("unauthorized") ||
-    normalized.includes("permission")
-  ) {
+  if (isForbiddenMessage(normalized)) {
     return "insufficient";
   }
   if (

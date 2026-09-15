@@ -1,3 +1,4 @@
+import { isForbiddenMessage } from "$shared/lib/forbidden-error";
 import { error as logError } from "@tauri-apps/plugin-log";
 import type { ClusterData, PodItem } from "$shared/model/clusters";
 import { loadClusterEntities } from "./get-cluster-info";
@@ -41,11 +42,7 @@ function normalizeNamespace(namespace?: string): string {
 function resolveErrorStatus(message?: string): TopologyHaStatus {
   if (!message) return "unknown";
   const normalized = message.toLowerCase();
-  if (
-    normalized.includes("forbidden") ||
-    normalized.includes("unauthorized") ||
-    normalized.includes("permission")
-  ) {
+  if (isForbiddenMessage(normalized)) {
     return "insufficient";
   }
   if (

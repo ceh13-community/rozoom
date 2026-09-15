@@ -1,6 +1,7 @@
+import { runCanI, type CanIStatus } from "$shared/api/can-i";
 import { kubectlRawArgsFront, kubectlRawFront } from "$shared/api/kubectl-proxy";
 
-export type OverviewAccessCapabilityStatus = "allowed" | "denied" | "unknown";
+export type OverviewAccessCapabilityStatus = CanIStatus;
 
 export type OverviewAccessCapability = {
   id:
@@ -45,72 +46,60 @@ const CAN_I_CHECKS: CanICheck[] = [
   {
     id: "pods_read",
     title: "Pods",
-    args: ["auth", "can-i", "list", "pods", "--all-namespaces"],
+    args: ["list", "pods", "--all-namespaces"],
     allowedDetail: "Can read pod inventory across namespaces.",
     deniedDetail: "Pod listing is restricted.",
   },
   {
     id: "events_read",
     title: "Events",
-    args: ["auth", "can-i", "list", "events", "--all-namespaces"],
+    args: ["list", "events", "--all-namespaces"],
     allowedDetail: "Can read warning and lifecycle events.",
     deniedDetail: "Event visibility is restricted.",
   },
   {
     id: "nodes_read",
     title: "Nodes",
-    args: ["auth", "can-i", "list", "nodes"],
+    args: ["list", "nodes"],
     allowedDetail: "Can inspect node health and pressure.",
     deniedDetail: "Node visibility is restricted.",
   },
   {
     id: "secrets_read",
     title: "Secrets",
-    args: ["auth", "can-i", "get", "secrets", "-n", "kube-system"],
+    args: ["get", "secrets", "-n", "kube-system"],
     allowedDetail: "Can inspect secrets in kube-system.",
     deniedDetail: "Secrets access is restricted.",
   },
   {
     id: "logs",
     title: "Logs",
-    args: ["auth", "can-i", "get", "pods", "-n", "default", "--subresource", "log"],
+    args: ["get", "pods", "-n", "default", "--subresource", "log"],
     allowedDetail: "Can read pod logs.",
     deniedDetail: "Pod log access is restricted.",
   },
   {
     id: "exec",
     title: "Exec",
-    args: ["auth", "can-i", "create", "pods", "-n", "default", "--subresource", "exec"],
+    args: ["create", "pods", "-n", "default", "--subresource", "exec"],
     allowedDetail: "Can start exec sessions into pods.",
     deniedDetail: "Pod exec access is restricted.",
   },
   {
     id: "portforward",
     title: "Port-forward",
-    args: ["auth", "can-i", "create", "pods", "-n", "default", "--subresource", "portforward"],
+    args: ["create", "pods", "-n", "default", "--subresource", "portforward"],
     allowedDetail: "Can open pod port-forward sessions.",
     deniedDetail: "Port-forward access is restricted.",
   },
   {
     id: "kube_system_read",
     title: "kube-system",
-    args: ["auth", "can-i", "list", "pods", "-n", "kube-system"],
+    args: ["list", "pods", "-n", "kube-system"],
     allowedDetail: "Can inspect kube-system pods.",
     deniedDetail: "kube-system pod access is restricted.",
   },
 ];
-
-function normalizeCanIStatus(
-  output: string,
-  errors: string,
-  code?: number,
-): OverviewAccessCapabilityStatus {
-  if (errors || code !== 0) return "unknown";
-  const normalized = output.trim().toLowerCase();
-  if (normalized === "yes") return "allowed";
-  if (normalized === "no") return "denied";
-  return "unknown";
-}
 
 function buildDiagnosticsImpact(capabilities: OverviewAccessCapability[]): string[] {
   const byId = new Map(capabilities.map((item) => [item.id, item]));
@@ -199,11 +188,7 @@ export async function fetchOverviewAccessProfile(
   const identity = await resolveSubject(clusterId);
   const capabilityResults = await Promise.all(
     CAN_I_CHECKS.map(async (check) => {
-      const response = await kubectlRawArgsFront(check.args, {
-        clusterId,
-        allowCommandUnavailable: true,
-      });
-      const status = normalizeCanIStatus(response.output, response.errors, response.code);
+      const status = await runCanI(clusterId, check.args);
       return {
         id: check.id,
         title: check.title,
