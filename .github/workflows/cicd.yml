@@ -290,6 +290,12 @@ jobs:
           # shipping an unsigned release the updater would reject.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # WAU-C telemetry: $env/dynamic/public is captured into _app/env.js at
+          # build time, so the PostHog key must be in the env when
+          # beforeBuildCommand (pnpm build) runs. Without it the release ships
+          # with telemetry permanently dark even after user consent.
+          PUBLIC_POSTHOG_KEY: ${{ secrets.PUBLIC_POSTHOG_KEY }}
+          PUBLIC_POSTHOG_HOST: ${{ secrets.PUBLIC_POSTHOG_HOST }}
         with:
           projectPath: dashboard-app
           tagName: app-v${{ env.APP_VERSION }}
@@ -333,6 +339,12 @@ jobs:
           NO_STRIP: "true"
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # WAU-C telemetry: $env/dynamic/public is captured into _app/env.js at
+          # build time, so the PostHog key must be in the env when
+          # beforeBuildCommand (pnpm build) runs. Without it the release ships
+          # with telemetry permanently dark even after user consent.
+          PUBLIC_POSTHOG_KEY: ${{ secrets.PUBLIC_POSTHOG_KEY }}
+          PUBLIC_POSTHOG_HOST: ${{ secrets.PUBLIC_POSTHOG_HOST }}
         # The vendored CLI dists (aws-dist, az-dist) resolve their private
         # libraries (libtinfo.so.5, libffi.so.6, ...) from their own
         # directories at runtime, but linuxdeploy traces every ELF in the
