@@ -1,5 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { createBatchPlan, updateBatchStep, buildBatchKubectlArgs } from "./batch-operations";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("$shared/api/kubectl-proxy", () => ({
+  kubectlRawArgsFront: vi.fn(),
+}));
+
+import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
+import {
+  createBatchPlan,
+  updateBatchStep,
+  buildBatchKubectlArgs,
+  gateBatchPlan,
+} from "./batch-operations";
 
 describe("batch-operations", () => {
   const targets = [
@@ -43,5 +54,76 @@ describe("batch-operations", () => {
       "--replicas",
     );
     expect(buildBatchKubectlArgs("delete", targets[0])).toContain("delete");
+  });
+
+  describe("gateBatchPlan", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("marks denied steps as errors with a plain-language message before running", async () => {
+      vi.mocked(kubectlRawArgsFront).mockResolvedValue({ output: "no\n", errors: "", code: 0 });
+
+      const plan = createBatchPlan("delete", targets);
+      const result = await gateBatchPlan(plan, "cluster-a");
+
+      expect(result.deniedSteps).toBe(2);
+      expect(result.plan.steps.every((s) => s.status === "error")).toBe(true);
+      expect(result.plan.steps[0].error).toContain('delete deployment "web"');
+      expect(result.plan.steps[0].error).not.toMatch(/Error from server/);
+      expect(kubectlRawArgsFront).toHaveBeenCalledTimes(1);
+      expect(kubectlRawArgsFront).toHaveBeenCalledWith(
+        ["auth", "can-i", "delete", "deployment", "-n", "prod"],
+        expect.objectContaining({ clusterId: "cluster-a" }),
+      );
+    });
+
+    it("checks patch permission for scale and leaves allowed steps pending", async () => {
+      vi.mocked(kubectlRawArgsFront).mockResolvedValue({ output: "yes\n", errors: "", code: 0 });
+
+      const plan = createBatchPlan("scale", targets, { scale: { replicas: 3 } });
+      const result = await gateBatchPlan(plan, "cluster-a");
+
+      expect(result.deniedSteps).toBe(0);
+      expect(result.plan.steps.every((s) => s.status === "pending")).toBe(true);
+      expect(kubectlRawArgsFront).toHaveBeenCalledWith(
+        ["auth", "can-i", "patch", "deployment", "-n", "prod"],
+        expect.objectContaining({ clusterId: "cluster-a" }),
+      );
+    });
+
+    it("fails open when can-i cannot decide", async () => {
+      vi.mocked(kubectlRawArgsFront).mockResolvedValue({
+        output: "",
+        errors: "no such command",
+        code: 1,
+      });
+
+      const plan = createBatchPlan("delete", targets);
+      const result = await gateBatchPlan(plan, "cluster-a");
+
+      expect(result.deniedSteps).toBe(0);
+      expect(result.unknownChecks).toBe(2);
+      expect(result.plan.steps.every((s) => s.status === "pending")).toBe(true);
+    });
+
+    it("gates namespaces independently", async () => {
+      vi.mocked(kubectlRawArgsFront).mockImplementation(async (args: string[]) => ({
+        output: args.includes("prod") ? "no\n" : "yes\n",
+        errors: "",
+        code: 0,
+      }));
+
+      const plan = createBatchPlan("delete", [
+        { kind: "Deployment", name: "web", namespace: "prod" },
+        { kind: "Deployment", name: "web", namespace: "staging" },
+      ]);
+      const result = await gateBatchPlan(plan, "cluster-a");
+
+      expect(result.deniedSteps).toBe(1);
+      expect(result.plan.steps[0].status).toBe("error");
+      expect(result.plan.steps[1].status).toBe("pending");
+      expect(kubectlRawArgsFront).toHaveBeenCalledTimes(2);
+    });
   });
 });

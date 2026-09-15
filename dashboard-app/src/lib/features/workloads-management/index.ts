@@ -100,7 +100,9 @@ export {
   createBatchPlan,
   updateBatchStep,
   buildBatchKubectlArgs,
+  gateBatchPlan,
   type BatchOperationPlan,
+  type BatchGateResult,
 } from "./model/batch-operations";
 export { estimateNamespaceCosts, type NamespaceCostReport } from "./model/namespace-cost";
 export { buildMigrationPlan, type MigrationPlan } from "./model/namespace-migration";
