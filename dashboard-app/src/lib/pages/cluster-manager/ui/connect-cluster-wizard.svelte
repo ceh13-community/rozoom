@@ -15,6 +15,7 @@
     generateExecKubeconfig,
     type ExecPluginKind,
   } from "$features/cluster-manager/model/exec-plugin";
+  import { humanizeConnectError } from "$features/cluster-manager/model/humanize-connect-error";
   import {
     listCloudClusters,
     listCloudScopes,
@@ -478,7 +479,7 @@ users:
           imported += 1;
           importedKeys.add(autoKey(cluster));
         } catch (e) {
-          failures.push(`${cluster.name}: ${(e as Error).message}`);
+          failures.push(`${cluster.name}: ${humanizeConnectError(e)}`);
         }
       } else {
         failures.push(`${cluster.name}: ${result.error ?? "import failed"}`);
@@ -517,7 +518,7 @@ users:
       const message = (e as Error).message;
       error = /EACCES|permission denied/i.test(message)
         ? "Could not read ~/.kube/config — check the file permissions."
-        : `Local scan failed: ${message}`;
+        : `Local scan failed: ${humanizeConnectError(e)}`;
       localClusters = [];
     }
     localScanning = false;
@@ -556,7 +557,7 @@ users:
         error = `Could not connect "${cluster.contextName}". It may already exist.`;
       }
     } catch (e) {
-      error = (e as Error).message;
+      error = humanizeConnectError(e);
     }
     localConnecting = null;
   }
@@ -594,7 +595,7 @@ users:
       oidcClientSecret = "";
       oidcCaData = "";
     } catch (e) {
-      error = (e as Error).message;
+      error = humanizeConnectError(e, oidcServerUrl.trim());
     }
     loading = false;
   }
@@ -699,7 +700,7 @@ users:
       certClientCert = "";
       certClientKey = "";
     } catch (e) {
-      error = (e as Error).message;
+      error = humanizeConnectError(e, certServerUrl.trim());
     }
     loading = false;
   }
@@ -720,7 +721,7 @@ users:
       tokenCaData = "";
       tokenValue = "";
     } catch (e) {
-      error = (e as Error).message;
+      error = humanizeConnectError(e, tokenServerUrl.trim());
     }
     loading = false;
   }
@@ -761,7 +762,7 @@ users:
       execExtra = "";
       execCommand = "";
     } catch (e) {
-      error = (e as Error).message;
+      error = humanizeConnectError(e, execServerUrl.trim());
     }
     loading = false;
   }
