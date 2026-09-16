@@ -2,6 +2,26 @@
 
 All notable changes to ROZOOM - K8s Linter IDE.
 
+## [0.24.0] - 2026-09-16
+
+### Added
+- Usage telemetry toggle in Fleet Settings: consent can now be granted or
+  revoked at any time from the app, not only via the first-launch prompt.
+- Preflight RBAC gating for batch workload actions (delete / edit / scale):
+  permissions are checked via `SelfSubjectAccessReview` before the action
+  runs, so forbidden operations are surfaced up front instead of failing
+  midway through a batch.
+- Updater observability: update check, download, and apply outcomes are
+  written to the tauri log file, so failed silent updates can be diagnosed
+  from the log instead of guesswork.
+
+### Fixed
+- Release builds now receive `PUBLIC_POSTHOG_KEY` / `PUBLIC_POSTHOG_HOST` at
+  build time (both the tauri-action build and the standalone AppImage build).
+  Every release since telemetry shipped had the key missing from the bundle,
+  so opt-in telemetry was permanently dark even after user consent; this is
+  the first release where consented telemetry actually reports.
+
 ## [0.22.3] - 2026-07-02
 
 ### Added
