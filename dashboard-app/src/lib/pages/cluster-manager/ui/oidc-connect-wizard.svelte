@@ -5,6 +5,7 @@
     type OidcProvider,
   } from "$features/cluster-manager/model/oidc-config";
   import { addClustersFromText } from "$features/cluster-manager";
+  import { humanizeConnectError } from "$features/cluster-manager/model/humanize-connect-error";
   import { Button } from "$shared/ui/button";
 
   let step = $state<1 | 2 | 3>(1);
@@ -55,7 +56,7 @@
       caData = "";
       generatedYaml = null;
     } catch (e) {
-      error = (e as Error).message;
+      error = humanizeConnectError(e, serverUrl.trim());
     }
   }
 
