@@ -241,6 +241,21 @@ jobs:
         working-directory: ./dashboard-app
         run: echo "APP_VERSION=$(node -p 'require("./src-tauri/tauri.conf.json").version' | tr -d '\r\n')" >> "$GITHUB_ENV"
 
+      # WAU-C telemetry: an empty PUBLIC_POSTHOG_KEY does not fail the build —
+      # the release ships fine and telemetry is just permanently dark, which is
+      # only discovered weeks later in PostHog. Fail the release up front
+      # instead, same policy as the updater signing secrets above. Guards both
+      # consumers below (tauri-action and the standalone AppImage build).
+      - name: Fail fast on empty PUBLIC_POSTHOG_KEY
+        shell: bash
+        env:
+          PUBLIC_POSTHOG_KEY: ${{ secrets.PUBLIC_POSTHOG_KEY }}
+        run: |
+          if [[ -z "${PUBLIC_POSTHOG_KEY//[[:space:]]/}" ]]; then
+            echo "::error::PUBLIC_POSTHOG_KEY secret is unset or blank; the release would ship with telemetry permanently dark. Set the repo secret and re-run."
+            exit 1
+          fi
+
       - name: Setup pnpm
         uses: ./.github/actions/setup-pnpm
 
