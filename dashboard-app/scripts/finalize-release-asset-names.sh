@@ -66,8 +66,11 @@ done < "$tmp/assets.tsv"
 if [[ -s "$tmp/renames.tsv" ]]; then
   gh release download "$TAG" --repo "$REPO" --pattern latest.json --dir "$tmp" --clobber
   while IFS=$'\t' read -r old new; do
+    # Exact suffix match on the URL basename - no regex, so dots and other
+    # metacharacters in asset names cannot mis-match.
     jq --arg old "$old" --arg new "$new" \
-      '.platforms |= with_entries(.value.url |= sub("/\($old)$"; "/\($new)"))' \
+      '.platforms |= with_entries(.value.url |=
+        (if endswith("/" + $old) then .[:length - ($old | length)] + $new else . end))' \
       "$tmp/latest.json" > "$tmp/latest.patched.json"
     mv "$tmp/latest.patched.json" "$tmp/latest.json"
   done < "$tmp/renames.tsv"
@@ -81,6 +84,7 @@ gh api "repos/${REPO}/releases/${RELEASE_ID}/assets" --paginate \
 
 verify_manifest() {
   local manifest="$1" marker="$2" url name
+  mkdir -p "$tmp/verify"
   gh release download "$TAG" --repo "$REPO" --pattern "$manifest" --dir "$tmp/verify" --clobber
   while IFS= read -r url; do
     name="${url##*/}"

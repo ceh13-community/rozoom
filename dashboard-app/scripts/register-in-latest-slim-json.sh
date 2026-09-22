@@ -57,6 +57,7 @@ for attempt in 1 2 3 4 5; do
   # Concurrent platform jobs can clobber each other; confirm our entry
   # survived, otherwise merge and upload again on a fresh download.
   sleep 5
+  mkdir -p "$tmp/check"
   rm -f "$tmp/check/$MANIFEST"
   if gh release download "$TAG" --repo "$REPO" --pattern "$MANIFEST" --dir "$tmp/check" --clobber 2>/dev/null \
     && [[ "$(jq -r --arg key "$PLATFORM_KEY" '.platforms[$key].url // empty' "$tmp/check/$MANIFEST")" == "$URL" ]]; then
