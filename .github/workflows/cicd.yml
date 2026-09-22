@@ -389,13 +389,199 @@ jobs:
           TAG: app-v${{ env.APP_VERSION }}
         run: bash ./scripts/register-appimage-in-latest-json.sh "$TAG"
 
+  # Slim tool-pack variant: same release, second set of artifacts. Bundles only
+  # kubectl + helm (VITE_ROZOOM_TOOLS filters both download-binaries.js and the
+  # frontend tool registry); tauri.slim.conf.json swaps the updater endpoint to
+  # latest-slim.json so slim installs only ever see slim updates, while the
+  # legacy endpoint (latest.json) keeps serving full artifacts to existing
+  # installs untouched. Built outside tauri-action: artifacts are renamed to
+  # `_slim` names and the slim updater manifest is assembled by scripts, none
+  # of which tauri-action supports. Runs after publish-tauri so the draft
+  # release already exists (avoids two racing draft releases for one tag).
+  publish-tauri-slim:
+    needs: publish-tauri
+    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest"
+            args: "--target aarch64-apple-darwin --bundles app,dmg"
+            label: "macOS ARM64 slim"
+            updater-platform: "darwin-aarch64"
+          - platform: "ubuntu-22.04"
+            args: "--bundles deb,rpm"
+            label: "Linux x64 slim"
+            updater-platform: "linux-x86_64"
+          - platform: "windows-latest"
+            args: "--bundles msi,nsis"
+            label: "Windows x64 slim"
+            updater-platform: "windows-x86_64"
+
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 90
+    env:
+      # Build-time tool filter: download-binaries.js only provisions these
+      # sidecars and the frontend registry hides everything else.
+      VITE_ROZOOM_TOOLS: "kubectl,helm"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Resolve app version
+        shell: bash
+        working-directory: ./dashboard-app
+        run: echo "APP_VERSION=$(node -p 'require("./src-tauri/tauri.conf.json").version' | tr -d '\r\n')" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm
+        uses: ./.github/actions/setup-pnpm
+
+      - name: Setup rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Download binaries
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: ./dashboard-app
+        run: pnpm download:binaries
+
+      - name: Sanitize version for MSI compatibility
+        if: runner.os == 'Windows'
+        shell: bash
+        working-directory: ./dashboard-app
+        run: |
+          RAW="${{ env.APP_VERSION }}"
+          # MSI requires numeric-only pre-release identifiers (<= 65535)
+          # Convert e.g. 0.21.0-rc.1 -> 0.21.0-1 (valid semver + MSI-compatible)
+          if [[ "$RAW" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-[a-zA-Z]+\.([0-9]+)$ ]]; then
+            MSI_VERSION="${BASH_REMATCH[1]}-${BASH_REMATCH[2]}"
+            echo "Sanitizing version for MSI: $RAW -> $MSI_VERSION"
+            node -e "
+              const fs = require('fs');
+              const p = 'src-tauri/tauri.conf.json';
+              const c = JSON.parse(fs.readFileSync(p, 'utf8'));
+              c.version = '$MSI_VERSION';
+              fs.writeFileSync(p, JSON.stringify(c, null, 2) + '\n');
+            "
+            sed -i "s/^version = \"$RAW\"/version = \"$MSI_VERSION\"/" src-tauri/Cargo.toml
+          fi
+
+      - name: Build slim bundles
+        shell: bash
+        working-directory: ./dashboard-app
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Same constraint as the full build: the PostHog key must be in the
+          # env when beforeBuildCommand (pnpm build) runs.
+          PUBLIC_POSTHOG_KEY: ${{ secrets.PUBLIC_POSTHOG_KEY }}
+          PUBLIC_POSTHOG_HOST: ${{ secrets.PUBLIC_POSTHOG_HOST }}
+        run: pnpm tauri build --config src-tauri/tauri.slim.conf.json ${{ matrix.args }}
+
+      # AppImage is the only Linux package the in-app updater can replace.
+      # Unlike the full build, no LD_LIBRARY_PATH surgery is needed: the
+      # vendored aws/az dists whose private libraries confused linuxdeploy
+      # are not part of the slim bundle.
+      - name: Build slim AppImage
+        if: runner.os == 'Linux'
+        working-directory: ./dashboard-app
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          NO_STRIP: "true"
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          PUBLIC_POSTHOG_KEY: ${{ secrets.PUBLIC_POSTHOG_KEY }}
+          PUBLIC_POSTHOG_HOST: ${{ secrets.PUBLIC_POSTHOG_HOST }}
+        run: pnpm tauri build --config src-tauri/tauri.slim.conf.json --bundles appimage --verbose
+
+      - name: Rename artifacts to slim names
+        shell: bash
+        working-directory: ./dashboard-app
+        run: bash ./scripts/rename-slim-artifacts.sh
+
+      # Release gate (accepted risk closure): assert on the built artifact that
+      # the slim binary points at latest-slim.json and NOT at the inherited
+      # full endpoint. Without this a config regression would silently update
+      # every slim install to the full bundle.
+      - name: Assert slim updater endpoint in built artifact
+        if: runner.os == 'Linux'
+        working-directory: ./dashboard-app
+        run: bash ./scripts/assert-slim-updater-endpoint.sh src-tauri/target/release/bundle/deb/*_slim.deb
+
+      - name: Report slim artifact sizes
+        shell: bash
+        working-directory: ./dashboard-app
+        run: find src-tauri/target -path '*/bundle/*' -name '*_slim*' -type f -exec du -h {} \;
+
+      - name: Upload slim artifacts to draft release
+        shell: bash
+        working-directory: ./dashboard-app
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: app-v${{ env.APP_VERSION }}
+        run: |
+          mapfile -t files < <(find src-tauri/target -path '*/bundle/*' -name '*_slim*' -type f)
+          [[ ${#files[@]} -gt 0 ]] || { echo "no slim artifacts found to upload" >&2; exit 1; }
+          gh release upload "$TAG" "${files[@]}" --clobber
+
+      - name: Register in latest-slim.json
+        shell: bash
+        working-directory: ./dashboard-app
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: app-v${{ env.APP_VERSION }}
+        run: |
+          case "${{ matrix.updater-platform }}" in
+            linux-x86_64)   pattern='*_slim.AppImage' ;;
+            darwin-aarch64) pattern='*_slim.app.tar.gz' ;;
+            windows-x86_64) pattern='*_slim_en-US.msi' ;;
+          esac
+          artifact="$(find src-tauri/target -path '*/bundle/*' -name "$pattern" -type f | head -n1)"
+          [[ -n "$artifact" ]] || { echo "no updater artifact matching $pattern" >&2; exit 1; }
+          bash ./scripts/register-in-latest-slim-json.sh "$TAG" "${{ matrix.updater-platform }}" "$artifact"
+
+      - name: Upload slim .deb for render smoke
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb-x64-slim
+          path: dashboard-app/src-tauri/target/release/bundle/deb/*_slim.deb
+          if-no-files-found: error
+
+  # Single-writer finalization: rename full assets to `_full-offline`, patch
+  # latest.json URLs accordingly, and cross-verify that each manifest only
+  # references its own variant's assets.
+  finalize-release-assets:
+    needs: [publish-tauri, publish-tauri-slim]
+    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Resolve app version
+        run: echo "APP_VERSION=$(node -p 'require("./src-tauri/tauri.conf.json").version' | tr -d '\r\n')" >> "$GITHUB_ENV"
+
+      - name: Finalize asset names and verify manifests
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash ./scripts/finalize-release-asset-names.sh "app-v${{ env.APP_VERSION }}"
+
   # Release gate: install the freshly built .deb in clean end-user distros and
   # verify the window actually renders (not just that the bundle built). Added
   # after 0.22.x shipped a .deb that launched to a blank window on Kali —
   # nothing in build or e2e (web-only) could have caught it.
   deb_render_smoke:
-    name: "Deb render smoke (${{ matrix.distro }})"
-    needs: publish-tauri
+    name: "Deb render smoke (${{ matrix.artifact }}, ${{ matrix.distro }})"
+    needs: [publish-tauri, publish-tauri-slim]
     if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -405,6 +591,7 @@ jobs:
       fail-fast: false
       matrix:
         distro: ["debian:12", "kalilinux/kali-rolling"]
+        artifact: ["linux-deb-x64", "linux-deb-x64-slim"]
     container:
       image: ${{ matrix.distro }}
     steps:
@@ -415,7 +602,7 @@ jobs:
       - name: Download built .deb
         uses: actions/download-artifact@v4
         with:
-          name: linux-deb-x64
+          name: ${{ matrix.artifact }}
           path: dashboard-app/deb
 
       - name: Install and verify window renders
