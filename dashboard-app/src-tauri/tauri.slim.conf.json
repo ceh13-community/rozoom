@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "security": {
+      "capabilities": ["slim"]
+    }
+  },
+  "bundle": {
+    "externalBin": ["binaries/rozoom-kubectl", "binaries/rozoom-helm"],
+    "resources": []
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/ceh13-community/rozoom/releases/latest/download/latest-slim.json"
+      ]
+    }
+  }
+}
