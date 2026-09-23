@@ -538,8 +538,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: app-v${{ env.APP_VERSION }}
+        # macOS runners ship bash 3.2, which has no `mapfile`; keep this loop
+        # bash-3 compatible or the darwin slim job dies before uploading.
         run: |
-          mapfile -t files < <(find src-tauri/target -path '*/bundle/*' -name '*_slim*' -type f)
+          files=()
+          while IFS= read -r f; do files+=("$f"); done < <(find src-tauri/target -path '*/bundle/*' -name '*_slim*' -type f)
           [[ ${#files[@]} -gt 0 ]] || { echo "no slim artifacts found to upload" >&2; exit 1; }
           gh release upload "$TAG" "${files[@]}" --clobber
 
