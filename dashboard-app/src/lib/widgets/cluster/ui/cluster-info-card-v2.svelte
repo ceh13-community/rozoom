@@ -117,6 +117,20 @@
     return { ...base, tooltip };
   });
   const platformLabel = $derived(getClusterPlatformLabel(cluster.name));
+  // Header stays neutral; status lives only in the badge, where a glyph
+  // keeps the three actionable states tellable apart without color.
+  const statusGlyph = $derived.by(() => {
+    switch (displayClusterCardColor?.text) {
+      case "Ok":
+        return "✓";
+      case "Warning":
+        return "!";
+      case "Critical":
+        return "✕";
+      default:
+        return "";
+    }
+  });
   const isRefreshLoading = $derived(checkState.loading);
   const showInitialRefreshHint = $derived(
     Boolean(cluster.needsInitialRefreshHint) && !isRefreshLoading && isClustersListRoute,
@@ -442,8 +456,7 @@
   >
     <!-- Header -->
     <Card.Title
-      class="flex items-center text-white px-4 py-3 cursor-pointer {displayClusterCardColor?.color ??
-        'bg-slate-600'} rounded-t-xl transition-colors duration-500"
+      class="flex items-center text-white px-4 py-3 cursor-pointer bg-slate-600 rounded-t-xl"
     >
       <div class="relative flex">
         <Button
@@ -451,6 +464,8 @@
           variant="ghost"
           onclick={refreshData}
           disabled={isRefreshLoading}
+          aria-label={isRefreshLoading ? "Refreshing cluster health" : "Refresh cluster health"}
+          title="Refresh cluster health"
         >
           <Refresh
             class={isRefreshLoading
@@ -476,7 +491,13 @@
       >
         {cluster.name}
       </button>
-      <Button class="hover:bg-transparent ml-auto" variant="ghost" onclick={goToCluster}>
+      <Button
+        class="hover:bg-transparent ml-auto"
+        variant="ghost"
+        onclick={goToCluster}
+        aria-label={`Open ${cluster.name} details`}
+        title="Open cluster details"
+      >
         <SquareChevronRight class="w-4 h-4" />
       </Button>
     </Card.Title>
@@ -489,6 +510,7 @@
             'bg-slate-500'} text-[11px] h-5 px-1.5 cursor-help"
           title={displayClusterCardColor?.tooltip ?? ""}
         >
+          {#if statusGlyph}<span class="mr-0.5" aria-hidden="true">{statusGlyph}</span>{/if}
           {displayClusterCardColor?.text.toUpperCase() ?? "UNKNOWN"}
         </Badge>
         <DriftBadge clusterId={cluster.uuid} />

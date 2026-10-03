@@ -942,14 +942,10 @@
           variant="ghost"
           onclick={refreshData}
           disabled={isRefreshLoading}
+          aria-label={isRefreshLoading ? "Refreshing cluster health" : "Refresh cluster health"}
+          title="Refresh cluster health"
         >
-          <Refresh
-            class={isRefreshLoading
-              ? "animate-spin"
-              : showInitialRefreshHint
-                ? "animate-bounce"
-                : ""}
-          />
+          <Refresh class={isRefreshLoading ? "animate-spin" : ""} />
         </Button>
         {#if cluster.needsInitialRefreshHint}
           {#if showInitialRefreshHint}
@@ -962,17 +958,27 @@
         {/if}
       </div>
 
-      <span
-        role="button"
-        class="truncate"
+      <a
+        href={`/dashboard/clusters/${encodeURIComponent(cluster.uuid)}?workload=overview`}
+        class="truncate underline-offset-4 hover:underline"
         title={cluster.name}
-        aria-label={cluster.name}
-        onclick={goToCluster}
-        onkeydown={(e) => handleKeypress(e, goToCluster)}
-        tabindex="0">{displayName}</span
+        onclick={(e) => {
+          // Modified clicks (new tab / new window) must keep native link
+          // behaviour; only a plain left click goes through goToCluster,
+          // which also stops background pollers before navigating.
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+          e.preventDefault();
+          goToCluster();
+        }}>{displayName}</a
       >
       {#if cluster.status !== "error" && !isRefreshLoading && !lastCheck?.errors}
-        <Button class="hover:bg-transparent ml-auto" variant="ghost" onclick={goToCluster}>
+        <Button
+          class="hover:bg-transparent ml-auto"
+          variant="ghost"
+          onclick={goToCluster}
+          aria-label={`Open ${displayName} details`}
+          title="Open cluster details"
+        >
           <SquareChevronRight class="w-4 h-4" />
         </Button>
       {/if}
@@ -983,9 +989,9 @@
         <DriftBadge clusterId={cluster.uuid} />
         <span title={displayClusterCardColor?.tooltip ?? ""} class="cursor-help">
           <Badge
-            class="text-white {displayClusterCardColor?.color} max-w-20 h-7 transition-colors duration-500"
+            class="text-white {displayClusterCardColor?.color} h-7 whitespace-nowrap uppercase transition-colors duration-500"
           >
-            {displayClusterCardColor?.text.toUpperCase()}
+            {displayClusterCardColor?.text}
           </Badge>
         </span>
       </div>
@@ -1014,14 +1020,14 @@
     {/if}
     <button
       type="button"
-      class="mx-6 mb-3 block w-[calc(100%-3rem)] rounded-xl border border-slate-300/90 bg-white px-3.5 py-3.5 text-left text-sm text-slate-900 shadow-sm transition hover:bg-slate-50"
+      class="mx-6 mb-3 block w-[calc(100%-3rem)] rounded-xl border border-border bg-card px-3.5 py-3.5 text-left text-sm text-card-foreground shadow-sm transition hover:bg-accent"
       onclick={goToClusterOrFixCreds}
       title={primaryAlertIsAuthError
         ? "Open Cluster Manager to refresh credentials"
         : "Open cluster details"}
     >
       <div class="flex items-center justify-between gap-3">
-        <div class="text-[13px] font-semibold tracking-[0.01em] text-slate-950">Primary Alert</div>
+        <div class="text-[13px] font-semibold tracking-[0.01em] text-foreground">Primary Alert</div>
         <Badge
           class={`min-w-16 justify-center text-white shadow-sm ${
             primaryAlert.severity === "critical"
@@ -1042,8 +1048,10 @@
                 : "Info"}
         </Badge>
       </div>
-      <div class="mt-2 text-sm font-semibold leading-5 text-slate-950">{primaryAlert.title}</div>
-      <div class="mt-1.5 text-xs font-medium leading-5 text-slate-700">{primaryAlert.detail}</div>
+      <div class="mt-2 text-sm font-semibold leading-5 text-foreground">{primaryAlert.title}</div>
+      <div class="mt-1.5 text-xs font-medium leading-5 text-muted-foreground">
+        {primaryAlert.detail}
+      </div>
     </button>
     <div class="px-6 flex flex-wrap justify-between items-center gap-y-1.5 gap-x-2 mb-3">
       <span class="shrink-0">Refresh:</span>
@@ -1098,8 +1106,8 @@
         {@const rawError = cluster.errors ?? checkState.error ?? ""}
         {@const friendly = humanizeClusterError(rawError)}
         <Popover.Root>
-          <Popover.Trigger>
-            <ShieldQuestion class="w-4 h-4 cursor-pointer text-rose-400" />
+          <Popover.Trigger aria-label="Why is this cluster unhealthy?">
+            <ShieldQuestion class="w-4 h-4 cursor-pointer text-rose-400" aria-hidden="true" />
           </Popover.Trigger>
           <Popover.Content class="w-80">
             <p class="text-rose-500 text-sm font-medium">{friendly.title}</p>

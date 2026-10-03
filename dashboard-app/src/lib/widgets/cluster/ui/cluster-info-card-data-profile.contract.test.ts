@@ -77,7 +77,9 @@ describe("cluster info card data profile contract", () => {
     expect(source).toContain("cursor-not-allowed opacity-70");
     expect(source).toContain("<Refresh");
     expect(source).toContain("animate-spin");
-    expect(source).toContain("animate-bounce");
+    // UX review 03/10: the bounce is gone on purpose - the pulse ring and
+    // the "refresh me" pill are the only initial-refresh attention cues.
+    expect(source).not.toContain("animate-bounce");
     expect(source).toContain("Configuration diagnostics are not loaded yet.");
     expect(source).toContain("Health diagnostics are not loaded yet.");
     expect(source).toContain('onclick={() => requestCardDiagnostics("config")}');
