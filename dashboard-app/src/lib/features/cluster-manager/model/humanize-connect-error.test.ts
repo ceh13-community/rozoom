@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { humanizeConnectError } from "./humanize-connect-error";
+import { humanizeConnectError, classifyConnectErrorClass } from "./humanize-connect-error";
 
 describe("humanizeConnectError", () => {
   it("maps expired/invalid token errors to actionable copy", () => {
@@ -71,5 +71,37 @@ describe("humanizeConnectError", () => {
     expect(humanizeConnectError(new Error('field "token" is required'))).toBe(
       'field "token" is required',
     );
+  });
+});
+
+describe("classifyConnectErrorClass", () => {
+  it("buckets the three known classes and falls back to unknown", () => {
+    expect(classifyConnectErrorClass(new Error("Unauthorized"))).toBe("auth");
+    expect(classifyConnectErrorClass(new Error("invalid bearer token"))).toBe("auth");
+
+    expect(classifyConnectErrorClass(new Error("connect ECONNREFUSED"))).toBe("network");
+    expect(classifyConnectErrorClass(new Error("fetch failed"))).toBe("network");
+
+    expect(
+      classifyConnectErrorClass(new Error("x509: certificate signed by unknown authority")),
+    ).toBe("tls");
+    expect(classifyConnectErrorClass(new Error("self-signed certificate"))).toBe("tls");
+
+    expect(classifyConnectErrorClass(new Error("kubeconfig has no clusters"))).toBe("unknown");
+    expect(classifyConnectErrorClass(undefined)).toBe("unknown");
+    expect(classifyConnectErrorClass("" as unknown)).toBe("unknown");
+  });
+
+  it("never leaks a server URL into the class", () => {
+    // The class is a fixed enum regardless of any URL embedded in the message.
+    const classes = [
+      classifyConnectErrorClass(new Error("dial tcp https://10.1.2.3:6443: timeout")),
+      classifyConnectErrorClass(new Error("Unauthorized https://10.1.2.3:6443")),
+      classifyConnectErrorClass(new Error("x509 https://10.1.2.3:6443")),
+    ];
+    for (const c of classes) {
+      expect(["auth", "network", "tls", "unknown"]).toContain(c);
+      expect(c).not.toContain("10.1.2.3");
+    }
   });
 });

@@ -12,7 +12,7 @@
   } from "$features/check-health/model/cert-notification-watcher";
   import { sweepHelmValuesTempfiles } from "$shared/api/helm";
   import { loadPluginState } from "$shared/plugins";
-  import { initAnalytics } from "$shared/analytics/wau-c";
+  import { initAnalytics, trackAppOpened } from "$shared/analytics/wau-c";
   import { maybePromptTelemetryConsent } from "$shared/analytics/telemetry-consent";
   import SplashScreen from "$shared/ui/splash-screen.svelte";
 
@@ -36,6 +36,10 @@
     // WAU-C telemetry, strictly opt-in. No-ops without a PUBLIC_POSTHOG_KEY or
     // until the user grants consent — see $shared/analytics. Never throws.
     initAnalytics();
+    // Activation funnel: app opened. No-ops until consent is granted, so the
+    // very first (undecided) launch stays dark; the consent handler fires it
+    // with first_run=true once the user opts in.
+    void trackAppOpened();
     // First-run consent prompt; re-shown each launch while undecided.
     maybePromptTelemetryConsent();
     const cleanupCliNotifications = initCliNotifications();

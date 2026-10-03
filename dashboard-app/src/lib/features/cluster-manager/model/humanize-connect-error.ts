@@ -47,6 +47,24 @@ const TLS_PATTERNS = [
   /\bssl\b/i,
 ];
 
+export type ConnectErrorClass = "auth" | "network" | "tls" | "unknown";
+
+/**
+ * Bucketed connect-failure class for telemetry. The raw `Error.message` may
+ * embed the API-server URL or other env-specific text, so it must never leave
+ * the app — this returns a coarse class instead.
+ */
+export function classifyConnectErrorClass(e: unknown): ConnectErrorClass {
+  const raw = e instanceof Error ? e.message : typeof e === "string" ? e : "";
+  if (!raw.trim()) return "unknown";
+
+  if (TOKEN_PATTERNS.some((p) => p.test(raw))) return "auth";
+  if (NETWORK_PATTERNS.some((p) => p.test(raw))) return "network";
+  if (TLS_PATTERNS.some((p) => p.test(raw))) return "tls";
+
+  return "unknown";
+}
+
 export function humanizeConnectError(e: unknown, serverUrl?: string): string {
   const raw = e instanceof Error ? e.message : typeof e === "string" ? e : "";
   if (!raw.trim()) return UNKNOWN_FAILURE;
