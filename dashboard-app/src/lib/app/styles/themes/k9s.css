@@ -416,23 +416,6 @@
     color: hsl(203 100% 88%) !important;
   }
 
-  /* ── Primary Alert card ────────────────────────────────────────── */
-
-  .k9s [data-testid="cluster-card"] button.rounded-xl {
-    background: hsl(0 0% 5% / 0.9) !important;
-    border-color: hsl(191 88% 44% / 0.25) !important;
-    color: hsl(203 100% 74%) !important;
-  }
-
-  .k9s [data-testid="cluster-card"] button.rounded-xl:hover {
-    background: hsl(198 62% 10% / 0.9) !important;
-  }
-
-  .k9s [data-testid="cluster-card"] button.rounded-xl .text-slate-950,
-  .k9s [data-testid="cluster-card"] button.rounded-xl .text-slate-700 {
-    color: hsl(187 32% 72%) !important;
-  }
-
   /* ── Drift popover ─────────────────────────────────────────────── */
 
   .k9s .border-rose-300 {
