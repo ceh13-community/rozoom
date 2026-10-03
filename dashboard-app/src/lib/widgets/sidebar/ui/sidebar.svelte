@@ -121,6 +121,7 @@
         variant="ghost"
         onclick={() => gotoPage("/cluster-manager")}
         title="Settings"
+        aria-label="Settings"
       >
         <Settings class="h-4 w-4" />
         <span class={cn(sidebarOpen ? "block" : "hidden")}>Settings</span>
@@ -131,6 +132,7 @@
           <button
             class="flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium text-muted-foreground hover:bg-muted relative"
             title="Notifications"
+            aria-label={$unreadCount > 0 ? `Notifications, ${$unreadCount} unread` : "Notifications"}
           >
             <Bell class="h-4 w-4" />
             {#if $unreadCount > 0}
@@ -277,9 +279,11 @@
           "flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium",
           linterEnabled
             ? cn(NAV_ACTIVE_CLASS, NAV_ACTIVE_HOVER_CLASS)
-            : "bg-red-600/20 text-red-400 hover:bg-red-600/30",
+            : "bg-slate-600/20 text-slate-400 hover:bg-slate-600/30",
         )}
         onclick={toggleLinter}
+        aria-pressed={linterEnabled}
+        aria-label="Toggle linter"
         title={linterEnabled ? "Linter on - click to disable" : "Linter off - click to enable"}
       >
         {#if linterEnabled}
@@ -299,6 +303,8 @@
             : "bg-slate-600/20 text-slate-400 hover:bg-slate-600/30",
         )}
         onclick={toggleDiagnostics}
+        aria-pressed={diagnosticsEnabled}
+        aria-label="Toggle runtime info"
         title={diagnosticsEnabled
           ? "Runtime info shown - click to hide"
           : "Runtime info hidden - click to show"}
@@ -320,6 +326,8 @@
             : "bg-slate-600/20 text-slate-400 hover:bg-slate-600/30",
         )}
         onclick={toggleCliNotifications}
+        aria-pressed={cliNotificationsEnabled}
+        aria-label="Toggle CLI toasts"
         title={cliNotificationsEnabled
           ? "CLI toasts shown - click to hide"
           : "CLI toasts hidden - click to show"}
@@ -352,7 +360,14 @@
         sidebarOpen ? "justify-between" : "justify-center",
       )}
     >
-      <Button variant="ghost" size="icon" title="Toggle sidebar" onclick={toggleSidebar}>
+      <Button
+        variant="ghost"
+        size="icon"
+        title="Toggle sidebar"
+        aria-label="Toggle sidebar"
+        aria-expanded={sidebarOpen}
+        onclick={toggleSidebar}
+      >
         <SquareChevronRight class="w-4 h-4" />
       </Button>
       <span
