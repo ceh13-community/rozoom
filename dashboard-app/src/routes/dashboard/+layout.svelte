@@ -178,6 +178,7 @@
                 class="h-9 w-9 justify-center px-0 !no-underline"
                 onclick={() => gotoPage("/dashboard")}
                 title="Dashboard"
+                aria-label="Dashboard"
               >
                 <Home class="h-4 w-4" />
               </Button>
@@ -187,6 +188,7 @@
                 class="h-7 w-7"
                 onclick={toggleWorkloadsMenu}
                 title="Expand cluster menu"
+                aria-label="Expand cluster menu"
               >
                 <PanelLeft class="h-4 w-4" />
               </Button>
@@ -208,6 +210,7 @@
                 class="shrink-0"
                 onclick={toggleWorkloadsMenu}
                 title="Collapse cluster menu"
+                aria-label="Collapse cluster menu"
               >
                 <PanelLeftClose class="h-4 w-4" />
               </Button>
