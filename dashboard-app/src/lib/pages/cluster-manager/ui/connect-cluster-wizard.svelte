@@ -32,15 +32,19 @@
   } from "$features/cluster-manager";
   import { detectedCloudConfigs } from "$features/cluster-finder/model/cli-store";
   import {
-    scanKubeconfigs,
-    selectLocalContexts,
     getLocalScanConsent,
     setLocalScanConsent,
     LOCAL_SCAN_PRIVACY_NOTE,
+    localScanClusters,
+    localScanConfig,
+    isLocalScanning,
+    localScanned,
+    localScanError,
+    runLocalDiscoveryScan,
+    clearLocalScan,
     type DiscoveredLocalCluster,
     type LocalScanConsent,
   } from "$features/cluster-finder";
-  import type { KubeConfigFileType } from "$entities/config";
   import {
     testKubeconfig,
     type TestConnectionResult,
@@ -101,12 +105,11 @@
   // ── Local-discovery state (P3) ──
   // One-click connect for local-runtime clusters (minikube / kind / k3d /
   // docker-desktop). Gated behind an explicit opt-in: we never read the
-  // kubeconfig until the user grants consent.
+  // kubeconfig until the user grants consent. The scan itself (config,
+  // results, loading/scanned flags) lives in local-scan-store so the
+  // Screen 0 "Refresh" button (cluster-manager.svelte) can trigger the
+  // same scan this wizard displays — see runLocalDiscoveryScan.
   let localConsent = $state<LocalScanConsent>("undecided");
-  let localConfig = $state<KubeConfigFileType | null>(null);
-  let localClusters = $state<DiscoveredLocalCluster[]>([]);
-  let localScanning = $state(false);
-  let localScanned = $state(false);
   let localConnecting = $state<string | null>(null);
 
   // ── Vault state ──
@@ -506,23 +509,20 @@ users:
     return $clustersList.some((entry) => entry.name === c.clusterName);
   }
 
+  // Shared with cluster-manager.svelte's Screen 0 Refresh button — see
+  // local-scan-store.ts. Surfaces the scan's raw error through this
+  // wizard's own error banner, same wording as before the store existed.
+  $effect(() => {
+    const message = $localScanError;
+    if (!message) return;
+    error = /EACCES|permission denied/i.test(message)
+      ? "Could not read ~/.kube/config — check the file permissions."
+      : `Local scan failed: ${humanizeConnectError(new Error(message))}`;
+  });
+
   async function runLocalScan() {
-    localScanning = true;
-    localClusters = [];
     clearMessages();
-    try {
-      const config = await scanKubeconfigs();
-      localConfig = config;
-      localClusters = config ? selectLocalContexts(config) : [];
-    } catch (e) {
-      const message = (e as Error).message;
-      error = /EACCES|permission denied/i.test(message)
-        ? "Could not read ~/.kube/config — check the file permissions."
-        : `Local scan failed: ${humanizeConnectError(e)}`;
-      localClusters = [];
-    }
-    localScanning = false;
-    localScanned = true;
+    await runLocalDiscoveryScan();
   }
 
   /** Opt-in handler: persist consent, then run the first scan. */
@@ -535,11 +535,11 @@ users:
   function declineLocalScan() {
     setLocalScanConsent(false);
     localConsent = "denied";
-    localClusters = [];
-    localConfig = null;
+    clearLocalScan();
   }
 
   async function connectLocal(cluster: DiscoveredLocalCluster) {
+    const localConfig = $localScanConfig;
     if (!localConfig) return;
     clearMessages();
     localConnecting = localKey(cluster);
@@ -852,10 +852,10 @@ users:
             <Button
               size="sm"
               class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7"
-              disabled={localScanning}
+              disabled={$isLocalScanning}
               onclick={grantLocalScan}
             >
-              {localScanning ? "Scanning" : "Scan local clusters"}
+              {$isLocalScanning ? "Scanning" : "Scan local clusters"}
             </Button>
             {#if localConsent === "undecided"}
               <Button size="sm" variant="outline" class="text-xs h-7" onclick={declineLocalScan}
@@ -872,7 +872,7 @@ users:
           <div class="flex items-center justify-between flex-wrap gap-2">
             <div>
               <p class="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
-                <Container size={14} /> Local clusters {localScanning ? "..." : ""}
+                <Container size={14} /> Local clusters {$isLocalScanning ? "..." : ""}
               </p>
               <p class="text-[10px] text-slate-400 mt-0.5">
                 minikube, kind, k3d, docker-desktop — one-click connect.
@@ -882,15 +882,15 @@ users:
               size="sm"
               variant="outline"
               class="text-xs h-7"
-              disabled={localScanning}
+              disabled={$isLocalScanning}
               onclick={runLocalScan}
             >
-              {localScanning ? "Scanning" : "Rescan"}
+              {$isLocalScanning ? "Scanning" : "Rescan"}
             </Button>
           </div>
-          {#if localClusters.length > 0}
+          {#if $localScanClusters.length > 0}
             <div class="space-y-1 max-h-48 overflow-y-auto">
-              {#each localClusters as cluster, clusterIndex (localKey(cluster))}
+              {#each $localScanClusters as cluster, clusterIndex (localKey(cluster))}
                 <div
                   class="flex items-center justify-between gap-2 rounded border border-slate-700 px-2.5 py-1.5 text-xs"
                 >
@@ -928,7 +928,7 @@ users:
                 </div>
               {/each}
             </div>
-          {:else if localScanned && !localScanning}
+          {:else if $localScanned && !$isLocalScanning}
             <p class="text-[10px] text-slate-500">
               No local clusters found. Start minikube/kind, or use a method below.
             </p>

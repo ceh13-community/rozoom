@@ -23,3 +23,13 @@ export {
   LOCAL_SCAN_PRIVACY_NOTE,
   type LocalScanConsent,
 } from "./model/local-consent";
+
+export {
+  localScanClusters,
+  localScanConfig,
+  isLocalScanning,
+  localScanned,
+  localScanError,
+  runLocalDiscoveryScan,
+  clearLocalScan,
+} from "./model/local-scan-store";

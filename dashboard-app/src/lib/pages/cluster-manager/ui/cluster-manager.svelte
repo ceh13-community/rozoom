@@ -13,6 +13,9 @@
     clearKubeConfigMessages,
     kubeConfigSuccess,
     isKubeConfigLoading,
+    hasLocalScanConsent,
+    needsLocalScanConsent,
+    runLocalDiscoveryScan,
   } from "$features/cluster-finder";
   import {
     detectedClis,
@@ -366,6 +369,22 @@
       void loadDetectedClis();
     }
     void probeDetectedClusters();
+  }
+
+  // Refresh (kubeconfig) and Rescan (ConnectClusterWizard's local-runtime
+  // scan) used to be two independent triggers: after `kind create
+  // cluster`, this button picked up the new kubeconfig entry but the
+  // wizard's "Local clusters" list stayed stale until the user found and
+  // clicked Rescan separately. Fire both from here instead. We never scan
+  // without consent — if the user hasn't decided yet, show a one-line
+  // opt-in hint rather than scanning silently.
+  let showLocalScanHint = $state(false);
+  async function handleKubeconfigRefresh() {
+    showLocalScanHint = needsLocalScanConsent();
+    await loadData();
+    if (hasLocalScanConsent()) {
+      await runLocalDiscoveryScan();
+    }
   }
 
   // User-initiated rescan of the Cloud Providers panel. onMount still
@@ -1460,7 +1479,7 @@
               <p>No kubeconfig files found in standard locations</p>
               <p class="text-xs my-2">Use upload or import options below</p>
               <Button
-                onclick={loadData}
+                onclick={() => void handleKubeconfigRefresh()}
                 disabled={isLoading}
                 class="dark:text-white w-full bg-indigo-600 hover:bg-indigo-700"
               >
@@ -1470,6 +1489,12 @@
                   ↻ Refresh
                 {/if}
               </Button>
+              {#if showLocalScanHint}
+                <p class="text-xs mt-2 text-slate-500 dark:text-slate-400">
+                  Looking for a local cluster (minikube, kind, k3d, docker-desktop)? Opt in to the
+                  local scan in "Connect a cluster" below.
+                </p>
+              {/if}
             </div>
           {:else}
             <div class="space-y-4">
