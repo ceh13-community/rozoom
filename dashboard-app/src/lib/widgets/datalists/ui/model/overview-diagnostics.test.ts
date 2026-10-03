@@ -122,6 +122,26 @@ describe("overview-diagnostics", () => {
     });
   });
 
+  it("distinguishes loading, paused, and never-ran states without checks", () => {
+    expect(buildPrimaryAlert(null, { loading: true })).toMatchObject({
+      severity: "info",
+      title: "Collecting diagnostics...",
+    });
+    expect(buildPrimaryAlert(null, { paused: true })).toMatchObject({
+      severity: "info",
+      title: "Health checks paused",
+    });
+    expect(buildPrimaryAlert(null)).toMatchObject({
+      severity: "info",
+      title: "No checks run yet",
+    });
+    // A refresh in flight wins over paused: the card should narrate the
+    // scan that is actually running.
+    expect(buildPrimaryAlert(null, { loading: true, paused: true }).title).toBe(
+      "Collecting diagnostics...",
+    );
+  });
+
   it("attaches investigate routes for workload-scoped risks", () => {
     const checks = makeChecks();
     const risks = buildOverviewTopRisks(checks);
