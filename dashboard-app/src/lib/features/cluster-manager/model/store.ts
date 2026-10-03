@@ -10,6 +10,8 @@ import {
   saveRemovedConfig,
 } from "../api/config-storage-repo";
 import { kubectlRawFront } from "$shared/api/kubectl-proxy";
+import { trackClusterAddAttempted, trackClusterAddFailed } from "$shared/analytics/wau-c";
+import { classifyConnectErrorClass } from "./humanize-connect-error";
 import yaml from "js-yaml";
 
 export const isClustersConfigLoading = writable(false);
@@ -188,6 +190,9 @@ async function addClusters(
   await Promise.all(
     clustersToAdd.map(async (cluster) => {
       let addResult: string | null = null;
+      // Activation funnel: a cluster add was attempted. Fire-and-forget; the
+      // tracker no-ops without consent. cluster name is hashed client-side.
+      void trackClusterAddAttempted(cluster.name);
       try {
         addResult = addCluster(cluster, options?.metaByName?.[cluster.name]);
 
@@ -227,6 +232,9 @@ async function addClusters(
           clustersList.update((clusters) => clusters.filter((entry) => entry.uuid !== addResult));
         }
         result.errors.push(`${cluster.name}: ${(error as Error).message}`);
+        // Activation funnel: the add failed. Only the bucketed class leaves
+        // the app — the raw message may embed the API-server URL.
+        void trackClusterAddFailed(cluster.name, classifyConnectErrorClass(error));
       }
     }),
   );

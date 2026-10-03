@@ -38,6 +38,7 @@
     isAuthError,
     isConnectionError,
   } from "$widgets/datalists/ui/model/overview-diagnostics";
+  import { trackFirstDiagnosticRendered } from "$shared/analytics/wau-c";
   import MetricsStatus from "./metrics-status.svelte";
   import DeploymentsCount from "./deployments-count.svelte";
   import ReplicasetsCount from "./replicasets-count.svelte";
@@ -155,6 +156,13 @@
   const scoredChecks = $derived.by<ClusterHealthChecks | null>(() => {
     if (!lastCheck || "errors" in lastCheck) return null;
     return lastCheck;
+  });
+  // Activation funnel: the first successful health check for this cluster has
+  // been rendered. Idempotent per cluster per install (persisted in wau-c).
+  $effect(() => {
+    if (lastCheck && !("errors" in lastCheck)) {
+      void trackFirstDiagnosticRendered(cluster.uuid);
+    }
   });
   const platformLabel = $derived.by(() => getClusterPlatformLabel(cluster.name));
   const displayName = $derived(resolveClusterDisplayName(cluster));

@@ -50,6 +50,7 @@
   import { markClusterRefreshHintSeen } from "$features/cluster-manager";
   import { globalLinterEnabled } from "$features/check-health/model/linter-preferences";
   import { buildPrimaryAlert } from "$widgets/datalists/ui/model/overview-diagnostics";
+  import { trackFirstDiagnosticRendered } from "$shared/analytics/wau-c";
   import DriftBadge from "./drift-badge.svelte";
 
   interface Props {
@@ -73,6 +74,13 @@
   const scoredChecks = $derived.by<ClusterHealthChecks | null>(() => {
     if (!lastCheck || "errors" in lastCheck) return null;
     return lastCheck;
+  });
+  // Activation funnel: the first successful health check for this cluster has
+  // been rendered. Idempotent per cluster per install (persisted in wau-c).
+  $effect(() => {
+    if (lastCheck && !("errors" in lastCheck)) {
+      void trackFirstDiagnosticRendered(clusterUuid);
+    }
   });
   const checkState = $derived($clusterStates[cluster.uuid] || { loading: false, error: null });
   const isClustersListRoute = $derived($page.url.pathname === "/dashboard");

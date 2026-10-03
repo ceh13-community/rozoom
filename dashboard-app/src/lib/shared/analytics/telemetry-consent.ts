@@ -1,7 +1,7 @@
 import { toast } from "svelte-sonner";
 import { env } from "$env/dynamic/public";
 import { needsConsentPrompt, setTelemetryConsent } from "./consent";
-import { initAnalytics } from "./wau-c";
+import { initAnalytics, trackAppOpened, trackConsentGranted } from "./wau-c";
 
 /**
  * First-run telemetry consent prompt — the opt-in gate (U_DAW decision
@@ -26,6 +26,10 @@ export function maybePromptTelemetryConsent(): void {
         setTelemetryConsent("granted");
         // Start analytics right away so consent takes effect without a reload.
         initAnalytics();
+        // Activation funnel: consent_granted, then app_opened with first_run=true
+        // (this is the first consented launch for this install).
+        void trackConsentGranted();
+        void trackAppOpened();
         toast.success("Telemetry enabled", {
           description: "Thanks! You can turn this off any time.",
         });
