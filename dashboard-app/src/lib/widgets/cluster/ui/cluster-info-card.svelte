@@ -366,7 +366,7 @@
           "The kubeconfig token or credentials were rejected by the API server. Open Cluster Manager to refresh.",
       };
     }
-    return buildPrimaryAlert(lastCheck, { loading: isRefreshLoading });
+    return buildPrimaryAlert(lastCheck, { loading: isRefreshLoading, paused: !effectiveLinter });
   });
   // When the primary alert is an auth error, the card's main CTA should
   // take the user to the place that fixes it instead of opening the

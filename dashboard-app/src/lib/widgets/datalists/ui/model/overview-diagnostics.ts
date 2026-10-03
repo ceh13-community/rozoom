@@ -505,7 +505,7 @@ export function humanizeClusterError(raw: string): { title: string; detail: stri
 
 export function buildPrimaryAlert(
   checks: ClusterHealthChecks | ClusterCheckError | null,
-  options?: { loading?: boolean },
+  options?: { loading?: boolean; paused?: boolean },
 ): OverviewPrimaryAlert {
   if (!checks) {
     // Loading = auto-initial or user-triggered refresh is in flight.
@@ -519,10 +519,21 @@ export function buildPrimaryAlert(
         detail: "Scanning pods, nodes, and control-plane health. This takes a few seconds.",
       };
     }
+    // Paused = the linter is off (globally or for this cluster), so no
+    // check will ever run. Promising "wait for health checks" here would
+    // be a lie - tell the user what to flip instead.
+    if (options?.paused) {
+      return {
+        severity: "info",
+        title: "Health checks paused",
+        detail:
+          "The linter is turned off, so diagnostics will not run. Enable it to scan this cluster.",
+      };
+    }
     return {
       severity: "info",
-      title: "No diagnostics yet",
-      detail: "Run or wait for health checks to populate cluster health.",
+      title: "No checks run yet",
+      detail: "Refresh to run the first health check on this cluster.",
     };
   }
   if (isCheckError(checks)) {

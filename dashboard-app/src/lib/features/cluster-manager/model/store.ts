@@ -73,7 +73,7 @@ async function saveClusters(clusters: AppClusterConfig[]): Promise<void> {
 /**
  * Fire one health check against a freshly-added cluster and clear its
  * needsInitialRefreshHint flag once the attempt settles (success or
- * failure). Without this the card stays in 'No diagnostics yet' state
+ * failure). Without this the card stays in 'No checks run yet' state
  * until the user manually clicks the refresh button, which has been a
  * recurring confusion: users expect auto-refresh to start immediately.
  *
@@ -218,7 +218,7 @@ async function addClusters(
 
         result.added.push(cluster.name);
         // Kick off one health check in the background so the new card
-        // stops showing 'No diagnostics yet' without the user having to
+        // stops showing 'No checks run yet' without the user having to
         // click the refresh button first. Dynamic import keeps cluster-
         // manager decoupled from the check-health module graph.
         void triggerInitialHealthCheck(addResult);
