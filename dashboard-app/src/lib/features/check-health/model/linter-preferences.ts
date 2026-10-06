@@ -7,17 +7,17 @@ const GLOBAL_LINTER_KEY = "globalLinterEnabled";
 
 type LinterStates = Record<string, boolean>;
 
-export const globalLinterEnabled = writable(false);
+export const globalLinterEnabled = writable(true);
 
 export async function loadGlobalLinterEnabled(): Promise<boolean> {
   try {
     const store = await storeManager.getStore(DASHBOARD_PREFERENCES_STORE);
     const value = (await store.get(GLOBAL_LINTER_KEY)) as boolean | null;
-    const enabled = typeof value === "boolean" ? value : false;
+    const enabled = typeof value === "boolean" ? value : true;
     globalLinterEnabled.set(enabled);
     return enabled;
   } catch {
-    return false;
+    return true;
   }
 }
 

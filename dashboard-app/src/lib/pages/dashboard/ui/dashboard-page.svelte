@@ -460,6 +460,7 @@
           ? 'border-emerald-500/50 bg-emerald-950/30 text-emerald-400 hover:bg-emerald-950/50'
           : 'border-red-500/50 bg-red-950/30 text-red-400 hover:bg-red-950/50'}"
         onclick={toggleGlobalLinter}
+        aria-pressed={linterEnabled}
         title={linterEnabled ? "Linter on - click to disable" : "Linter off - click to enable"}
       >
         {#if linterEnabled}
