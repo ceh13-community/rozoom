@@ -43,8 +43,11 @@ test.describe("fleet optimization features", () => {
   test("synthetic fleet cards have Infrastructure section with lazy load", async ({ page }) => {
     await page.goto("/dashboard?syntheticFleet=50");
 
-    // Enable Linter and switch to Detailed card mode
-    await page.getByRole("button", { name: "Linter", exact: true }).click();
+    // Linter is on by default; assert it, then switch to Detailed card mode
+    await expect(page.getByRole("button", { name: "Linter", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await page.getByText("Detailed", { exact: true }).click();
 
     await expect(page.locator('[data-testid="cluster-card"]').first()).toBeVisible();
@@ -68,8 +71,11 @@ test.describe("fleet optimization features", () => {
   }) => {
     await page.goto("/dashboard?syntheticFleet=50");
 
-    // Enable Linter and switch to Detailed card mode
-    await page.getByRole("button", { name: "Linter", exact: true }).click();
+    // Linter is on by default; assert it, then switch to Detailed card mode
+    await expect(page.getByRole("button", { name: "Linter", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await page.getByText("Detailed", { exact: true }).click();
 
     const firstCard = page.locator('[data-testid="cluster-card"]').first();
@@ -86,8 +92,11 @@ test.describe("fleet optimization features", () => {
   test("synthetic fleet cards have Health checks section", async ({ page }) => {
     await page.goto("/dashboard?syntheticFleet=50");
 
-    // Enable Linter and switch to Detailed card mode
-    await page.getByRole("button", { name: "Linter", exact: true }).click();
+    // Linter is on by default; assert it, then switch to Detailed card mode
+    await expect(page.getByRole("button", { name: "Linter", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await page.getByText("Detailed", { exact: true }).click();
 
     const firstCard = page.locator('[data-testid="cluster-card"]').first();
