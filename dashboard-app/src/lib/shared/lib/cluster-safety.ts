@@ -23,13 +23,11 @@ const ALWAYS_BLOCKED_IN_READONLY: ReadonlySet<DestructiveAction> = new Set([
   "apply-yaml",
   "helm-uninstall",
   "helm-rollback",
-]);
-
-const REQUIRES_CONFIRMATION: ReadonlySet<DestructiveAction> = new Set([
-  "helm-install",
   "exec-shell",
   "edit-resource",
 ]);
+
+const REQUIRES_CONFIRMATION: ReadonlySet<DestructiveAction> = new Set(["helm-install"]);
 
 export type SafetyCheckResult = {
   allowed: boolean;

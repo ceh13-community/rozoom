@@ -22,6 +22,8 @@ describe("cluster-safety", () => {
         "apply-yaml",
         "helm-uninstall",
         "helm-rollback",
+        "exec-shell",
+        "edit-resource",
       ];
 
       for (const action of blocked) {
@@ -32,7 +34,7 @@ describe("cluster-safety", () => {
     });
 
     it("requires confirmation for cautious actions on read-only clusters", () => {
-      const cautious: DestructiveAction[] = ["helm-install", "exec-shell", "edit-resource"];
+      const cautious: DestructiveAction[] = ["helm-install"];
 
       for (const action of cautious) {
         const result = checkActionSafety(readOnlyCluster, action);
