@@ -525,9 +525,9 @@ export function buildPrimaryAlert(
     if (options?.paused) {
       return {
         severity: "info",
-        title: "Health checks paused",
+        title: "Turn on the linter to scan this cluster",
         detail:
-          "The linter is turned off, so diagnostics will not run. Enable it to scan this cluster.",
+          "The linter is off for this cluster, so diagnostics will not run.",
       };
     }
     return {

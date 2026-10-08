@@ -129,7 +129,7 @@ describe("overview-diagnostics", () => {
     });
     expect(buildPrimaryAlert(null, { paused: true })).toMatchObject({
       severity: "info",
-      title: "Health checks paused",
+      title: "Turn on the linter to scan this cluster",
     });
     expect(buildPrimaryAlert(null)).toMatchObject({
       severity: "info",

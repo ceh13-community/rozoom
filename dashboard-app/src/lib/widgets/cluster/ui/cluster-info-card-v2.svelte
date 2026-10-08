@@ -91,7 +91,7 @@
       return {
         color: "bg-slate-600",
         text: "Paused",
-        tooltip: "Health monitoring is paused. Enable the linter toggle to start diagnostics.",
+        tooltip: "Linter is off for this cluster - diagnostics won't run. Click the gauge icon to turn it on.",
       };
     if (awaitingInitialRefresh)
       return {
