@@ -96,6 +96,52 @@ describe("activation funnel telemetry", () => {
     });
   });
 
+  it("replays pre-consent funnel steps once after consent is granted", async () => {
+    const {
+      trackClusterAddAttempted,
+      trackFirstDiagnosticRendered,
+      flushPendingFunnelEvents,
+      posthog,
+    } = await loadWauC();
+
+    // Fresh install: the prompt only appears after the first scan, so these
+    // steps happen while consent is still undecided and stay dark.
+    await trackClusterAddAttempted("cluster-a");
+    await trackFirstDiagnosticRendered("cluster-a");
+    await trackFirstDiagnosticRendered("cluster-a"); // re-render queues once
+    expect(posthog.capture).not.toHaveBeenCalled();
+
+    grantConsent();
+    await flushPendingFunnelEvents();
+
+    expect(posthog.capture).toHaveBeenCalledTimes(2);
+    expect(posthog.capture).toHaveBeenNthCalledWith(1, "rozoom_cluster_add_attempted", {
+      source: "web",
+      cluster_id: "hash:cluster-a:",
+    });
+    expect(posthog.capture).toHaveBeenNthCalledWith(2, "rozoom_first_diagnostic_rendered", {
+      source: "web",
+      cluster_id: "hash:cluster-a:",
+    });
+
+    // The queue is one-shot and the first-diagnostic flag is now persisted.
+    await flushPendingFunnelEvents();
+    await trackFirstDiagnosticRendered("cluster-a");
+    expect(posthog.capture).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not queue replays once consent is denied", async () => {
+    window.localStorage.setItem("rozoom.telemetry_consent", "denied");
+    const { trackClusterAddAttempted, flushPendingFunnelEvents, posthog } = await loadWauC();
+
+    await trackClusterAddAttempted("cluster-a");
+    // Even if the user later flips to granted (settings), a denied-time step
+    // must not resurface.
+    grantConsent();
+    await flushPendingFunnelEvents();
+    expect(posthog.capture).not.toHaveBeenCalled();
+  });
+
   it("first_diagnostic_rendered fires only once per cluster", async () => {
     grantConsent();
     const { trackFirstDiagnosticRendered, posthog } = await loadWauC();

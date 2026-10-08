@@ -39,6 +39,7 @@
     isConnectionError,
   } from "$widgets/datalists/ui/model/overview-diagnostics";
   import { trackFirstDiagnosticRendered } from "$shared/analytics/wau-c";
+  import { maybePromptTelemetryConsent } from "$shared/analytics/telemetry-consent";
   import MetricsStatus from "./metrics-status.svelte";
   import DeploymentsCount from "./deployments-count.svelte";
   import ReplicasetsCount from "./replicasets-count.svelte";
@@ -160,9 +161,14 @@
   // Activation funnel: the first successful health check for this cluster has
   // been rendered. Idempotent per cluster per install (persisted in wau-c).
   $effect(() => {
-    if (lastCheck && !("errors" in lastCheck)) {
+    if (!lastCheck) return;
+    if (!("errors" in lastCheck)) {
       void trackFirstDiagnosticRendered(cluster.uuid);
     }
+    // Consent prompt moves here (Sprint 24 item 7): only once the first scan
+    // has rendered — success or error — so it never covers "Detected
+    // clusters" during onboarding. Once per session, guarded inside.
+    maybePromptTelemetryConsent();
   });
   const platformLabel = $derived.by(() => getClusterPlatformLabel(cluster.name));
   const displayName = $derived(resolveClusterDisplayName(cluster));
@@ -321,7 +327,8 @@
       return {
         color: "bg-slate-600",
         text: "Paused",
-        tooltip: "Linter is off for this cluster - diagnostics won't run. Click the gauge icon to turn it on.",
+        tooltip:
+          "Linter is off for this cluster - diagnostics won't run. Click the gauge icon to turn it on.",
       };
     if (awaitingInitialRefresh)
       return {
