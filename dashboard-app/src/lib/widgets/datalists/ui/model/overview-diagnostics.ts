@@ -526,8 +526,7 @@ export function buildPrimaryAlert(
       return {
         severity: "info",
         title: "Turn on the linter to scan this cluster",
-        detail:
-          "The linter is off for this cluster, so diagnostics will not run.",
+        detail: "The linter is off for this cluster, so diagnostics will not run.",
       };
     }
     return {
