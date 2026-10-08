@@ -26,6 +26,7 @@
     "qa:live:observability-tail": "node ./qa/live/observability-tail-smoke.mjs",
     "qa:live:access-reviews-port-forwarding": "node ./qa/live/access-reviews-port-forwarding-smoke.mjs",
     "qa:live:workbench-parity": "node ./qa/live/workbench-parity.mjs",
+    "qa:live:first-scan-cost": "node ./qa/live/first-scan-cost.mjs",
     "build:deb": "pnpm exec tauri build --bundles deb && bash ./scripts/normalize-linux-artifact-names.sh",
     "build:rpm": "bash ./scripts/build-linux-rpm.sh && bash ./scripts/normalize-linux-artifact-names.sh",
     "build:linux": "pnpm run build:deb && pnpm run build:rpm",
