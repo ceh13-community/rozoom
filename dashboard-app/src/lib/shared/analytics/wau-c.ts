@@ -1,7 +1,7 @@
 import posthog from "posthog-js";
 import { env } from "$env/dynamic/public";
 import { getInstallId, computeAnonymousHash } from "./install-identity";
-import { isTelemetryEnabled } from "./consent";
+import { getTelemetryConsent, isDoNotTrack, isTelemetryEnabled } from "./consent";
 
 /**
  * WAU-C (Weekly Active Users — Core) + activation-funnel instrumentation.
@@ -162,11 +162,37 @@ export async function trackConsentGranted(): Promise<void> {
   await capture("rozoom_consent_granted");
 }
 
+// ── Pre-consent replay ──────────────────────────────────────────────
+// The consent prompt appears only after the first scan (Sprint 24 item 7),
+// so on a fresh install the cluster-add and first-diagnostic steps happen
+// *before* the user can grant consent and capture() no-ops them. These steps
+// never re-occur in the session, so without a replay the calibration metric
+// first_diagnostic/cluster_add would read 0:0 on every clean install. Keep
+// them in-memory (keyed, so repeated renders queue once) and flush right
+// after "Allow". Deliberately not persisted: a user who declines or quits
+// undecided leaves nothing behind.
+const pendingReplays = new Map<string, () => Promise<void>>();
+
+function rememberPending(key: string, replay: () => Promise<void>): void {
+  if (isDoNotTrack() || getTelemetryConsent() !== "undecided") return;
+  if (!pendingReplays.has(key)) pendingReplays.set(key, replay);
+}
+
+/** Re-emit funnel steps that happened before consent was granted. */
+export async function flushPendingFunnelEvents(): Promise<void> {
+  const replays = [...pendingReplays.values()];
+  pendingReplays.clear();
+  for (const replay of replays) await replay();
+}
+
 /** A cluster add (kubeconfig import / paste / selection) was attempted. */
 export async function trackClusterAddAttempted(clusterId: string): Promise<void> {
   const hash = await clusterHash(clusterId);
   if (hash === null) return;
-  await capture("rozoom_cluster_add_attempted", { cluster_id: hash });
+  const fired = await capture("rozoom_cluster_add_attempted", { cluster_id: hash });
+  if (!fired) {
+    rememberPending(`add:${hash}`, () => trackClusterAddAttempted(clusterId));
+  }
 }
 
 /** A cluster add failed; `errorClass` is a bucket, never the raw message. */
@@ -176,10 +202,13 @@ export async function trackClusterAddFailed(
 ): Promise<void> {
   const hash = await clusterHash(clusterId);
   if (hash === null) return;
-  await capture("rozoom_cluster_add_failed", {
+  const fired = await capture("rozoom_cluster_add_failed", {
     cluster_id: hash,
     error_class: errorClass,
   });
+  if (!fired) {
+    rememberPending(`add-failed:${hash}`, () => trackClusterAddFailed(clusterId, errorClass));
+  }
 }
 
 const FIRST_DIAG_KEY = "rozoom.first_diagnostic_rendered";
@@ -217,5 +246,7 @@ export async function trackFirstDiagnosticRendered(clusterId: string): Promise<v
   if (fired) {
     seen.add(hash);
     saveRenderedHashes(seen);
+  } else {
+    rememberPending(`first-diag:${hash}`, () => trackFirstDiagnosticRendered(clusterId));
   }
 }

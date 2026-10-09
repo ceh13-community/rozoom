@@ -13,7 +13,6 @@
   import { sweepHelmValuesTempfiles } from "$shared/api/helm";
   import { loadPluginState } from "$shared/plugins";
   import { initAnalytics, trackAppOpened } from "$shared/analytics/wau-c";
-  import { maybePromptTelemetryConsent } from "$shared/analytics/telemetry-consent";
   import SplashScreen from "$shared/ui/splash-screen.svelte";
 
   import "$lib/app/styles/index.css";
@@ -40,8 +39,8 @@
     // very first (undecided) launch stays dark; the consent handler fires it
     // with first_run=true once the user opts in.
     void trackAppOpened();
-    // First-run consent prompt; re-shown each launch while undecided.
-    maybePromptTelemetryConsent();
+    // The consent prompt is NOT shown here: it appears after the first scan
+    // has rendered (cluster cards), so onboarding is never covered by it.
     const cleanupCliNotifications = initCliNotifications();
     startCertNotificationWatcher();
     // Silent update check + background download; the only UI is a bell item
