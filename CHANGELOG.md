@@ -2,9 +2,32 @@
 
 All notable changes to ROZOOM - K8s Linter IDE.
 
+The first paragraph of each release section is shown verbatim in the in-app
+updater dialog, so it must state the user-facing change in plain language.
+The release build fails if the section for the released version is missing.
+
+## [0.25.3] - 2026-10-12
+
+The manifest linter is now on by default for every confirmed cluster: new
+connections are checked without any setup. You can switch it off per cluster
+from the cluster card.
+
+### Added
+
+- Telemetry consent prompt after the first scan completes; usage reporting
+  stays off until you explicitly agree.
+- Read-only mode now hard-blocks exec-shell and resource editing on the
+  backend, instead of only hiding the buttons.
+
+### Changed
+
+- The cluster card now tells you how to turn the linter on when it is off,
+  instead of only stating the fact.
+
 ## [0.24.0] - 2026-09-16
 
 ### Added
+
 - Usage telemetry toggle in Fleet Settings: consent can now be granted or
   revoked at any time from the app, not only via the first-launch prompt.
 - Preflight RBAC gating for batch workload actions (delete / edit / scale):
@@ -16,6 +39,7 @@ All notable changes to ROZOOM - K8s Linter IDE.
   from the log instead of guesswork.
 
 ### Fixed
+
 - Release builds now receive `PUBLIC_POSTHOG_KEY` / `PUBLIC_POSTHOG_HOST` at
   build time (both the tauri-action build and the standalone AppImage build).
   Every release since telemetry shipped had the key missing from the bundle,
@@ -25,6 +49,7 @@ All notable changes to ROZOOM - K8s Linter IDE.
 ## [0.22.3] - 2026-07-02
 
 ### Added
+
 - Local cluster auto-discovery: the connect wizard can now scan
   `~/.kube/config` and offer detected contexts to connect in one click,
   instead of requiring a manual kubeconfig paste. Discovery is gated behind
@@ -41,6 +66,7 @@ All notable changes to ROZOOM - K8s Linter IDE.
 ## [0.22.2] - 2026-06-11
 
 ### Added
+
 - Anonymous usage telemetry (PostHog) with strict opt-in consent: an explicit
   prompt on first launch, and no events leave the app until consent is given.
   Declining persists and is never re-asked; DNT/GPC browser signals disable
@@ -48,12 +74,14 @@ All notable changes to ROZOOM - K8s Linter IDE.
   viewed, workload detail opened, resource action executed.
 
 ### Fixed
+
 - Windows: helm install no longer hangs during sidecar provisioning (zip is
   extracted via `bsdtar`).
 - Sidecar provisioning no longer half-runs silently when a single tool
   download stalls or fails; failures now surface per tool.
 
 ### CI
+
 - E2E smoke jobs skip (instead of failing) on Playwright CDN download outages.
 - Manual release builds are protected from concurrency auto-cancellation.
 
@@ -69,16 +97,19 @@ only the new `design-system/` brand kit was added to the repository for
 consumers of the brand assets (logo, colors, components, screenshots).
 
 ### Added
+
 - `design-system/` — brand kit (logo, banner, font subsets, color tokens,
   preview pages for components, anatomy, spacing) for downstream usage.
 
 ### Notes
+
 - Runtime build is identical to `0.22.0-rc.3`. See `[0.22.0-rc.3]` below for
   the cumulative feature/fix list shipped in this release.
 
 ## [0.22.0-rc.3] - 2026-05-09
 
 ### Added
+
 - Cluster Ops UX overhaul rounds 1–10 across all 5 Cluster Ops pages
   (Helm Catalog, Helm Releases, Backup Status, Version Audit, Deprecation Scan)
 - Fleet Health Overview at the top of Manage Clusters
@@ -112,6 +143,7 @@ consumers of the brand assets (logo, colors, components, screenshots).
 - Phase 9 roadmap: performance and parallelism via Rust workers (docs)
 
 ### Changed
+
 - Menu reorganized: Cluster Ops, Security & Compliance, Observability,
   Plugin Marketplace as top-level section; icon collisions resolved
 - Workload labels: Helm → Helm Releases, Cluster Version & Helm Audit → Version Audit,
@@ -123,6 +155,7 @@ consumers of the brand assets (logo, colors, components, screenshots).
 - /dev/ui-catalog gated to dev and staging only
 
 ### Fixed
+
 - Cluster card refresh timestamp on errored health checks and local attempt timestamps
 - Cluster card toolbar wrapping on narrow widths
 - Cluster card refresh-interval dropdown sync between compact and detailed views
@@ -131,18 +164,20 @@ consumers of the brand assets (logo, colors, components, screenshots).
   bump JS-level timeout ceiling so helm --timeout 10m wins
 - Cluster page Updating dots visibility (text-foreground in loading state)
 - Helm panel table-fixed layout to prevent row rendering gaps + reload on nav-back
-- RPM build: suppress build-id errors for bundled binaries, glob /usr/bin/rozoom-*
+- RPM build: suppress build-id errors for bundled binaries, glob /usr/bin/rozoom-\*
 - Cargo: declare url and webkit2gtk as explicit dependencies
 - Trivy checksum fetch via direct CDN URL with checksum-skip fallback
 - TCPing pinned version, darwin-arm64 fallback, GitHub API rate-limit retry
 
 ### Notes
+
 - This is the first CHANGELOG entry since 0.20.0; the 0.21.0-rc.x and 0.22.0-rc.1 / rc.2
   cycles are summarized cumulatively above. See Git history for per-PR detail.
 
 ## [0.20.0] - 2026-03-30
 
 ### Added
+
 - Pre-commit hooks via husky + lint-staged (format + lint on every commit)
 - Dev-only UI component catalog at /dev/ui-catalog
 - Network recovery listener - auto-recovers clusters after VPN reconnect
@@ -152,6 +187,7 @@ consumers of the brand assets (logo, colors, components, screenshots).
 - Rancher to platform compatibility docs
 
 ### Fixed
+
 - Multi-pane layout (2/3) collapsing to 1 when navigating between workloads
 - Workspace pane state lost on cluster switch in unpinned mode
 - Offline clusters appearing in pane cluster selector
@@ -161,12 +197,14 @@ consumers of the brand assets (logo, colors, components, screenshots).
 - onCopyKubectlDescribe missing from ResourceActionsMenu props
 
 ### Changed
+
 - Feature capability cache clears only unreachable entries on network restore (not all)
 - Workspace layout and pane config persisted to localStorage for unpinned tabs
 
 ## [0.19.0] - 2026-03-29
 
 ### Added
+
 - Three-state secret visibility in details sheets (masked -> base64 -> decoded)
 - Resource metrics badge with CPU/Memory progress bars for pods and nodes
 - Node disk usage indicator from kubelet stats summary API
@@ -182,11 +220,13 @@ consumers of the brand assets (logo, colors, components, screenshots).
 - App version display in sidebar footer
 
 ### Changed
+
 - Explain this state section made collapsible (auto-opens on sync error)
 - Metrics badge moved from header to body in details sheets
 - Dropdown menus use dynamic max-height for viewport fitting
 
 ### Fixed
+
 - Pod watcher timeout too short for remote clusters in Tauri dev mode
 - Pod Attach using kubectl exec instead of kubectl attach
 - Kubelet health check key mismatch (kubelet -> kubelet_cadvisor)
@@ -198,33 +238,39 @@ consumers of the brand assets (logo, colors, components, screenshots).
 - Sidebar icon alignment in collapsed mode
 
 ### Refactored
+
 - Unified details sheets with DetailsSheetPortal (10 sheets)
 - Unified action menus with ResourceActionsMenu (4 duplicates removed)
 - Unified workbench panels with ResourceYamlWorkbenchPanel
 - Deleted 7 dead-code files (-695 lines net)
 
 ### Documentation
+
 - Comprehensive docs update for all new features
 - Updated CONTRIBUTING.md with architecture overview and component reference
 
 ## [0.18.0] - 2026-03-29
 
 ### Added
+
 - YAML editor: lint gutter, hover tooltips, breadcrumb, multi-doc nav, path copy, diff view
 - Managed provider detection for 11 cloud providers
 - Hetzner Object Storage backup support with checksumAlgorithm fix
 
 ### Fixed
+
 - OVH providerID prefix (ovh:// -> openstack://)
 - Dropdown menus overflowing viewport on small screens
 
 ## [0.17.0] - 2026-03-27
 
 ### Added
+
 - Hetzner Object Storage as backup provider
 - Kubeconform schema validation in YAML editor
 - K8s-aware autocompletion with snippets
 
 ### Fixed
+
 - Cloud import, cross-platform shell, race condition in CLI execution
 - Risk findings readability on dark and k9s themes
