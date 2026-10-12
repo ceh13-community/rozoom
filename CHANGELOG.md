@@ -8,21 +8,19 @@ The release build fails if the section for the released version is missing.
 
 ## [0.25.3] - 2026-10-12
 
-The manifest linter is now on by default for every confirmed cluster: new
-connections are checked without any setup. You can switch it off per cluster
-from the cluster card.
+The manifest linter is now on by default for every cluster you connect: new
+clusters are checked right after connecting, with no setup. You can turn it
+off per cluster from the cluster card, or for all clusters from the sidebar
+toggle.
 
 ### Added
 
 - Telemetry consent prompt after the first scan completes; usage reporting
   stays off until you explicitly agree.
-- Read-only mode now hard-blocks exec-shell and resource editing on the
-  backend, instead of only hiding the buttons.
 
 ### Changed
 
-- The cluster card now tells you how to turn the linter on when it is off,
-  instead of only stating the fact.
+- The cluster card now tells you how to turn the linter on when it is off.
 
 ## [0.24.0] - 2026-09-16
 
