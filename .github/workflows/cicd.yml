@@ -241,6 +241,19 @@ jobs:
         working-directory: ./dashboard-app
         run: echo "APP_VERSION=$(node -p 'require("./src-tauri/tauri.conf.json").version' | tr -d '\r\n')" >> "$GITHUB_ENV"
 
+      # The release body doubles as the updater-dialog notes (tauri-action
+      # copies it into latest.json). A missing changelog entry fails the
+      # release here, before any build minutes are spent.
+      - name: Extract release notes from CHANGELOG.md
+        shell: bash
+        working-directory: ./dashboard-app
+        run: |
+          {
+            echo "RELEASE_NOTES<<CHANGELOG_NOTES_EOF"
+            bash ./scripts/extract-release-notes.sh "${{ env.APP_VERSION }}" ../CHANGELOG.md
+            echo "CHANGELOG_NOTES_EOF"
+          } >> "$GITHUB_ENV"
+
       # WAU-C telemetry: an empty PUBLIC_POSTHOG_KEY does not fail the build —
       # the release ships fine and telemetry is just permanently dark, which is
       # only discovered weeks later in PostHog. Fail the release up front
@@ -315,8 +328,12 @@ jobs:
           projectPath: dashboard-app
           tagName: app-v${{ env.APP_VERSION }}
           releaseName: "App v${{ env.APP_VERSION }}"
+          # The first line below is what a user reads in the updater dialog;
+          # the artifact table stays on the release page only — the
+          # finalize-release-assets job rewrites latest*.json notes to the
+          # changelog text without it.
           releaseBody: |
-            Release `v${{ env.APP_VERSION }}` is available as a draft build.
+            ${{ env.RELEASE_NOTES }}
 
             ## Artifacts by platform
 
@@ -331,7 +348,6 @@ jobs:
             Notes:
             - Linux artifacts use normalized filenames with underscores.
             - macOS: run `xattr -dr com.apple.quarantine /Applications/ROZOOM*.app` if quarantined.
-            - This draft release is intended for validation before final publication.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
@@ -592,6 +608,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash ./scripts/finalize-release-asset-names.sh "app-v${{ env.APP_VERSION }}"
+
+      # tauri-action copies the whole release body (artifact table included)
+      # into latest.json notes, and the slim manifest bootstraps with a
+      # placeholder; the updater dialog shows notes verbatim. Replace both
+      # with the changelog section for this version.
+      - name: Rewrite updater notes from CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash ./scripts/extract-release-notes.sh "${{ env.APP_VERSION }}" ../CHANGELOG.md > /tmp/updater-notes.md
+          bash ./scripts/set-updater-notes.sh "app-v${{ env.APP_VERSION }}" /tmp/updater-notes.md
 
   # Release gate: install the freshly built .deb in clean end-user distros and
   # verify the window actually renders (not just that the bundle built). Added

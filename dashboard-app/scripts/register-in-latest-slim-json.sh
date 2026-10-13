@@ -41,6 +41,8 @@ trap 'rm -rf "$tmp"' EXIT
 for attempt in 1 2 3 4 5; do
   rm -f "$tmp/$MANIFEST"
   if ! gh release download "$TAG" --repo "$REPO" --pattern "$MANIFEST" --dir "$tmp" --clobber 2>/dev/null; then
+    # Bootstrap notes are a placeholder; finalize-release-assets rewrites
+    # them from CHANGELOG.md via set-updater-notes.sh.
     jq -n --arg v "$VERSION" --arg notes \
       "ROZOOM v${VERSION} (slim tool-pack: kubectl + helm bundled). Full notes: https://github.com/${REPO}/releases/tag/${TAG}" \
       --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
