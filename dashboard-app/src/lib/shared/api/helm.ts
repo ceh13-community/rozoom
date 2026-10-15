@@ -3,6 +3,7 @@ import { spawnCli } from "$shared/api/cli";
 // eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { CONFIG_DIR } from "$entities/config/model/appConfig";
 import { clusterKey } from "$shared/lib/cluster-key";
+import { checkHelmActionReadOnly } from "$shared/lib/readonly-guard";
 import { getClusterNodesNames } from "$shared/api/tauri";
 import { emitCliNotification } from "$shared/lib/cli-notification";
 import {
@@ -727,6 +728,11 @@ export async function uninstallHelmRelease(
     return { success: false, error: "Release name and namespace are required" };
   }
 
+  const readOnlyCheck = checkHelmActionReadOnly(clusterId, "helm-uninstall");
+  if (readOnlyCheck.blocked) {
+    return { success: false, error: readOnlyCheck.reason };
+  }
+
   const kubeconfigPath = await getKubeconfigPath(clusterId);
   const result = await runHelmCommand(
     [
@@ -886,6 +892,11 @@ export async function rollbackHelmRelease(
   const revision = params.revision.trim();
   if (!releaseName || !namespace || !revision) {
     return { success: false, error: "Release name, namespace and revision are required" };
+  }
+
+  const readOnlyCheck = checkHelmActionReadOnly(clusterId, "helm-rollback");
+  if (readOnlyCheck.blocked) {
+    return { success: false, error: readOnlyCheck.reason };
   }
 
   const kubeconfigPath = await getKubeconfigPath(clusterId);
