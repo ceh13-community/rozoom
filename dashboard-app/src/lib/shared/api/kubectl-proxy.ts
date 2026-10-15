@@ -13,6 +13,7 @@ import { getBrowserInvokeFallback, isTauriAvailable } from "$shared/lib/tauri-ru
 import { isRuntimeDebugEnabled, writeRuntimeDebugLog } from "$shared/lib/runtime-debug";
 import { emitCliNotification, isUserFacingCommand } from "$shared/lib/cli-notification";
 import { isMutatingKubectlCommand } from "$shared/analytics/kubectl-mutation";
+import { buildReadOnlyBlockedResult, checkKubectlReadOnly } from "$shared/lib/readonly-guard";
 import { trackCoreAction } from "$shared/analytics/wau-c";
 
 type KubectlExecResult = {
@@ -330,6 +331,10 @@ export async function kubectlRawFront(
   args: string,
   options?: KubectlOptions,
 ): Promise<{ output: string; errors: string; code?: number }> {
+  const readOnlyCheck = checkKubectlReadOnly(options?.clusterId, args.trim().split(/\s+/));
+  if (readOnlyCheck.blocked) {
+    return buildReadOnlyBlockedResult(readOnlyCheck.reason);
+  }
   if (getBrowserInvoke()) {
     return runBrowserKubectlFallback(withReadRequestTimeout(args.trim().split(/\s+/)), options);
   }
@@ -413,6 +418,10 @@ export async function kubectlRawArgsFront(
   args: string[],
   options?: KubectlOptions,
 ): Promise<{ output: string; errors: string; code?: number }> {
+  const readOnlyCheck = checkKubectlReadOnly(options?.clusterId, args);
+  if (readOnlyCheck.blocked) {
+    return buildReadOnlyBlockedResult(readOnlyCheck.reason);
+  }
   const dedupeKey = isCoalescibleReadCommand(args, options?.signal)
     ? toReadRequestKey(options?.clusterId, args)
     : null;
@@ -569,6 +578,12 @@ export async function kubectlStreamArgsFront(
   options?: KubectlOptions,
   handlers: KubectlStreamHandlers = {},
 ): Promise<KubectlStreamProcess> {
+  const readOnlyCheck = checkKubectlReadOnly(options?.clusterId, args);
+  if (readOnlyCheck.blocked) {
+    throw new Error(
+      readOnlyCheck.reason ?? "This cluster is read-only. Mutating commands are blocked.",
+    );
+  }
   if (!canUseDesktopKubectlRuntime()) {
     throw new Error("Desktop kubectl streaming is unavailable outside the Tauri runtime.");
   }

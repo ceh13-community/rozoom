@@ -10,6 +10,7 @@ import {
   saveRemovedConfig,
 } from "../api/config-storage-repo";
 import { kubectlRawFront } from "$shared/api/kubectl-proxy";
+import { registerClusterSafetyInfo } from "$shared/lib/readonly-guard";
 import { trackClusterAddAttempted, trackClusterAddFailed } from "$shared/analytics/wau-c";
 import { classifyConnectErrorClass } from "./humanize-connect-error";
 import yaml from "js-yaml";
@@ -19,6 +20,12 @@ export const clustersConfigError = writable<string | null>(null);
 export const clustersConfigSuccess = writable<string | null>(null);
 export const clustersList = writable<AppClusterConfig[]>([]);
 export const removedClustersList = writable<AppClusterConfig[]>([]);
+
+// Keep the shared-layer read-only guard in sync so kubectl-proxy/helm can
+// hard-block mutations for read-only clusters without importing features.
+clustersList.subscribe((clusters) => {
+  registerClusterSafetyInfo(clusters);
+});
 
 type FlattenedKubeconfig = {
   clusters?: Array<{ name?: string }>;
