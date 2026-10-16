@@ -611,8 +611,10 @@ jobs:
 
       # tauri-action copies the whole release body (artifact table included)
       # into latest.json notes, and the slim manifest bootstraps with a
-      # placeholder; the updater dialog shows notes verbatim. Replace both
-      # with the changelog section for this version.
+      # placeholder. The in-app notification shows fixed copy (app-updater.ts)
+      # and never renders these notes, but latest.json is still the public
+      # release-notes feed. Replace both with the changelog section for this
+      # version.
       - name: Rewrite updater notes from CHANGELOG.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
