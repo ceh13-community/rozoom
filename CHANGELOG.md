@@ -2,8 +2,10 @@
 
 All notable changes to ROZOOM - K8s Linter IDE.
 
-The first paragraph of each release section is shown verbatim in the in-app
-updater dialog, so it must state the user-facing change in plain language.
+The first paragraph of each release section becomes the release notes in the
+updater feed (latest.json) and on the GitHub release page, so it must state
+the user-facing change in plain language. The in-app update notification
+deliberately shows fixed copy and never displays these notes.
 The release build fails if the section for the released version is missing.
 
 ## [0.25.3] - 2026-10-12
