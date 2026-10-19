@@ -11,7 +11,6 @@ Date: 2025-11-14
 
 ## Expected Outputs
 
-- AppImage
 - DEB
 - RPM
 

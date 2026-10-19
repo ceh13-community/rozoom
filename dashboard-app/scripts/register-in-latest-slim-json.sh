@@ -7,12 +7,13 @@
 # installs untouched. tauri-action only knows how to write latest.json, so
 # the slim manifest is assembled here, one platform entry per slim job.
 #
-# The three slim platform jobs may write concurrently; a lost update is
-# detected by re-downloading after upload and retried.
+# The slim platform jobs (darwin, windows; Linux ships no updater-replaceable
+# package) may write concurrently; a lost update is detected by re-downloading
+# after upload and retried.
 #
 # Usage: register-in-latest-slim-json.sh <tag> <platform-key> <artifact-path>
-#   e.g. register-in-latest-slim-json.sh app-v0.25.0 linux-x86_64 \
-#          src-tauri/target/release/bundle/appimage/ROZOOM_..._slim.AppImage
+#   e.g. register-in-latest-slim-json.sh app-v0.25.0 darwin-aarch64 \
+#          src-tauri/target/aarch64-apple-darwin/release/bundle/macos/ROZOOM_..._slim.app.tar.gz
 # Requires: gh (authenticated), jq, <artifact-path>.sig next to the artifact.
 set -euo pipefail
 

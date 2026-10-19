@@ -5,7 +5,6 @@
 #
 # ROZOOM_K8s_Linter_IDE_0.25.0_amd64.deb      -> ..._amd64_slim.deb
 # ROZOOM_K8s_Linter_IDE-0.25.0-1.x86_64.rpm   -> ...-1.x86_64_slim.rpm
-# ROZOOM_K8s_Linter_IDE_0.25.0_amd64.AppImage -> ..._amd64_slim.AppImage
 # ROZOOM_K8s_Linter_IDE_0.25.0_x64_en-US.msi  -> ..._x64_slim_en-US.msi
 # ROZOOM_K8s_Linter_IDE_0.25.0_x64-setup.exe  -> ..._x64_slim-setup.exe
 # ROZOOM_K8s_Linter_IDE_0.25.0_aarch64.dmg    -> ..._aarch64_slim.dmg
@@ -47,7 +46,6 @@ rename_pair() {
 
 rename_pair "_amd64.deb"        "_amd64_slim.deb"
 rename_pair ".x86_64.rpm"       ".x86_64_slim.rpm"
-rename_pair "_amd64.AppImage"   "_amd64_slim.AppImage"
 rename_pair "_x64_en-US.msi"    "_x64_slim_en-US.msi"
 rename_pair "_x64-setup.exe"    "_x64_slim-setup.exe"
 rename_pair "_aarch64.dmg"      "_aarch64_slim.dmg"

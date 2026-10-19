@@ -51,16 +51,16 @@ provider IDs from node specs.
 
 ## Desktop Platform Support
 
-| Platform    | Architecture              | Artifacts                   | Status          |
-| ----------- | ------------------------- | --------------------------- | --------------- |
-| **Linux**   | x86_64                    | `.deb`, `.rpm`, `.AppImage` | Production      |
-| **Linux**   | ARM64 (aarch64)           | `.deb`                      | CI ready        |
-| **macOS**   | ARM64 (Apple Silicon M1+) | `.dmg`                      | Production      |
-| **macOS**   | x64 (Intel)               | `.dmg`                      | Production      |
-| **Windows** | x64                       | `.msi`, `.exe` (NSIS)       | Production      |
-| **Windows** | ARM64                     | Not yet                     | Planned         |
-| **Android** | ARM64                     | `.apk`                      | Planned (alpha) |
-| **iOS**     | ARM64                     | `.ipa`                      | Planned         |
+| Platform    | Architecture              | Artifacts             | Status          |
+| ----------- | ------------------------- | --------------------- | --------------- |
+| **Linux**   | x86_64                    | `.deb`, `.rpm`        | Production      |
+| **Linux**   | ARM64 (aarch64)           | `.deb`                | CI ready        |
+| **macOS**   | ARM64 (Apple Silicon M1+) | `.dmg`                | Production      |
+| **macOS**   | x64 (Intel)               | `.dmg`                | Production      |
+| **Windows** | x64                       | `.msi`, `.exe` (NSIS) | Production      |
+| **Windows** | ARM64                     | Not yet               | Planned         |
+| **Android** | ARM64                     | `.apk`                | Planned (alpha) |
+| **iOS**     | ARM64                     | `.ipa`                | Planned         |
 
 ### Android Roadmap
 
