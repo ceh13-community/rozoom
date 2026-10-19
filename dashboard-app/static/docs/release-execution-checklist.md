@@ -164,7 +164,7 @@ Use this document as the release gate for the next production build. Every item 
 - gate: packaged release artifact verified using `static/docs/packaging-distribution-audit.md`
 - evidence:
   - `pnpm exec tauri build`
-  - AppImage / DEB / RPM output
+  - DEB / RPM output
   - bundled binaries present
   - logs path verified
   - support artifact export verified

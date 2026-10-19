@@ -43,9 +43,9 @@ let inFlight: Promise<void> | null = null;
 
 /**
  * Silent launch-time check. Never throws, never shows UI unless an update was
- * actually downloaded. A failed check (offline, deb/rpm install where Tauri
- * only supports AppImage, GitHub down) is logged and otherwise ignored - it is
- * not the user's problem.
+ * actually downloaded. A failed check (offline, Linux installs - deb/rpm are
+ * not updater-replaceable, GitHub down) is logged and otherwise ignored - it
+ * is not the user's problem.
  */
 export function checkForUpdateSilently(port?: UpdaterPort): Promise<void> {
   if (!port && !isTauriAvailable()) return Promise.resolve();

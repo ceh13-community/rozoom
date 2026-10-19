@@ -246,7 +246,7 @@ To activate it:
 - **Frontend:** SvelteKit, TypeScript, pnpm
 - **Desktop Backend:** Rust, Tauri v2
 - **Testing:** Vitest
-- **Packaging:** Tauri Bundler (AppImage, DEB, RPM)
+- **Packaging:** Tauri Bundler (DEB, RPM)
 - **Build & DevOps:** Docker, BuildKit, multi-stage builds
 
 ---

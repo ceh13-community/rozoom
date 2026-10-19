@@ -42,7 +42,6 @@ full_offline_name() {
   case "$base" in
     *_amd64.deb)       out="${base%_amd64.deb}_amd64_full-offline.deb" ;;
     *.x86_64.rpm)      out="${base%.x86_64.rpm}.x86_64_full-offline.rpm" ;;
-    *_amd64.AppImage)  out="${base%_amd64.AppImage}_amd64_full-offline.AppImage" ;;
     *_x64_en-US.msi)   out="${base%_x64_en-US.msi}_x64_full-offline_en-US.msi" ;;
     *_x64-setup.exe)   out="${base%_x64-setup.exe}_x64_full-offline-setup.exe" ;;
     *_aarch64.dmg)     out="${base%_aarch64.dmg}_aarch64_full-offline.dmg" ;;

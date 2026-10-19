@@ -216,7 +216,8 @@ jobs:
           # - platform: "macos-latest"
           #   args: "--target x86_64-apple-darwin --bundles app,dmg"
           #   label: "macOS x64"
-          # Linux x86_64 (DEB + RPM; AppImage built separately below)
+          # Linux x86_64 (DEB + RPM; AppImage dropped: the bundled
+          # WebKit/EGL stack aborts on launch, headless and on real GPUs)
           - platform: "ubuntu-22.04"
             args: "--bundles deb,rpm"
             label: "Linux x64"
@@ -257,8 +258,7 @@ jobs:
       # WAU-C telemetry: an empty PUBLIC_POSTHOG_KEY does not fail the build —
       # the release ships fine and telemetry is just permanently dark, which is
       # only discovered weeks later in PostHog. Fail the release up front
-      # instead, same policy as the updater signing secrets above. Guards both
-      # consumers below (tauri-action and the standalone AppImage build).
+      # instead, same policy as the updater signing secrets above.
       - name: Fail fast on empty PUBLIC_POSTHOG_KEY
         shell: bash
         env:
@@ -312,7 +312,6 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPIMAGE_EXTRACT_AND_RUN: "1"
           # Updater artifacts (.sig + latest.json) are signed with the project
           # minisign key. Missing secrets fail the build loudly rather than
           # shipping an unsigned release the updater would reject.
@@ -341,7 +340,7 @@ jobs:
             |----------|-------------|-----------|
             | **Windows** | x64 | `.msi`, `.exe` (NSIS) |
             | **macOS** | ARM64 (M1+) | `.dmg`, `.app.tar.gz` |
-            | **Linux** | x64 | `.deb`, `.rpm`, `.AppImage` |
+            | **Linux** | x64 | `.deb`, `.rpm` |
 
             Download the package matching your OS and architecture.
 
@@ -360,65 +359,6 @@ jobs:
           path: dashboard-app/src-tauri/target/release/bundle/deb/*.deb
           if-no-files-found: error
 
-      # AppImage is the only Linux package the in-app updater can replace, so a
-      # failure here must fail the release, not hide behind continue-on-error.
-      - name: Build AppImage
-        if: runner.os == 'Linux'
-        working-directory: ./dashboard-app
-        env:
-          APPIMAGE_EXTRACT_AND_RUN: "1"
-          NO_STRIP: "true"
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # WAU-C telemetry: $env/dynamic/public is captured into _app/env.js at
-          # build time, so the PostHog key must be in the env when
-          # beforeBuildCommand (pnpm build) runs. Without it the release ships
-          # with telemetry permanently dark even after user consent.
-          PUBLIC_POSTHOG_KEY: ${{ secrets.PUBLIC_POSTHOG_KEY }}
-          PUBLIC_POSTHOG_HOST: ${{ secrets.PUBLIC_POSTHOG_HOST }}
-        # The vendored CLI dists (aws-dist, az-dist) resolve their private
-        # libraries (libtinfo.so.5, libffi.so.6, ...) from their own
-        # directories at runtime, but linuxdeploy traces every ELF in the
-        # AppDir and aborts with "Could not find dependency" on any of them
-        # the host distro lacks. Put the dist lib dirs on LD_LIBRARY_PATH
-        # (absolute paths: linuxdeploy runs from a different cwd) so the
-        # trace resolves them where the app actually will — but AFTER the
-        # system lib dirs: linuxdeploy's gtk plugin runs host binaries
-        # (gtk-query-immodules-3.0) with this same environment, and with the
-        # dist dirs first they load aws-dist's ancient libz.so.1 instead of
-        # the system one and die on `ZLIB_1.2.9' not found. System dirs
-        # first restores normal resolution for shared names; the dist dirs
-        # at the tail only catch libs the distro does not ship at all.
-        # --verbose because tauri otherwise swallows linuxdeploy's stderr
-        # and a red run says only "failed to run linuxdeploy".
-        run: |
-          LD_LIBRARY_PATH="/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:$(find "$PWD/src-tauri/binaries" -name 'lib*.so*' -exec dirname {} \; | sort -u | paste -sd:)"
-          export LD_LIBRARY_PATH
-          pnpm tauri build --bundles appimage --verbose
-
-      - name: Upload AppImage to draft release
-        if: runner.os == 'Linux'
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: app-v${{ env.APP_VERSION }}
-          draft: true
-          files: |
-            dashboard-app/src-tauri/target/release/bundle/appimage/*.AppImage
-            dashboard-app/src-tauri/target/release/bundle/appimage/*.AppImage.sig
-
-      # The AppImage is built outside tauri-action, so it never lands in
-      # latest.json. Merge the linux-x86_64 entry in by hand; a failure here
-      # leaves Linux without in-app updates, so it fails the release.
-      - name: Register AppImage in latest.json
-        if: runner.os == 'Linux'
-        shell: bash
-        working-directory: ./dashboard-app
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: app-v${{ env.APP_VERSION }}
-        run: bash ./scripts/register-appimage-in-latest-json.sh "$TAG"
 
   # Slim tool-pack variant: same release, second set of artifacts. Bundles only
   # kubectl + helm (VITE_ROZOOM_TOOLS filters both download-binaries.js and the
@@ -504,7 +444,6 @@ jobs:
         shell: bash
         working-directory: ./dashboard-app
         env:
-          APPIMAGE_EXTRACT_AND_RUN: "1"
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Same constraint as the full build: the PostHog key must be in the
@@ -512,22 +451,6 @@ jobs:
           PUBLIC_POSTHOG_KEY: ${{ secrets.PUBLIC_POSTHOG_KEY }}
           PUBLIC_POSTHOG_HOST: ${{ secrets.PUBLIC_POSTHOG_HOST }}
         run: pnpm tauri build --config src-tauri/tauri.slim.conf.json ${{ matrix.args }}
-
-      # AppImage is the only Linux package the in-app updater can replace.
-      # Unlike the full build, no LD_LIBRARY_PATH surgery is needed: the
-      # vendored aws/az dists whose private libraries confused linuxdeploy
-      # are not part of the slim bundle.
-      - name: Build slim AppImage
-        if: runner.os == 'Linux'
-        working-directory: ./dashboard-app
-        env:
-          APPIMAGE_EXTRACT_AND_RUN: "1"
-          NO_STRIP: "true"
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          PUBLIC_POSTHOG_KEY: ${{ secrets.PUBLIC_POSTHOG_KEY }}
-          PUBLIC_POSTHOG_HOST: ${{ secrets.PUBLIC_POSTHOG_HOST }}
-        run: pnpm tauri build --config src-tauri/tauri.slim.conf.json --bundles appimage --verbose
 
       - name: Rename artifacts to slim names
         shell: bash
@@ -562,7 +485,11 @@ jobs:
           [[ ${#files[@]} -gt 0 ]] || { echo "no slim artifacts found to upload" >&2; exit 1; }
           gh release upload "$TAG" "${files[@]}" --clobber
 
+      # No Linux entry: the AppImage was the only updater-replaceable Linux
+      # package and it is no longer shipped (WebKit/EGL abort on launch, both
+      # headless and on real GPUs), so Linux installs update via deb/rpm.
       - name: Register in latest-slim.json
+        if: runner.os != 'Linux'
         shell: bash
         working-directory: ./dashboard-app
         env:
@@ -570,7 +497,6 @@ jobs:
           TAG: app-v${{ env.APP_VERSION }}
         run: |
           case "${{ matrix.updater-platform }}" in
-            linux-x86_64)   pattern='*_slim.AppImage' ;;
             darwin-aarch64) pattern='*_slim.app.tar.gz' ;;
             windows-x86_64) pattern='*_slim_en-US.msi' ;;
           esac
