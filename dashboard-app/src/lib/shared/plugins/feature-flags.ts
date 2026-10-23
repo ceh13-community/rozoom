@@ -27,13 +27,23 @@ const PREFS_VERSION_KEY = "pluginPrefsVersion";
  * are not reverted because we only ADD to the set, never remove.
  *
  * v1 (implicit): first-run seed only. Existing users kept whatever they had.
- * v2 (current): default-disable plugins whose pages are not linked from the
+ * v2: default-disable plugins whose pages are not linked from the
  *   Fleet Dashboard cluster card (security-suite, capacity-intelligence,
  *   performance-suite, gitops-integration, workload-visualizer,
  *   cert-rotation). Existing users get these hidden on next launch so the
  *   narrower default reaches them without requiring a manual reset.
+ * v3 (current): workload-visualizer is default-on again, and the migration
+ *   removes it from the stored disabled set ONCE. The store cannot tell a
+ *   v2-seeded disable from an explicit user disable, so users who turned
+ *   the Workload Map off by hand see it reappear one time; re-disabling it
+ *   sticks because v3+ never removes it again. Deliberate trade-off: the
+ *   feature shipped off-by-default since 0.25.1, so almost every disable is
+ *   the v2 seed, and the escape hatch is one Marketplace click.
  */
-const CURRENT_PREFS_VERSION = 2;
+const CURRENT_PREFS_VERSION = 3;
+
+/** Plugins force-removed from the stored disabled set by the v3 migration. */
+const V3_REENABLED_PLUGIN_IDS = ["workload-visualizer"];
 
 export const pluginLicenses = writable<Record<string, PluginLicense>>({});
 export const disabledPlugins = writable<Set<string>>(new Set());
@@ -78,13 +88,17 @@ export async function loadPluginState(): Promise<void> {
     // Upgrade path: schema version bumped and this install is still on an
     // older one. Merge (union) current defaults with stored disabled so the
     // narrower policy reaches existing users without reverting their
-    // explicit enables - we only add, never remove. Example: user had
-    // {security-suite: enabled, gitops-integration: enabled}; after v2
-    // migration both become disabled because v2 marks them defaultDisabled.
-    // A user who had explicitly disabled other plugins keeps those too.
+    // explicit enables. Example: user had {security-suite: enabled,
+    // gitops-integration: enabled}; after v2 migration both become disabled
+    // because v2 marks them defaultDisabled. A user who had explicitly
+    // disabled other plugins keeps those too. The one exception to
+    // "add, never remove" is the v3 re-enable list documented above.
     if (storedVersion < CURRENT_PREFS_VERSION) {
       const merged = new Set<string>(stored);
       for (const id of getDefaultDisabledPluginIds()) merged.add(id);
+      if (storedVersion < 3) {
+        for (const id of V3_REENABLED_PLUGIN_IDS) merged.delete(id);
+      }
       disabledPlugins.set(merged);
       try {
         await store.set(DISABLED_KEY, [...merged]);
