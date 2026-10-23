@@ -46,14 +46,14 @@ Default sort: **health score ascending** - most problematic clusters appear firs
 
 Enable reorder mode (GripVertical icon) to drag-and-drop cards into a custom order. The order is saved in `dashboard-preferences.json` and restored on next visit. Reset button returns to the default health-based sort.
 
-### New in v0.17: Fleet Organization
+### Fleet Organization
 
-| Feature           | Description                                                                                                                                             |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Custom groups** | User-defined groups with CRUD operations. Assign clusters to groups, collapse/expand. Persisted in `dashboard-preferences.json`. (`cluster-groups.ts`)  |
-| **Smart groups**  | Rule-based auto-grouping by provider/env/tags/name with equals/contains/regex operators. AND/OR logic. First-match-wins assignment. (`smart-groups.ts`) |
-| **Saved views**   | Save and quick-switch dashboard filter presets (env, provider, status, tag, group, search). Default view support. (`saved-views.ts`)                    |
-| **Safety guards** | Read-only clusters block destructive actions. Production clusters require confirmation. 3-tier risk: locked/caution/safe. (`cluster-safety.ts`)         |
+| Feature           | Description                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Custom groups** | User-defined groups with CRUD operations. Assign clusters to groups, collapse/expand. Persisted in `dashboard-preferences.json`. (`cluster-groups.ts`)                                                                                                                                                                                                                                                                                  |
+| **Smart groups**  | Rule-based auto-grouping by provider/env/tags/name with equals/contains/regex operators. AND/OR logic. First-match-wins assignment. (`smart-groups.ts`)                                                                                                                                                                                                                                                                                 |
+| **Saved views**   | Save and quick-switch dashboard filter presets (env, provider, status, tag, group, search). Default view support. (`saved-views.ts`)                                                                                                                                                                                                                                                                                                    |
+| **Safety guards** | Production clusters require confirmation. 3-tier risk: locked/caution/safe. (`cluster-safety.ts`) Read-only clusters: destructive actions (delete/exec/apply/scale) are rejected at the kubectl execution boundary (`[BLOCKED] ... is read-only`) - shipped after v0.25.3 (#188). In v0.25.3 the read-only flag is a UI guard rail only. Confirm dialogs still appear on read-only clusters; the rejection surfaces after confirmation. |
 
 ### Global Linter Toggle
 

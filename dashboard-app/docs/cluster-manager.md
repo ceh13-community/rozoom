@@ -18,24 +18,30 @@ A collapsible panel at the top that shows three layers of detection:
 | **OS Tools (system PATH)**         | Same CLIs detected in your operating system via `which`/`where`. Blue check = found in PATH, with version and path shown. |
 | **Detected Credentials & Configs** | Cloud provider config files found in your home directory (`~/.aws/`, `~/.kube/`, `~/.config/gcloud/`, etc.).              |
 
-**Bundled tools** (14 total):
+**Tool registry** (20 tools: 19 bundled + 1 planned; `tooling.ts` `TOOL_REGISTRY`):
 
-| Tool        | Category   | Purpose                                                     |
-| ----------- | ---------- | ----------------------------------------------------------- |
-| kubectl     | Core K8s   | Cluster operations, resource management                     |
-| helm        | Core K8s   | Chart-based package management                              |
-| kustomize   | Core K8s   | Manifest customization without templates                    |
-| kubeconform | Validation | Validate YAML against K8s JSON schemas                      |
-| pluto       | Validation | Detect deprecated Kubernetes API versions                   |
-| stern       | Debug      | Multi-pod, multi-container log tailing                      |
-| velero      | Backup     | Cluster backup and disaster recovery                        |
-| yq          | YAML       | YAML/JSON processor for manifest transformations            |
-| aws         | Cloud      | AWS CLI for EKS cluster management                          |
-| gcloud      | Cloud      | Google Cloud SDK for GKE (not bundled - install separately) |
-| doctl       | Cloud      | DigitalOcean CLI for DOKS                                   |
-| hcloud      | Cloud      | Hetzner Cloud CLI                                           |
-| oc          | Cloud      | OpenShift/OKD client                                        |
-| az          | Cloud      | Azure CLI for AKS cluster management                        |
+| Tool        | Category   | Status  | Purpose                                                    |
+| ----------- | ---------- | ------- | ---------------------------------------------------------- |
+| kubectl     | Core K8s   | bundled | Cluster operations, resource management                    |
+| helm        | Core K8s   | bundled | Chart-based package management                             |
+| kustomize   | Core K8s   | bundled | Manifest customization without templates                   |
+| kubeconform | Validation | bundled | Validate YAML against K8s JSON schemas                     |
+| pluto       | Validation | bundled | Detect deprecated Kubernetes API versions                  |
+| stern       | Debug      | bundled | Multi-pod, multi-container log tailing                     |
+| velero      | Backup     | bundled | Cluster backup and disaster recovery                       |
+| yq          | YAML       | bundled | YAML/JSON processor for manifest transformations           |
+| curl        | Network    | bundled | HTTP probing and API debugging                             |
+| doggo       | Network    | bundled | DNS lookups                                                |
+| grpcurl     | Network    | bundled | gRPC endpoint probing                                      |
+| websocat    | Network    | bundled | WebSocket endpoint probing                                 |
+| tcping      | Network    | bundled | TCP connectivity checks                                    |
+| trivy       | Security   | bundled | Image and manifest vulnerability scanning                  |
+| aws         | Cloud      | bundled | AWS CLI for EKS cluster management                         |
+| gcloud      | Cloud      | planned | Google Cloud SDK for GKE (not bundled, install separately) |
+| doctl       | Cloud      | bundled | DigitalOcean CLI for DOKS                                  |
+| hcloud      | Cloud      | bundled | Hetzner Cloud CLI                                          |
+| oc          | Cloud      | bundled | OpenShift/OKD client                                       |
+| az          | Cloud      | bundled | Azure CLI for AKS cluster management                       |
 
 All binaries are downloaded and verified by `download-binaries.js` with
 SHA-256 checksums (and PGP for AWS CLI). No system PATH dependencies -
@@ -62,21 +68,21 @@ Clusters you've added to ROZOOM. Features:
 - Bulk actions (select all, remove selected)
 - "Open Cluster Dashboard" button to enter the main IDE view
 
-### Connect Cluster Wizard (v0.17)
+### Connect Cluster Wizard
 
 Collapsible wizard on the Cluster Manager page with 5 auth methods:
 
-| Method                | Security | What it does                                                                                  |
-| --------------------- | -------- | --------------------------------------------------------------------------------------------- |
-| **OIDC / SSO**        | High     | Azure AD, Okta, Keycloak, Google, Generic. Generates kubeconfig with kubelogin exec plugin.   |
-| **Cloud Provider**    | High     | AWS EKS, GKE, AKS, DigitalOcean. Cross-region discovery, one-click import using bundled CLIs. |
-| **HashiCorp Vault**   | High     | Dynamic credentials via token/kubernetes/OIDC/approle auth.                                   |
-| **X.509 Certificate** | High     | Client cert + private key (base64 PEM). Mutual TLS.                                           |
-| **Bearer Token**      | Medium   | Static or ServiceAccount token. Warning about no auto-rotation.                               |
+| Method                | Security | What it does                                                                                                                                     |
+| --------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **OIDC / SSO**        | High     | Azure AD, Okta, Keycloak, Google, Generic. Generates kubeconfig with kubelogin exec plugin.                                                      |
+| **Cloud Provider**    | High     | AWS EKS, GKE, AKS, DigitalOcean. Cross-region discovery, one-click import via provider CLIs (bundled, except `gcloud` for GKE - user-installed). |
+| **HashiCorp Vault**   | High     | Dynamic credentials via token/kubernetes/OIDC/approle auth.                                                                                      |
+| **X.509 Certificate** | High     | Client cert + private key (base64 PEM). Mutual TLS.                                                                                              |
+| **Bearer Token**      | Medium   | Static or ServiceAccount token. Warning about no auto-rotation.                                                                                  |
 
 Both "Connect Cluster" and "Cloud Providers" panels are collapsed by default.
 
-### Enterprise Authentication (v0.17)
+### Enterprise Authentication
 
 | Feature                       | Description                                                                                                                                                                                                                               |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -88,23 +94,25 @@ Both "Connect Cluster" and "Cloud Providers" panels are collapsed by default.
 | **Auth & Credentials page**   | Cluster Ops sidebar page showing auth method, token status, credential storage findings with remediation.                                                                                                                                 |
 | **Credential hygiene**        | File permission check (should be 0600), stale token detection, embedded key warnings, TLS verification. (`credential-hygiene.ts`) Ref: [K8s Secrets Best Practices](https://kubernetes.io/docs/concepts/security/secrets-good-practices/) |
 
-### New in v0.17
+### Cluster Lifecycle Features
 
-| Feature                           | Description                                                                                                                                                                                                                                   |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Real connection probe**         | Each detected cluster gets a real `kubectl cluster-info` ping with latency (ms) instead of name-based heuristic. Status updates asynchronously after page load. (`probe-connection.ts`)                                                       |
-| **Cloud import one-click**        | List and import clusters from AWS EKS, GKE, AKS, DigitalOcean using bundled CLIs. AWS EKS supports cross-region discovery. Multi-scope scan across AWS profiles, GCP projects, Azure subscriptions via "Scan all" button. (`cloud-import.ts`) |
-| **Soft-delete with restore**      | Removed clusters move to a trash list instead of permanent deletion. Restore or purge from trash. (`removedClustersList` store)                                                                                                               |
-| **Default namespace per context** | Set a default namespace that auto-applies on cluster switch (before user overrides). Stored in `AppClusterConfig.defaultNamespace`.                                                                                                           |
-| **Rename context**                | Rename cluster context in the stored kubeconfig file and update the app store. Rewrites context/cluster names in YAML. (`renameClusterContext()`)                                                                                             |
-| **Kubeconfig merge/dedupe**       | Merge multiple kubeconfig files with automatic duplicate detection and conflict resolution. Reports all conflicts with source file tracking. (`kubeconfig-merge.ts`)                                                                          |
-| **Catalog export/import**         | Export groups, tags, display names as JSON without secrets. Import on another machine. Versioned format with validation. (`catalog-export.ts`)                                                                                                |
-| **Audit trail**                   | Records cluster management actions (add, remove, restore, rename, group changes) with timestamps. Capped at 500 entries. (`audit-trail.ts`)                                                                                                   |
+| Feature                           | Description                                                                                                                                                                                                                                                                              |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Real connection probe**         | Each detected cluster gets a real `kubectl cluster-info` ping with latency (ms) instead of name-based heuristic. Status updates asynchronously after page load. (`probe-connection.ts`)                                                                                                  |
+| **Cloud import one-click**        | List and import clusters from AWS EKS, GKE, AKS, DigitalOcean via provider CLIs (bundled, except `gcloud` - user-installed). AWS EKS supports cross-region discovery. Multi-scope scan across AWS profiles, GCP projects, Azure subscriptions via "Scan all" button. (`cloud-import.ts`) |
+| **Soft-delete with restore**      | Removed clusters move to a trash list instead of permanent deletion. Restore or purge from trash. (`removedClustersList` store)                                                                                                                                                          |
+| **Default namespace per context** | Set a default namespace that auto-applies on cluster switch (before user overrides). Stored in `AppClusterConfig.defaultNamespace`.                                                                                                                                                      |
+| **Rename context**                | Rename cluster context in the stored kubeconfig file and update the app store. Rewrites context/cluster names in YAML. (`renameClusterContext()`)                                                                                                                                        |
+| **Kubeconfig merge/dedupe**       | Merge multiple kubeconfig files with automatic duplicate detection and conflict resolution. Reports all conflicts with source file tracking. (`kubeconfig-merge.ts`)                                                                                                                     |
+| **Catalog export/import**         | Export groups, tags, display names as JSON without secrets. Import on another machine. Versioned format with validation. (`catalog-export.ts`)                                                                                                                                           |
+| **Audit trail**                   | Records cluster management actions (add, remove, restore, rename, group changes) with timestamps. Capped at 500 entries. (`audit-trail.ts`)                                                                                                                                              |
 
 ### Cloud Import
 
-Import Kubernetes clusters directly from cloud provider APIs using bundled CLIs.
-Requires valid cloud credentials (detected automatically from standard config paths).
+Import Kubernetes clusters directly from cloud provider APIs via provider CLIs.
+`aws`, `az`, and `doctl` are bundled; `gcloud` for GKE is not bundled and must be
+installed by the user. Requires valid cloud credentials (detected automatically
+from standard config paths).
 
 | Provider         | CLI      | Cross-region | How it works                                                                                    |
 | ---------------- | -------- | ------------ | ----------------------------------------------------------------------------------------------- |
@@ -127,7 +135,7 @@ If a specific region is provided (via Connect Cluster Wizard), only that region 
 The import uses `az aks get-credentials --name X --resource-group Y` with the correct
 resource group, not the location.
 
-**Multi-scope discovery (v0.21+):**
+**Multi-scope discovery:**
 
 Each provider supports scoped credentials beyond the default:
 
