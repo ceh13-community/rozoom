@@ -62,7 +62,7 @@ describe("loadPluginState - default-disabled bootstrap", () => {
     // stored at current version AND empty = user explicitly re-enabled all.
     storeGet.mockImplementation((key: string) => {
       if (key === "disabledPlugins") return Promise.resolve([]);
-      if (key === "pluginPrefsVersion") return Promise.resolve(2);
+      if (key === "pluginPrefsVersion") return Promise.resolve(3);
       return Promise.resolve(null);
     });
 
@@ -75,7 +75,7 @@ describe("loadPluginState - default-disabled bootstrap", () => {
   it("respects a non-empty stored list verbatim on current version", async () => {
     storeGet.mockImplementation((key: string) => {
       if (key === "disabledPlugins") return Promise.resolve(["security-suite"]);
-      if (key === "pluginPrefsVersion") return Promise.resolve(2);
+      if (key === "pluginPrefsVersion") return Promise.resolve(3);
       return Promise.resolve(null);
     });
 
@@ -151,7 +151,7 @@ describe("loadPluginState - default-disabled bootstrap", () => {
   it("current-version users are not re-migrated", async () => {
     storeGet.mockImplementation((key: string) => {
       if (key === "disabledPlugins") return Promise.resolve(["alerts-hub"]);
-      if (key === "pluginPrefsVersion") return Promise.resolve(2);
+      if (key === "pluginPrefsVersion") return Promise.resolve(3);
       return Promise.resolve(null);
     });
 
@@ -160,6 +160,63 @@ describe("loadPluginState - default-disabled bootstrap", () => {
     // User's exact stored state wins, no new ids added.
     expect(get(disabledPlugins)).toEqual(new Set(["alerts-hub"]));
     expect(storeSet).not.toHaveBeenCalled();
+  });
+
+  it("v2 -> v3 migration removes workload-visualizer from the stored set", async () => {
+    // Typical v2 user: the v2 seed put workload-visualizer into the set.
+    storeGet.mockImplementation((key: string) => {
+      if (key === "disabledPlugins")
+        return Promise.resolve(["workload-visualizer", "security-suite"]);
+      if (key === "pluginPrefsVersion") return Promise.resolve(2);
+      return Promise.resolve(null);
+    });
+
+    await loadPluginState();
+
+    const disabled = get(disabledPlugins);
+    expect(disabled.has("workload-visualizer")).toBe(false);
+    expect(disabled.has("security-suite")).toBe(true);
+    const writes = storeSet.mock.calls;
+    expect(writes.some(([k, v]) => k === "pluginPrefsVersion" && v === 3)).toBe(true);
+    const disabledWrite = writes.find(([k]) => k === "disabledPlugins");
+    expect(disabledWrite?.[1]).not.toContain("workload-visualizer");
+  });
+
+  it("v1 -> v3 migration never re-adds workload-visualizer via defaults", async () => {
+    // v1 user with nothing stored in the set: union of current defaults must
+    // not contain workload-visualizer because the manifest no longer marks it
+    // defaultDisabled.
+    storeGet.mockImplementation((key: string) => {
+      if (key === "disabledPlugins") return Promise.resolve([]);
+      if (key === "pluginPrefsVersion") return Promise.resolve(null);
+      return Promise.resolve(null);
+    });
+
+    await loadPluginState();
+
+    expect(get(disabledPlugins).has("workload-visualizer")).toBe(false);
+  });
+
+  it("a v3 user who re-disables workload-visualizer stays disabled", async () => {
+    storeGet.mockImplementation((key: string) => {
+      if (key === "disabledPlugins") return Promise.resolve(["workload-visualizer"]);
+      if (key === "pluginPrefsVersion") return Promise.resolve(3);
+      return Promise.resolve(null);
+    });
+
+    await loadPluginState();
+
+    expect(get(disabledPlugins).has("workload-visualizer")).toBe(true);
+    expect(storeSet).not.toHaveBeenCalled();
+  });
+
+  it("fresh installs seed without workload-visualizer", async () => {
+    storeGet.mockResolvedValue(null);
+
+    await loadPluginState();
+
+    expect(defaultDisabledIds().has("workload-visualizer")).toBe(false);
+    expect(get(disabledPlugins).has("workload-visualizer")).toBe(false);
   });
 
   it("only disables plugins with no cluster-card-linked pages", async () => {

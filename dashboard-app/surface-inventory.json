@@ -154,7 +154,7 @@
       "name": "Workload Visualizer",
       "tier": "free",
       "category": "developer-tools",
-      "defaultDisabled": true,
+      "defaultDisabled": false,
       "pages": [
         {
           "id": "visualizer",
@@ -507,7 +507,7 @@
       "component": "lib/widgets/datalists/ui/cluster-health/workload-visualizer-panel.svelte",
       "plugin": "workload-visualizer",
       "section": "cluster-ops",
-      "visibility": "plugin-gated (off by default)"
+      "visibility": "plugin-gated"
     },
     {
       "key": "resourcemap",
@@ -515,7 +515,7 @@
       "component": "lib/widgets/datalists/ui/cluster-health/resource-map-panel.svelte",
       "plugin": "workload-visualizer",
       "section": "cluster-ops",
-      "visibility": "plugin-gated (off by default)"
+      "visibility": "plugin-gated"
     },
     {
       "key": "nodespressures",

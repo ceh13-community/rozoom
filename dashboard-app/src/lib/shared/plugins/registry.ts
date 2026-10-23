@@ -348,7 +348,8 @@ export const BUILTIN_PLUGINS: PluginManifest[] = [
       ],
       analysisModules: ["workload-visualizer"],
     },
-    defaultDisabled: true,
+    // Default-on since prefs v3: the Workload Map is the killer feature and
+    // hiding it behind the Marketplace cost us activation (card xBshbC8x).
   },
 
   // ── New togglable plugins: audit + compliance + observability add-ons ──
