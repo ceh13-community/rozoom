@@ -9,6 +9,8 @@
     "build:staging": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && prettier -c . && eslint && svelte-check --tsconfig ./tsconfig.json",
+    "surface:check": "node ./scripts/surface-inventory.mjs --check",
+    "surface:write": "node ./scripts/surface-inventory.mjs --write",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "tauri": "tauri",
     "tauri:dev:rozoom": "VITE_ENABLE_WORKSPACE_DEBUG_PANEL=true VITE_ENABLE_RUNTIME_FILE_LOGS=true VITE_ENABLE_DEVTOOLS_CONSOLE=true VITE_ENABLE_PODS_STREAM_WATCH=true tauri dev",

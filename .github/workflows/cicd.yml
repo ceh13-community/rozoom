@@ -56,6 +56,9 @@ jobs:
       - name: Run tests
         run: pnpm vitest run
 
+      - name: UI surface inventory gate
+        run: pnpm run surface:check
+
       - name: Build web app
         run: pnpm run build
 
@@ -358,7 +361,6 @@ jobs:
           name: linux-deb-x64
           path: dashboard-app/src-tauri/target/release/bundle/deb/*.deb
           if-no-files-found: error
-
 
   # Slim tool-pack variant: same release, second set of artifacts. Bundles only
   # kubectl + helm (VITE_ROZOOM_TOOLS filters both download-binaries.js and the
