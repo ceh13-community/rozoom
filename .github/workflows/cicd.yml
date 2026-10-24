@@ -92,10 +92,32 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('dashboard-app/pnpm-lock.yaml') }}
+          # A stale browser cache (older lockfile) is still a valid starting
+          # point: the install step below verifies and tops it up. Better a
+          # partial restore than a full download after every lockfile bump.
+          restore-keys: |
+            playwright-${{ runner.os }}-
 
       - name: Install Playwright system deps
-        timeout-minutes: 6
-        run: pnpm exec playwright install-deps chromium
+        id: sys_deps
+        timeout-minutes: 9
+        # Same contract as the Chromium step below: apt mirrors stall or flake,
+        # and this job is already continue-on-error — a red ❌ from an apt
+        # hiccup protects nothing, it only reads like a test failure on a
+        # green-by-substance PR. Bound each attempt, retry on a fresh go,
+        # and after 3 attempts warn + skip the smoke instead of failing.
+        run: |
+          for attempt in 1 2 3; do
+            echo "System deps install attempt $attempt/3"
+            timeout 160 pnpm exec playwright install-deps chromium && {
+              echo "available=true" >> "$GITHUB_OUTPUT"; exit 0;
+            }
+            echo "attempt $attempt stalled or failed; retrying"
+            sleep 5
+          done
+          echo "::warning::playwright install-deps failed after 3 attempts (apt mirror/infra); skipping e2e smoke — non-blocking."
+          echo "available=false" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Install Playwright browser (Chromium)
         id: chromium_install
@@ -133,7 +155,7 @@ jobs:
           key: ${{ steps.playwright-cache.outputs.cache-primary-key }}
 
       - name: Run e2e smoke
-        if: steps.chromium_install.outputs.available != 'false'
+        if: steps.sys_deps.outputs.available == 'true' && steps.chromium_install.outputs.available == 'true'
         run: pnpm run test:e2e
 
       - name: Upload Playwright report
@@ -143,6 +165,61 @@ jobs:
           name: playwright-report
           path: dashboard-app/playwright-report
           if-no-files-found: ignore
+
+  playwright_cache_seed:
+    # e2e_smoke only runs on pull_request, so its cache saves land on
+    # refs/pull/N/merge — invisible to sibling PRs under GitHub's cache
+    # isolation. Nothing ever saves the key on main, so the FIRST run of
+    # every new PR is a guaranteed miss and pays the full browser download
+    # (and historically the full apt pass inside a 6-minute window). Seed
+    # the cache from the default branch on push: PRs are allowed to restore
+    # base-branch caches, so one save here serves every PR until the
+    # lockfile hash moves again.
+    if: github.event_name == 'push'
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: ./.github/actions/setup-pnpm
+
+      - name: Restore Playwright browser cache
+        id: playwright-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('dashboard-app/pnpm-lock.yaml') }}
+
+      - name: Install Playwright browser (Chromium)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 12
+        # Same stall-bounded retry contract as e2e_smoke. On total failure
+        # exit non-zero so the save step is skipped — never seed main with
+        # an empty/partial ms-playwright dir (the exact poisoning the PR job
+        # defends against). The job is continue-on-error: a failed seed is
+        # an infra flake, the next push retries it.
+        run: |
+          for attempt in 1 2 3; do
+            echo "Chromium install attempt $attempt/3"
+            timeout 180 pnpm exec playwright install chromium && exit 0
+            echo "attempt $attempt stalled or failed; retrying"
+            sleep 5
+          done
+          echo "::warning::cache seed: chromium download failed after 3 attempts (CDN/infra); cache not seeded this push."
+          exit 1
+
+      - name: Save Playwright browser cache
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.playwright-cache.outputs.cache-primary-key }}
 
   # mobile-app CI is handled separately in .github/workflows/mobile-ci.yml
   # (path-triggered on mobile-app/** changes). Android Tauri build is excluded
