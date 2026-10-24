@@ -11,14 +11,20 @@ provider IDs from node specs.
 
 ### Managed Cloud
 
-| Provider          | Detection                                         | Bundled CLI                            | Cert Management    |
-| ----------------- | ------------------------------------------------- | -------------------------------------- | ------------------ |
-| AWS EKS           | `*.eks.amazonaws.com`, `aws` exec, name patterns  | `aws` (resource bundle)                | Managed by AWS     |
-| GKE               | `*.googleapis.com`, `gke-gcloud-auth-plugin` exec | `gcloud` (not bundled - user installs) | Managed by Google  |
-| AKS               | `*.azmk8s.io`, `kubelogin` exec                   | `az` (sidecar)                         | Managed by Azure   |
-| DigitalOcean DOKS | `*.k8s.ondigitalocean.com`, `doctl` exec          | `doctl` (sidecar)                      | Managed by DO      |
-| Hetzner           | `*.hcloud.app`, name patterns                     | `hcloud` (sidecar)                     | Managed by Hetzner |
-| Oracle OKE        | `*.oraclecloud.com`, name patterns                | -                                      | Managed by Oracle  |
+| Provider          | Detection                                         | Bundled CLI                            | Cert Management   |
+| ----------------- | ------------------------------------------------- | -------------------------------------- | ----------------- |
+| AWS EKS           | `*.eks.amazonaws.com`, `aws` exec, name patterns  | `aws` (resource bundle)                | Managed by AWS    |
+| GKE               | `*.googleapis.com`, `gke-gcloud-auth-plugin` exec | `gcloud` (not bundled - user installs) | Managed by Google |
+| AKS               | `*.azmk8s.io`, `kubelogin` exec                   | `az` (sidecar)                         | Managed by Azure  |
+| DigitalOcean DOKS | `*.k8s.ondigitalocean.com`, `doctl` exec          | `doctl` (sidecar)                      | Managed by DO     |
+| Hetzner           | `*.hcloud.app`, name patterns                     | `hcloud` (sidecar)                     | Self-managed      |
+| Oracle OKE        | `*.oraclecloud.com`, name patterns                | -                                      | Managed by Oracle |
+
+Note: Hetzner is grouped under "managed cloud" for provider detection and UI
+grouping (`provider-detection.ts`), but Hetzner has no first-party managed
+Kubernetes service - the control plane on Hetzner clusters is self-managed,
+and health checks treat `hcloud://`/`hrobot://` nodes as non-managed
+(`collect-cluster-data.ts`).
 
 ### Management Platforms
 

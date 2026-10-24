@@ -102,24 +102,24 @@ TLS certificate lifecycle management for control-plane and kubelet certificates.
 
 The panel auto-detects cluster distribution and applies the appropriate rotation strategy:
 
-| Distribution    | Strategy                                                  | Auto-rotate |
-| --------------- | --------------------------------------------------------- | ----------- |
-| kubeadm         | `kubeadm certs renew all` via exec into control-plane pod | Yes         |
-| OpenShift       | `oc adm certificate approve` via CSR approval             | Yes         |
-| K3s             | Restart k3s/k3s-agent service (manual)                    | No          |
-| RKE2            | Restart rke2-server/rke2-agent service (manual)           | No          |
-| Minikube        | `minikube stop && minikube start` (manual)                | No          |
-| Kind            | Recreate cluster (manual)                                 | No          |
-| K3d             | Stop and start cluster (manual)                           | No          |
-| Docker Desktop  | Reset Kubernetes in settings (manual)                     | No          |
-| Rancher Desktop | Reset Kubernetes in preferences (manual)                  | No          |
-| Colima          | `colima stop && colima start` (manual)                    | No          |
-| AWS EKS         | Managed by AWS - automatic                                | N/A         |
-| GKE             | Managed by Google - automatic                             | N/A         |
-| AKS             | Managed by Azure - automatic                              | N/A         |
-| DigitalOcean    | Managed by DigitalOcean - automatic                       | N/A         |
-| Hetzner         | Managed by Hetzner - automatic                            | N/A         |
-| Oracle OKE      | Managed by Oracle - automatic                             | N/A         |
+| Distribution    | Strategy                                                                  | Auto-rotate |
+| --------------- | ------------------------------------------------------------------------- | ----------- |
+| kubeadm         | `kubeadm certs renew all` via exec into control-plane pod                 | Yes         |
+| OpenShift       | `oc adm certificate approve` via CSR approval                             | Yes         |
+| K3s             | Restart k3s/k3s-agent service (manual)                                    | No          |
+| RKE2            | Restart rke2-server/rke2-agent service (manual)                           | No          |
+| Minikube        | `minikube stop && minikube start` (manual)                                | No          |
+| Kind            | Recreate cluster (manual)                                                 | No          |
+| K3d             | Stop and start cluster (manual)                                           | No          |
+| Docker Desktop  | Reset Kubernetes in settings (manual)                                     | No          |
+| Rancher Desktop | Reset Kubernetes in preferences (manual)                                  | No          |
+| Colima          | `colima stop && colima start` (manual)                                    | No          |
+| AWS EKS         | Managed by AWS - automatic                                                | N/A         |
+| GKE             | Managed by Google - automatic                                             | N/A         |
+| AKS             | Managed by Azure - automatic                                              | N/A         |
+| DigitalOcean    | Managed by DigitalOcean - automatic                                       | N/A         |
+| Hetzner         | Self-managed control plane - follows distribution strategy (e.g. kubeadm) | No          |
+| Oracle OKE      | Managed by Oracle - automatic                                             | N/A         |
 
 **Multi-strategy fallback:** kubeadm exec -> CSR approval -> manual instructions.
 
