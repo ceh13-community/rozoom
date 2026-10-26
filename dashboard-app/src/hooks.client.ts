@@ -16,7 +16,7 @@ if (shouldInitSentry(dev)) {
   if (!dsn) {
     throw new Error("Sentry DSN must be defined when Sentry initialization is enabled.");
   }
-  const scrub = shouldScrubSentry(dev);
+  const scrub = shouldScrubSentry();
   Sentry.init({
     dsn,
     environment: getSentryEnvironment(),

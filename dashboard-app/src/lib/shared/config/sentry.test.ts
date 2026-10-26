@@ -6,7 +6,6 @@ vi.mock("$env/dynamic/public", () => ({
     PUBLIC_SENTRY_DSN: undefined,
     PUBLIC_SENTRY_ENVIRONMENT: undefined,
     PUBLIC_SENTRY_ENABLE_IN_DEV: undefined,
-    PUBLIC_SENTRY_FORCE_SCRUB: undefined,
     PUBLIC_SENTRY_DISABLE_SCRUB: undefined,
   },
 }));
@@ -26,7 +25,6 @@ describe("sentry config", () => {
     publicEnv.PUBLIC_SENTRY_DSN = undefined;
     publicEnv.PUBLIC_SENTRY_ENVIRONMENT = undefined;
     publicEnv.PUBLIC_SENTRY_ENABLE_IN_DEV = undefined;
-    publicEnv.PUBLIC_SENTRY_FORCE_SCRUB = undefined;
     publicEnv.PUBLIC_SENTRY_DISABLE_SCRUB = undefined;
   });
 
@@ -65,29 +63,13 @@ describe("sentry config", () => {
   });
 
   describe("shouldScrubSentry", () => {
-    it("does not scrub in dev mode by default (sandbox sees everything)", () => {
-      expect(shouldScrubSentry(true)).toBe(false);
+    it("scrubs by default in every mode, dev included (no env needed)", () => {
+      expect(shouldScrubSentry()).toBe(true);
     });
 
-    it("scrubs in production by default (release builds are safe)", () => {
-      expect(shouldScrubSentry(false)).toBe(true);
-    });
-
-    it("PUBLIC_SENTRY_FORCE_SCRUB=true enables scrubber in dev", () => {
-      publicEnv.PUBLIC_SENTRY_FORCE_SCRUB = "true";
-      expect(shouldScrubSentry(true)).toBe(true);
-    });
-
-    it("PUBLIC_SENTRY_DISABLE_SCRUB=true disables scrubber in production", () => {
+    it("PUBLIC_SENTRY_DISABLE_SCRUB=true is the only way to disable the scrubber", () => {
       publicEnv.PUBLIC_SENTRY_DISABLE_SCRUB = "true";
-      expect(shouldScrubSentry(false)).toBe(false);
-    });
-
-    it("DISABLE wins over FORCE when both set", () => {
-      publicEnv.PUBLIC_SENTRY_FORCE_SCRUB = "true";
-      publicEnv.PUBLIC_SENTRY_DISABLE_SCRUB = "true";
-      expect(shouldScrubSentry(false)).toBe(false);
-      expect(shouldScrubSentry(true)).toBe(false);
+      expect(shouldScrubSentry()).toBe(false);
     });
   });
 });
