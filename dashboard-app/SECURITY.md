@@ -171,5 +171,5 @@ is the single highest-priority item and unlocks PCI-DSS, HIPAA, and SOC 2.
 
 If you discover a security vulnerability, please report it responsibly:
 
-- Email: udawpk@gmail.com
+- Use [GitHub Private Vulnerability Reporting](https://github.com/ceh13-community/rozoom/security/advisories/new)
 - Do not open a public GitHub issue for security vulnerabilities
