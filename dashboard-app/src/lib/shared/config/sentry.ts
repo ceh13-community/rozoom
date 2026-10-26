@@ -42,29 +42,19 @@ export function shouldInitSentry(dev: boolean) {
 /**
  * Whether to apply the credential scrubber (beforeSend / beforeBreadcrumb).
  *
- * - Development mode (`dev === true`): scrubber OFF by default so the
- *   sandbox repo retains full visibility into raw payloads. We want to
- *   see unredacted stack traces while building features.
- * - Production / release builds: scrubber ON by default. The public
- *   release repo must never emit credentials, kubeconfig paths, or
- *   Authorization headers to Sentry.
+ * Scrubbing is ON by default in every mode, including dev: a dev build
+ * pointed at a real cluster must not leak kubeconfig paths or
+ * Authorization headers to Sentry just because nobody set an env var.
  *
- * Two env flags override the default:
- *   PUBLIC_SENTRY_FORCE_SCRUB   - enable scrubber even in dev (for
- *                                 testing the scrubber locally)
- *   PUBLIC_SENTRY_DISABLE_SCRUB - disable scrubber even in production
- *                                 (short-lived internal debugging only)
+ * The only way to see raw payloads is the explicit opt-out:
+ *   PUBLIC_SENTRY_DISABLE_SCRUB - disable scrubber (short-lived local
+ *                                 debugging against throwaway clusters only)
  */
-export function shouldScrubSentry(dev: boolean) {
-  const force = isTruthy(
-    typeof env.PUBLIC_SENTRY_FORCE_SCRUB === "string" ? env.PUBLIC_SENTRY_FORCE_SCRUB : undefined,
-  );
+export function shouldScrubSentry() {
   const disable = isTruthy(
     typeof env.PUBLIC_SENTRY_DISABLE_SCRUB === "string"
       ? env.PUBLIC_SENTRY_DISABLE_SCRUB
       : undefined,
   );
-  if (disable) return false;
-  if (force) return true;
-  return !dev;
+  return !disable;
 }
