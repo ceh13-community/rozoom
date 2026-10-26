@@ -169,5 +169,6 @@ RFC 5424 over TCP+TLS, and plain JSONL tail forwarders.
 
 ## Reporting security issues
 
-See [`SECURITY.md`](../SECURITY.md). Email: udawpk@gmail.com. Do **not**
-open public GitHub issues for vulnerabilities.
+See [`SECURITY.md`](../SECURITY.md). Report via
+[GitHub Private Vulnerability Reporting](https://github.com/ceh13-community/rozoom/security/advisories/new).
+Do **not** open public GitHub issues for vulnerabilities.
