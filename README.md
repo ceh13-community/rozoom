@@ -136,6 +136,8 @@ The ROZOOM core is licensed under the Apache License 2.0. See [LICENSE](LICENSE)
 
 Marketplace plugins may be subject to their own license terms.
 
-Copyright (c) 2024-2026 ceh13-community, Inc.
+Copyright (c) 2024-2026 ROZOOM contributors.
 
-ROZOOM - K8s Linter IDE and the ROZOOM Logo are trademarks of ceh13-community, Inc.
+ROZOOM and the ROZOOM Logo are unregistered trademarks of the ROZOOM contributors.
+
+Kubernetes® and the Kubernetes logo are registered trademarks of The Linux Foundation in the United States and other countries. ROZOOM is not affiliated with, endorsed by, or sponsored by The Linux Foundation or the Kubernetes project.
