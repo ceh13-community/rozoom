@@ -806,7 +806,7 @@
                 namespace={row.namespace}
                 showExportIncident={false}
                 showDownloadYaml={false}
-                showPortForward={false}
+                showPortForward={true}
                 isDeleting={isDeleting(row.uid)}
                 isEvicting={isEvicting(row.uid)}
                 isYamlBusy={false}
@@ -822,7 +822,7 @@
                 onRunDebugDescribe={() => onRunDebugDescribe(row)}
                 onCopyDebug={() => onCopyDebug(row)}
                 onPreviousLogs={() => onPreviousLogs(row)}
-                onPortForward={() => {}}
+                onPortForward={() => onPortForward(row)}
                 onEvict={() => onEvict(row)}
                 onLogs={() => onLogs(row)}
                 onDelete={() => onDelete(row)}
