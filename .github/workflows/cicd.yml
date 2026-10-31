@@ -426,7 +426,19 @@ jobs:
 
             Notes:
             - Linux artifacts use normalized filenames with underscores.
-            - macOS: run `xattr -dr com.apple.quarantine /Applications/ROZOOM*.app` if quarantined.
+
+            ### macOS (Apple Silicon)
+
+            This build is not notarized yet, so macOS blocks it on first launch. Approve it once:
+
+            1. Open the .dmg and drag ROZOOM to Applications.
+            2. Launch ROZOOM. macOS will say the developer cannot be verified. Click Done.
+            3. Open System Settings > Privacy & Security, scroll to Security. Click "Open Anyway" next to the ROZOOM notice and confirm with Touch ID or your password.
+            4. Launch ROZOOM again and click Open.
+
+            macOS remembers the choice; updates install without repeating this.
+
+            Do not run `xattr -dr com.apple.quarantine`: it strips a system protection from the whole bundle.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
