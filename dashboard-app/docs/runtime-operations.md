@@ -299,11 +299,7 @@ pnpm tauri build --target x86_64-apple-darwin --bundles app,dmg
 # Artifact: src-tauri/target/*/release/bundle/dmg/*.dmg
 ```
 
-If macOS quarantines the app after install:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/ROZOOM*.app
-```
+Builds are unsigned and not notarized, so macOS blocks the app on first launch. Launch it once and click Done, then open System Settings > Privacy & Security, scroll to Security and click **Open Anyway**. Launch ROZOOM again and click Open. macOS remembers the choice. Do not remove the quarantine attribute with `xattr`: it strips a system protection from the whole bundle.
 
 ### Windows (MSI + NSIS)
 

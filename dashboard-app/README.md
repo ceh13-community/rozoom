@@ -129,11 +129,7 @@ The `local-copy/` directory will contain:
 
 ### Run unsigned application on macOS
 
-After installing the DMG, macOS may quarantine the app. Remove the quarantine flag:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/ROZOOM\ -\ K8s\ Linter\ IDE.app
-```
+Builds are unsigned and not notarized, so macOS blocks the app on first launch. Launch it once and click Done, then open System Settings > Privacy & Security, scroll to Security and click **Open Anyway**. Launch ROZOOM again and click Open. macOS remembers the choice. Do not remove the quarantine attribute with `xattr`: it strips a system protection from the whole bundle.
 
 ### What the Docker build includes
 
