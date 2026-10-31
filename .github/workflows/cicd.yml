@@ -426,7 +426,7 @@ jobs:
 
             Notes:
             - Linux artifacts use normalized filenames with underscores.
-            - macOS: run `xattr -dr com.apple.quarantine /Applications/ROZOOM*.app` if quarantined.
+            - macOS: builds are unsigned and not notarized. If Gatekeeper blocks the app, right-click it in Finder and choose **Open** to confirm once.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
