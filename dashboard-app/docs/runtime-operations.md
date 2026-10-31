@@ -299,11 +299,7 @@ pnpm tauri build --target x86_64-apple-darwin --bundles app,dmg
 # Artifact: src-tauri/target/*/release/bundle/dmg/*.dmg
 ```
 
-If macOS quarantines the app after install:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/ROZOOM*.app
-```
+Builds are unsigned and not notarized. If Gatekeeper blocks the app after install, right-click it in Finder and choose **Open** to confirm once.
 
 ### Windows (MSI + NSIS)
 

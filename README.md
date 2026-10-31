@@ -37,8 +37,7 @@
 
 You're now looking at fleet health, RBAC risks, Helm releases, and triaged workloads across every connected cluster.
 
-> **macOS quarantine:** if Gatekeeper blocks the unsigned `.app`, run
-> `xattr -dr com.apple.quarantine "/Applications/ROZOOM - K8s Linter IDE.app"`.
+> **macOS:** builds are unsigned and not notarized. If Gatekeeper blocks the app, right-click it in Finder and choose **Open** to confirm once.
 
 ---
 

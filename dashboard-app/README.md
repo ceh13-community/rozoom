@@ -129,11 +129,7 @@ The `local-copy/` directory will contain:
 
 ### Run unsigned application on macOS
 
-After installing the DMG, macOS may quarantine the app. Remove the quarantine flag:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/ROZOOM\ -\ K8s\ Linter\ IDE.app
-```
+Builds are unsigned and not notarized. If Gatekeeper blocks the app after installing the DMG, right-click it in Finder and choose **Open** to confirm once.
 
 ### What the Docker build includes
 
