@@ -37,7 +37,7 @@
 
 You're now looking at fleet health, RBAC risks, Helm releases, and triaged workloads across every connected cluster.
 
-> **macOS:** builds are unsigned and not notarized. If Gatekeeper blocks the app, right-click it in Finder and choose **Open** to confirm once.
+> **macOS:** builds are unsigned and not notarized, so macOS blocks the app on first launch. Launch it once and click Done, then open System Settings > Privacy & Security, scroll to Security and click **Open Anyway**. Launch ROZOOM again and click Open. macOS remembers the choice. Do not remove the quarantine attribute with `xattr`: it strips a system protection from the whole bundle.
 
 ---
 
