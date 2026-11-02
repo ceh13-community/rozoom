@@ -82,14 +82,19 @@ describe("WAU-C on the wire (real posthog-js)", () => {
     const wauC = await import("./wau-c");
 
     await wauC.trackCoreAction("rozoom_dashboard_viewed", "prod");
-    // Batched requests flush on a timer; compression (CompressionStream) is async.
-    await vi.advanceTimersByTimeAsync(5_000);
-    await vi.advanceTimersByTimeAsync(1_000);
-
-    const eventRequests = sent.filter(
-      (s) => /\/(e|batch)\/?\?/.test(s.url) || /\/(e|batch)\/?$/.test(s.url),
-    );
-    expect(eventRequests.length).toBeGreaterThan(0);
+    // The batch flushes on a (fake) timer, but the SDK gzips the body through
+    // CompressionStream: zlib on the libuv thread pool, real asynchrony that
+    // advancing fake timers does not wait for. On a loaded CI runner the
+    // compressed body landed after the assertion. Poll instead: vi.waitFor
+    // advances the fake timers by `interval` on every check and waits real
+    // time in between, so both the flush timer and the thread pool get there.
+    const findEventRequests = () =>
+      sent.filter((s) => /\/(e|batch)\/?\?/.test(s.url) || /\/(e|batch)\/?$/.test(s.url));
+    await vi.waitFor(() => expect(findEventRequests().length).toBeGreaterThan(0), {
+      timeout: 10_000,
+      interval: 100,
+    });
+    const eventRequests = findEventRequests();
     // No /flags or /decide call at all.
     expect(sent.some((s) => /\/(flags|decide)\//.test(s.url))).toBe(false);
     // The client asks the server not to record the IP.
