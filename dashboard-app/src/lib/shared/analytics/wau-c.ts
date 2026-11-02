@@ -44,7 +44,7 @@ export function initAnalytics(): void {
 
   try {
     posthog.init(key, {
-      api_host: env.PUBLIC_POSTHOG_HOST?.trim() || "https://us.i.posthog.com",
+      api_host: env.PUBLIC_POSTHOG_HOST?.trim() || "https://eu.i.posthog.com",
       autocapture: false,
       capture_pageview: false,
       capture_pageleave: false,
