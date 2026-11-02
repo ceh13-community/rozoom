@@ -90,6 +90,7 @@ describe("WAU-C stays dark without a PostHog key", () => {
       autocapture: false,
       capture_pageview: false,
       disable_session_recording: true,
+      person_profiles: "never",
     });
     expect(options?.property_denylist).toBe(PROPERTY_DENYLIST);
     // The screen address, referrers and the SDK's own ids never leave the app.

@@ -137,7 +137,11 @@ export async function ensureAnalytics(): Promise<boolean> {
         capture_pageview: false,
         capture_pageleave: false,
         disable_session_recording: true,
-        person_profiles: "identified_only",
+        // No person profiles at all (PM decision 2026-11-02): events still carry the
+        // install hash as distinct_id, so unique installs count the same, but PostHog
+        // creates no person record (nothing without an expiry) and, with person
+        // processing off, never builds the $set/$set_once blocks in the first place.
+        person_profiles: "never",
       });
       initialized = true;
     } catch {

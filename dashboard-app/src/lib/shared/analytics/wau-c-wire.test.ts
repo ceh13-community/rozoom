@@ -106,6 +106,8 @@ describe("WAU-C on the wire (real posthog-js)", () => {
     expect(props.source).toBe("web");
     expect(props.cluster_id).toBe("hash:prod:install-1");
     expect(props.$lib).toBe("web"); // the SDK's own technical properties still travel
+    // No person profiles: the server is told not to process a person for this event.
+    expect(props.$process_person_profile).toBe(false);
 
     const keys = flattenKeys(ours);
     const forbidden = keys.filter(
