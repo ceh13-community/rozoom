@@ -67,6 +67,51 @@ jobs:
       - name: Build web app
         run: pnpm run build
 
+  # publish-tauri and publish-tauri-slim run `licenses:write` on every platform
+  # of their matrix, but pr_checks exercises the generator on Linux only. Run
+  # the same step on the two other release platforms here, so a Windows- or
+  # macOS-only failure shows up on the PR instead of on the release build.
+  # The committed binaries manifest stands in for `download:binaries`: the
+  # generator reads only the manifest, not the binaries.
+  licenses_cross_os:
+    if: github.event_name == 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: ./.github/actions/setup-pnpm
+
+      - name: Setup rust
+        uses: ./.github/actions/setup-rust
+
+      # Same command, same default shell as the release jobs.
+      - name: Regenerate third-party licenses for the bundled versions
+        run: pnpm run licenses:write
+
+      # Same assertion as assert-bundle-licenses.sh, on the generated file.
+      - name: Generated file names the manifest versions
+        shell: bash
+        run: |
+          for tool in kubectl helm; do
+            version="$(node -p "require('./static/binaries/install-manifest.json').tools['$tool'].version")"
+            if ! grep -qF "| $version |" ../THIRD-PARTY-LICENSES.md; then
+              echo "::error::THIRD-PARTY-LICENSES.md generated on ${{ runner.os }} does not list $tool $version" >&2
+              exit 1
+            fi
+            echo "ok: $tool $version listed"
+          done
+          git diff --stat -- ../THIRD-PARTY-LICENSES.md
+
   e2e_smoke:
     if: github.event_name == 'pull_request'
     continue-on-error: true
