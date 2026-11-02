@@ -1,5 +1,5 @@
 /**
- * Anonymous identity for WAU-C telemetry — no PII, no auth.
+ * Pseudonymous install identity for WAU-C telemetry — no account data, no auth.
  *
  * install_id is a random UUID generated once per install and persisted in
  * localStorage. The value reported to PostHog is never the raw id but

@@ -52,9 +52,12 @@ Dates: current as of **2026-04-19**.
 
 - **No external telemetry** beyond optional Sentry and strictly opt-in
   usage analytics (PostHog, off by default): nothing is sent unless the
-  user accepts the first-run consent prompt, and only three anonymous
-  core-action events when they do. No autocapture, no session recording,
-  no PII, no Mixpanel/GA.
+  user accepts the first-run consent prompt. When they do, a small set of
+  named events (app opened, consent granted, cluster add attempted or
+  failed with an error class only, first diagnostic rendered, three core
+  actions) tied to a pseudonymous install hash. No autocapture, no
+  session recording, no cluster contents, no account or user data, no
+  Mixpanel/GA. Details: https://rozoom.app/privacy
 - **All cloud API calls** go through bundled CLIs (aws/gcloud/az/etc).
   The WebView never reaches a cloud endpoint directly.
 - **Local audit trail** — cluster add/remove/restore events timestamped
