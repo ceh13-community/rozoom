@@ -36,13 +36,23 @@ describe("activation funnel telemetry", () => {
     window.localStorage.clear();
   });
 
-  it("identifies with an install-level hash and stamps cluster_id on Core Actions", async () => {
+  it("boots on the install-level hash and stamps cluster_id on Core Actions", async () => {
     grantConsent();
     const { trackCoreAction, posthog } = await loadWauC();
     await trackCoreAction("rozoom_dashboard_viewed", "cluster-a");
-    expect(posthog.identify).toHaveBeenCalledWith("hash::install-1");
+    // Identity comes from bootstrap, so the funnel joins on one distinct_id from the
+    // first event and the SDK never has to merge an anonymous id via $identify.
+    expect(posthog.init).toHaveBeenCalledWith(
+      "phc_test_key",
+      expect.objectContaining({
+        bootstrap: { distinctID: "hash::install-1", isIdentifiedID: true },
+        persistence: "memory",
+      }),
+    );
+    expect(posthog.identify).not.toHaveBeenCalled();
     expect(posthog.capture).toHaveBeenCalledWith("rozoom_dashboard_viewed", {
       source: "web",
+      $geoip_disable: true,
       cluster_id: "hash:cluster-a:install-1",
     });
   });
@@ -82,7 +92,10 @@ describe("activation funnel telemetry", () => {
     grantConsent();
     const { trackConsentGranted, posthog } = await loadWauC();
     await trackConsentGranted();
-    expect(posthog.capture).toHaveBeenCalledWith("rozoom_consent_granted", { source: "web" });
+    expect(posthog.capture).toHaveBeenCalledWith("rozoom_consent_granted", {
+      source: "web",
+      $geoip_disable: true,
+    });
   });
 
   it("cluster_add_failed emits a bucketed error class, never the raw message", async () => {
@@ -91,6 +104,7 @@ describe("activation funnel telemetry", () => {
     await trackClusterAddFailed("cluster-a", "network");
     expect(posthog.capture).toHaveBeenCalledWith("rozoom_cluster_add_failed", {
       source: "web",
+      $geoip_disable: true,
       cluster_id: "hash:cluster-a:install-1",
       error_class: "network",
     });
@@ -117,10 +131,12 @@ describe("activation funnel telemetry", () => {
     expect(posthog.capture).toHaveBeenCalledTimes(2);
     expect(posthog.capture).toHaveBeenNthCalledWith(1, "rozoom_cluster_add_attempted", {
       source: "web",
+      $geoip_disable: true,
       cluster_id: "hash:cluster-a:install-1",
     });
     expect(posthog.capture).toHaveBeenNthCalledWith(2, "rozoom_first_diagnostic_rendered", {
       source: "web",
+      $geoip_disable: true,
       cluster_id: "hash:cluster-a:install-1",
     });
 
@@ -153,6 +169,7 @@ describe("activation funnel telemetry", () => {
     expect(posthog.capture).toHaveBeenCalledTimes(1);
     expect(posthog.capture).toHaveBeenCalledWith("rozoom_first_diagnostic_rendered", {
       source: "web",
+      $geoip_disable: true,
       cluster_id: "hash:cluster-a:install-1",
     });
   });
