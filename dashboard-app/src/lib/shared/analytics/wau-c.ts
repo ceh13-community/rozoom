@@ -67,11 +67,30 @@ async function installIdentity(): Promise<string> {
   return computeAnonymousHash("", getInstallId());
 }
 
+/**
+ * Cluster identity: SHA-256(cluster_id + install_id), exactly as install-identity.ts
+ * documents. The install id is the salt: the same cluster hashes differently on every
+ * install, so a short common name ("prod", "minikube") cannot be looked up across
+ * installs. Releases before 0.26.0 hashed the identifier alone; see legacyClusterHash.
+ */
 async function clusterHash(clusterId: string): Promise<string | null> {
+  try {
+    return await computeAnonymousHash(clusterId, getInstallId());
+  } catch {
+    // crypto.subtle unavailable — stay dark rather than send a malformed event.
+    return null;
+  }
+}
+
+/**
+ * The unsalted hash used by releases before 0.26.0. Never sent anywhere: kept only to
+ * recognise clusters an upgraded install already recorded in localStorage under the
+ * old scheme, so the upgrade does not re-fire one-shot events.
+ */
+async function legacyClusterHash(clusterId: string): Promise<string | null> {
   try {
     return await computeAnonymousHash(clusterId, "");
   } catch {
-    // crypto.subtle unavailable — stay dark rather than send a malformed event.
     return null;
   }
 }
@@ -242,6 +261,16 @@ export async function trackFirstDiagnosticRendered(clusterId: string): Promise<v
   if (hash === null) return;
   const seen = loadRenderedHashes();
   if (seen.has(hash)) return;
+  // An install upgraded from a release before 0.26.0 remembers this cluster under the
+  // unsalted hash. Count it as seen and move the record to the salted hash, otherwise
+  // every known cluster would report a second "first diagnostic" right after the upgrade.
+  const legacy = await legacyClusterHash(clusterId);
+  if (legacy !== null && seen.has(legacy)) {
+    seen.delete(legacy);
+    seen.add(hash);
+    saveRenderedHashes(seen);
+    return;
+  }
   const fired = await capture("rozoom_first_diagnostic_rendered", { cluster_id: hash });
   if (fired) {
     seen.add(hash);
