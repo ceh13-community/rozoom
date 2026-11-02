@@ -59,6 +59,11 @@ jobs:
       - name: UI surface inventory gate
         run: pnpm run surface:check
 
+      # No Rust toolchain in this job: the crate table is carried over from the
+      # committed file; npm, tools and license texts are checked for drift.
+      - name: Third-party licenses gate
+        run: pnpm run licenses:check -- --skip-cargo
+
       - name: Build web app
         run: pnpm run build
 
@@ -368,6 +373,12 @@ jobs:
         working-directory: ./dashboard-app
         run: pnpm download:binaries
 
+      # The manifest now names the versions that were just downloaded, so the
+      # file bundled as a resource lists exactly what ships.
+      - name: Regenerate third-party licenses for the bundled versions
+        working-directory: ./dashboard-app
+        run: pnpm run licenses:write
+
       - name: Sanitize version for MSI compatibility
         if: runner.os == 'Windows'
         shell: bash
@@ -445,6 +456,13 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
+      # Release gate: the installer carries THIRD-PARTY-LICENSES.md and that
+      # copy names the bundled kubectl and helm versions.
+      - name: Assert third-party licenses in built artifact
+        if: runner.os == 'Linux'
+        working-directory: ./dashboard-app
+        run: bash ./scripts/assert-bundle-licenses.sh src-tauri/target/release/bundle/deb/*.deb kubectl helm trivy
+
       - name: Upload .deb for render smoke
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
@@ -512,6 +530,10 @@ jobs:
         working-directory: ./dashboard-app
         run: pnpm download:binaries
 
+      - name: Regenerate third-party licenses for the bundled versions
+        working-directory: ./dashboard-app
+        run: pnpm run licenses:write
+
       - name: Sanitize version for MSI compatibility
         if: runner.os == 'Windows'
         shell: bash
@@ -558,6 +580,11 @@ jobs:
         if: runner.os == 'Linux'
         working-directory: ./dashboard-app
         run: bash ./scripts/assert-slim-updater-endpoint.sh src-tauri/target/release/bundle/deb/*_slim.deb
+
+      - name: Assert third-party licenses in slim artifact
+        if: runner.os == 'Linux'
+        working-directory: ./dashboard-app
+        run: bash ./scripts/assert-bundle-licenses.sh src-tauri/target/release/bundle/deb/*_slim.deb kubectl helm
 
       - name: Report slim artifact sizes
         shell: bash

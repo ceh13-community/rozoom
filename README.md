@@ -135,6 +135,8 @@ The current version is defined in:
 
 The ROZOOM core is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
 
+The bundled command-line tools (kubectl, Helm and the others) and the libraries the app is built from are distributed under their own licenses, listed with their texts in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md). The same file ships inside every installer.
+
 Marketplace plugins may be subject to their own license terms.
 
 Copyright (c) 2024-2026 ROZOOM contributors.

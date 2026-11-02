@@ -1,0 +1,145 @@
+{
+  "$comment": "Hand-maintained table of the command-line tools bundled as Tauri sidecars and resources. Versions come from dashboard-app/static/binaries/install-manifest.json at generation time; this file holds what does not change per release: upstream, license, and the tag pattern that turns a version into a source tree URL. Placeholders: {version} as in the manifest, {bare} without a leading v, {underscored} bare with dots replaced by underscores.",
+  "tools": {
+    "kubectl": {
+      "name": "kubectl",
+      "upstream": "https://github.com/kubernetes/kubernetes",
+      "sourceUrl": "https://github.com/kubernetes/kubernetes/tree/{version}",
+      "license": "Apache-2.0",
+      "variants": ["full", "slim"]
+    },
+    "helm": {
+      "name": "Helm",
+      "upstream": "https://github.com/helm/helm",
+      "sourceUrl": "https://github.com/helm/helm/tree/{version}",
+      "license": "Apache-2.0",
+      "variants": ["full", "slim"]
+    },
+    "doctl": {
+      "name": "doctl",
+      "upstream": "https://github.com/digitalocean/doctl",
+      "sourceUrl": "https://github.com/digitalocean/doctl/tree/{version}",
+      "license": "Apache-2.0",
+      "variants": ["full"]
+    },
+    "pluto": {
+      "name": "Pluto",
+      "upstream": "https://github.com/FairwindsOps/pluto",
+      "sourceUrl": "https://github.com/FairwindsOps/pluto/tree/{version}",
+      "license": "Apache-2.0",
+      "variants": ["full"]
+    },
+    "velero": {
+      "name": "Velero",
+      "upstream": "https://github.com/vmware-tanzu/velero",
+      "sourceUrl": "https://github.com/vmware-tanzu/velero/tree/{version}",
+      "license": "Apache-2.0",
+      "variants": ["full"]
+    },
+    "aws": {
+      "name": "AWS CLI v2",
+      "upstream": "https://github.com/aws/aws-cli",
+      "sourceUrl": "https://github.com/aws/aws-cli/tree/{bare}",
+      "license": "Apache-2.0",
+      "variants": ["full"],
+      "bundledAs": "resources/binaries/aws-dist",
+      "note": "Shipped as the upstream self-contained distribution. It embeds a Python runtime and Python packages; each package keeps its own license file inside the aws-dist directory."
+    },
+    "kustomize": {
+      "name": "Kustomize",
+      "upstream": "https://github.com/kubernetes-sigs/kustomize",
+      "sourceUrl": "https://github.com/kubernetes-sigs/kustomize/tree/{version}",
+      "license": "Apache-2.0",
+      "variants": ["full"]
+    },
+    "kubeconform": {
+      "name": "kubeconform",
+      "upstream": "https://github.com/yannh/kubeconform",
+      "sourceUrl": "https://github.com/yannh/kubeconform/tree/{version}",
+      "license": "Apache-2.0",
+      "variants": ["full"]
+    },
+    "stern": {
+      "name": "stern",
+      "upstream": "https://github.com/stern/stern",
+      "sourceUrl": "https://github.com/stern/stern/tree/{version}",
+      "license": "Apache-2.0",
+      "variants": ["full"]
+    },
+    "yq": {
+      "name": "yq",
+      "upstream": "https://github.com/mikefarah/yq",
+      "sourceUrl": "https://github.com/mikefarah/yq/tree/{version}",
+      "license": "MIT",
+      "variants": ["full"]
+    },
+    "hcloud": {
+      "name": "hcloud (Hetzner Cloud CLI)",
+      "upstream": "https://github.com/hetznercloud/cli",
+      "sourceUrl": "https://github.com/hetznercloud/cli/tree/{version}",
+      "license": "MIT",
+      "variants": ["full"]
+    },
+    "oc": {
+      "name": "oc (OpenShift client, OKD build)",
+      "upstream": "https://github.com/openshift/oc",
+      "sourceUrl": "https://github.com/okd-project/okd/releases/tag/{version}",
+      "license": "Apache-2.0",
+      "variants": ["full"],
+      "note": "The binary is taken from the OKD release of the same version; the source is the openshift/oc repository."
+    },
+    "az": {
+      "name": "Azure CLI",
+      "upstream": "https://github.com/Azure/azure-cli",
+      "sourceUrl": "https://github.com/Azure/azure-cli/tree/azure-cli-{bare}",
+      "license": "MIT",
+      "variants": ["full"],
+      "bundledAs": "resources/binaries/az-dist",
+      "note": "Shipped as the contents of the upstream Debian package. It embeds a Python runtime and Python packages; each package keeps its own license file inside the az-dist directory."
+    },
+    "curl": {
+      "name": "curl (static build)",
+      "upstream": "https://github.com/curl/curl",
+      "sourceUrl": "https://github.com/curl/curl/tree/curl-{underscored}",
+      "license": "curl",
+      "variants": ["full"],
+      "note": "Static binary from https://github.com/stunnel/static-curl (build scripts under MIT, see LICENSE.static-curl). The binary statically links OpenSSL (Apache-2.0), libssh2 (BSD-3-Clause), nghttp2, nghttp3 and ngtcp2 (MIT), brotli (MIT), zstd (BSD-3-Clause), zlib-ng (Zlib), c-ares (MIT), libpsl (MIT) and libidn2 (LGPL-3.0-or-later or GPL-2.0-or-later), each under its own upstream license."
+    },
+    "doggo": {
+      "name": "doggo",
+      "upstream": "https://github.com/mr-karan/doggo",
+      "sourceUrl": "https://github.com/mr-karan/doggo/tree/{version}",
+      "license": "GPL-3.0",
+      "variants": ["full"],
+      "note": "Distributed unmodified as a separate executable; the app runs it as a subprocess. The complete corresponding source is at the source URL above."
+    },
+    "grpcurl": {
+      "name": "grpcurl",
+      "upstream": "https://github.com/fullstorydev/grpcurl",
+      "sourceUrl": "https://github.com/fullstorydev/grpcurl/tree/{version}",
+      "license": "MIT",
+      "variants": ["full"]
+    },
+    "websocat": {
+      "name": "websocat",
+      "upstream": "https://github.com/vi/websocat",
+      "sourceUrl": "https://github.com/vi/websocat/tree/{version}",
+      "license": "MIT",
+      "variants": ["full"]
+    },
+    "tcping": {
+      "name": "tcping",
+      "upstream": "https://github.com/cloverstd/tcping",
+      "sourceUrl": "https://github.com/cloverstd/tcping/tree/{version}",
+      "license": "MIT",
+      "variants": ["full"]
+    },
+    "trivy": {
+      "name": "Trivy",
+      "upstream": "https://github.com/aquasecurity/trivy",
+      "sourceUrl": "https://github.com/aquasecurity/trivy/tree/{version}",
+      "license": "Apache-2.0",
+      "variants": ["full"]
+    }
+  }
+}

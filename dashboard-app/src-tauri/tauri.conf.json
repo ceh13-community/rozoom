@@ -44,10 +44,11 @@
       "binaries/rozoom-tcping",
       "binaries/rozoom-trivy"
     ],
-    "resources": [
-      "binaries/aws-dist",
-      "binaries/az-dist"
-    ],
+    "resources": {
+      "binaries/aws-dist": "binaries/aws-dist",
+      "binaries/az-dist": "binaries/az-dist",
+      "../../THIRD-PARTY-LICENSES.md": "THIRD-PARTY-LICENSES.md"
+    },
     "active": true,
     "targets": [
       "deb",
