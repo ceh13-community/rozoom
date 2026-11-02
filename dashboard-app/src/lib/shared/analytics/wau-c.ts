@@ -181,7 +181,7 @@ async function capture(event: string, props: Record<string, unknown> = {}): Prom
 }
 
 /**
- * Emit a Core Action. Resolves the anonymous identity lazily so we never block
+ * Emit a Core Action. Resolves the pseudonymous identity lazily so we never block
  * first paint. No-ops silently when analytics is not initialised.
  */
 export async function trackCoreAction(event: CoreAction, clusterId: string): Promise<void> {
