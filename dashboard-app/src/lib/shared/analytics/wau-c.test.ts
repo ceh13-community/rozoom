@@ -8,6 +8,12 @@ vi.mock("posthog-js", () => ({
   },
 }));
 
+vi.mock("./install-identity", () => ({
+  getInstallId: () => "install-1",
+  computeAnonymousHash: async (clusterId: string, installId: string) =>
+    `hash:${clusterId}:${installId}`,
+}));
+
 // wau-c.ts keeps a module-level `initialized` flag, so every test gets a
 // fresh copy of the module via resetModules + dynamic import. resetModules
 // also re-evaluates the posthog-js and $env mocks, so all three must be
@@ -63,17 +69,54 @@ describe("WAU-C stays dark without a PostHog key", () => {
 
   it("initialises with a real key and granted consent", async () => {
     grantConsent();
-    const { initAnalytics, posthog, env } = await loadWauC();
+    const { ensureAnalytics, posthog, env } = await loadWauC();
     env.PUBLIC_POSTHOG_KEY = "phc_test_key";
-    initAnalytics();
+    await expect(ensureAnalytics()).resolves.toBe(true);
     expect(posthog.init).toHaveBeenCalledTimes(1);
     expect(vi.mocked(posthog.init).mock.calls[0]?.[0]).toBe("phc_test_key");
   });
 
-  it("stays dark with a key but without consent", async () => {
-    const { initAnalytics, posthog, env } = await loadWauC();
+  it("boots identified on the install hash and keeps nothing of PostHog's on disk", async () => {
+    grantConsent();
+    const { ensureAnalytics, PROPERTY_DENYLIST, posthog, env } = await loadWauC();
     env.PUBLIC_POSTHOG_KEY = "phc_test_key";
-    initAnalytics();
+    await ensureAnalytics();
+    const options = vi.mocked(posthog.init).mock.calls[0]?.[1];
+    expect(options).toMatchObject({
+      persistence: "memory",
+      bootstrap: { distinctID: "hash::install-1", isIdentifiedID: true },
+      advanced_disable_flags: true,
+      ip: false,
+      autocapture: false,
+      capture_pageview: false,
+      disable_session_recording: true,
+    });
+    expect(options?.property_denylist).toBe(PROPERTY_DENYLIST);
+    // The screen address, referrers and the SDK's own ids never leave the app.
+    expect(PROPERTY_DENYLIST).toEqual(
+      expect.arrayContaining([
+        "$current_url",
+        "$pathname",
+        "$referrer",
+        "$device_id",
+        "$session_id",
+      ]),
+    );
+    expect(posthog.identify).not.toHaveBeenCalled();
+  });
+
+  it("shares one in-flight init between concurrent callers", async () => {
+    grantConsent();
+    const { ensureAnalytics, posthog, env } = await loadWauC();
+    env.PUBLIC_POSTHOG_KEY = "phc_test_key";
+    await Promise.all([ensureAnalytics(), ensureAnalytics(), ensureAnalytics()]);
+    expect(posthog.init).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays dark with a key but without consent", async () => {
+    const { ensureAnalytics, posthog, env } = await loadWauC();
+    env.PUBLIC_POSTHOG_KEY = "phc_test_key";
+    await expect(ensureAnalytics()).resolves.toBe(false);
     expect(posthog.init).not.toHaveBeenCalled();
   });
 });

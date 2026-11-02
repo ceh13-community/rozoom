@@ -36,14 +36,24 @@ describe("activation funnel telemetry", () => {
     window.localStorage.clear();
   });
 
-  it("identifies with an install-level hash and stamps cluster_id on Core Actions", async () => {
+  it("boots on the install-level hash and stamps cluster_id on Core Actions", async () => {
     grantConsent();
     const { trackCoreAction, posthog } = await loadWauC();
     await trackCoreAction("rozoom_dashboard_viewed", "cluster-a");
-    expect(posthog.identify).toHaveBeenCalledWith("hash::install-1");
+    // Identity comes from bootstrap, so the funnel joins on one distinct_id from the
+    // first event and the SDK never has to merge an anonymous id via $identify.
+    expect(posthog.init).toHaveBeenCalledWith(
+      "phc_test_key",
+      expect.objectContaining({
+        bootstrap: { distinctID: "hash::install-1", isIdentifiedID: true },
+        persistence: "memory",
+      }),
+    );
+    expect(posthog.identify).not.toHaveBeenCalled();
     expect(posthog.capture).toHaveBeenCalledWith("rozoom_dashboard_viewed", {
       source: "web",
-      cluster_id: "hash:cluster-a:",
+      $geoip_disable: true,
+      cluster_id: "hash:cluster-a:install-1",
     });
   });
 
@@ -82,7 +92,10 @@ describe("activation funnel telemetry", () => {
     grantConsent();
     const { trackConsentGranted, posthog } = await loadWauC();
     await trackConsentGranted();
-    expect(posthog.capture).toHaveBeenCalledWith("rozoom_consent_granted", { source: "web" });
+    expect(posthog.capture).toHaveBeenCalledWith("rozoom_consent_granted", {
+      source: "web",
+      $geoip_disable: true,
+    });
   });
 
   it("cluster_add_failed emits a bucketed error class, never the raw message", async () => {
@@ -91,7 +104,8 @@ describe("activation funnel telemetry", () => {
     await trackClusterAddFailed("cluster-a", "network");
     expect(posthog.capture).toHaveBeenCalledWith("rozoom_cluster_add_failed", {
       source: "web",
-      cluster_id: "hash:cluster-a:",
+      $geoip_disable: true,
+      cluster_id: "hash:cluster-a:install-1",
       error_class: "network",
     });
   });
@@ -117,11 +131,13 @@ describe("activation funnel telemetry", () => {
     expect(posthog.capture).toHaveBeenCalledTimes(2);
     expect(posthog.capture).toHaveBeenNthCalledWith(1, "rozoom_cluster_add_attempted", {
       source: "web",
-      cluster_id: "hash:cluster-a:",
+      $geoip_disable: true,
+      cluster_id: "hash:cluster-a:install-1",
     });
     expect(posthog.capture).toHaveBeenNthCalledWith(2, "rozoom_first_diagnostic_rendered", {
       source: "web",
-      cluster_id: "hash:cluster-a:",
+      $geoip_disable: true,
+      cluster_id: "hash:cluster-a:install-1",
     });
 
     // The queue is one-shot and the first-diagnostic flag is now persisted.
@@ -153,7 +169,37 @@ describe("activation funnel telemetry", () => {
     expect(posthog.capture).toHaveBeenCalledTimes(1);
     expect(posthog.capture).toHaveBeenCalledWith("rozoom_first_diagnostic_rendered", {
       source: "web",
-      cluster_id: "hash:cluster-a:",
+      $geoip_disable: true,
+      cluster_id: "hash:cluster-a:install-1",
     });
+  });
+
+  it("does not re-fire first_diagnostic for a cluster recorded by a pre-0.26.0 release", async () => {
+    grantConsent();
+    // Releases before 0.26.0 stored the unsalted hash (install id not mixed in).
+    window.localStorage.setItem(
+      "rozoom.first_diagnostic_rendered",
+      JSON.stringify(["hash:cluster-a:"]),
+    );
+    const { trackFirstDiagnosticRendered, posthog } = await loadWauC();
+
+    await trackFirstDiagnosticRendered("cluster-a");
+
+    expect(posthog.capture).not.toHaveBeenCalled();
+    // The record moves to the salted hash so later renders stay silent too.
+    expect(
+      JSON.parse(window.localStorage.getItem("rozoom.first_diagnostic_rendered") ?? "[]"),
+    ).toEqual(["hash:cluster-a:install-1"]);
+    await trackFirstDiagnosticRendered("cluster-a");
+    expect(posthog.capture).not.toHaveBeenCalled();
+  });
+
+  it("the salt makes the same cluster hash differently per install", async () => {
+    grantConsent();
+    const { trackCoreAction, posthog } = await loadWauC();
+    await trackCoreAction("rozoom_dashboard_viewed", "prod");
+    const [, props] = vi.mocked(posthog.capture).mock.calls[0] ?? [];
+    expect((props as { cluster_id: string }).cluster_id).toBe("hash:prod:install-1");
+    expect((props as { cluster_id: string }).cluster_id).not.toBe("hash:prod:");
   });
 });
