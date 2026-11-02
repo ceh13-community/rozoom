@@ -14,11 +14,14 @@
     ShieldOff,
     SquareChevronRight,
     MessageSquareCode,
+    BookCopy,
   } from "$shared/ui/icons";
+  import { openExternalUrl } from "$shared/api/in-app-browser";
   import { LightSwitch } from "$shared/ui/light-switch";
   import { NAV_ACTIVE_CLASS, NAV_ACTIVE_HOVER_CLASS } from "$shared/ui/nav-active";
   import { BUNDLED_TOOLS } from "$shared/config/tooling";
   const appVersion: string = __APP_VERSION__;
+  const DOCS_URL = "https://rozoom.app/docs";
   import type { InstallManifest } from "$shared/config/tooling";
   import {
     globalLinterEnabled,
@@ -126,13 +129,25 @@
         <Settings class="h-4 w-4" />
         <span class={cn(sidebarOpen ? "block" : "hidden")}>Settings</span>
       </Button>
+      <Button
+        class="w-full p-2 justify-start"
+        variant="ghost"
+        onclick={() => void openExternalUrl(DOCS_URL)}
+        title="Documentation"
+        aria-label="Documentation"
+      >
+        <BookCopy class="h-4 w-4" />
+        <span class={cn(sidebarOpen ? "block" : "hidden")}>Documentation</span>
+      </Button>
       <LightSwitch showLabel={sidebarOpen} />
       <Popover.Root>
         <Popover.Trigger class="w-full">
           <button
             class="flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium text-muted-foreground hover:bg-muted relative"
             title="Notifications"
-            aria-label={$unreadCount > 0 ? `Notifications, ${$unreadCount} unread` : "Notifications"}
+            aria-label={$unreadCount > 0
+              ? `Notifications, ${$unreadCount} unread`
+              : "Notifications"}
           >
             <Bell class="h-4 w-4" />
             {#if $unreadCount > 0}

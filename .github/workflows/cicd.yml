@@ -424,6 +424,8 @@ jobs:
 
             Download the package matching your OS and architecture.
 
+            Full documentation: https://rozoom.app/docs
+
             Notes:
             - Linux artifacts use normalized filenames with underscores.
 
