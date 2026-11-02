@@ -1,12 +1,16 @@
 import { toast } from "svelte-sonner";
 import { env } from "$env/dynamic/public";
 import { needsConsentPrompt, setTelemetryConsent } from "./consent";
+import TelemetryConsentDescription from "./telemetry-consent-description.svelte";
 import {
   flushPendingFunnelEvents,
   initAnalytics,
   trackAppOpened,
   trackConsentGranted,
 } from "./wau-c";
+
+/** The description slot as svelte-sonner types it (string or a Svelte 4 component class). */
+type ToastDescription = NonNullable<Parameters<typeof toast.info>[1]>["description"];
 
 // Shown at most once per session: the first-scan trigger lives in the cluster
 // cards, which re-run their effect on every health-check update.
@@ -29,9 +33,11 @@ export function maybePromptTelemetryConsent(): void {
   if (promptedThisSession) return;
   promptedThisSession = true;
   toast.info("Help improve Rozoom?", {
-    description:
-      "Share anonymous usage counts for three core actions — an anonymous " +
-      "install hash, no personal data, no session recording. Off unless you allow it.",
+    // Copy from the designer spec (mM8lRQ78): processor, region and a privacy
+    // link in one line; what exactly is counted is explained on that page.
+    // svelte-sonner 0.3 types the component slot for Svelte 4 component classes;
+    // Svelte 5 components render fine there at runtime but not in the type system.
+    description: TelemetryConsentDescription as unknown as ToastDescription,
     duration: Number.POSITIVE_INFINITY,
     action: {
       label: "Allow",

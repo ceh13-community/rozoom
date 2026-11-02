@@ -1,6 +1,8 @@
 <script lang="ts">
   import { Input } from "$shared/ui/input";
   import { Button } from "$shared/ui/button";
+  import PrivacyPolicyLink from "$shared/analytics/privacy-policy-link.svelte";
+  import { TELEMETRY_SETTINGS_DESCRIPTION } from "$shared/analytics/telemetry-copy";
   import {
     envSortPriority,
     moveEnv,
@@ -409,8 +411,8 @@
       <div class="space-y-0.5">
         <div class="text-xs font-semibold">Usage telemetry</div>
         <div class="text-xs text-muted-foreground">
-          Anonymous usage counts for three core actions, keyed by an anonymous install hash. No
-          personal data, no session recording. Off unless you allow it.
+          {TELEMETRY_SETTINGS_DESCRIPTION}
+          <PrivacyPolicyLink />
         </div>
       </div>
       {#if telemetryDnt}
