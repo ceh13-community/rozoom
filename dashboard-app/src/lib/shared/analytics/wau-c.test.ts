@@ -105,6 +105,36 @@ describe("WAU-C stays dark without a PostHog key", () => {
     expect(posthog.identify).not.toHaveBeenCalled();
   });
 
+  it("strips the person payload posthog-js adds outside the denylist's reach", async () => {
+    grantConsent();
+    const { ensureAnalytics, stripPersonPayload, posthog, env } = await loadWauC();
+    env.PUBLIC_POSTHOG_KEY = "phc_test_key";
+    await ensureAnalytics();
+    const options = vi.mocked(posthog.init).mock.calls[0]?.[1];
+    expect(options?.before_send).toBe(stripPersonPayload);
+
+    const outgoing = stripPersonPayload({
+      event: "rozoom_app_opened",
+      properties: {
+        source: "web",
+        $geoip_disable: true,
+        first_run: true,
+        $initial_current_url: "tauri://localhost/dashboard/clusters/abc",
+        $initial_referrer: "$direct",
+        $set: { $current_url: "tauri://localhost/dashboard" },
+        $set_once: { $initial_pathname: "/dashboard" },
+      },
+      $set: { $current_url: "tauri://localhost/dashboard/clusters/abc", $os: "Linux" },
+      $set_once: { $initial_current_url: "tauri://localhost/dashboard/clusters/abc" },
+    });
+
+    expect(outgoing).toEqual({
+      event: "rozoom_app_opened",
+      properties: { source: "web", $geoip_disable: true, first_run: true },
+    });
+    expect(stripPersonPayload(null)).toBeNull();
+  });
+
   it("shares one in-flight init between concurrent callers", async () => {
     grantConsent();
     const { ensureAnalytics, posthog, env } = await loadWauC();
