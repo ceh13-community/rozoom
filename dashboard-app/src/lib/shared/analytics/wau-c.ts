@@ -63,6 +63,35 @@ export const PROPERTY_DENYLIST = [
  */
 const BASE_EVENT_PROPS = { source: "web", $geoip_disable: true } as const;
 
+/** The shape posthog-js hands to `before_send`: the event name plus the payload blocks we care about. */
+type OutgoingEvent = {
+  event: string;
+  properties?: Record<string, unknown>;
+  $set?: Record<string, unknown>;
+  $set_once?: Record<string, unknown>;
+} | null;
+
+/**
+ * Last hook before the wire. For an identified person posthog-js attaches person
+ * payload outside `properties`: `$set` (current URL, host, path, referrer) and, once
+ * per session, `$set_once` with the `$initial_*` versions of the same. `property_denylist`
+ * never sees those blocks, so they are stripped here, together with any `$initial_*`
+ * key that may still sit in `properties`. The event itself is kept.
+ */
+export function stripPersonPayload<T extends OutgoingEvent>(event: T): T {
+  if (!event) return event;
+  delete event.$set;
+  delete event.$set_once;
+  if (event.properties) {
+    event.properties = Object.fromEntries(
+      Object.entries(event.properties).filter(
+        ([key]) => key !== "$set" && key !== "$set_once" && !key.startsWith("$initial_"),
+      ),
+    );
+  }
+  return event;
+}
+
 /**
  * Kick off initialisation without waiting for it. Safe to call on every app mount
  * and again right after consent is granted; see ensureAnalytics for the rules.
@@ -97,6 +126,9 @@ export async function ensureAnalytics(): Promise<boolean> {
         // and consent flags live under rozoom.* keys and are not the SDK's.
         persistence: "memory",
         property_denylist: PROPERTY_DENYLIST,
+        // Person payload ($set/$set_once with the first and current URL) bypasses the
+        // denylist; drop it on the way out.
+        before_send: stripPersonPayload,
         // We define no feature flags, so never call /flags (also skips remote config).
         advanced_disable_flags: true,
         // Ask the server not to record the client IP; the EU project discards it anyway.
@@ -105,7 +137,11 @@ export async function ensureAnalytics(): Promise<boolean> {
         capture_pageview: false,
         capture_pageleave: false,
         disable_session_recording: true,
-        person_profiles: "identified_only",
+        // No person profiles at all (PM decision 2026-11-02): events still carry the
+        // install hash as distinct_id, so unique installs count the same, but PostHog
+        // creates no person record (nothing without an expiry) and, with person
+        // processing off, never builds the $set/$set_once blocks in the first place.
+        person_profiles: "never",
       });
       initialized = true;
     } catch {
