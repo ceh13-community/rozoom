@@ -2,15 +2,15 @@ import { toast } from "svelte-sonner";
 import { env } from "$env/dynamic/public";
 import { needsConsentPrompt, setTelemetryConsent } from "./consent";
 import TelemetryConsentDescription from "./telemetry-consent-description.svelte";
-
-/** The description slot as svelte-sonner types it (string or a Svelte 4 component class). */
-type ToastDescription = NonNullable<Parameters<typeof toast.info>[1]>["description"];
 import {
   flushPendingFunnelEvents,
   initAnalytics,
   trackAppOpened,
   trackConsentGranted,
 } from "./wau-c";
+
+/** The description slot as svelte-sonner types it (string or a Svelte 4 component class). */
+type ToastDescription = NonNullable<Parameters<typeof toast.info>[1]>["description"];
 
 // Shown at most once per session: the first-scan trigger lives in the cluster
 // cards, which re-run their effect on every health-check update.
