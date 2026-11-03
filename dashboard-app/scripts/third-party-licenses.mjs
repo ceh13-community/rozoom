@@ -33,9 +33,15 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const APP_DIR = path.resolve(new URL(".", import.meta.url).pathname, "..");
+// Not URL.pathname: on Windows that is "/D:/a/..." and path.resolve turns it
+// into a path on the wrong drive.
+const APP_DIR = fileURLToPath(new URL("..", import.meta.url));
 const REPO_DIR = path.resolve(APP_DIR, "..");
+// pnpm is a .cmd shim on Windows, which Node only spawns through a shell.
+// The arguments passed below carry no shell metacharacters.
+const SPAWN_SHELL = process.platform === "win32";
 const OUTPUT = path.join(REPO_DIR, "THIRD-PARTY-LICENSES.md");
 const MANIFEST = path.join(APP_DIR, "static", "binaries", "install-manifest.json");
 const TOOLS_TABLE = path.join(REPO_DIR, "third-party", "tools.json");
@@ -199,6 +205,7 @@ function npmPackages() {
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
     stdio: ["ignore", "pipe", "ignore"],
+    shell: SPAWN_SHELL,
   });
   const byLicense = JSON.parse(raw);
   const packages = [];
@@ -242,6 +249,7 @@ function cargoCrates() {
     encoding: "utf8",
     maxBuffer: 256 * 1024 * 1024,
     stdio: ["ignore", "pipe", "inherit"],
+    shell: SPAWN_SHELL,
   });
   const meta = JSON.parse(raw);
   const workspace = new Set(meta.workspace_members);
