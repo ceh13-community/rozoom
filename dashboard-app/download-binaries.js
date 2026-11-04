@@ -2244,6 +2244,12 @@ async function prefixSidecarBinaries() {
 // on a missing `rozoom-<tool>-<triple>` sidecar. Bound these steps with a timer
 // (which keeps the loop alive) and fall back to the same stub macOS ships.
 const RESOURCE_STEP_TIMEOUT_MS = 120_000;
+// The aws/az dists are a different size class: a ~60 MB zip unpacked into
+// thousands of files and copied again. The same step took 10 s on the
+// 2026-10-12 release runner and more than 120 s on the 2026-11-04 one (run
+// 41787001371), which turned the Linux full-offline bundle into a stub without
+// failing the build. Give these two steps ten minutes; a real hang still ends.
+const RESOURCE_DIST_TIMEOUT_MS = 600_000;
 
 async function withTimeout(promise, ms, label) {
   let timer;
@@ -2262,10 +2268,12 @@ async function withTimeout(promise, ms, label) {
 async function runResource(name, fn, stubDir) {
   if (!isToolEnabled(name)) return;
   try {
-    await withTimeout(fn(), RESOURCE_STEP_TIMEOUT_MS, name);
+    await withTimeout(fn(), RESOURCE_DIST_TIMEOUT_MS, name);
   } catch (e) {
+    // `::warning::` surfaces the fallback in the GitHub run summary: the build
+    // stays green, but the bundle ships without this tool.
     console.warn(
-      `⚠️ ${name} install failed (${e?.message ?? e}); falling back to stub ${stubDir}/`,
+      `::warning::${name} install failed (${e?.message ?? e}); falling back to stub ${stubDir}/ (not bundled)`,
     );
     await ensureResourceStub(stubDir);
   }
