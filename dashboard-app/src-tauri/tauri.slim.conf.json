@@ -7,7 +7,11 @@
   },
   "bundle": {
     "externalBin": ["binaries/rozoom-kubectl", "binaries/rozoom-helm"],
-    "resources": { "../../THIRD-PARTY-LICENSES.md": "THIRD-PARTY-LICENSES.md" }
+    "resources": {
+      "binaries/aws-dist": null,
+      "binaries/az-dist": null,
+      "../../THIRD-PARTY-LICENSES.md": "THIRD-PARTY-LICENSES.md"
+    }
   },
   "plugins": {
     "updater": {
