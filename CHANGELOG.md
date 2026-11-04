@@ -8,6 +8,36 @@ the user-facing change in plain language. The in-app update notification
 deliberately shows fixed copy and never displays these notes.
 The release build fails if the section for the released version is missing.
 
+## [0.26.0] - 2026-11-04
+
+Usage telemetry now goes to PostHog in the EU (Frankfurt) and sends less:
+usage counts tied to a random install ID, no person profiles, no screen
+addresses and no device identifiers. The consent prompt names the processor
+and region and links the privacy policy. Every bundle now ships
+THIRD-PARTY-LICENSES.md, and the sidebar links to the user documentation at
+rozoom.app/docs.
+
+### Added
+
+- THIRD-PARTY-LICENSES.md in every bundle, generated at release time from the
+  real npm and Cargo dependency trees and the bundled CLI tools.
+- Sidebar link to the user documentation at rozoom.app/docs.
+- Port-forward action in the pod actions menu of the flat (default) pods view.
+- Workload Map plugin is on by default (preferences migration v3).
+
+### Changed
+
+- Telemetry endpoint moved to PostHog EU Cloud; the consent prompt and the
+  Fleet Settings toggle name PostHog (EU, Frankfurt) and link the privacy
+  policy.
+- Telemetry payload minimised: the cluster hash is salted, no person profiles
+  are created, geolocation lookup is off, and the screen address, referrer and
+  device or session identifiers never leave the app.
+- Read-only clusters are enforced where kubectl and helm actually run, not only
+  in the UI.
+- Sentry scrubs credentials by default in all modes.
+- Linux releases ship .deb and .rpm; the AppImage is no longer published.
+
 ## [0.25.3] - 2026-10-12
 
 The manifest linter is now on by default for every cluster you connect: new
