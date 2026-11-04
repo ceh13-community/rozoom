@@ -55,6 +55,10 @@
     // re-render reactively once the store updates.
     void loadPluginState();
     const handleClick = (event: MouseEvent) => {
+      // A component that already handled the click (preventDefault, e.g. the
+      // privacy-policy link, which goes to the system browser) must not get a
+      // second, in-app window on top of it.
+      if (event.defaultPrevented) return;
       const target = event.target as HTMLElement | null;
       const anchor = target?.closest("a[href]") as HTMLAnchorElement | null;
       if (!anchor) return;
