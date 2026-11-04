@@ -116,7 +116,9 @@ function identifiers(expression) {
 }
 
 function versionPlaceholders(version) {
-  const bare = version.replace(/^v/, "");
+  // Packaging builds carry a "-<n>" suffix (static-curl tags its releases
+  // 8.23.0-1); upstream tags never do, so the source link uses the bare version.
+  const bare = version.replace(/^v/, "").replace(/-\d+$/, "");
   return { version, bare, underscored: bare.replace(/\./g, "_") };
 }
 

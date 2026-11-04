@@ -508,6 +508,14 @@ jobs:
         working-directory: ./dashboard-app
         run: bash ./scripts/assert-bundle-licenses.sh src-tauri/target/release/bundle/deb/*.deb kubectl helm trivy
 
+      # aws-dist/az-dist fall back to an empty stub when their install fails or
+      # stalls; the build stays green and the Linux full-offline bundle ships
+      # without the AWS/Azure CLI (release 0.26.0, 2026-11-04). Red build instead.
+      - name: Assert aws/az resource dirs in built artifact
+        if: runner.os == 'Linux'
+        working-directory: ./dashboard-app
+        run: bash ./scripts/assert-bundle-resources.sh src-tauri/target/release/bundle/deb/*.deb aws az
+
       - name: Upload .deb for render smoke
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4

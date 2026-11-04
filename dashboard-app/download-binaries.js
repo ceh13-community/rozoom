@@ -316,7 +316,18 @@ async function extractZipSafe(source, opts) {
     }
     return;
   }
-  return extractZip(source, { dir: destDir });
+  // Linux/macOS: the JS extractor (extract-zip/yauzl) hung on the aws zip in CI on
+  // 2026-11-04 (two release runs, Node 26.13: no "aws installed" line, the next
+  // step started 20-45 ms after the timeout fired, az on the same runner took 3 s).
+  // Use the system unzip, synchronous like the Windows path; fall back to the JS
+  // extractor only where unzip is missing.
+  try {
+    execSync("unzip -v", { stdio: "ignore" });
+  } catch {
+    console.warn("  unzip not found, falling back to extract-zip");
+    return extractZip(source, { dir: destDir });
+  }
+  execSync(`unzip -q -o "${source}" -d "${destDir}"`, { stdio: "inherit" });
 }
 
 async function rmForce(p) {
@@ -2264,8 +2275,10 @@ async function runResource(name, fn, stubDir) {
   try {
     await withTimeout(fn(), RESOURCE_STEP_TIMEOUT_MS, name);
   } catch (e) {
+    // `::warning::` surfaces the fallback in the GitHub run summary: the build
+    // stays green, but the bundle ships without this tool.
     console.warn(
-      `⚠️ ${name} install failed (${e?.message ?? e}); falling back to stub ${stubDir}/`,
+      `::warning::${name} install failed (${e?.message ?? e}); falling back to stub ${stubDir}/ (not bundled)`,
     );
     await ensureResourceStub(stubDir);
   }
