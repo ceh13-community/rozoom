@@ -129,10 +129,20 @@ function fillTemplate(template, version) {
 /* Bundled tools                                                               */
 /* -------------------------------------------------------------------------- */
 
-function toolsSection() {
+/**
+ * @param {boolean} strict  `--check` compares against the committed reference manifest,
+ *   where every tool in third-party/tools.json must be present. The release build
+ *   (`--write`) runs right after `download:binaries`, whose manifest names only what
+ *   was actually installed: an optional resource that is Linux-only (aws) or whose
+ *   install stalled is replaced by an empty stub and has no manifest entry. Nothing
+ *   of it ships, so there is nothing to license: warn and leave the row out instead
+ *   of failing the release on every platform.
+ */
+function toolsSection(strict) {
   const manifest = readJson(MANIFEST).tools ?? {};
   const tools = readJson(TOOLS_TABLE).tools;
   const names = Object.keys(tools).sort();
+  // A shipped tool without a license entry is always an error, in both modes.
   const missing = Object.keys(manifest).filter((k) => !tools[k] && k !== "gcloud");
   if (missing.length) {
     throw new Error(
@@ -148,10 +158,12 @@ function toolsSection() {
   for (const key of names) {
     const tool = tools[key];
     const entry = manifest[key];
-    if (!entry)
-      throw new Error(
-        `third-party/tools.json lists "${key}" but install-manifest.json has no such tool`,
-      );
+    if (!entry) {
+      const problem = `third-party/tools.json lists "${key}" but install-manifest.json has no such tool`;
+      if (strict) throw new Error(problem);
+      console.warn(`::warning::${problem}; not bundled in this build, left out of the tools table`);
+      continue;
+    }
     const version = entry.version;
     const source = fillTemplate(tool.sourceUrl, version);
     const bundle = tool.variants.includes("slim") ? "full, slim" : "full";
@@ -333,7 +345,7 @@ function spdxSection(expressions) {
 /* Main                                                                        */
 /* -------------------------------------------------------------------------- */
 
-function generate({ skipCargo, existing }) {
+function generate({ skipCargo, existing, strict }) {
   const packages = npmPackages();
   const cargo = skipCargo ? carriedCargoSection(existing) : cargoSection(cargoCrates());
   const expressions = [...packages.map((p) => p.license), ...licensesInTable(cargo)];
@@ -351,7 +363,7 @@ function generate({ skipCargo, existing }) {
     "Regenerate with `pnpm run licenses:write` in dashboard-app. " +
     `Tool versions are those of the binaries manifest (last resolved ${snapshot || "unknown"}); ` +
     "the release build regenerates this file after downloading the binaries, so the copy inside the installer names the bundled versions.\n\n" +
-    toolsSection() +
+    toolsSection(strict) +
     "\n" +
     npmSection(packages) +
     "\n" +
@@ -366,7 +378,7 @@ function main() {
   const mode = args.find((a) => a === "--write" || a === "--check") ?? "--check";
   const skipCargo = args.includes("--skip-cargo");
   const existing = existsSync(OUTPUT) ? readFileSync(OUTPUT, "utf8") : "";
-  const content = generate({ skipCargo, existing });
+  const content = generate({ skipCargo, existing, strict: mode === "--check" });
 
   if (mode === "--write") {
     writeFileSync(OUTPUT, content);
