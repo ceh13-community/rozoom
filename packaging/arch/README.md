@@ -27,7 +27,7 @@ upgrade, pull the repository and run `makepkg -si` again.
 
 ```bash
 ./update-pkgbuild.sh          # rewrite PKGBUILD and .SRCINFO for the latest release
-./update-pkgbuild.sh --check  # exit 1 when PKGBUILD lags behind the latest release
+./update-pkgbuild.sh --check  # exit 1 when PKGBUILD or .SRCINFO lags behind the latest release
 ```
 
 The checksum is the sha256 digest GitHub records for the release asset, so the
@@ -41,6 +41,7 @@ regenerated with `makepkg --printsrcinfo > .SRCINFO`.
 ```
 
 runs the clone-and-build steps above inside a fresh `archlinux:base-devel`
-container (needs Docker), checks the installed files, starts the app under Xvfb
-and leaves the log and a screenshot in `test-out/`. Run it before changing
-anything here. A real Arch desktop with a GPU is not part of this check.
+container (needs Docker), checks the installed files, starts the app under Xvfb,
+checks that the first screen was actually drawn and leaves the log and a
+screenshot in `test-out/`. Run it before changing anything here. A real Arch
+desktop with a GPU is not part of this check.

@@ -22,7 +22,7 @@ sha256sums=('a69158cc163f232f83ebc54ca65a45da421a24ff98dfdcf3d866090783fcc50a'
 
 package() {
   # The .deb is an ar archive; its data.tar.gz already carries the /usr tree
-  # (binary, bundled kubectl/helm shims, .desktop, hicolor icons, THIRD-PARTY-LICENSES.md).
+  # (binary, bundled kubectl and helm, .desktop, hicolor icons, THIRD-PARTY-LICENSES.md).
   bsdtar -xOf "${srcdir}/${_deb}" data.tar.gz | bsdtar -xf - -C "${pkgdir}"
 
   install -Dm644 "${srcdir}/LICENSE-${pkgver}" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
