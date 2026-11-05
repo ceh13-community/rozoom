@@ -51,8 +51,8 @@ export const getClusterPlatformLabel = (name?: string | null): ClusterPlatformLa
  * Preference order:
  *   1. explicit `displayName` if set by the user in Cluster Manager
  *   2. trailing `cluster/<name>` segment for EKS ARNs (so
- *      "arn:aws:eks:us-east-1:...:cluster/prod-7env" renders as
- *      "prod-7env" instead of the 60-char ARN truncated with ellipsis)
+ *      "arn:aws:eks:us-east-1:...:cluster/prod-cluster" renders as
+ *      "prod-cluster" instead of the 60-char ARN truncated with ellipsis)
  *   3. trailing segment for GKE context names ("gke_project_region_name"
  *      -> "name")
  *   4. the raw cluster name as a fallback

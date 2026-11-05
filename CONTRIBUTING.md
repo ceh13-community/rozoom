@@ -5,8 +5,8 @@ Thank you for your interest in contributing! This guide will help you get starte
 ## Quick Start
 
 ```bash
-git clone https://github.com/ceh13-community/svelte-dashboard.git
-cd dashboard-app
+git clone https://github.com/ceh13-community/rozoom.git
+cd rozoom/dashboard-app
 pnpm install
 pnpm download:binaries
 pnpm tauri dev
@@ -123,6 +123,7 @@ dashboard-app/
 ### Key Patterns
 
 **Workload Page Registration** - 4 files to touch:
+
 1. `workload-route-registry.ts` - component loader + props
 2. `+page.ts` - VALID_WORKLOADS array
 3. `cluster-page-workspace.ts` - VALID_WORKLOADS Set
@@ -137,6 +138,7 @@ dashboard-app/
 ### Themes
 
 3 built-in themes in `src/lib/app/styles/themes/`:
+
 - `dark.css` - dark theme (default)
 - `light.css` - light theme
 - `k9s.css` - retro terminal theme (requires specific overrides for risk badges, etc.)
@@ -151,37 +153,37 @@ Before creating new components, check existing ones. In dev mode, visit [`/dev/u
 
 ### UI Primitives (`$shared/ui/`)
 
-| Component | Purpose |
-|-----------|---------|
-| `Button` | All buttons (loading/success states via `loadingLabel` prop) |
-| `LoadingDots` | Animated "..." for loading states |
-| `DetailsSheetPortal` | Portal wrapper for all side-panel details sheets |
-| `TableEmptyState` | Empty state for tables |
-| `Input`, `Badge`, `Sheet`, `Card` | Standard UI elements |
+| Component                         | Purpose                                                      |
+| --------------------------------- | ------------------------------------------------------------ |
+| `Button`                          | All buttons (loading/success states via `loadingLabel` prop) |
+| `LoadingDots`                     | Animated "..." for loading states                            |
+| `DetailsSheetPortal`              | Portal wrapper for all side-panel details sheets             |
+| `TableEmptyState`                 | Empty state for tables                                       |
+| `Input`, `Badge`, `Sheet`, `Card` | Standard UI elements                                         |
 
 ### Details Sheet Components (`common/`)
 
-| Component | Purpose |
-|-----------|---------|
-| `DetailsSheetHeader` | Header with title + action buttons |
-| `DetailsMetadataGrid` | Properties grid (labels, annotations, fields) |
-| `DetailsEventsList` | Events section with loading/error states |
-| `DetailsExplainState` | Collapsible watcher/runtime debug info |
-| `ResourceTrafficChain` | Auto-resolving dependency chain (20 resource types) |
-| `ResourceMetricsBadge` | CPU/Memory/Disk inline progress bars |
-| `PvcUsageBar` | PVC disk usage from kubelet stats |
-| `ResourceActionsMenu` | Unified dropdown menu (Show details, Edit YAML, etc.) |
-| `ResourceYamlWorkbenchPanel` | Unified YAML viewer panel |
+| Component                    | Purpose                                               |
+| ---------------------------- | ----------------------------------------------------- |
+| `DetailsSheetHeader`         | Header with title + action buttons                    |
+| `DetailsMetadataGrid`        | Properties grid (labels, annotations, fields)         |
+| `DetailsEventsList`          | Events section with loading/error states              |
+| `DetailsExplainState`        | Collapsible watcher/runtime debug info                |
+| `ResourceTrafficChain`       | Auto-resolving dependency chain (20 resource types)   |
+| `ResourceMetricsBadge`       | CPU/Memory/Disk inline progress bars                  |
+| `PvcUsageBar`                | PVC disk usage from kubelet stats                     |
+| `ResourceActionsMenu`        | Unified dropdown menu (Show details, Edit YAML, etc.) |
+| `ResourceYamlWorkbenchPanel` | Unified YAML viewer panel                             |
 
 ### Workload Components
 
-| Component | Purpose |
-|-----------|---------|
-| `ResourceYamlSheet` | YAML editor with kubeconform, breadcrumb, diff |
-| `ResourceLogsSheet` | Log viewer with streaming |
-| `ResourceDetailsSheet` | Generic details for STS, RS, Jobs, CronJobs |
-| `MultiPaneWorkbench` | Investigate panel (1/2/3 panes) |
-| `WorkloadBulkActions` | Bulk selection toolbar |
+| Component              | Purpose                                        |
+| ---------------------- | ---------------------------------------------- |
+| `ResourceYamlSheet`    | YAML editor with kubeconform, breadcrumb, diff |
+| `ResourceLogsSheet`    | Log viewer with streaming                      |
+| `ResourceDetailsSheet` | Generic details for STS, RS, Jobs, CronJobs    |
+| `MultiPaneWorkbench`   | Investigate panel (1/2/3 panes)                |
+| `WorkloadBulkActions`  | Bulk selection toolbar                         |
 
 ## Adding a New Page
 
@@ -223,12 +225,12 @@ See `dashboard-app/docs/configuration.md` -> "Adding a New Configuration Resourc
 
 See `dashboard-app/.env.example` for all available options:
 
-| Variable | Purpose |
-|----------|---------|
-| `PUBLIC_SENTRY_DSN` | Sentry error tracking DSN |
-| `VITE_ENABLE_RUNTIME_FILE_LOGS` | Enable file-based logs |
+| Variable                           | Purpose                                  |
+| ---------------------------------- | ---------------------------------------- |
+| `PUBLIC_SENTRY_DSN`                | Sentry error tracking DSN                |
+| `VITE_ENABLE_RUNTIME_FILE_LOGS`    | Enable file-based logs                   |
 | `VITE_ENABLE_VERBOSE_RUNTIME_LOGS` | Verbose tracing (WARNING: can freeze UI) |
-| `VITE_ENABLE_PODS_STREAM_WATCH` | Enable pod streaming watcher |
+| `VITE_ENABLE_PODS_STREAM_WATCH`    | Enable pod streaming watcher             |
 
 ## Questions?
 

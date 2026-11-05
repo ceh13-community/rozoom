@@ -4,15 +4,15 @@ ROZOOM is a Swiss Army Knife for Kubernetes - an all-in-one fleet IDE that gives
 
 ## Core principles
 
-### 1. Zero dependencies
+### 1. Bundled tools
 
-ROZOOM bundles every CLI tool it needs. It never reaches into system PATH. A fresh install on a clean machine works immediately - no `brew install kubectl`, no `apt-get install helm`, no version conflicts.
+ROZOOM ships the CLI tools it needs: kubectl and Helm in every build, the rest in the full-offline build. For its own work it runs those copies, not the ones on your system PATH; [`SECURITY.md`](SECURITY.md) lists the exceptions. A fresh install on a clean machine works immediately - no `brew install kubectl`, no `apt-get install helm`, no version conflicts.
 
 This means:
 
 - Every user gets the same tool versions
 - No "works on my machine" problems
-- Air-gapped environments work out of the box
+- The full-offline build carries its tools into air-gapped environments
 - Tool updates are coordinated with app releases
 
 ### 2. Fleet-first
@@ -42,12 +42,13 @@ ROZOOM works with any Kubernetes cluster: minikube, kind, EKS, GKE, AKS, DOKS, H
 
 ### 6. Local-first
 
-All data stays on the user's machine:
+Cluster data stays on the user's machine:
 
 - Health check cache is local
 - Preferences are local
-- No telemetry, no analytics, no phone-home
-- Sentry crash reporting is optional and contains no cluster data
+- Usage telemetry is opt-in: nothing is sent until you choose Allow, and cluster contents are never part of it
+- The app checks GitHub for updates on every start
+- Crash reporting is not configured in release builds
 
 ### 7. Transparency
 

@@ -13,15 +13,15 @@ describe("resolveClusterDisplayName", () => {
   it("extracts trailing name from EKS ARN", () => {
     expect(
       resolveClusterDisplayName({
-        name: "arn:aws:eks:us-east-1:058264254041:cluster/prod-7env",
+        name: "arn:aws:eks:us-east-1:123456789012:cluster/prod-cluster",
       }),
-    ).toBe("prod-7env");
+    ).toBe("prod-cluster");
   });
 
   it("handles hyphenated and dotted EKS cluster names inside ARN", () => {
     expect(
       resolveClusterDisplayName({
-        name: "arn:aws:eks:eu-west-2:111122223333:cluster/team.backend-prod",
+        name: "arn:aws:eks:eu-west-2:123456789012:cluster/team.backend-prod",
       }),
     ).toBe("team.backend-prod");
   });
@@ -46,7 +46,7 @@ describe("resolveClusterDisplayName", () => {
     expect(
       resolveClusterDisplayName({
         displayName: "Team A prod",
-        name: "arn:aws:eks:us-east-1:058264254041:cluster/prod-7env",
+        name: "arn:aws:eks:us-east-1:123456789012:cluster/prod-cluster",
       }),
     ).toBe("Team A prod");
   });
