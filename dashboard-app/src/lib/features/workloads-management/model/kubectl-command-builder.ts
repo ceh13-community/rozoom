@@ -1,3 +1,5 @@
+import { quoteCommandArgument } from "$shared/lib/format-command-line";
+
 export type KubectlTarget = {
   resource: string;
   name: string;
@@ -20,17 +22,19 @@ function getNamespace(namespace?: string) {
 }
 
 export function buildKubectlGetYamlCommand(target: KubectlTarget) {
+  const name = quoteCommandArgument(target.name);
   if (target.namespaceScoped === false) {
-    return `kubectl get ${target.resource} ${target.name} -o yaml`;
+    return `kubectl get ${target.resource} ${name} -o yaml`;
   }
-  return `kubectl get ${target.resource} ${target.name} -n ${getNamespace(target.namespace)} -o yaml`;
+  return `kubectl get ${target.resource} ${name} -n ${quoteCommandArgument(getNamespace(target.namespace))} -o yaml`;
 }
 
 export function buildKubectlDescribeCommand(target: KubectlTarget) {
+  const name = quoteCommandArgument(target.name);
   if (target.namespaceScoped === false) {
-    return `kubectl describe ${target.resource} ${target.name}`;
+    return `kubectl describe ${target.resource} ${name}`;
   }
-  return `kubectl describe ${target.resource} ${target.name} -n ${getNamespace(target.namespace)}`;
+  return `kubectl describe ${target.resource} ${name} -n ${quoteCommandArgument(getNamespace(target.namespace))}`;
 }
 
 export function buildKubectlLogsArgs(target: KubectlLogsTarget) {

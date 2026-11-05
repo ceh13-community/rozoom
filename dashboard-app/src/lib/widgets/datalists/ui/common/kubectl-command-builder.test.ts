@@ -6,6 +6,15 @@ import {
 } from "./kubectl-command-builder";
 
 describe("kubectl-command-builder", () => {
+  it("quotes a name that a shell would not read back as one word", () => {
+    const target = { resource: "roles", name: "a b;c", namespace: "team" };
+
+    expect(buildKubectlDescribeCommand(target)).toBe("kubectl describe roles 'a b;c' -n team");
+    expect(buildKubectlGetYamlCommand({ ...target, namespaceScoped: false })).toBe(
+      "kubectl get roles 'a b;c' -o yaml",
+    );
+  });
+
   it("builds get yaml and describe commands for namespaced resources", () => {
     expect(
       buildKubectlGetYamlCommand({
