@@ -15,11 +15,14 @@ Dates: current as of **2026-04-19**.
 - **Tauri v2 process isolation.** Frontend (WebView) cannot spawn system
   processes; every CLI call goes through the allowlisted sidecar
   capability system. See [`SECURITY.md`](../SECURITY.md).
-- **Restrictive CSP.** `script-src 'self'`, `connect-src` restricted to
-  127.0.0.1 / localhost. No remote script loading, no `eval`, no external
-  HTTP from the WebView.
-- **Bundled binaries only.** kubectl, helm, aws, gcloud, az, doctl,
-  hcloud, oc, trivy and 11 others ship with the app. No system PATH use.
+- **Restrictive CSP.** `script-src 'self'`; `connect-src` allows the app
+  itself, 127.0.0.1 / localhost and the two PostHog EU hosts, used only
+  after the user allows telemetry. No remote script loading, no `eval`.
+  The update check runs in the backend, outside the WebView.
+- **Bundled binaries for the app's own work.** kubectl and Helm ship with
+  every build; aws, gcloud, az, doctl, hcloud, oc, trivy and 11 others ship
+  with the full-offline build. Where the app does use system PATH is listed
+  in [`SECURITY.md`](../SECURITY.md).
   Most binaries are checked against upstream checksums at build time
   (`download-binaries.js`); see `SECURITY.md` for the exceptions.
 - **DevTools disabled** in production builds.
@@ -50,14 +53,17 @@ Dates: current as of **2026-04-19**.
 
 ### Data handling
 
-- **No external telemetry** beyond optional Sentry and strictly opt-in
-  usage analytics (PostHog, off by default): nothing is sent unless the
-  user accepts the first-run consent prompt. When they do, a small set of
+- **Telemetry is opt-in.** Release builds set no Sentry DSN, so nothing
+  goes to Sentry. Usage analytics (PostHog) are off by default: nothing is
+  sent unless the user accepts the first-run consent prompt. When they do, a small set of
   named events (app opened, consent granted, cluster add attempted or
   failed with an error class only, first diagnostic rendered, three core
   actions) tied to a pseudonymous install hash. No autocapture, no
   session recording, no cluster contents, no account or user data, no
   Mixpanel/GA. Details: https://rozoom.app/privacy
+- **Other connections.** The app contacts GitHub on every start to check
+  for updates, whatever the telemetry choice. The full list of destinations
+  is in [`SECURITY.md`](../SECURITY.md).
 - **All cloud API calls** go through bundled CLIs (aws/gcloud/az/etc).
   The WebView never reaches a cloud endpoint directly.
 - **Local audit trail** — cluster add/remove/restore events timestamped
@@ -135,7 +141,8 @@ for full specification.
 ## For reviewers asking specific questions
 
 **"Where are credentials stored and how?"**
-Today: plaintext YAML in `AppData/configs/<uuid>.yaml`, file mode 0600.
+Today: plaintext YAML in `AppData/configs/<uuid>.yaml`. The app sets no
+file mode, so the system default applies (0664 measured on Linux).
 After 8.1: encrypted Stronghold snapshot or OS keyring entries, accessed
 via passphrase or OS keyring ACL. Plaintext path remains as opt-in
 escape hatch for CI with a persistent red banner in the UI.

@@ -57,7 +57,7 @@ Clone the repository and install dependencies:
 
 ```bash
 git clone https://github.com/ceh13-community/rozoom.git
-cd dashboard-app
+cd rozoom/dashboard-app
 pnpm install
 ```
 
@@ -273,13 +273,13 @@ To activate it:
 |  |                           |  |  kubectl, helm, kustomize,  |  |
 |  |  Widgets (237 components) |  |  kubeconform, pluto, stern, |  |
 |  |  Shared (111 utilities)   |  |  velero, yq, aws, doctl,   |  |
-|  |  Plugins (12 plugins)     |  |  hcloud, oc, az            |  |
+|  |  Plugins (18 modules)     |  |  hcloud, oc, az            |  |
 |  +---------------------------+  +-----------------------------+  |
 |                                                                  |
 |  +------------------------------------------------------------+  |
 |  |                    Plugin System                            |  |
-|  |  Core (4) | Free (3) | Pro (5) | Community (extensible)    |  |
-|  |  Feature flags + 14-day trial + license management         |  |
+|  |  Core (4) | Free (14)                                      |  |
+|  |  Feature flags                                             |  |
 |  +------------------------------------------------------------+  |
 +------------------------------------------------------------------+
          |                    |                    |

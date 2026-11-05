@@ -82,7 +82,7 @@ Tauri 2 supports Android via `pnpm tauri android init`. Remaining work for alpha
 
 ## Bundled CLI Tools
 
-All CLI tools are bundled inside the application. No system PATH dependencies.
+The full-offline build bundles all the tools below; the slim build bundles kubectl and Helm. The app does its own work with these copies. Where it does use your system PATH is listed in [`SECURITY.md`](../SECURITY.md).
 
 | Tool        | Purpose                  | Provider     | Sidecar Name       |
 | ----------- | ------------------------ | ------------ | ------------------ |

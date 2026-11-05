@@ -16,7 +16,7 @@ const FIXTURE = [
   `[2026-08-29][10:12:03][ERROR][webview:kubectl] kubectl command failed: code=1 args="--kubeconfig /home/u/.kube/config --token=${BEARER} get pods"`,
   `[2026-08-29][10:12:03][WARN][webview:auth] basic auth for https://registry: password: "hunter2-not-a-real-one"`,
   `[2026-08-29][10:12:04][DEBUG][webview:tls] -----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n-----END RSA PRIVATE KEY-----`,
-  `[2026-08-29][10:12:05][ERROR][webview:kubectl] kubectl command failed: cluster=00000000-0000-4000-8000-000000000001 code=1 args="--kubeconfig /home/user/.local/share/com.rozoom.k8s-linter-ide/configs/13b66118.yaml get pods -n kube-system"`,
+  `[2026-08-29][10:12:05][ERROR][webview:kubectl] kubectl command failed: cluster=00000000-0000-4000-8000-000000000001 code=1 args="--kubeconfig /home/user/.local/share/com.rozoom.k8s-linter-ide/configs/00000000.yaml get pods -n kube-system"`,
 ].join("\n");
 
 describe("redactSecrets", () => {
@@ -36,7 +36,7 @@ describe("redactSecrets", () => {
     expect(out).toContain("-----BEGIN [REDACTED]-----");
     // Cluster ids, paths and kubectl args without secrets are untouched.
     expect(out).toContain(
-      'cluster=00000000-0000-4000-8000-000000000001 code=1 args="--kubeconfig /home/user/.local/share/com.rozoom.k8s-linter-ide/configs/13b66118.yaml get pods -n kube-system"',
+      'cluster=00000000-0000-4000-8000-000000000001 code=1 args="--kubeconfig /home/user/.local/share/com.rozoom.k8s-linter-ide/configs/00000000.yaml get pods -n kube-system"',
     );
   });
 

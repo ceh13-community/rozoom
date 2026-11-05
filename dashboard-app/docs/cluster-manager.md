@@ -46,8 +46,9 @@ A collapsible panel at the top that shows three layers of detection:
 `download-binaries.js` downloads the binaries and checks them against the
 SHA-256 checksums their upstream publishes (PGP for AWS CLI). `yq` is not
 checked, and `curl`, `doggo`, `grpcurl`, `websocat` and `tcping` are checked
-only when upstream publishes a checksum. No system PATH dependencies - the app
-is fully self-contained.
+only when upstream publishes a checksum. The app does its own work with these
+copies. Where it does use your system PATH is listed in
+[`SECURITY.md`](../SECURITY.md).
 
 ### Detected Kubeconfig Files
 

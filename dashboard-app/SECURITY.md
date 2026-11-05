@@ -30,13 +30,15 @@ ROZOOM is built with [Tauri v2](https://v2.tauri.app/), which provides process i
 | `eu.i.posthog.com`                                   | Only after you allow usage telemetry                                                  | Usage events, see [the privacy notice](https://rozoom.app/privacy) |
 | Cloud provider APIs                                  | When you use a provider CLI from the app                                              | Provider CLIs bundled in the full-offline build                    |
 | Helm repository hosts                                | When you add a repository or install a chart                                          | Chart downloads via the helm sidecar                               |
+| External web pages                                   | When you click an external link in the app                                            | The page opens in an app window                                    |
+| Trivy database hosts                                 | When you run a local Trivy scan, full-offline build                                   | The Trivy sidecar downloads its vulnerability database             |
 | `fonts.googleapis.com`, `fonts.gstatic.com`          | Every start, releases up to and including 0.26.0                                      | Removed in 0.26.1. No font was loaded                              |
 
 An exec plugin named in a kubeconfig is started by kubectl and makes its own connections.
 
 ### CLI tools (bundled sidecars)
 
-ROZOOM runs its own bundled copies of these tools, not the ones on the system PATH. The slim build bundles only kubectl and Helm; the full-offline build bundles the rest. Each binary is allowlisted in the Tauri capability system:
+For its own work ROZOOM runs its bundled copies of these tools. The slim build bundles only kubectl and Helm; the full-offline build bundles the rest. Each binary is allowlisted in the Tauri capability system:
 
 | Binary                        | Purpose                         |
 | ----------------------------- | ------------------------------- |
@@ -50,6 +52,12 @@ ROZOOM runs its own bundled copies of these tools, not the ones on the system PA
 | velero                        | Backup management               |
 | doctl, gcloud, hcloud, oc, az | Cloud provider CLIs             |
 | aws (bundled dist)            | AWS CLI                         |
+
+Your system PATH is used in three places:
+
+- The **Scan cloud providers** button runs `which` (`where.exe` on Windows), then each tool it finds, to read its version. This happens on the click and each time the page loads after that.
+- kubectl starts any credential plugin your kubeconfig names, such as `aws` or `gke-gcloud-auth-plugin`, from PATH.
+- The debug terminal runs the commands you type through your platform shell.
 
 ## Tauri security configuration
 
@@ -67,7 +75,7 @@ The app enforces a CSP that restricts:
 
 Tauri v2 capabilities (defined in `src-tauri/capabilities/default.json`) enforce least-privilege:
 
-- **Shell**: allowlisted bundled tools, plus the platform shell (`sh`, `cmd`, `powershell`) for the debug terminal, which runs the commands you type
+- **Shell**: allowlisted bundled tools; `which`, `where.exe` and the same tools from the system PATH for the scan described above; and the platform shell (`sh`, `cmd`, `powershell`) for the debug terminal, which runs the commands you type
 - **Filesystem**: scoped to specific directories (kubeconfig, cloud credentials, app data)
 - **HTTP**: only localhost connections allowed
 
