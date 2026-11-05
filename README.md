@@ -28,6 +28,7 @@
 1. Download the installer for your OS from the [latest release](https://github.com/ceh13-community/rozoom/releases/latest):
    - **macOS** — `.dmg` (Apple Silicon)
    - **Linux** — `.deb` or `.rpm` (x64)
+   - **Arch Linux** (no AUR package yet) — build it from the repository: `git clone --depth 1 https://github.com/ceh13-community/rozoom.git && cd rozoom/packaging/arch && makepkg -si` (details in [packaging/arch](packaging/arch/README.md))
    - **Windows** — `.msi` or `.exe` installer (x64)
 2. Install and launch ROZOOM. No sign-in, no cloud account.
 3. On first run, click **Connect a cluster** and pick your path:
