@@ -20,8 +20,8 @@ Dates: current as of **2026-04-19**.
   HTTP from the WebView.
 - **Bundled binaries only.** kubectl, helm, aws, gcloud, az, doctl,
   hcloud, oc, trivy and 11 others ship with the app. No system PATH use.
-  Each binary is SHA256-pinned against upstream checksums at build time
-  (`download-binaries.js`).
+  Most binaries are checked against upstream checksums at build time
+  (`download-binaries.js`); see `SECURITY.md` for the exceptions.
 - **DevTools disabled** in production builds.
 
 ### Kubernetes-facing security
@@ -148,8 +148,8 @@ paths or stderr snippets. After 8.2, a `beforeSend` regex scrub strips
 headers, and kubeconfig absolute paths before upload.
 
 **"How do you verify bundled binaries are what upstream published?"**
-Today: SHA256 checksums from the upstream GitHub release, pinned at
-build time. After 8.6: cosign verification against the sigstore
+Today: SHA256 checksums from the upstream GitHub release, fetched at
+build time, for most binaries; see `SECURITY.md` for the exceptions. After 8.6: cosign verification against the sigstore
 public-good Rekor transparency log for upstreams that sign (kubectl,
 helm, trivy, velero).
 

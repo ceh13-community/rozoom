@@ -92,24 +92,30 @@ ROZOOM copies kubeconfig files to its own app data directory. This prevents:
 ## Compliance posture
 
 Suitable today for **internal dev-team use**: strong RBAC/PSS/hygiene checks,
-restrictive CSP, SHA256-pinned bundled binaries, no telemetry unless you opt in.
+restrictive CSP, no telemetry unless you opt in.
 
 Not yet suitable for **regulated environments** (SOC 2 Type II, ISO 27001,
 PCI-DSS 4.0, HIPAA, FedRAMP). Known gaps and their compliance mapping:
 
-| Gap                                      | Risk                         | Blocks                                                                                |
-| ---------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------- |
-| Plaintext kubeconfig on disk             | CRITICAL                     | PCI-DSS req 3, ISO 27001 A.10.1, SOC 2 CC6.1, FedRAMP SC-28, HIPAA §164.312(a)(2)(iv) |
-| Audit log has no tamper protection       | HIGH                         | SOC 2 CC7.3, ISO 27001 A.12.4.2, FedRAMP AU-9                                         |
-| `readOnly` flag not enforced everywhere  | MEDIUM                       | ISO 27001 A.9.4.1                                                                     |
-| Bundled binaries verified only by SHA256 | MEDIUM                       | SLSA Level 3+                                                                         |
-| Plugins not sandboxed                    | HIGH (when marketplace live) | OWASP ASVS V14                                                                        |
-| No HTTP_PROXY / custom CA support        | MEDIUM                       | enterprise MITM proxies                                                               |
-| No SIEM export                           | MEDIUM                       | SOC 2 CC7.2                                                                           |
-| No app-level session lock                | MEDIUM                       | NIST 800-53 IA-11                                                                     |
+| Gap                                     | Risk                         | Blocks                                                                                |
+| --------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------- |
+| Plaintext kubeconfig on disk            | CRITICAL                     | PCI-DSS req 3, ISO 27001 A.10.1, SOC 2 CC6.1, FedRAMP SC-28, HIPAA §164.312(a)(2)(iv) |
+| Audit log has no tamper protection      | HIGH                         | SOC 2 CC7.3, ISO 27001 A.12.4.2, FedRAMP AU-9                                         |
+| `readOnly` flag not enforced everywhere | MEDIUM                       | ISO 27001 A.9.4.1                                                                     |
+| Bundled binaries not fully verified     | MEDIUM                       | SLSA Level 3+                                                                         |
+| Plugins not sandboxed                   | HIGH (when marketplace live) | OWASP ASVS V14                                                                        |
+| No HTTP_PROXY / custom CA support       | MEDIUM                       | enterprise MITM proxies                                                               |
+| No SIEM export                          | MEDIUM                       | SOC 2 CC7.2                                                                           |
+| No app-level session lock               | MEDIUM                       | NIST 800-53 IA-11                                                                     |
 
 Encrypted kubeconfig at rest (Tauri Stronghold or OS keyring) is the
 highest-priority item and unlocks PCI-DSS, HIPAA, and SOC 2.
+
+Bundled binaries are downloaded at build time and checked against the checksum
+their upstream publishes for that release, or its PGP signature for the AWS CLI.
+Nothing is pinned in this repository. `yq` is not checked, and `curl`, `doggo`,
+`grpcurl`, `websocat` and `tcping` are checked only when upstream publishes a
+checksum.
 
 ## Reporting security issues
 

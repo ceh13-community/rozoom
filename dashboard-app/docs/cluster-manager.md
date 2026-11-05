@@ -43,9 +43,11 @@ A collapsible panel at the top that shows three layers of detection:
 | oc          | Cloud      | bundled | OpenShift/OKD client                                       |
 | az          | Cloud      | bundled | Azure CLI for AKS cluster management                       |
 
-All binaries are downloaded and verified by `download-binaries.js` with
-SHA-256 checksums (and PGP for AWS CLI). No system PATH dependencies -
-the app is fully self-contained.
+`download-binaries.js` downloads the binaries and checks them against the
+SHA-256 checksums their upstream publishes (PGP for AWS CLI). `yq` is not
+checked, and `curl`, `doggo`, `grpcurl`, `websocat` and `tcping` are checked
+only when upstream publishes a checksum. No system PATH dependencies - the app
+is fully self-contained.
 
 ### Detected Kubeconfig Files
 

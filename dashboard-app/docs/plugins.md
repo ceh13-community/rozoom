@@ -1,7 +1,7 @@
 # Plugins
 
 ROZOOM uses a plugin architecture to organize features into installable modules.
-Core features are always available. Pro plugins include a 14-day free trial.
+Core features are always available.
 
 ---
 
@@ -9,12 +9,11 @@ Core features are always available. Pro plugins include a 14-day free trial.
 
 ### Plugin Tiers
 
-| Tier          | Description                                                       | Disable? |
-| ------------- | ----------------------------------------------------------------- | -------- |
-| **Core**      | Cluster management, health checks, workload browser, Helm catalog | No       |
-| **Free**      | Fleet organization, fix templates, workload visualizer            | Yes      |
-| **Pro**       | Security, capacity, performance, auth, GitOps (14-day trial)      | Yes      |
-| **Community** | Third-party plugins from marketplace                              | Yes      |
+| Tier          | Description                                                                                           | Disable? |
+| ------------- | ----------------------------------------------------------------------------------------------------- | -------- |
+| **Core**      | Cluster management, health checks, workload browser, Helm catalog                                     | No       |
+| **Free**      | Fleet organization, fix templates, workload visualizer, security, capacity, performance, auth, GitOps | Yes      |
+| **Community** | Third-party plugins from marketplace                                                                  | Yes      |
 
 ### Available Plugins
 
@@ -27,18 +26,17 @@ Core features are always available. Pro plugins include a 14-day free trial.
 | Fleet Organization    | Free | Custom groups, smart groups, saved views                   |
 | Fix Templates         | Free | YAML generators for PDB, NetworkPolicy, quota, probes      |
 | Workload Visualizer   | Free | Dependency map: Ingress -> Service -> Deployment -> Pod    |
-| Security Suite        | Pro  | RBAC risk scanner, PSS compliance, credential hygiene      |
-| Capacity Intelligence | Pro  | Resource heatmap, bin-packing score, cost analysis         |
-| Performance Suite     | Pro  | RED metrics, CPU throttling, SLO tracking                  |
-| Enterprise Auth       | Pro  | OIDC wizard, Vault integration, auth detection             |
-| GitOps Integration    | Pro  | ArgoCD and Flux bootstrap with generated YAML              |
+| Security Suite        | Free | RBAC risk scanner, PSS compliance, credential hygiene      |
+| Capacity Intelligence | Free | Resource heatmap, bin-packing score, cost analysis         |
+| Performance Suite     | Free | RED metrics, CPU throttling, SLO tracking                  |
+| Enterprise Auth       | Free | OIDC wizard, Vault integration, auth detection             |
+| GitOps Integration    | Free | ArgoCD and Flux bootstrap with generated YAML              |
 
 ### Managing Plugins
 
 1. Open a cluster -> Cluster Ops sidebar -> **Plugins**
 2. Filter by tier or category
 3. Toggle Enable/Disable per plugin
-4. Pro plugins start with 14-day free trial automatically
 
 ---
 
