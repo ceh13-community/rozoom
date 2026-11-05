@@ -1,12 +1,20 @@
 import { writable } from "svelte/store";
+import type { CliTool } from "$shared/api/cli";
 import type { PodItem } from "$shared/model/clusters";
+
+/** A command the app builds itself. It always runs as an argument list, never through a shell. */
+export type ShellPresetCommand = {
+  tool: CliTool;
+  args: string[];
+  commandLine: string;
+};
 
 export type ShellWindowState = {
   id: string;
   clusterId: string;
   targetPod: Partial<PodItem> | null;
   podSessionMode?: "exec" | "attach";
-  initialCommand?: string;
+  preset?: ShellPresetCommand;
   sessionLabel?: string;
   targetNamespace?: string;
   openedAt?: number;
@@ -42,7 +50,7 @@ export function openShellModal(clusterId: string) {
 export function openDebugDescribeModal(
   clusterId: string,
   options: {
-    initialCommand: string;
+    preset: ShellPresetCommand;
     sessionLabel: string;
     targetNamespace?: string;
   },
@@ -54,7 +62,7 @@ export function openDebugDescribeModal(
       id: buildWindowId(clusterId, null),
       clusterId,
       targetPod: null,
-      initialCommand: options.initialCommand,
+      preset: options.preset,
       sessionLabel: options.sessionLabel,
       targetNamespace: options.targetNamespace,
       openedAt: Date.now(),

@@ -20,7 +20,11 @@ describe("shell window store", () => {
   it("opens debug, exec, debug-pod and attach windows with expected session modes", () => {
     openShellModal("c-1");
     openDebugDescribeModal("c-1", {
-      initialCommand: "kubectl describe pod api-0 -n default",
+      preset: {
+        tool: "kubectl",
+        args: ["describe", "pod", "-n", "default", "--", "api-0"],
+        commandLine: "kubectl describe pod -n default -- api-0",
+      },
       sessionLabel: "Describe pod default/api-0",
       targetNamespace: "default",
     });
@@ -40,7 +44,7 @@ describe("shell window store", () => {
     expect(state[0]?.targetPod).toBeNull();
     expect(state[0]?.sessionKind).toBe("debug-shell");
     expect(state[1]?.sessionKind).toBe("debug-describe");
-    expect(state[1]?.initialCommand).toContain("kubectl describe pod api-0");
+    expect(state[1]?.preset?.args).toContain("api-0");
     expect(typeof state[1]?.openedAt).toBe("number");
     expect(state[2]?.podSessionMode).toBe("exec");
     expect(state[3]?.sessionKind).toBe("pod-debug");
