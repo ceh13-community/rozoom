@@ -20,9 +20,9 @@ function normalizeResource(resource: string) {
  */
 export function buildDebugDescribeArgs(target: DebugDescribeTarget): string[] {
   const resource = normalizeResource(target.resource);
-  const name = target.name.trim();
+  const name = target.name;
   const namespace = target.namespace?.trim();
-  if (!resource || !name) {
+  if (!resource || !name.trim()) {
     throw new Error("Debug describe requires both resource and name.");
   }
 

@@ -34,6 +34,12 @@ describe("debug-describe runtime", () => {
     ).toEqual(["describe", "clusterroles", "--", "admin"]);
   });
 
+  it("does not trim a name, so it describes that object and not a similar one", () => {
+    expect(
+      buildDebugDescribeArgs({ clusterId: "cluster-a", resource: "roles", name: "victim " }),
+    ).toEqual(["describe", "roles", "--", "victim "]);
+  });
+
   it("keeps an unusual name as one argument and quotes it on the command line", () => {
     const target = { clusterId: "cluster-a", resource: "roles", name: "a b", namespace: "team" };
 

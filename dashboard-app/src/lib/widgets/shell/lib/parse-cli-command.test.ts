@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCommandLine } from "$shared/lib/format-command-line";
+import { canCopyCommandLine, formatCommandLine } from "$shared/lib/format-command-line";
 import { parseCliCommand } from "./parse-cli-command";
 import { tokenizeCommand } from "./tokenize-command";
 
@@ -27,6 +27,31 @@ describe("parseCliCommand", () => {
     ["a trailing backslash", "kubectl describe clusterroles name\\"],
   ])("refuses a command with %s", (_label, command) => {
     expect(parseCliCommand(command).kind).toBe("invalid");
+  });
+});
+
+describe("parseCliCommand on Windows", () => {
+  it.each(["dir C:\\Users\\", "cd C:\\foo\\", 'dir "C:\\Program Files\\"', "type C:\\a\\it's.txt"])(
+    "passes %s to cmd instead of refusing it",
+    (command) => {
+      expect(parseCliCommand(command, "windows")).toEqual({ kind: "shell" });
+    },
+  );
+
+  it("still runs a parsable bundled tool directly", () => {
+    expect(parseCliCommand("kubectl get ns", "windows")).toEqual({
+      kind: "cli",
+      tool: "kubectl",
+      args: ["get", "ns"],
+    });
+  });
+});
+
+describe("canCopyCommandLine", () => {
+  it("blocks only arguments that cmd or PowerShell could read differently", () => {
+    expect(canCopyCommandLine(["describe", "roles", "--", "viewer"], true)).toBe(true);
+    expect(canCopyCommandLine(["describe", "roles", "--", "a&calc"], true)).toBe(false);
+    expect(canCopyCommandLine(["describe", "roles", "--", "a&calc"], false)).toBe(true);
   });
 });
 

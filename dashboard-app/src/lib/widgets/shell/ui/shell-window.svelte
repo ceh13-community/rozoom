@@ -19,6 +19,11 @@
     pickMainContainer,
   } from "$widgets/datalists/ui/pods-list/pod-shell";
   import { parseCliCommand, SUPPORTED_CLI_TOOLS } from "$widgets/shell/lib/parse-cli-command";
+  import {
+    canCopyCommandLine,
+    COPY_BLOCKED_MESSAGE,
+    isWindowsPlatform,
+  } from "$shared/lib/format-command-line";
 
   export let windowState: ShellWindowState;
   export let windowIndex = 0;
@@ -527,7 +532,7 @@
   }
 
   async function runLocalCommand(command: string) {
-    const parsed = parseCliCommand(command);
+    const parsed = parseCliCommand(command, isWindowsPlatform() ? "windows" : "posix");
     if (parsed.kind === "invalid") {
       throw new Error(`Not run: ${parsed.error}`);
     }
@@ -923,7 +928,10 @@
           <Button
             variant="outline"
             class="whitespace-nowrap"
-            disabled={!shellPreset}
+            disabled={!shellPreset || !canCopyCommandLine(shellPreset.args)}
+            title={shellPreset && !canCopyCommandLine(shellPreset.args)
+              ? COPY_BLOCKED_MESSAGE
+              : undefined}
             onclick={() =>
               shellPreset &&
               void copyToClipboard(shellPreset.commandLine, "Copied debug describe command.")}

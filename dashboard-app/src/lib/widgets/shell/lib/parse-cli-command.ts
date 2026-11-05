@@ -31,12 +31,19 @@ export type ParsedCommand =
 
 /**
  * Decide how a command typed into the terminal runs: a bundled tool directly with an
- * argument list, anything else through the platform shell. A command that cannot be
- * parsed runs nowhere; handing it to the shell would give it a different meaning.
+ * argument list, anything else through the platform shell. On POSIX a command that
+ * cannot be parsed runs nowhere; handing it to the shell would give it a different
+ * meaning. The tokenizer follows POSIX rules, so on Windows, where `dir C:\\Users\\` is
+ * ordinary, such a command goes to cmd as typed.
  */
-export function parseCliCommand(command: string): ParsedCommand {
+export function parseCliCommand(
+  command: string,
+  platform: "posix" | "windows" = "posix",
+): ParsedCommand {
   const result = tokenizeCommand(command);
-  if (!result.ok) return { kind: "invalid", error: result.error };
+  if (!result.ok) {
+    return platform === "windows" ? { kind: "shell" } : { kind: "invalid", error: result.error };
+  }
   const [head, ...args] = result.tokens;
   const tool = Object.hasOwn(SUPPORTED_CLI_TOOLS, head) ? SUPPORTED_CLI_TOOLS[head] : null;
   return tool ? { kind: "cli", tool, args } : { kind: "shell" };

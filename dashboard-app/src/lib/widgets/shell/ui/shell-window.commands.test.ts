@@ -76,6 +76,18 @@ describe("shell window command execution", () => {
     expect(cli.execCliForCluster).not.toHaveBeenCalled();
   });
 
+  it("passes a typed Windows path to cmd instead of refusing it", async () => {
+    const platform = vi.spyOn(window.navigator, "platform", "get").mockReturnValue("Win32");
+    renderDebugTerminal();
+
+    await typeAndRun("dir C:\\Users\\");
+
+    await waitFor(() => {
+      expect(cli.execShellCommand).toHaveBeenCalledWith("dir C:\\Users\\");
+    });
+    platform.mockRestore();
+  });
+
   it("still runs a typed bundled tool directly", async () => {
     renderDebugTerminal();
 
