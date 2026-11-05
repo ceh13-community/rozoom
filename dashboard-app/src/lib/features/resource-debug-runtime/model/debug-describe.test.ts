@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  buildDebugDescribeArgs,
   buildDebugDescribeCommand,
   buildDebugDescribeLabel,
   runDebugDescribe,
@@ -24,7 +25,33 @@ describe("debug-describe runtime", () => {
         name: "api-0",
         namespace: "prod",
       }),
-    ).toBe("kubectl describe pod api-0 -n prod");
+    ).toBe("kubectl describe pod -n prod -- api-0");
+  });
+
+  it("omits the namespace flag for cluster-scoped resources", () => {
+    expect(
+      buildDebugDescribeArgs({ clusterId: "cluster-a", resource: "ClusterRoles", name: "admin" }),
+    ).toEqual(["describe", "clusterroles", "--", "admin"]);
+  });
+
+  it("does not trim a name, so it describes that object and not a similar one", () => {
+    expect(
+      buildDebugDescribeArgs({ clusterId: "cluster-a", resource: "roles", name: "victim " }),
+    ).toEqual(["describe", "roles", "--", "victim "]);
+  });
+
+  it("keeps an unusual name as one argument and quotes it on the command line", () => {
+    const target = { clusterId: "cluster-a", resource: "roles", name: "a b", namespace: "team" };
+
+    expect(buildDebugDescribeArgs(target)).toEqual([
+      "describe",
+      "roles",
+      "-n",
+      "team",
+      "--",
+      "a b",
+    ]);
+    expect(buildDebugDescribeCommand(target)).toBe("kubectl describe roles -n team -- 'a b'");
   });
 
   it("builds a readable debug describe label", () => {
@@ -47,7 +74,11 @@ describe("debug-describe runtime", () => {
     });
 
     expect(openDebugDescribeModal).toHaveBeenCalledWith("cluster-a", {
-      initialCommand: "kubectl describe pod api-0 -n prod",
+      preset: {
+        tool: "kubectl",
+        args: ["describe", "pod", "-n", "prod", "--", "api-0"],
+        commandLine: "kubectl describe pod -n prod -- api-0",
+      },
       sessionLabel: "Describe pod prod/api-0",
       targetNamespace: "prod",
     });

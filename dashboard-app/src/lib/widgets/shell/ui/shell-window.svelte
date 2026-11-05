@@ -2,10 +2,15 @@
   import { onMount, onDestroy, afterUpdate, tick } from "svelte";
   import { Button } from "$shared/ui/button";
   import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
-  import { execCliForCluster, execShellCommand, type CliTool } from "$shared/api/cli";
+  import { execCliForCluster, execShellCommand } from "$shared/api/cli";
   import { confirmAction } from "$shared/lib/confirm-action";
   import { buildTextExportFilename, exportTextArtifact } from "$shared/lib/text-export";
-  import { closeShellModal, focusShellModal, type ShellWindowState } from "$features/shell";
+  import {
+    closeShellModal,
+    focusShellModal,
+    type ShellPresetCommand,
+    type ShellWindowState,
+  } from "$features/shell";
   import type { PodItem } from "$shared/model/clusters";
   import {
     buildPodShellExecArgs,
@@ -13,7 +18,12 @@
     getPodSessionInitialCommand,
     pickMainContainer,
   } from "$widgets/datalists/ui/pods-list/pod-shell";
-  import { tokenizeCommand } from "$widgets/shell/lib/tokenize-command";
+  import { parseCliCommand, SUPPORTED_CLI_TOOLS } from "$widgets/shell/lib/parse-cli-command";
+  import {
+    canCopyCommandLine,
+    COPY_BLOCKED_MESSAGE,
+    isWindowsPlatform,
+  } from "$shared/lib/format-command-line";
 
   export let windowState: ShellWindowState;
   export let windowIndex = 0;
@@ -32,7 +42,7 @@
   let shellTargetNamespace = "default";
   let shellTargetLabel = "";
   let shellTargetPod: Partial<PodItem> | null = null;
-  let shellPresetCommand = "";
+  let shellPreset: ShellPresetCommand | null = null;
   let shellOpenedAt: number | null = null;
   let shellLastRunAt: number | null = null;
   let shellCleanupPod: { name: string; namespace: string } | null = null;
@@ -266,7 +276,7 @@
     shellTargetPod = null;
     shellTargetNamespace = "default";
     shellTargetLabel = "";
-    shellPresetCommand = "";
+    shellPreset = null;
     shellOpenedAt = null;
     shellLastRunAt = null;
     shellCleanupPod = null;
@@ -452,14 +462,12 @@
     shellSessionKind = state.sessionKind ?? "debug-shell";
     shellTargetNamespace = targetPod?.metadata?.namespace ?? state.targetNamespace ?? "default";
     shellTargetLabel = state.sessionLabel ?? targetPod?.metadata?.name ?? clusterId;
-    shellPresetCommand = state.initialCommand?.trim() ?? "";
+    shellPreset = state.preset ?? null;
     shellOpenedAt = state.openedAt ?? Date.now();
     shellLastRunAt = null;
     shellCleanupPod = state.cleanupPod ?? null;
     sessionClusterId = clusterId;
-    shellCommand = state.initialCommand
-      ? state.initialCommand
-      : getPodSessionInitialCommand(shellMode);
+    shellCommand = state.preset?.commandLine ?? getPodSessionInitialCommand(shellMode);
     resetHistoryNavigation();
     collapsed = false;
     maximized = false;
@@ -484,8 +492,8 @@
         appendShellOutput(`\n✅ Terminal ready. K8s tools: ${tools}`);
         appendShellOutput(`Shell commands also available (ls, cat, grep, find, curl, etc.)`);
         if (!isSessionActive(sessionId)) return;
-        if (shellPresetCommand) {
-          await executePresetCommand(shellPresetCommand);
+        if (shellPreset) {
+          await executePresetCommand(shellPreset);
         }
       } else if (shellMode === "pod-attach" || shellMode === "pod-exec") {
         // Pre-check: verify pod is running
@@ -514,49 +522,25 @@
     }
   }
 
-  const SUPPORTED_CLI_TOOLS: Record<string, CliTool> = {
-    kubectl: "kubectl",
-    helm: "helm",
-    stern: "stern",
-    velero: "velero",
-    kustomize: "kustomize",
-    kubeconform: "kubeconform",
-    pluto: "pluto",
-    yq: "yq",
-    doctl: "doctl",
-    aws: "aws",
-    gcloud: "gcloud",
-    hcloud: "hcloud",
-    oc: "oc",
-    az: "az",
-    curl: "curl",
-    doggo: "doggo",
-    grpcurl: "grpcurl",
-    websocat: "websocat",
-    tcping: "tcping",
-    trivy: "trivy",
-  };
-
-  function parseCliCommand(command: string): { tool: CliTool; args: string[] } | null {
-    const result = tokenizeCommand(command);
-    if (!result.ok || result.tokens.length === 0) return null;
-    const [head, ...rest] = result.tokens;
-    const tool = SUPPORTED_CLI_TOOLS[head];
-    if (!tool) return null;
-    return { tool, args: rest };
-  }
-
-  async function runLocalCommand(command: string) {
-    const parsed = parseCliCommand(command);
-    const result = parsed
-      ? await execCliForCluster(parsed.tool, parsed.args, sessionClusterId)
-      : await execShellCommand(command);
+  function reportCommandResult(result: { code: number; stdout: string; stderr: string }) {
     const output = result.stdout?.trim();
     if (output?.length) appendShellOutput(output);
     if (result.code !== 0) {
       const stderr = result.stderr?.trim();
       throw new Error(stderr || `Command exited with code ${result.code}`);
     }
+  }
+
+  async function runLocalCommand(command: string) {
+    const parsed = parseCliCommand(command, isWindowsPlatform() ? "windows" : "posix");
+    if (parsed.kind === "invalid") {
+      throw new Error(`Not run: ${parsed.error}`);
+    }
+    reportCommandResult(
+      parsed.kind === "cli"
+        ? await execCliForCluster(parsed.tool, parsed.args, sessionClusterId)
+        : await execShellCommand(command),
+    );
   }
 
   async function runDebugCommand(command: string) {
@@ -619,16 +603,14 @@
     }
   }
 
-  async function executePresetCommand(command: string) {
-    const normalized = command.trim();
-    if (!normalized) return;
+  async function executePresetCommand(preset: ShellPresetCommand) {
     shellCommandBusy = true;
     shellLastRunAt = Date.now();
     shellError = null;
     appendShellOutput("");
-    appendShellOutput(`$ ${normalized}`);
+    appendShellOutput(`$ ${preset.commandLine}`);
     try {
-      await runDebugCommand(normalized);
+      reportCommandResult(await execCliForCluster(preset.tool, preset.args, sessionClusterId));
     } catch (error) {
       shellError = error instanceof Error ? error.message : "Failed to execute command.";
       appendShellOutput(`❌ ${shellError}`);
@@ -916,7 +898,7 @@
         <div
           class="mt-2 break-all rounded border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-[11px] text-emerald-300"
         >
-          {shellPresetCommand || shellCommand}
+          {shellPreset?.commandLine ?? shellCommand}
         </div>
       </div>
     {/if}
@@ -938,17 +920,21 @@
           <Button
             variant="outline"
             class="whitespace-nowrap"
-            disabled={!shellReady || shellBusy || shellCommandBusy || !shellPresetCommand}
-            onclick={() => void executePresetCommand(shellPresetCommand)}
+            disabled={!shellReady || shellBusy || shellCommandBusy || !shellPreset}
+            onclick={() => shellPreset && void executePresetCommand(shellPreset)}
           >
             {shellCommandBusy ? "Running" : "Rerun"}
           </Button>
           <Button
             variant="outline"
             class="whitespace-nowrap"
-            disabled={!shellPresetCommand}
+            disabled={!shellPreset || !canCopyCommandLine(shellPreset.args)}
+            title={shellPreset && !canCopyCommandLine(shellPreset.args)
+              ? COPY_BLOCKED_MESSAGE
+              : undefined}
             onclick={() =>
-              void copyToClipboard(shellPresetCommand, "Copied debug describe command.")}
+              shellPreset &&
+              void copyToClipboard(shellPreset.commandLine, "Copied debug describe command.")}
           >
             Copy command
           </Button>

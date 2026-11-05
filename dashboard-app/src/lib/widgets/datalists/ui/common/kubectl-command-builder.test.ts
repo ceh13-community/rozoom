@@ -1,11 +1,76 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildKubectlDeleteArgs,
   buildKubectlDescribeCommand,
   buildKubectlGetYamlCommand,
   buildKubectlLogsArgs,
+  canCopyKubectlCommand,
 } from "./kubectl-command-builder";
 
 describe("kubectl-command-builder", () => {
+  it("quotes a name that a shell would not read back as one word", () => {
+    const target = { resource: "roles", name: "a b;c", namespace: "team" };
+
+    expect(buildKubectlDescribeCommand(target)).toBe("kubectl describe roles -n team -- 'a b;c'");
+    expect(buildKubectlGetYamlCommand({ ...target, namespaceScoped: false })).toBe(
+      "kubectl get roles -o yaml -- 'a b;c'",
+    );
+  });
+
+  it("keeps a name with a leading dash from being read as a flag", () => {
+    expect(
+      buildKubectlDescribeCommand({ resource: "roles", name: "--all", namespace: "team" }),
+    ).toBe("kubectl describe roles -n team -- --all");
+  });
+
+  it("puts every delete flag before the separator and the name last", () => {
+    const target = { resource: "roles", name: "--all", namespace: "team", namespaceScoped: true };
+
+    expect(buildKubectlDeleteArgs(target, { dryRun: true })).toEqual([
+      "delete",
+      "roles",
+      "-n",
+      "team",
+      "--dry-run=server",
+      "-o",
+      "name",
+      "--",
+      "--all",
+    ]);
+    expect(buildKubectlDeleteArgs(target)).toEqual([
+      "delete",
+      "roles",
+      "-n",
+      "team",
+      "--",
+      "--all",
+    ]);
+  });
+
+  it("omits the namespace when deleting a cluster-scoped resource", () => {
+    const target = { resource: "clusterroles", name: "--all", namespaceScoped: false };
+
+    expect(buildKubectlDeleteArgs(target, { dryRun: true })).toEqual([
+      "delete",
+      "clusterroles",
+      "--dry-run=server",
+      "-o",
+      "name",
+      "--",
+      "--all",
+    ]);
+    expect(buildKubectlDeleteArgs(target)).toEqual(["delete", "clusterroles", "--", "--all"]);
+  });
+
+  it("allows copying an unusual name on POSIX only", () => {
+    const usual = { resource: "roles", name: "viewer", namespace: "team" };
+    const unusual = { resource: "roles", name: "a&calc", namespace: "team" };
+
+    expect(canCopyKubectlCommand(usual, true)).toBe(true);
+    expect(canCopyKubectlCommand(unusual, true)).toBe(false);
+    expect(canCopyKubectlCommand(unusual, false)).toBe(true);
+  });
+
   it("builds get yaml and describe commands for namespaced resources", () => {
     expect(
       buildKubectlGetYamlCommand({
@@ -13,7 +78,7 @@ describe("kubectl-command-builder", () => {
         name: "app-config",
         namespace: "prod",
       }),
-    ).toBe("kubectl get configmaps app-config -n prod -o yaml");
+    ).toBe("kubectl get configmaps -n prod -o yaml -- app-config");
 
     expect(
       buildKubectlDescribeCommand({
@@ -21,7 +86,7 @@ describe("kubectl-command-builder", () => {
         name: "api-123",
         namespace: "prod",
       }),
-    ).toBe("kubectl describe pods api-123 -n prod");
+    ).toBe("kubectl describe pods -n prod -- api-123");
   });
 
   it("omits namespace flag for cluster scoped resources", () => {
@@ -31,24 +96,24 @@ describe("kubectl-command-builder", () => {
         name: "system-cluster-critical",
         namespaceScoped: false,
       }),
-    ).toBe("kubectl get priorityclasses system-cluster-critical -o yaml");
+    ).toBe("kubectl get priorityclasses -o yaml -- system-cluster-critical");
   });
 
   it("defaults namespace to 'default' when omitted or empty", () => {
     expect(buildKubectlGetYamlCommand({ resource: "pods", name: "x" })).toBe(
-      "kubectl get pods x -n default -o yaml",
+      "kubectl get pods -n default -o yaml -- x",
     );
 
     expect(buildKubectlGetYamlCommand({ resource: "pods", name: "x", namespace: "" })).toBe(
-      "kubectl get pods x -n default -o yaml",
+      "kubectl get pods -n default -o yaml -- x",
     );
 
     expect(buildKubectlGetYamlCommand({ resource: "pods", name: "x", namespace: "  " })).toBe(
-      "kubectl get pods x -n default -o yaml",
+      "kubectl get pods -n default -o yaml -- x",
     );
 
     expect(buildKubectlDescribeCommand({ resource: "pods", name: "x" })).toBe(
-      "kubectl describe pods x -n default",
+      "kubectl describe pods -n default -- x",
     );
   });
 

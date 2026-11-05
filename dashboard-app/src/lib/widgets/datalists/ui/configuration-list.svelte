@@ -116,9 +116,12 @@
   import DetailsEventsList from "./common/details-events-list.svelte";
   import MultiPaneWorkbench from "$shared/ui/multi-pane-workbench.svelte";
   import {
+    buildKubectlDeleteArgs,
     buildKubectlDescribeCommand as buildKubectlDescribeCliCommand,
     buildKubectlGetYamlCommand as buildKubectlGetYamlCliCommand,
+    canCopyKubectlCommand,
   } from "./common/kubectl-command-builder";
+  import { COPY_BLOCKED_MESSAGE } from "$shared/lib/format-command-line";
   import { runDebugDescribe } from "$features/resource-debug-runtime";
   import { invalidateWorkloadSnapshotCache } from "./common/workload-cache-invalidation";
   import PortForwardBrowserTab from "./common/port-forward-browser-tab.svelte";
@@ -1667,24 +1670,29 @@
     }
   }
 
-  function buildGetYamlCommand(row: ConfigurationRow) {
-    const resource = resourceByWorkload[workloadKey] ?? workloadKey;
-    return buildKubectlGetYamlCliCommand({
-      resource,
+  function getKubectlTarget(row: ConfigurationRow) {
+    return {
+      resource: resourceByWorkload[workloadKey] ?? workloadKey,
       name: row.name,
       namespace: row.namespace,
       namespaceScoped: isNamespaceScoped && row.namespace !== "cluster",
-    });
+    };
+  }
+
+  function buildGetYamlCommand(row: ConfigurationRow) {
+    return buildKubectlGetYamlCliCommand(getKubectlTarget(row));
   }
 
   function buildDescribeCommand(row: ConfigurationRow) {
-    const resource = resourceByWorkload[workloadKey] ?? workloadKey;
-    return buildKubectlDescribeCliCommand({
-      resource,
-      name: row.name,
-      namespace: row.namespace,
-      namespaceScoped: isNamespaceScoped && row.namespace !== "cluster",
-    });
+    return buildKubectlDescribeCliCommand(getKubectlTarget(row));
+  }
+
+  async function copyRowCommand(row: ConfigurationRow, command: string, successMessage: string) {
+    if (!canCopyKubectlCommand(getKubectlTarget(row))) {
+      errorMessage = COPY_BLOCKED_MESSAGE;
+      return;
+    }
+    await copyTextToClipboard(command, successMessage);
   }
 
   function openDebugDescribeForRow(row: ConfigurationRow) {
@@ -3994,19 +4002,16 @@ spec:
         if (isNamespacesWorkload && !canDeleteNamespaceRow(row)) {
           throw new Error(`Namespace "${row.name}" is protected and cannot be deleted from UI.`);
         }
-        const resource = resourceByWorkload[workloadKey] ?? workloadKey;
-        const args = ["delete", resource, row.name];
-        if (isNamespaceScoped && row.namespace !== "cluster") {
-          args.push("-n", row.namespace);
-        }
-        const dryRunArgs = [...args, "--dry-run=server", "-o", "name"];
-        const dryRun = await kubectlRawArgsFront(dryRunArgs, { clusterId });
+        const target = getKubectlTarget(row);
+        const dryRun = await kubectlRawArgsFront(buildKubectlDeleteArgs(target, { dryRun: true }), {
+          clusterId,
+        });
         if (dryRun.errors || dryRun.code !== 0) {
           throw new Error(
             dryRun.errors || dryRun.output || `Dry-run delete failed for ${row.name}`,
           );
         }
-        const result = await kubectlRawArgsFront(args, { clusterId });
+        const result = await kubectlRawArgsFront(buildKubectlDeleteArgs(target), { clusterId });
         if (result.errors || result.code !== 0) {
           throw new Error(result.errors || result.output || `Failed to delete ${row.name}`);
         }
@@ -4891,7 +4896,8 @@ spec:
           onCopyKubectlGetYaml={() => {
             const row = firstSelected();
             if (!row) return;
-            void copyTextToClipboard(
+            void copyRowCommand(
+              row,
               buildGetYamlCommand(row),
               `Copied command for ${row.namespace}/${row.name}`,
             );
@@ -4899,7 +4905,8 @@ spec:
           onCopyKubectlDescribe={() => {
             const row = firstSelected();
             if (!row) return;
-            void copyTextToClipboard(
+            void copyRowCommand(
+              row,
               buildDescribeCommand(row),
               `Copied describe command for ${row.namespace}/${row.name}`,
             );
@@ -5481,12 +5488,14 @@ spec:
                   onShowDetails={() => showDetails(row)}
                   onEditYaml={() => void openYamlEditor(row)}
                   onCopyKubectlGetYaml={() =>
-                    void copyTextToClipboard(
+                    void copyRowCommand(
+                      row,
                       buildGetYamlCommand(row),
                       `Copied command for ${row.namespace}/${row.name}`,
                     )}
                   onCopyKubectlDescribe={() =>
-                    void copyTextToClipboard(
+                    void copyRowCommand(
+                      row,
                       buildDescribeCommand(row),
                       `Copied describe command for ${row.namespace}/${row.name}`,
                     )}
@@ -5731,12 +5740,14 @@ spec:
                       onShowDetails={() => showDetails(row)}
                       onEditYaml={() => void openYamlEditor(row)}
                       onCopyKubectlGetYaml={() =>
-                        void copyTextToClipboard(
+                        void copyRowCommand(
+                          row,
                           buildGetYamlCommand(row),
                           `Copied command for ${row.namespace}/${row.name}`,
                         )}
                       onCopyKubectlDescribe={() =>
-                        void copyTextToClipboard(
+                        void copyRowCommand(
+                          row,
                           buildDescribeCommand(row),
                           `Copied describe command for ${row.namespace}/${row.name}`,
                         )}
@@ -5969,7 +5980,8 @@ spec:
               ariaLabel: "Copy kubectl get yaml",
               icon: Copy,
               onClick: () =>
-                void copyTextToClipboard(
+                void copyRowCommand(
+                  detailRow,
                   buildGetYamlCommand(detailRow),
                   `Copied command for ${detailRow.namespace}/${detailRow.name}`,
                 ),
@@ -5980,7 +5992,8 @@ spec:
               ariaLabel: "Copy kubectl describe",
               icon: ClipboardList,
               onClick: () =>
-                void copyTextToClipboard(
+                void copyRowCommand(
+                  detailRow,
                   buildDescribeCommand(detailRow),
                   `Copied describe command for ${detailRow.namespace}/${detailRow.name}`,
                 ),

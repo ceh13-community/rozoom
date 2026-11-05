@@ -9,4 +9,4 @@ export {
   closeAllShellModals,
   focusShellModal,
 } from "./model/store";
-export type { ShellWindowState } from "./model/store";
+export type { ShellPresetCommand, ShellWindowState } from "./model/store";

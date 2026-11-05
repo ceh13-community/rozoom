@@ -6,6 +6,7 @@ export {
   buildKubectlDescribeCommand,
   buildKubectlGetYamlCommand,
   buildKubectlLogsArgs,
+  canCopyKubectlCommand,
 } from "./model/kubectl-command-builder";
 export { parseResourceQuery, applyResourceQuery } from "./model/resource-query";
 export { listSavedViews, upsertSavedView, deleteSavedView } from "./model/saved-views-store";

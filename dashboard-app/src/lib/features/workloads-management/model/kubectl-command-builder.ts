@@ -1,3 +1,5 @@
+import { canCopyCommandLine, formatCommandLine } from "$shared/lib/format-command-line";
+
 export type KubectlTarget = {
   resource: string;
   name: string;
@@ -19,18 +21,52 @@ function getNamespace(namespace?: string) {
   return normalized && normalized.length > 0 ? normalized : "default";
 }
 
+function getNamespaceArgs(target: KubectlTarget) {
+  return target.namespaceScoped === false ? [] : ["-n", getNamespace(target.namespace)];
+}
+
+/** Commands for copying into a terminal. The name stays after `--`, so it is never a flag. */
 export function buildKubectlGetYamlCommand(target: KubectlTarget) {
-  if (target.namespaceScoped === false) {
-    return `kubectl get ${target.resource} ${target.name} -o yaml`;
-  }
-  return `kubectl get ${target.resource} ${target.name} -n ${getNamespace(target.namespace)} -o yaml`;
+  return formatCommandLine([
+    "kubectl",
+    "get",
+    target.resource,
+    ...getNamespaceArgs(target),
+    "-o",
+    "yaml",
+    "--",
+    target.name,
+  ]);
 }
 
 export function buildKubectlDescribeCommand(target: KubectlTarget) {
-  if (target.namespaceScoped === false) {
-    return `kubectl describe ${target.resource} ${target.name}`;
-  }
-  return `kubectl describe ${target.resource} ${target.name} -n ${getNamespace(target.namespace)}`;
+  return formatCommandLine([
+    "kubectl",
+    "describe",
+    target.resource,
+    ...getNamespaceArgs(target),
+    "--",
+    target.name,
+  ]);
+}
+
+/**
+ * Arguments for `kubectl delete`. Everything after `--` is a name, so every flag goes
+ * first and the name last: a name that looks like a flag must delete only itself.
+ */
+export function buildKubectlDeleteArgs(target: KubectlTarget, options?: { dryRun?: boolean }) {
+  return [
+    "delete",
+    target.resource,
+    ...getNamespaceArgs(target),
+    ...(options?.dryRun ? ["--dry-run=server", "-o", "name"] : []),
+    "--",
+    target.name,
+  ];
+}
+
+export function canCopyKubectlCommand(target: KubectlTarget, windows?: boolean) {
+  return canCopyCommandLine([target.resource, ...getNamespaceArgs(target), target.name], windows);
 }
 
 export function buildKubectlLogsArgs(target: KubectlLogsTarget) {
