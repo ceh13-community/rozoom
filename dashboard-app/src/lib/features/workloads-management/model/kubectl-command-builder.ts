@@ -1,4 +1,4 @@
-import { quoteCommandArgument } from "$shared/lib/format-command-line";
+import { canCopyCommandLine, formatCommandLine } from "$shared/lib/format-command-line";
 
 export type KubectlTarget = {
   resource: string;
@@ -21,20 +21,37 @@ function getNamespace(namespace?: string) {
   return normalized && normalized.length > 0 ? normalized : "default";
 }
 
+function getNamespaceArgs(target: KubectlTarget) {
+  return target.namespaceScoped === false ? [] : ["-n", getNamespace(target.namespace)];
+}
+
+/** Commands for copying into a terminal. The name stays after `--`, so it is never a flag. */
 export function buildKubectlGetYamlCommand(target: KubectlTarget) {
-  const name = quoteCommandArgument(target.name);
-  if (target.namespaceScoped === false) {
-    return `kubectl get ${target.resource} ${name} -o yaml`;
-  }
-  return `kubectl get ${target.resource} ${name} -n ${quoteCommandArgument(getNamespace(target.namespace))} -o yaml`;
+  return formatCommandLine([
+    "kubectl",
+    "get",
+    target.resource,
+    ...getNamespaceArgs(target),
+    "-o",
+    "yaml",
+    "--",
+    target.name,
+  ]);
 }
 
 export function buildKubectlDescribeCommand(target: KubectlTarget) {
-  const name = quoteCommandArgument(target.name);
-  if (target.namespaceScoped === false) {
-    return `kubectl describe ${target.resource} ${name}`;
-  }
-  return `kubectl describe ${target.resource} ${name} -n ${quoteCommandArgument(getNamespace(target.namespace))}`;
+  return formatCommandLine([
+    "kubectl",
+    "describe",
+    target.resource,
+    ...getNamespaceArgs(target),
+    "--",
+    target.name,
+  ]);
+}
+
+export function canCopyKubectlCommand(target: KubectlTarget, windows?: boolean) {
+  return canCopyCommandLine([target.resource, ...getNamespaceArgs(target), target.name], windows);
 }
 
 export function buildKubectlLogsArgs(target: KubectlLogsTarget) {

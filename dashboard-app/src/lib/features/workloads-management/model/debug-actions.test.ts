@@ -9,8 +9,8 @@ describe("debug-actions", () => {
       namespace: "prod",
       logsTarget: "api-123",
     });
-    expect(actions.getYaml).toBe("kubectl get pods api-123 -n prod -o yaml");
-    expect(actions.describe).toBe("kubectl describe pods api-123 -n prod");
+    expect(actions.getYaml).toBe("kubectl get pods -n prod -o yaml -- api-123");
+    expect(actions.describe).toBe("kubectl describe pods -n prod -- api-123");
     expect(actions.logs).toContain("logs api-123");
   });
 });

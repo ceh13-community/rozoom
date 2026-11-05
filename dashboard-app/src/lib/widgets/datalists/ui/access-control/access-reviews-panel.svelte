@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatCommandLine } from "$shared/lib/format-command-line";
   import type { PageData } from "$entities/cluster";
   import { selectedNamespace } from "$features/namespace-management";
   import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
@@ -74,7 +75,7 @@
   }
 
   async function copyCommand() {
-    const command = `kubectl ${buildCanIArgs().join(" ")}`;
+    const command = formatCommandLine(["kubectl", ...buildCanIArgs()]);
     try {
       await navigator.clipboard.writeText(command);
       result = `Copied: ${command}`;
