@@ -52,7 +52,7 @@ Use this template for every release-candidate soak. Fill it in with real timesta
 - status: `partial`
 - environment:
   - local desktop runtime
-  - healthy clusters observed: `minikube`, `arn:aws:eks:us-east-2:058264254041:cluster/test-7env`
+  - healthy clusters observed: `minikube`, `arn:aws:eks:us-east-2:123456789012:cluster/test-cluster`
 - build / commit:
   - version: `0.7.1`
   - pushed release-hardening baseline: `09ec683`

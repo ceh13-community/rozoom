@@ -84,7 +84,7 @@ Expected result:
   - repo HEAD used for the last pushed release-hardening baseline: `09ec683`
 - cluster id(s):
   - `minikube`
-  - `arn:aws:eks:us-east-2:058264254041:cluster/test-7env`
+  - `arn:aws:eks:us-east-2:123456789012:cluster/test-cluster`
 - runtime profile used:
   - `Balanced`
   - manual/cached pod runtime state also exercised during operator pass

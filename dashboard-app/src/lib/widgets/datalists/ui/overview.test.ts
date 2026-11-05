@@ -256,8 +256,8 @@ describe("overview", () => {
       props: {
         data: {
           ...overviewData,
-          slug: "arn:aws:eks:us-east-2:058264254041:cluster/test-7env",
-          title: "Overview - Cluster: arn:aws:eks:us-east-2:058264254041:cluster/test-7env",
+          slug: "arn:aws:eks:us-east-2:123456789012:cluster/test-cluster",
+          title: "Overview - Cluster: arn:aws:eks:us-east-2:123456789012:cluster/test-cluster",
         },
       },
     });

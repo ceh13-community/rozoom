@@ -53,7 +53,7 @@ Use this document as the release gate for the next production build. Every item 
     - observed activity includes `kubectl`, `helm`, and `velero` sidecars only
     - healthy cluster metrics path verified via read-only `kubectl top pod -A` on:
       - `minikube`
-      - `arn:aws:eks:us-east-2:058264254041:cluster/test-7env`
+      - `arn:aws:eks:us-east-2:123456789012:cluster/test-cluster`
     - local Playwright smoke harness is present in `e2e/`, but this sandbox blocks `vite preview` with `listen EPERM`, so browser automation cannot be used here as final release evidence
 
 ### 3. Staging Soak
@@ -87,7 +87,7 @@ Use this document as the release gate for the next production build. Every item 
   - current local evidence:
     - historical desktop log includes a metrics API degradation sample:
       - `2026-02-28 21:12:34` `Error from server (ServiceUnavailable): the server is currently unable to handle the request (get pods.metrics.k8s.io)`
-    - current healthy metrics path verified on `minikube` and `test-7env`
+    - current healthy metrics path verified on `minikube` and `test-cluster`
   - remaining gap:
     - explicit manual pass on a currently degraded or metrics-server-missing cluster still needs sign-off
 
