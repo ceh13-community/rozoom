@@ -116,6 +116,7 @@
   import DetailsEventsList from "./common/details-events-list.svelte";
   import MultiPaneWorkbench from "$shared/ui/multi-pane-workbench.svelte";
   import {
+    buildKubectlDeleteArgs,
     buildKubectlDescribeCommand as buildKubectlDescribeCliCommand,
     buildKubectlGetYamlCommand as buildKubectlGetYamlCliCommand,
     canCopyKubectlCommand,
@@ -4001,19 +4002,16 @@ spec:
         if (isNamespacesWorkload && !canDeleteNamespaceRow(row)) {
           throw new Error(`Namespace "${row.name}" is protected and cannot be deleted from UI.`);
         }
-        const resource = resourceByWorkload[workloadKey] ?? workloadKey;
-        const args = ["delete", resource, row.name];
-        if (isNamespaceScoped && row.namespace !== "cluster") {
-          args.push("-n", row.namespace);
-        }
-        const dryRunArgs = [...args, "--dry-run=server", "-o", "name"];
-        const dryRun = await kubectlRawArgsFront(dryRunArgs, { clusterId });
+        const target = getKubectlTarget(row);
+        const dryRun = await kubectlRawArgsFront(buildKubectlDeleteArgs(target, { dryRun: true }), {
+          clusterId,
+        });
         if (dryRun.errors || dryRun.code !== 0) {
           throw new Error(
             dryRun.errors || dryRun.output || `Dry-run delete failed for ${row.name}`,
           );
         }
-        const result = await kubectlRawArgsFront(args, { clusterId });
+        const result = await kubectlRawArgsFront(buildKubectlDeleteArgs(target), { clusterId });
         if (result.errors || result.code !== 0) {
           throw new Error(result.errors || result.output || `Failed to delete ${row.name}`);
         }

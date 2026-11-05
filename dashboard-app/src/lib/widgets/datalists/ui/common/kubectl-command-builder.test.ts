@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildKubectlDeleteArgs,
   buildKubectlDescribeCommand,
   buildKubectlGetYamlCommand,
   buildKubectlLogsArgs,
@@ -20,6 +21,45 @@ describe("kubectl-command-builder", () => {
     expect(
       buildKubectlDescribeCommand({ resource: "roles", name: "--all", namespace: "team" }),
     ).toBe("kubectl describe roles -n team -- --all");
+  });
+
+  it("puts every delete flag before the separator and the name last", () => {
+    const target = { resource: "roles", name: "--all", namespace: "team", namespaceScoped: true };
+
+    expect(buildKubectlDeleteArgs(target, { dryRun: true })).toEqual([
+      "delete",
+      "roles",
+      "-n",
+      "team",
+      "--dry-run=server",
+      "-o",
+      "name",
+      "--",
+      "--all",
+    ]);
+    expect(buildKubectlDeleteArgs(target)).toEqual([
+      "delete",
+      "roles",
+      "-n",
+      "team",
+      "--",
+      "--all",
+    ]);
+  });
+
+  it("omits the namespace when deleting a cluster-scoped resource", () => {
+    const target = { resource: "clusterroles", name: "--all", namespaceScoped: false };
+
+    expect(buildKubectlDeleteArgs(target, { dryRun: true })).toEqual([
+      "delete",
+      "clusterroles",
+      "--dry-run=server",
+      "-o",
+      "name",
+      "--",
+      "--all",
+    ]);
+    expect(buildKubectlDeleteArgs(target)).toEqual(["delete", "clusterroles", "--", "--all"]);
   });
 
   it("allows copying an unusual name on POSIX only", () => {

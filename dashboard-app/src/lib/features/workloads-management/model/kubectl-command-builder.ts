@@ -50,6 +50,21 @@ export function buildKubectlDescribeCommand(target: KubectlTarget) {
   ]);
 }
 
+/**
+ * Arguments for `kubectl delete`. Everything after `--` is a name, so every flag goes
+ * first and the name last: a name that looks like a flag must delete only itself.
+ */
+export function buildKubectlDeleteArgs(target: KubectlTarget, options?: { dryRun?: boolean }) {
+  return [
+    "delete",
+    target.resource,
+    ...getNamespaceArgs(target),
+    ...(options?.dryRun ? ["--dry-run=server", "-o", "name"] : []),
+    "--",
+    target.name,
+  ];
+}
+
 export function canCopyKubectlCommand(target: KubectlTarget, windows?: boolean) {
   return canCopyCommandLine([target.resource, ...getNamespaceArgs(target), target.name], windows);
 }
