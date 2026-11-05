@@ -57,6 +57,27 @@ describe("ScaleDialog", () => {
     expect(onConfirm).toHaveBeenCalledWith(3);
   });
 
+  it("confirms an edited count with Enter", async () => {
+    const onConfirm = vi.fn();
+    const { getByLabelText } = render(ScaleDialog, {
+      props: {
+        open: true,
+        resourceKind: "Deployment",
+        resourceName: "my-api",
+        namespace: "prod",
+        currentReplicas: 3,
+        onConfirm,
+        onCancel: vi.fn(),
+      },
+    });
+
+    const input = getByLabelText("Desired replica count");
+    await fireEvent.input(input, { target: { value: "2" } });
+    await fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(onConfirm).toHaveBeenCalledWith(2);
+  });
+
   it("uses the singular label when the user changes the count to 1", async () => {
     const { getByLabelText, getByRole } = render(ScaleDialog, {
       props: {
