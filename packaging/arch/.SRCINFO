@@ -1,6 +1,6 @@
 pkgbase = rozoom-bin
 	pkgdesc = ROZOOM K8s Linter IDE: desktop Kubernetes manager and linter, client-side only (official binary, slim build)
-	pkgver = 0.26.0
+	pkgver = 0.26.1
 	pkgrel = 1
 	url = https://rozoom.app
 	arch = x86_64
@@ -11,12 +11,12 @@ pkgbase = rozoom-bin
 	optdepends = noto-fonts-emoji: icons in the UI
 	provides = rozoom
 	conflicts = rozoom
-	noextract = ROZOOM_K8s_Linter_IDE_0.26.0_amd64_slim.deb
+	noextract = ROZOOM_K8s_Linter_IDE_0.26.1_amd64_slim.deb
 	options = !strip
 	options = !debug
-	source = ROZOOM_K8s_Linter_IDE_0.26.0_amd64_slim.deb::https://github.com/ceh13-community/rozoom/releases/download/app-v0.26.0/ROZOOM_K8s_Linter_IDE_0.26.0_amd64_slim.deb
-	source = LICENSE-0.26.0::https://raw.githubusercontent.com/ceh13-community/rozoom/app-v0.26.0/LICENSE
-	sha256sums = a69158cc163f232f83ebc54ca65a45da421a24ff98dfdcf3d866090783fcc50a
+	source = ROZOOM_K8s_Linter_IDE_0.26.1_amd64_slim.deb::https://github.com/ceh13-community/rozoom/releases/download/app-v0.26.1/ROZOOM_K8s_Linter_IDE_0.26.1_amd64_slim.deb
+	source = LICENSE-0.26.1::https://raw.githubusercontent.com/ceh13-community/rozoom/app-v0.26.1/LICENSE
+	sha256sums = 0f9d0fc8bafca7f668c8334e4baaf8166073638a2495620d8b78df07ad22d239
 	sha256sums = cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
 
 pkgname = rozoom-bin
