@@ -8,20 +8,24 @@ the user-facing change in plain language. The in-app update notification
 deliberately shows fixed copy and never displays these notes.
 The release build fails if the section for the released version is missing.
 
-## [0.26.1] - 2026-11-06
+## [0.26.1] - 2026-11-05
 
-Fixes how Debug describe runs kubectl for resources with unusual names, and the app
-no longer connects to font servers when it starts. We recommend this update.
+Fixes how Debug describe and Delete in the configuration lists run kubectl for
+resources with unusual names, and the app no longer connects to font servers when
+it starts. We recommend this update.
 
 ### Changed
 
 - Debug describe runs kubectl with an argument list. The command it shows now
   reads `kubectl describe pod -n prod -- api-0`.
 - The Copy kubectl describe and Copy kubectl get actions quote a name that a shell
-  would not read back as one word.
+  would not read back as one word. On Windows, where that quoting does not apply,
+  they say so for such a name and offer Run debug describe instead.
 
 ### Fixed
 
+- Delete in the configuration lists (ConfigMaps, Secrets, Roles and others) passes
+  the name after `--`, so kubectl reads it only as a name.
 - The terminal refuses a typed command it cannot parse and shows the parse error.
 - Removed the external font links, which opened connections to Google's font
   servers on every start. The fonts themselves were never loaded by the app.
