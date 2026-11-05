@@ -1,0 +1,9 @@
+# makepkg output
+pkg/
+src/
+*.pkg.tar*
+*.deb
+LICENSE-*
+
+# test-clean-arch.sh output
+test-out/
