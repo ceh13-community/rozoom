@@ -4,7 +4,7 @@ ROZOOM is a desktop application that manages Kubernetes clusters. Security is a 
 
 ## Architecture
 
-ROZOOM is built with [Tauri v2](https://v2.tauri.app/), which provides process isolation between the frontend (WebView) and backend (Rust). The frontend cannot execute arbitrary system commands - all CLI interactions go through a sandboxed capability system.
+ROZOOM is built with [Tauri v2](https://v2.tauri.app/), which provides process isolation between the frontend (WebView) and backend (Rust). The frontend reaches the system only through the Tauri capability system described below.
 
 ## What ROZOOM accesses
 
@@ -22,16 +22,21 @@ ROZOOM is built with [Tauri v2](https://v2.tauri.app/), which provides process i
 
 ### Network
 
-| Destination               | Purpose                                            |
-| ------------------------- | -------------------------------------------------- |
-| Kubernetes API servers    | All cluster operations (via kubectl/helm sidecars) |
-| `127.0.0.1` / `localhost` | Internal API routes only                           |
+| Destination                                          | When                                                                                  | Purpose                                                            |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Kubernetes API servers                               | Working with a cluster; opening the cluster manager, for clusters in `~/.kube/config` | Cluster operations and access tests (via kubectl/helm sidecars)    |
+| `127.0.0.1` / `localhost`                            | While the app runs                                                                    | Internal API routes and port-forwards                              |
+| `github.com`, `release-assets.githubusercontent.com` | Every start                                                                           | Update check                                                       |
+| `eu.i.posthog.com`                                   | Only after you allow usage telemetry                                                  | Usage events, see [the privacy notice](https://rozoom.app/privacy) |
+| Cloud provider APIs                                  | When you use a provider CLI from the app                                              | Provider CLIs bundled in the full-offline build                    |
+| Helm repository hosts                                | When you add a repository or install a chart                                          | Chart downloads via the helm sidecar                               |
+| `fonts.googleapis.com`, `fonts.gstatic.com`          | Every start, releases up to and including 0.26.0                                      | Removed in 0.26.1. No font was loaded                              |
 
-ROZOOM does **not** make any external HTTP requests to third-party services. All cloud provider API calls go through the bundled CLI tools (aws, gcloud, az, doctl, hcloud, oc).
+An exec plugin named in a kubeconfig is started by kubectl and makes its own connections.
 
 ### CLI tools (bundled sidecars)
 
-All binaries are bundled with the app - ROZOOM never uses system PATH. Each binary is allowlisted in the Tauri capability system:
+ROZOOM runs its own bundled copies of these tools, not the ones on the system PATH. The slim build bundles only kubectl and Helm; the full-offline build bundles the rest. Each binary is allowlisted in the Tauri capability system:
 
 | Binary                        | Purpose                         |
 | ----------------------------- | ------------------------------- |
@@ -55,17 +60,16 @@ The app enforces a CSP that restricts:
 - Scripts: only from app bundle (`'self'`)
 - Styles: from app bundle + inline (required by Svelte component styles)
 - Images: from app bundle + data URIs + blobs
-- Connections: only to localhost (internal API)
+- Connections: localhost and, for opt-in usage telemetry, the PostHog EU hosts
 - No eval, no remote script loading
 
 ### Capability system
 
 Tauri v2 capabilities (defined in `src-tauri/capabilities/default.json`) enforce least-privilege:
 
-- **Shell**: only allowlisted sidecar binaries can be executed
+- **Shell**: allowlisted bundled tools, plus the platform shell (`sh`, `cmd`, `powershell`) for the debug terminal, which runs the commands you type
 - **Filesystem**: scoped to specific directories (kubeconfig, cloud credentials, app data)
 - **HTTP**: only localhost connections allowed
-- **No arbitrary command execution**: cannot run system commands outside the allowlist
 
 ### DevTools
 
@@ -82,90 +86,30 @@ ROZOOM copies kubeconfig files to its own app data directory. This prevents:
 ## Data storage
 
 - Health check results are cached locally in the app data directory
-- No data is sent to external servers
-- Sentry error tracking (optional) sends crash reports only. The SDK is
-  configured to exclude cluster data, credentials, and kubeconfig content
-  by design, but automated scrubbing is still being hardened (see
-  Phase 8.2 below). Until that work lands, treat Sentry telemetry as a
-  best-effort carve-out rather than an enforced guarantee.
+- Cluster data, credentials and kubeconfig content are not part of usage telemetry
+- Crash reporting is not configured in release builds: no Sentry DSN is set, and the CSP does not allow it
 
 ## Compliance posture
 
 Suitable today for **internal dev-team use**: strong RBAC/PSS/hygiene checks,
-restrictive CSP, per-file 0600 permissions, SHA256-pinned bundled binaries,
-no external telemetry beyond optional Sentry.
+restrictive CSP, SHA256-pinned bundled binaries, no telemetry unless you opt in.
 
 Not yet suitable for **regulated environments** (SOC 2 Type II, ISO 27001,
-PCI-DSS 4.0, HIPAA, FedRAMP). Known gaps, their compliance mapping, and the
-planned hardening are tracked as **Phase 8** in [`ROADMAP.md`](../ROADMAP.md):
+PCI-DSS 4.0, HIPAA, FedRAMP). Known gaps and their compliance mapping:
 
 | Gap                                      | Risk                         | Blocks                                                                                |
 | ---------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------- |
 | Plaintext kubeconfig on disk             | CRITICAL                     | PCI-DSS req 3, ISO 27001 A.10.1, SOC 2 CC6.1, FedRAMP SC-28, HIPAA §164.312(a)(2)(iv) |
-| Sentry without credential scrubbing      | HIGH                         | GDPR Art. 32, SOC 2 CC6.7                                                             |
 | Audit log has no tamper protection       | HIGH                         | SOC 2 CC7.3, ISO 27001 A.12.4.2, FedRAMP AU-9                                         |
-| `readOnly` flag not enforced             | MEDIUM                       | ISO 27001 A.9.4.1                                                                     |
-| No signed auto-update                    | HIGH                         | NIST SSDF PS.2, US EO 14028                                                           |
+| `readOnly` flag not enforced everywhere  | MEDIUM                       | ISO 27001 A.9.4.1                                                                     |
 | Bundled binaries verified only by SHA256 | MEDIUM                       | SLSA Level 3+                                                                         |
 | Plugins not sandboxed                    | HIGH (when marketplace live) | OWASP ASVS V14                                                                        |
 | No HTTP_PROXY / custom CA support        | MEDIUM                       | enterprise MITM proxies                                                               |
 | No SIEM export                           | MEDIUM                       | SOC 2 CC7.2                                                                           |
 | No app-level session lock                | MEDIUM                       | NIST 800-53 IA-11                                                                     |
 
-Phase 8.1 (encrypted kubeconfig at rest via Tauri Stronghold or OS keyring)
-is the single highest-priority item and unlocks PCI-DSS, HIPAA, and SOC 2.
-
-## Compliance posture
-
-Suitable today for **internal dev-team use**: strong RBAC/PSS/hygiene checks,
-restrictive CSP, per-file 0600 permissions, SHA256-pinned bundled binaries,
-no external telemetry beyond optional Sentry.
-
-Not yet suitable for **regulated environments** (SOC 2 Type II, ISO 27001,
-PCI-DSS 4.0, HIPAA, FedRAMP). Known gaps, their compliance mapping, and the
-planned hardening are tracked as **Phase 8** in [`ROADMAP.md`](../ROADMAP.md):
-
-| Gap                                      | Risk                         | Blocks                                                                                |
-| ---------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------- |
-| Plaintext kubeconfig on disk             | CRITICAL                     | PCI-DSS req 3, ISO 27001 A.10.1, SOC 2 CC6.1, FedRAMP SC-28, HIPAA §164.312(a)(2)(iv) |
-| Sentry without credential scrubbing      | HIGH                         | GDPR Art. 32, SOC 2 CC6.7                                                             |
-| Audit log has no tamper protection       | HIGH                         | SOC 2 CC7.3, ISO 27001 A.12.4.2, FedRAMP AU-9                                         |
-| `readOnly` flag not enforced             | MEDIUM                       | ISO 27001 A.9.4.1                                                                     |
-| No signed auto-update                    | HIGH                         | NIST SSDF PS.2, US EO 14028                                                           |
-| Bundled binaries verified only by SHA256 | MEDIUM                       | SLSA Level 3+                                                                         |
-| Plugins not sandboxed                    | HIGH (when marketplace live) | OWASP ASVS V14                                                                        |
-| No HTTP_PROXY / custom CA support        | MEDIUM                       | enterprise MITM proxies                                                               |
-| No SIEM export                           | MEDIUM                       | SOC 2 CC7.2                                                                           |
-| No app-level session lock                | MEDIUM                       | NIST 800-53 IA-11                                                                     |
-
-Phase 8.1 (encrypted kubeconfig at rest via Tauri Stronghold or OS keyring)
-is the single highest-priority item and unlocks PCI-DSS, HIPAA, and SOC 2.
-
-## Compliance posture
-
-Suitable today for **internal dev-team use**: strong RBAC/PSS/hygiene checks,
-restrictive CSP, per-file 0600 permissions, SHA256-pinned bundled binaries,
-no external telemetry beyond optional Sentry.
-
-Not yet suitable for **regulated environments** (SOC 2 Type II, ISO 27001,
-PCI-DSS 4.0, HIPAA, FedRAMP). Known gaps, their compliance mapping, and the
-planned hardening are tracked as **Phase 8** in [`ROADMAP.md`](../ROADMAP.md):
-
-| Gap                                      | Risk                         | Blocks                                                                                |
-| ---------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------- |
-| Plaintext kubeconfig on disk             | CRITICAL                     | PCI-DSS req 3, ISO 27001 A.10.1, SOC 2 CC6.1, FedRAMP SC-28, HIPAA §164.312(a)(2)(iv) |
-| Sentry without credential scrubbing      | HIGH                         | GDPR Art. 32, SOC 2 CC6.7                                                             |
-| Audit log has no tamper protection       | HIGH                         | SOC 2 CC7.3, ISO 27001 A.12.4.2, FedRAMP AU-9                                         |
-| `readOnly` flag not enforced             | MEDIUM                       | ISO 27001 A.9.4.1                                                                     |
-| No signed auto-update                    | HIGH                         | NIST SSDF PS.2, US EO 14028                                                           |
-| Bundled binaries verified only by SHA256 | MEDIUM                       | SLSA Level 3+                                                                         |
-| Plugins not sandboxed                    | HIGH (when marketplace live) | OWASP ASVS V14                                                                        |
-| No HTTP_PROXY / custom CA support        | MEDIUM                       | enterprise MITM proxies                                                               |
-| No SIEM export                           | MEDIUM                       | SOC 2 CC7.2                                                                           |
-| No app-level session lock                | MEDIUM                       | NIST 800-53 IA-11                                                                     |
-
-Phase 8.1 (encrypted kubeconfig at rest via Tauri Stronghold or OS keyring)
-is the single highest-priority item and unlocks PCI-DSS, HIPAA, and SOC 2.
+Encrypted kubeconfig at rest (Tauri Stronghold or OS keyring) is the
+highest-priority item and unlocks PCI-DSS, HIPAA, and SOC 2.
 
 ## Reporting security issues
 

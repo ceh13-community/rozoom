@@ -56,7 +56,7 @@ Before you begin, ensure the following tools are installed:
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/ceh13-community/svelte-dashboard.git
+git clone https://github.com/ceh13-community/rozoom.git
 cd dashboard-app
 pnpm install
 ```
@@ -504,7 +504,7 @@ Every contribution helps maintain bundled tools, add new features, and keep the 
 **Other ways to help:**
 
 - Star the repository
-- Report bugs and suggest features via [GitHub Issues](https://github.com/ceh13-community/svelte-dashboard/issues)
+- Report bugs and suggest features via [GitHub Issues](https://github.com/ceh13-community/rozoom/issues)
 - Contribute code, documentation, or translations
 - Share ROZOOM with your DevOps team
 

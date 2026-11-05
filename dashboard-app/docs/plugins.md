@@ -18,20 +18,20 @@ Core features are always available. Pro plugins include a 14-day free trial.
 
 ### Available Plugins
 
-| Plugin                | Tier | Price  | What it does                                               |
-| --------------------- | ---- | ------ | ---------------------------------------------------------- |
-| Cluster Manager       | Core | Free   | Add, organize, manage clusters with 5 auth methods         |
-| Health Checks         | Core | Free   | 37 automated checks: API server, etcd, nodes, pods, certs  |
-| Workload Browser      | Core | Free   | Browse 61 K8s resource types with YAML editor, logs, shell |
-| Helm Catalog          | Core | Free   | 25 curated charts with one-click install                   |
-| Fleet Organization    | Free | Free   | Custom groups, smart groups, saved views                   |
-| Fix Templates         | Free | Free   | YAML generators for PDB, NetworkPolicy, quota, probes      |
-| Workload Visualizer   | Free | Free   | Dependency map: Ingress -> Service -> Deployment -> Pod    |
-| Security Suite        | Pro  | $9/mo  | RBAC risk scanner, PSS compliance, credential hygiene      |
-| Capacity Intelligence | Pro  | $9/mo  | Resource heatmap, bin-packing score, cost analysis         |
-| Performance Suite     | Pro  | $9/mo  | RED metrics, CPU throttling, SLO tracking                  |
-| Enterprise Auth       | Pro  | $12/mo | OIDC wizard, Vault integration, auth detection             |
-| GitOps Integration    | Pro  | $5/mo  | ArgoCD and Flux bootstrap with generated YAML              |
+| Plugin                | Tier | What it does                                               |
+| --------------------- | ---- | ---------------------------------------------------------- |
+| Cluster Manager       | Core | Add, organize, manage clusters with 5 auth methods         |
+| Health Checks         | Core | 37 automated checks: API server, etcd, nodes, pods, certs  |
+| Workload Browser      | Core | Browse 61 K8s resource types with YAML editor, logs, shell |
+| Helm Catalog          | Core | 25 curated charts with one-click install                   |
+| Fleet Organization    | Free | Custom groups, smart groups, saved views                   |
+| Fix Templates         | Free | YAML generators for PDB, NetworkPolicy, quota, probes      |
+| Workload Visualizer   | Free | Dependency map: Ingress -> Service -> Deployment -> Pod    |
+| Security Suite        | Pro  | RBAC risk scanner, PSS compliance, credential hygiene      |
+| Capacity Intelligence | Pro  | Resource heatmap, bin-packing score, cost analysis         |
+| Performance Suite     | Pro  | RED metrics, CPU throttling, SLO tracking                  |
+| Enterprise Auth       | Pro  | OIDC wizard, Vault integration, auth detection             |
+| GitOps Integration    | Pro  | ArgoCD and Flux bootstrap with generated YAML              |
 
 ### Managing Plugins
 

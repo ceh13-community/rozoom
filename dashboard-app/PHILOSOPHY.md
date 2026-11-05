@@ -42,12 +42,13 @@ ROZOOM works with any Kubernetes cluster: minikube, kind, EKS, GKE, AKS, DOKS, H
 
 ### 6. Local-first
 
-All data stays on the user's machine:
+Cluster data stays on the user's machine:
 
 - Health check cache is local
 - Preferences are local
-- No telemetry, no analytics, no phone-home
-- Sentry crash reporting is optional and contains no cluster data
+- Usage telemetry is opt-in: nothing is sent until you choose Allow, and cluster contents are never part of it
+- The app checks GitHub for updates on every start
+- Crash reporting is not configured in release builds
 
 ### 7. Transparency
 
