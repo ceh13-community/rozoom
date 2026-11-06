@@ -23,7 +23,8 @@
     onCancel,
   }: ScaleDialogProps = $props();
 
-  let inputValue = $state("");
+  // A number input bound with bind:value holds a number once edited, null when emptied.
+  let inputValue = $state<string | number | null>("");
   let error = $state("");
 
   $effect(() => {
@@ -33,8 +34,8 @@
     }
   });
 
-  function validate(value: string): number | null {
-    const trimmed = value.trim();
+  function validate(value: string | number | null): number | null {
+    const trimmed = String(value ?? "").trim();
     if (!/^\d+$/.test(trimmed)) {
       error = "Replica count must be a non-negative integer.";
       return null;
@@ -90,7 +91,7 @@
     <div class="flex justify-end gap-2 pb-2">
       <Button variant="outline" size="sm" onclick={onCancel}>Cancel</Button>
       <Button size="sm" onclick={handleConfirm}>
-        Scale to {inputValue} replica{inputValue === "1" ? "" : "s"}
+        Scale to {inputValue ?? ""} replica{String(inputValue) === "1" ? "" : "s"}
       </Button>
     </div>
   </Dialog.Content>

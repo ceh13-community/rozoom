@@ -1,4 +1,4 @@
-import { render } from "@testing-library/svelte";
+import { fireEvent, render } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 import ScaleDialog from "./scale-dialog.svelte";
 
@@ -35,5 +35,85 @@ describe("ScaleDialog", () => {
     });
 
     expect(getByText("default/redis - currently 1 replica")).toBeInTheDocument();
+  });
+
+  it("confirms a replica count the user changed", async () => {
+    const onConfirm = vi.fn();
+    const { getByLabelText, getByRole } = render(ScaleDialog, {
+      props: {
+        open: true,
+        resourceKind: "Deployment",
+        resourceName: "my-api",
+        namespace: "prod",
+        currentReplicas: 2,
+        onConfirm,
+        onCancel: vi.fn(),
+      },
+    });
+
+    await fireEvent.input(getByLabelText("Desired replica count"), { target: { value: "3" } });
+    await fireEvent.click(getByRole("button", { name: "Scale to 3 replicas" }));
+
+    expect(onConfirm).toHaveBeenCalledWith(3);
+  });
+
+  it("confirms an edited count with Enter", async () => {
+    const onConfirm = vi.fn();
+    const { getByLabelText } = render(ScaleDialog, {
+      props: {
+        open: true,
+        resourceKind: "Deployment",
+        resourceName: "my-api",
+        namespace: "prod",
+        currentReplicas: 3,
+        onConfirm,
+        onCancel: vi.fn(),
+      },
+    });
+
+    const input = getByLabelText("Desired replica count");
+    await fireEvent.input(input, { target: { value: "2" } });
+    await fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(onConfirm).toHaveBeenCalledWith(2);
+  });
+
+  it("uses the singular label when the user changes the count to 1", async () => {
+    const { getByLabelText, getByRole } = render(ScaleDialog, {
+      props: {
+        open: true,
+        resourceKind: "Deployment",
+        resourceName: "my-api",
+        namespace: "prod",
+        currentReplicas: 2,
+        onConfirm: vi.fn(),
+        onCancel: vi.fn(),
+      },
+    });
+
+    await fireEvent.input(getByLabelText("Desired replica count"), { target: { value: "1" } });
+
+    expect(getByRole("button", { name: "Scale to 1 replica" })).toBeInTheDocument();
+  });
+
+  it("rejects an emptied count with a message", async () => {
+    const onConfirm = vi.fn();
+    const { getByLabelText, getByRole, getByText } = render(ScaleDialog, {
+      props: {
+        open: true,
+        resourceKind: "Deployment",
+        resourceName: "my-api",
+        namespace: "prod",
+        currentReplicas: 2,
+        onConfirm,
+        onCancel: vi.fn(),
+      },
+    });
+
+    await fireEvent.input(getByLabelText("Desired replica count"), { target: { value: "" } });
+    await fireEvent.click(getByRole("button", { name: /^Scale to/ }));
+
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(getByText("Replica count must be a non-negative integer.")).toBeInTheDocument();
   });
 });
