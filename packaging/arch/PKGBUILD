@@ -1,7 +1,7 @@
 # Maintainer: ROZOOM team (https://github.com/ceh13-community/rozoom/issues)
 
 pkgname=rozoom-bin
-pkgver=0.26.0
+pkgver=0.26.1
 pkgrel=1
 pkgdesc="ROZOOM K8s Linter IDE: desktop Kubernetes manager and linter, client-side only (official binary, slim build)"
 arch=('x86_64')
@@ -17,7 +17,7 @@ _deb="ROZOOM_K8s_Linter_IDE_${pkgver}_amd64_slim.deb"
 source=("${_deb}::https://github.com/ceh13-community/rozoom/releases/download/app-v${pkgver}/${_deb}"
         "LICENSE-${pkgver}::https://raw.githubusercontent.com/ceh13-community/rozoom/app-v${pkgver}/LICENSE")
 noextract=("${_deb}")
-sha256sums=('a69158cc163f232f83ebc54ca65a45da421a24ff98dfdcf3d866090783fcc50a'
+sha256sums=('0f9d0fc8bafca7f668c8334e4baaf8166073638a2495620d8b78df07ad22d239'
             'cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30')
 
 package() {
