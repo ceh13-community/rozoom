@@ -4,10 +4,13 @@
 #      name (slim assets are already `_slim`-named by their build jobs),
 #   2. rewrites the URLs inside latest.json to the renamed assets
 #      (signatures cover file content, not names, so they stay valid),
-#   3. verifies both manifests: every URL points at an existing asset,
-#      every latest-slim.json URL is a `_slim` asset, every latest.json URL
-#      is a `_full-offline` asset - the "slim never gets full and vice
-#      versa" guarantee, asserted on the release itself.
+#   2b. removes the bare `linux-x86_64` key from both manifests (Linux
+#      packages are not updater-replaceable; assert-updater-manifest.sh),
+#   3. verifies both manifests: valid JSON with the four platform keys and no
+#      bare Linux key (assert-updater-manifest.sh), every URL points at an
+#      existing asset, every latest-slim.json URL is a `_slim` asset, every
+#      latest.json URL is a `_full-offline` asset - the "slim never gets full
+#      and vice versa" guarantee, asserted on the release itself.
 #
 # Runs after all build jobs (needs:) so there are no concurrent writers.
 #
@@ -17,6 +20,7 @@ set -euo pipefail
 
 TAG="${1:?release tag required, e.g. app-v0.25.0}"
 REPO="${GITHUB_REPOSITORY:-ceh13-community/rozoom}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -77,6 +81,22 @@ if [[ -s "$tmp/renames.tsv" ]]; then
   echo "latest.json URLs updated to _full-offline asset names"
 fi
 
+# 2b. Drop the bare `linux-x86_64` key from both manifests. tauri-action writes
+#     it from the Linux .deb; every client up to 0.26.1 acts on it (pkexec on a
+#     .deb install, failed write on .rpm, overwritten AppImage - see
+#     assert-updater-manifest.sh). Linux installs update by hand; the
+#     per-package keys linux-x86_64-deb / -rpm stay for the 0.26.2+ notice.
+mkdir -p "$tmp/strip"
+for manifest in latest.json latest-slim.json; do
+  gh release download "$TAG" --repo "$REPO" --pattern "$manifest" --dir "$tmp/strip" --clobber
+  if jq -e '.platforms | has("linux-x86_64")' "$tmp/strip/$manifest" >/dev/null; then
+    jq 'del(.platforms["linux-x86_64"])' "$tmp/strip/$manifest" > "$tmp/strip/$manifest.new"
+    mv "$tmp/strip/$manifest.new" "$tmp/strip/$manifest"
+    gh release upload "$TAG" "$tmp/strip/$manifest" --repo "$REPO" --clobber
+    echo "removed the bare linux-x86_64 key from $manifest"
+  fi
+done
+
 # 3. Cross-verify both manifests against the final asset list.
 gh api "repos/${REPO}/releases/${RELEASE_ID}/assets" --paginate \
   --jq '.[].name' > "$tmp/final-assets.txt"
@@ -85,6 +105,17 @@ verify_manifest() {
   local manifest="$1" marker="$2" url name
   mkdir -p "$tmp/verify"
   gh release download "$TAG" --repo "$REPO" --pattern "$manifest" --dir "$tmp/verify" --clobber
+  # Shape gate: valid JSON, .platforms an object with the four platform keys,
+  # url and signature on every entry, no bare Linux key (step 2b removed it; a
+  # concurrent writer or a changed tauri-action could restore it).
+  bash "${SCRIPT_DIR}/assert-updater-manifest.sh" "$tmp/verify/$manifest" || return 1
+  # The URL list is materialised first: a jq failure inside a process
+  # substitution would otherwise end the loop silently and pass the gate.
+  if ! jq -r '.platforms[].url' "$tmp/verify/$manifest" > "$tmp/verify/$manifest.urls"; then
+    echo "::error::$manifest: cannot list platform URLs" >&2
+    return 1
+  fi
+  [[ -s "$tmp/verify/$manifest.urls" ]] || { echo "::error::$manifest lists no platform URLs" >&2; return 1; }
   while IFS= read -r url; do
     name="${url##*/}"
     if ! grep -qxF "$name" "$tmp/final-assets.txt"; then
@@ -95,7 +126,7 @@ verify_manifest() {
       echo "::error::$manifest points at '$name' which is not a $marker asset" >&2
       return 1
     fi
-  done < <(jq -r '.platforms[].url' "$tmp/verify/$manifest")
+  done < "$tmp/verify/$manifest.urls"
   echo "OK: every $manifest URL resolves to an existing $marker asset"
 }
 

@@ -7,9 +7,12 @@
 # installs untouched. tauri-action only knows how to write latest.json, so
 # the slim manifest is assembled here, one platform entry per slim job.
 #
-# The slim platform jobs (darwin, windows; Linux ships no updater-replaceable
-# package) may write concurrently; a lost update is detected by re-downloading
-# after upload and retried.
+# The slim platform jobs (darwin, windows, linux) may write concurrently; a lost
+# update is detected by re-downloading after upload and retried. Linux registers
+# its .deb and .rpm under linux-x86_64-deb / linux-x86_64-rpm only: the bare
+# linux-x86_64 key makes clients up to 0.26.1 install or overwrite things
+# (assert-updater-manifest.sh), the per-package keys only feed the 0.26.2+
+# "new version" notice.
 #
 # Usage: register-in-latest-slim-json.sh <tag> <platform-key> <artifact-path>
 #   e.g. register-in-latest-slim-json.sh app-v0.25.0 darwin-aarch64 \
@@ -18,7 +21,10 @@
 set -euo pipefail
 
 TAG="${1:?release tag required, e.g. app-v0.25.0}"
-PLATFORM_KEY="${2:?platform key required, e.g. linux-x86_64}"
+PLATFORM_KEY="${2:?platform key required, e.g. darwin-aarch64 or linux-x86_64-deb}"
+case "$PLATFORM_KEY" in
+  linux-x86_64) echo "refusing the bare linux-x86_64 key: Linux packages are not updater-replaceable (use linux-x86_64-deb or -rpm)" >&2; exit 1 ;;
+esac
 ARTIFACT="${3:?artifact path required}"
 REPO="${GITHUB_REPOSITORY:-ceh13-community/rozoom}"
 MANIFEST="latest-slim.json"
@@ -42,6 +48,14 @@ trap 'rm -rf "$tmp"' EXIT
 for attempt in 1 2 3 4 5; do
   rm -f "$tmp/$MANIFEST"
   if ! gh release download "$TAG" --repo "$REPO" --pattern "$MANIFEST" --dir "$tmp" --clobber 2>/dev/null; then
+    # Only a manifest that does not exist yet is bootstrapped. A download that
+    # failed while the asset exists would otherwise be replaced by a one-entry
+    # manifest and the other platforms lost; that attempt is retried instead.
+    if gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name' 2>/dev/null | grep -qxF "$MANIFEST"; then
+      echo "$MANIFEST exists on the release but could not be downloaded (attempt $attempt); retrying" >&2
+      sleep $((attempt * 5))
+      continue
+    fi
     # Bootstrap notes are a placeholder; finalize-release-assets rewrites
     # them from CHANGELOG.md via set-updater-notes.sh.
     jq -n --arg v "$VERSION" --arg notes \
@@ -55,7 +69,15 @@ for attempt in 1 2 3 4 5; do
     "$tmp/$MANIFEST" > "$tmp/merged.json"
   mv "$tmp/merged.json" "$tmp/$MANIFEST"
 
-  gh release upload "$TAG" "$tmp/$MANIFEST" --repo "$REPO" --clobber
+  # Two jobs uploading the same asset at the same time make one of them fail
+  # (422, or a delete that the other already did); under `set -e` that would
+  # kill the job before the retry loop ever looks, finalize is skipped and the
+  # release goes red on a healthy build. A failed upload is just this attempt.
+  if ! gh release upload "$TAG" "$tmp/$MANIFEST" --repo "$REPO" --clobber; then
+    echo "upload of $MANIFEST failed (attempt $attempt), probably a concurrent writer; retrying" >&2
+    sleep $((attempt * 5))
+    continue
+  fi
 
   # Concurrent platform jobs can clobber each other; confirm our entry
   # survived, otherwise merge and upload again on a fresh download.

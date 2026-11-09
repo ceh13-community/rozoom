@@ -169,6 +169,7 @@ Use this document as the release gate for the next production build. Every item 
   - logs path verified
   - support artifact export verified
   - upgrade/install notes checked
+  - updater manifests: `latest.json` and `latest-slim.json` carry no bare `linux-x86_64` key (`scripts/assert-updater-manifest.sh` on both: valid JSON, the four platform keys, no bare key; the finalize job removes the bare key and fails if it is back). Linux `.deb`/`.rpm` installs update by hand: the app only shows "Rozoom X is available" with a link to the release page, read from `linux-x86_64-deb` / `linux-x86_64-rpm`. The release notes say so.
   - current repo evidence:
     - `pnpm build` completed inside `pnpm exec tauri build`
     - native Tauri release binary built:
