@@ -576,7 +576,9 @@
 
     await addClustersFromText(rawConfigData);
 
-    if ($clustersList.length > 0) {
+    // Keep the text when the import reported an error: the file is already removed,
+    // so the textarea is the only copy the user has left to fix and retry.
+    if (!$clustersConfigError) {
       rawConfigData = "";
     }
   }

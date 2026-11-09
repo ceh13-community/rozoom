@@ -1,4 +1,5 @@
 import { kubectlRawArgsFront, kubectlRawFront } from "$shared/api/kubectl-proxy";
+import { PRIVATE_DIR_MODE, PRIVATE_FILE_MODE } from "$shared/lib/private-files";
 import { isTauriAvailable } from "$shared/lib/tauri-runtime";
 import {
   buildBackupDirPath,
@@ -97,7 +98,13 @@ export async function createYamlBackup(
   }
 
   const { BaseDirectory, writeTextFile, mkdir } = await import("@tauri-apps/plugin-fs");
-  await mkdir(dirPath, { baseDir: BaseDirectory.Download, recursive: true });
+  // A backup can include Secrets, so the folder and its files are owner-only even in
+  // Downloads. The user can relax that on the files they choose to share.
+  await mkdir(dirPath, {
+    baseDir: BaseDirectory.Download,
+    recursive: true,
+    mode: PRIVATE_DIR_MODE,
+  });
 
   const files: YamlBackupFileEntry[] = [];
   const errors: string[] = [];
@@ -119,6 +126,7 @@ export async function createYamlBackup(
         const filename = buildResourceFilename(task.resourceType, task.namespace);
         await writeTextFile(`${dirPath}/${filename}`, result.yaml, {
           baseDir: BaseDirectory.Download,
+          mode: PRIVATE_FILE_MODE,
         });
         files.push({
           resourceType: task.resourceType,
@@ -152,6 +160,7 @@ export async function createYamlBackup(
 
   await writeTextFile(`${dirPath}/${buildMetadataFilename()}`, JSON.stringify(metadata, null, 2), {
     baseDir: BaseDirectory.Download,
+    mode: PRIVATE_FILE_MODE,
   });
 
   progress.phase = "done";
@@ -290,7 +299,8 @@ export async function restoreFromYamlBackup(
         baseDir: BaseDirectory.Download,
       });
 
-      await writeTextFile(tempPath, yamlContent);
+      // Restored manifests may be Secrets: owner-only while the temp file exists.
+      await writeTextFile(tempPath, yamlContent, { mode: PRIVATE_FILE_MODE });
       tempWritten = true;
 
       // Server-side dry-run validates admission + defaults against live cluster

@@ -4,6 +4,7 @@ import { spawnCli } from "$shared/api/cli";
 import { CONFIG_DIR } from "$entities/config/model/appConfig";
 import { clusterKey } from "$shared/lib/cluster-key";
 import { checkHelmActionReadOnly } from "$shared/lib/readonly-guard";
+import { PRIVATE_FILE_MODE } from "$shared/lib/private-files";
 import { getClusterNodesNames } from "$shared/api/tauri";
 import { emitCliNotification } from "$shared/lib/cli-notification";
 import {
@@ -667,7 +668,8 @@ export async function installOrUpgradeHelmRelease(
     const { writeTextFile, remove } = await import("@tauri-apps/plugin-fs");
     const appDir = await appDataDir();
     const path = `${appDir}/helm-values-${Math.random().toString(36).slice(2, 10)}.yaml`;
-    await writeTextFile(path, params.valuesYaml);
+    // Values files often carry passwords and keys: owner-only while they exist.
+    await writeTextFile(path, params.valuesYaml, { mode: PRIVATE_FILE_MODE });
     args.push("--values", path);
     valuesCleanup = async () => {
       await remove(path).catch(() => {});

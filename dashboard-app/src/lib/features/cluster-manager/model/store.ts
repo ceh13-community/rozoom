@@ -1,6 +1,11 @@
 import { get, writable } from "svelte/store";
 import type { AppClusterConfig, KubeCluster, KubeConfigFileType } from "$entities/config";
-import { saveClusterOnDisk, saveKubeConfig, getClusterFromDisk } from "../api/disk";
+import {
+  saveClusterOnDisk,
+  saveKubeConfig,
+  getClusterFromDisk,
+  removePastedKubeConfig,
+} from "../api/disk";
 import { formatResultMessages } from "../ui/formatters";
 import { parseKubeconfigText } from "$entities/config";
 import { kubeconfigArgs, selectContextForCluster } from "./kubeconfig-context";
@@ -173,7 +178,13 @@ export async function addClustersFromText(configText: string): Promise<void> {
     return;
   }
 
-  return addClustersFromKubeconfig(config, path);
+  try {
+    await addClustersFromKubeconfig(config, path);
+  } finally {
+    // The per-cluster files written above are the copies the app keeps; the pasted
+    // original would be a second copy of every token it contains.
+    await removePastedKubeConfig();
+  }
 }
 
 async function addClusters(
