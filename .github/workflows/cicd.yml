@@ -677,6 +677,7 @@ jobs:
             darwin-aarch64) entries='darwin-aarch64=*_slim.app.tar.gz' ;;
             windows-x86_64) entries='windows-x86_64=*_slim_en-US.msi' ;;
             linux-x86_64)   entries='linux-x86_64-deb=*_slim.deb linux-x86_64-rpm=*_slim.rpm' ;;
+            *) echo "no latest-slim.json entries defined for updater-platform '${{ matrix.updater-platform }}'" >&2; exit 1 ;;
           esac
           for entry in $entries; do
             key="${entry%%=*}"; pattern="${entry#*=}"

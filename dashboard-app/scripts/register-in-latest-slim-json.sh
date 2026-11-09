@@ -11,7 +11,7 @@
 # update is detected by re-downloading after upload and retried. Linux registers
 # its .deb and .rpm under linux-x86_64-deb / linux-x86_64-rpm only: the bare
 # linux-x86_64 key makes clients up to 0.26.1 install or overwrite things
-# (assert-no-bare-linux-key.sh), the per-package keys only feed the 0.26.2+
+# (assert-updater-manifest.sh), the per-package keys only feed the 0.26.2+
 # "new version" notice.
 #
 # Usage: register-in-latest-slim-json.sh <tag> <platform-key> <artifact-path>
@@ -48,6 +48,14 @@ trap 'rm -rf "$tmp"' EXIT
 for attempt in 1 2 3 4 5; do
   rm -f "$tmp/$MANIFEST"
   if ! gh release download "$TAG" --repo "$REPO" --pattern "$MANIFEST" --dir "$tmp" --clobber 2>/dev/null; then
+    # Only a manifest that does not exist yet is bootstrapped. A download that
+    # failed while the asset exists would otherwise be replaced by a one-entry
+    # manifest and the other platforms lost; that attempt is retried instead.
+    if gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name' 2>/dev/null | grep -qxF "$MANIFEST"; then
+      echo "$MANIFEST exists on the release but could not be downloaded (attempt $attempt); retrying" >&2
+      sleep $((attempt * 5))
+      continue
+    fi
     # Bootstrap notes are a placeholder; finalize-release-assets rewrites
     # them from CHANGELOG.md via set-updater-notes.sh.
     jq -n --arg v "$VERSION" --arg notes \

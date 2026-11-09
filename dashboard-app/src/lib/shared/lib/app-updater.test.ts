@@ -243,13 +243,36 @@ describe("app-updater", () => {
       expect(window.localStorage.getItem("rozoom.update_notice_seen")).toBe("0.26.3");
     });
 
-    it("treats a failed package-kind probe as a non-Linux install", async () => {
+    it("treats a failed probe on a Linux desktop as an unknown package: announce only", async () => {
+      // jsdom reports a Linux user agent.
+      expect(navigator.userAgent).toMatch(/linux/i);
       const downloadAndInstall = vi.fn(async () => {});
       const { port, check } = makePort({ update: { version: "0.26.3", downloadAndInstall } });
       port.linuxPackageKind.mockRejectedValueOnce(new Error("no such command"));
       await checkForUpdateSilently(port);
-      expect(check).toHaveBeenCalledWith();
-      expect(downloadAndInstall).toHaveBeenCalledTimes(1);
+      expect(check).toHaveBeenCalledWith({ target: "linux-x86_64-deb" });
+      expect(downloadAndInstall).not.toHaveBeenCalled();
+      expect(get(appNotifications)[0].detail).toContain(
+        "Download the new package from the release page",
+      );
+    });
+
+    it("runs the regular download flow when the probe fails off Linux", async () => {
+      Object.defineProperty(navigator, "userAgent", {
+        value: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15",
+        configurable: true,
+      });
+      try {
+        const downloadAndInstall = vi.fn(async () => {});
+        const { port, check } = makePort({ update: { version: "0.26.3", downloadAndInstall } });
+        port.linuxPackageKind.mockRejectedValueOnce(new Error("no such command"));
+        await checkForUpdateSilently(port);
+        expect(check).toHaveBeenCalledWith();
+        expect(downloadAndInstall).toHaveBeenCalledTimes(1);
+      } finally {
+        delete (navigator as { userAgent?: string }).userAgent;
+      }
+      expect(navigator.userAgent).toMatch(/linux/i);
     });
   });
 });

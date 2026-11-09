@@ -124,14 +124,23 @@ async function runUpdateCycle(port?: UpdaterPort): Promise<void> {
   await downloadAndNotify(updater, update);
 }
 
-/** A failed probe counts as "not a Linux package": the regular flow then fails or succeeds as before. */
+/**
+ * A failed probe on a Linux desktop counts as an unknown Linux package: the
+ * release is announced, nothing is installed. Off Linux the regular flow runs.
+ */
 async function detectLinuxPackageKind(updater: UpdaterPort): Promise<LinuxPackageKind | null> {
   try {
     return await updater.linuxPackageKind();
   } catch (error) {
     console.debug("[updater] package kind unavailable:", error);
-    return null;
+    return isLinuxUserAgent() ? "unknown" : null;
   }
+}
+
+function isLinuxUserAgent(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  return /linux/i.test(ua) && !/android/i.test(ua);
 }
 
 /** Manifest key for a Linux install. Only x86_64 Linux packages are published. */
