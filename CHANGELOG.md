@@ -33,7 +33,7 @@ install it the way you installed this one. We recommend this update.
   and backup panels and every helm wrapper. This is a guard in the app, not an
   access boundary: for a hard limit use RBAC. helm install on a read-only
   cluster is blocked, not confirmed. The Trivy Quick scan runs without the
-  node collector on a read-only cluster, so it creates no namespace and no job.
+  node collector on a read-only cluster and creates no objects there.
 - Ready on the first screen appears only when the API server answered.
   Connection refused, timeout and DNS failures show as unreachable with the
   reason in the row tooltip.
