@@ -434,11 +434,15 @@
 
   // User-initiated: asks one detected cluster's API server whether it answers.
   // This is the only place on this screen that runs the context's credentials.
-  async function checkDetectedCluster(cluster: Pick<DetectedCluster, "name" | "contextName">) {
+  async function checkDetectedCluster(
+    cluster: Pick<DetectedCluster, "name" | "contextName">,
+    generation = probeGeneration,
+  ) {
     const config = $kubeConfigFile;
     if (!config || !cluster.contextName || probeInFlight[cluster.name]) return;
+    // A queue that started before Refresh must not start new probes after it.
+    if (generation !== probeGeneration) return;
 
-    const generation = probeGeneration;
     probeInFlight = { ...probeInFlight, [cluster.name]: true };
     // probeClusterConnection never throws: timeouts and failures come back as a result.
     const result = await probeClusterConnection(cluster.contextName, config.path || null);
@@ -450,16 +454,19 @@
   }
 
   async function checkAllDetectedClusters() {
+    // Fixed for the whole queue: Refresh bumps probeGeneration, which stops the workers
+    // and makes every probe they still hold drop its result.
+    const generation = probeGeneration;
     const queue = detectedClusters.filter(
       (cluster) => !cluster.alreadyAdded && cluster.contextName && !probeInFlight[cluster.name],
     );
     const workers = Array.from(
       { length: Math.min(MAX_PARALLEL_CHECKS, queue.length) },
       async () => {
-        while (queue.length > 0) {
+        while (queue.length > 0 && generation === probeGeneration) {
           const next = queue.shift();
           if (!next) break;
-          await checkDetectedCluster(next);
+          await checkDetectedCluster(next, generation);
         }
       },
     );
