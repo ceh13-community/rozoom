@@ -12,6 +12,8 @@
   } from "$features/check-health/model/cert-notification-watcher";
   import { sweepHelmValuesTempfiles } from "$shared/api/helm";
   import { hardenPrivateFiles } from "$shared/lib/private-files";
+  import { removePastedKubeConfig } from "$features/cluster-manager/api/disk";
+  import { sweepTestKubeconfigs } from "$features/cluster-manager/api/test-connection";
   import { loadPluginState } from "$shared/plugins";
   import { initAnalytics, trackAppOpened } from "$shared/analytics/wau-c";
   import SplashScreen from "$shared/ui/splash-screen.svelte";
@@ -53,6 +55,10 @@
     // Kubeconfigs and connection-test copies written by earlier releases kept the
     // umask (664/775); make them owner-only. New files are created that way.
     void hardenPrivateFiles();
+    // The pasted kubeconfig is only needed during an import, and no import runs at
+    // start: a copy left by an earlier release holds every token of that paste.
+    void removePastedKubeConfig();
+    void sweepTestKubeconfigs();
     // Hydrate plugin enable/disable state from persisted preferences. Without
     // this, disabledPlugins starts empty on every launch and Marketplace
     // toggles never survive a restart. Fire-and-forget - the sidebar will

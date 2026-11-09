@@ -67,7 +67,8 @@
   import { execCli } from "$shared/api/cli";
   import { appTheme, type AppTheme } from "$shared/theme";
   import { yamlSyntaxHighlight, isDarkEditorTheme } from "./yaml-editor-theme";
-  import { writeTextFile, mkdir } from "@tauri-apps/plugin-fs";
+  import { writeTextFile, mkdir, remove } from "@tauri-apps/plugin-fs";
+  import { PRIVATE_DIR_MODE, PRIVATE_FILE_MODE } from "$shared/lib/private-files";
   import { appDataDir } from "@tauri-apps/api/path";
 
   interface Props {
@@ -796,12 +797,18 @@
     if (!doc.includes("apiVersion:") && !doc.includes("kind:")) return;
 
     const generation = ++kubeconformGeneration;
+    // The buffer can be a Secret: owner-only while it exists, and it exists only for
+    // the duration of the check.
+    const dataDir = await appDataDir().catch(() => null);
+    if (!dataDir) return;
+    const tmpFile = `${dataDir}yaml-lint/lint-buffer.yaml`;
     try {
-      const dataDir = await appDataDir();
-      const tmpDir = `${dataDir}yaml-lint`;
-      await mkdir("yaml-lint", { baseDir: 11 /* AppData */, recursive: true });
-      const tmpFile = `${tmpDir}/lint-buffer.yaml`;
-      await writeTextFile(tmpFile, doc);
+      await mkdir("yaml-lint", {
+        baseDir: 11 /* AppData */,
+        recursive: true,
+        mode: PRIVATE_DIR_MODE,
+      });
+      await writeTextFile(tmpFile, doc, { mode: PRIVATE_FILE_MODE });
 
       const result = await execCli("kubeconform", [
         "-output",
@@ -831,6 +838,8 @@
       }
     } catch {
       // kubeconform not available - silently skip
+    } finally {
+      await remove(tmpFile).catch(() => {});
     }
   }
 
