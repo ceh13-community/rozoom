@@ -46,10 +46,11 @@ export async function instantQuery(
   promql: string,
 ): Promise<PromQueryResult | null> {
   const path = buildProxyPath(endpoint, "query", promql);
-  const raw = await kubectlJson<PromQueryResult>(
-    `get --raw=${JSON.stringify(path)} --request-timeout=15s`,
-    { clusterId },
-  );
+  // kubectl gets the argv directly, no shell: quoting the path would send the
+  // quotes to the API server. URLSearchParams keeps the path free of spaces.
+  const raw = await kubectlJson<PromQueryResult>(`get --raw=${path} --request-timeout=15s`, {
+    clusterId,
+  });
   if (typeof raw === "string") return null;
   if (raw.status !== "success") return null;
   return raw;
