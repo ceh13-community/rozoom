@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { evaluateTlsGate, type TlsGateResult } from "./tls-gate";
+import {
+  evaluateTlsGate,
+  kubeconfigTlsYaml,
+  TlsBlockedError,
+  type TlsGateResult,
+} from "./tls-gate";
 
 /** Assert the gate blocked and narrow to the blocking variant so `reason` is typed. */
 function expectBlocked(gate: TlsGateResult): { allowed: false; reason: string } {
@@ -81,5 +86,76 @@ describe("evaluateTlsGate", () => {
         insecureSkipTlsVerify: false,
       }).allowed,
     ).toBe(false);
+  });
+});
+
+describe("evaluateTlsGate with an explicit skip", () => {
+  it("allows a remote https cluster with no CA once skipping was accepted", () => {
+    const gate = evaluateTlsGate({
+      server: "https://api.prod.example.com:6443",
+      hasCertificateAuthority: false,
+      insecureSkipTlsVerify: true,
+      insecureSkipAccepted: true,
+    });
+    expect(gate.allowed).toBe(true);
+  });
+
+  it("does not let an accepted skip through plain HTTP to a remote host", () => {
+    const gate = evaluateTlsGate({
+      server: "http://api.prod.example.com:8080",
+      hasCertificateAuthority: false,
+      insecureSkipTlsVerify: true,
+      insecureSkipAccepted: true,
+    });
+    expect(expectBlocked(gate).reason).toMatch(/plain HTTP/i);
+  });
+});
+
+describe("kubeconfigTlsYaml", () => {
+  const remote = "https://api.prod.example.com:6443";
+
+  it("writes the CA and verifies the server when a CA is given", () => {
+    expect(kubeconfigTlsYaml({ server: remote, caData: " LS0t " })).toBe(
+      "\n    certificate-authority-data: LS0t",
+    );
+  });
+
+  it("refuses a remote cluster with no CA and explains why", () => {
+    for (const caData of [undefined, null, "", "   "]) {
+      expect(() => kubeconfigTlsYaml({ server: remote, caData })).toThrow(TlsBlockedError);
+      expect(() => kubeconfigTlsYaml({ server: remote, caData })).toThrow(/CA certificate/i);
+    }
+  });
+
+  it("allows loopback with no CA and writes no skip flag", () => {
+    expect(kubeconfigTlsYaml({ server: "https://127.0.0.1:6443" })).toBe("");
+    expect(kubeconfigTlsYaml({ server: "https://localhost:6443", caData: null })).toBe("");
+  });
+
+  it("writes the skip flag only when the user asked for it", () => {
+    expect(kubeconfigTlsYaml({ server: remote, skipVerification: true })).toBe(
+      "\n    insecure-skip-tls-verify: true",
+    );
+    expect(kubeconfigTlsYaml({ server: "https://127.0.0.1:6443", skipVerification: true })).toBe(
+      "\n    insecure-skip-tls-verify: true",
+    );
+  });
+
+  it("keeps verification on when both a CA and the skip are given", () => {
+    expect(kubeconfigTlsYaml({ server: remote, caData: "LS0t", skipVerification: true })).toBe(
+      "\n    certificate-authority-data: LS0t",
+    );
+  });
+
+  it("refuses plain HTTP to a remote host even with a CA or a skip", () => {
+    const server = "http://api.prod.example.com:8080";
+    expect(() => kubeconfigTlsYaml({ server, caData: "LS0t" })).toThrow(TlsBlockedError);
+    expect(() => kubeconfigTlsYaml({ server, skipVerification: true })).toThrow(TlsBlockedError);
+  });
+
+  it("refuses a server that is not a URL", () => {
+    expect(() => kubeconfigTlsYaml({ server: "not a url", caData: "LS0t" })).toThrow(
+      TlsBlockedError,
+    );
   });
 });

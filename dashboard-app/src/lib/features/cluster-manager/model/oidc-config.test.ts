@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateKubeloginExecConfig, generateOidcKubeconfig, OIDC_PRESETS } from "./oidc-config";
+import { TlsBlockedError } from "./tls-gate";
 
 describe("oidc-config", () => {
   it("has presets for all major providers", () => {
@@ -78,15 +79,26 @@ describe("oidc-config", () => {
       expect(yaml).toContain("--oidc-issuer-url=https://sso.example.com");
     });
 
-    it("uses insecure-skip-tls when no CA data", () => {
-      const yaml = generateOidcKubeconfig("dev", "https://localhost:6443", null, {
-        provider: "generic",
-        issuerUrl: "https://sso.dev",
-        clientId: "dev",
-      });
+    const oidc = { provider: "generic", issuerUrl: "https://sso.dev", clientId: "dev" } as const;
 
-      expect(yaml).toContain("insecure-skip-tls-verify: true");
+    it("refuses a remote cluster with no CA", () => {
+      expect(() =>
+        generateOidcKubeconfig("prod", "https://api.example.com:6443", null, oidc),
+      ).toThrow(TlsBlockedError);
+    });
+
+    it("writes no skip flag for loopback with no CA", () => {
+      const yaml = generateOidcKubeconfig("dev", "https://localhost:6443", null, oidc);
+      expect(yaml).not.toContain("insecure-skip-tls-verify");
       expect(yaml).not.toContain("certificate-authority-data");
+      expect(yaml).toContain("server: https://localhost:6443\n  name: dev");
+    });
+
+    it("writes the skip flag only on an explicit request", () => {
+      const yaml = generateOidcKubeconfig("prod", "https://api.example.com:6443", null, oidc, {
+        skipTlsVerify: true,
+      });
+      expect(yaml).toContain("insecure-skip-tls-verify: true");
     });
   });
 });

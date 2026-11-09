@@ -8,6 +8,8 @@
  * falls through verbatim so real diagnostics are never hidden.
  */
 
+import { TlsBlockedError } from "./tls-gate";
+
 const TOKEN_EXPIRED =
   "The token is expired or invalid. Get a new one from your cluster administrator or recreate the service account.";
 
@@ -66,6 +68,8 @@ export function classifyConnectErrorClass(e: unknown): ConnectErrorClass {
 }
 
 export function humanizeConnectError(e: unknown, serverUrl?: string): string {
+  // The gate's reason is already written for the user and names the fix.
+  if (e instanceof TlsBlockedError) return e.message;
   const raw = e instanceof Error ? e.message : typeof e === "string" ? e : "";
   if (!raw.trim()) return UNKNOWN_FAILURE;
 

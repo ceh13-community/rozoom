@@ -16,6 +16,11 @@
     type ExecPluginKind,
   } from "$features/cluster-manager/model/exec-plugin";
   import { humanizeConnectError } from "$features/cluster-manager/model/humanize-connect-error";
+  import { TlsBlockedError } from "$features/cluster-manager/model/tls-gate";
+  import {
+    generateCertificateKubeconfig,
+    generateTokenKubeconfig,
+  } from "$features/cluster-manager/model/direct-credentials-kubeconfig";
   import {
     listCloudClusters,
     listCloudScopes,
@@ -152,54 +157,28 @@
   let testing = $state(false);
   let testResult = $state<TestConnectionResult | null>(null);
   let previewCopied = $state(false);
+  /** Explicit, per-connection choice. Reset whenever the method changes or a cluster is added. */
+  let skipTlsVerify = $state(false);
 
   function buildCertificateYaml(): string {
-    const caLine = certCaData.trim()
-      ? `    certificate-authority-data: ${certCaData.trim()}`
-      : `    insecure-skip-tls-verify: true`;
-    return `apiVersion: v1
-kind: Config
-clusters:
-- cluster:
-    server: ${certServerUrl.trim()}
-${caLine}
-  name: ${certClusterName.trim()}
-contexts:
-- context:
-    cluster: ${certClusterName.trim()}
-    user: cert-user
-  name: ${certClusterName.trim()}
-current-context: ${certClusterName.trim()}
-users:
-- name: cert-user
-  user:
-    client-certificate-data: ${certClientCert.trim()}
-    client-key-data: ${certClientKey.trim()}
-`;
+    return generateCertificateKubeconfig({
+      clusterName: certClusterName.trim(),
+      serverUrl: certServerUrl.trim(),
+      caData: certCaData,
+      skipTlsVerify,
+      clientCert: certClientCert.trim(),
+      clientKey: certClientKey.trim(),
+    });
   }
 
   function buildTokenYaml(): string {
-    const caLine = tokenCaData.trim()
-      ? `    certificate-authority-data: ${tokenCaData.trim()}`
-      : `    insecure-skip-tls-verify: true`;
-    return `apiVersion: v1
-kind: Config
-clusters:
-- cluster:
-    server: ${tokenServerUrl.trim()}
-${caLine}
-  name: ${tokenClusterName.trim()}
-contexts:
-- context:
-    cluster: ${tokenClusterName.trim()}
-    user: token-user
-  name: ${tokenClusterName.trim()}
-current-context: ${tokenClusterName.trim()}
-users:
-- name: token-user
-  user:
-    token: ${tokenValue.trim()}
-`;
+    return generateTokenKubeconfig({
+      clusterName: tokenClusterName.trim(),
+      serverUrl: tokenServerUrl.trim(),
+      caData: tokenCaData,
+      skipTlsVerify,
+      token: tokenValue.trim(),
+    });
   }
 
   function buildPreviewYaml(): string | null {
@@ -222,6 +201,7 @@ users:
             clientId: oidcClientId.trim(),
             clientSecret: oidcClientSecret.trim() || undefined,
           },
+          { skipTlsVerify },
         );
       }
       if (method === "exec") {
@@ -231,6 +211,7 @@ users:
           clusterName: execClusterName.trim(),
           serverUrl: execServerUrl.trim(),
           caData: execCaData.trim() || undefined,
+          skipTlsVerify,
           primary: execPrimary.trim() || undefined,
           secondary: execSecondary.trim() || undefined,
           tertiary: execTertiary.trim() || undefined,
@@ -253,12 +234,22 @@ users:
         return buildTokenYaml();
       }
       return null;
-    } catch {
+    } catch (e) {
+      if (e instanceof TlsBlockedError) throw e;
       return null;
     }
   }
 
-  const previewYaml = $derived(buildPreviewYaml());
+  function buildPreview(): { yaml: string | null; blockedReason: string | null } {
+    try {
+      return { yaml: buildPreviewYaml(), blockedReason: null };
+    } catch (e) {
+      return { yaml: null, blockedReason: e instanceof TlsBlockedError ? e.message : null };
+    }
+  }
+
+  const preview = $derived(buildPreview());
+  const previewYaml = $derived(preview.yaml);
   const previewSupported = $derived(
     method === "oidc" || method === "exec" || method === "certificate" || method === "token",
   );
@@ -417,6 +408,7 @@ users:
     clearMessages();
     testResult = null;
     showPreview = false;
+    skipTlsVerify = false;
     if (next === "cloud") void loadScopesForProvider();
   }
 
@@ -586,6 +578,7 @@ users:
           clientId: oidcClientId.trim(),
           clientSecret: oidcClientSecret.trim() || undefined,
         },
+        { skipTlsVerify },
       );
       await addClustersFromText(yaml);
       success = `Cluster "${oidcClusterName}" added with ${oidcPreset.label} OIDC.`;
@@ -594,6 +587,7 @@ users:
       oidcServerUrl = "";
       oidcClientSecret = "";
       oidcCaData = "";
+      skipTlsVerify = false;
     } catch (e) {
       error = humanizeConnectError(e, oidcServerUrl.trim());
     }
@@ -697,6 +691,7 @@ users:
       certClusterName = "";
       certServerUrl = "";
       certCaData = "";
+      skipTlsVerify = false;
       certClientCert = "";
       certClientKey = "";
     } catch (e) {
@@ -719,6 +714,7 @@ users:
       tokenClusterName = "";
       tokenServerUrl = "";
       tokenCaData = "";
+      skipTlsVerify = false;
       tokenValue = "";
     } catch (e) {
       error = humanizeConnectError(e, tokenServerUrl.trim());
@@ -740,6 +736,7 @@ users:
         clusterName: execClusterName.trim(),
         serverUrl: execServerUrl.trim(),
         caData: execCaData.trim() || undefined,
+        skipTlsVerify,
         primary: execPrimary.trim() || undefined,
         secondary: execSecondary.trim() || undefined,
         tertiary: execTertiary.trim() || undefined,
@@ -756,6 +753,7 @@ users:
       execClusterName = "";
       execServerUrl = "";
       execCaData = "";
+      skipTlsVerify = false;
       execPrimary = "";
       execSecondary = "";
       execTertiary = "";
@@ -795,6 +793,23 @@ users:
     if (localConsent === "granted") void runLocalScan();
   });
 </script>
+
+{#snippet tlsSkipControl(caData: string)}
+  <div class="space-y-1">
+    <label class="flex items-center gap-2 text-[11px] text-slate-400">
+      <input type="checkbox" bind:checked={skipTlsVerify} disabled={caData.trim().length > 0} />
+      Skip TLS verification (insecure)
+    </label>
+    {#if skipTlsVerify && caData.trim().length === 0}
+      <div
+        class="text-[10px] text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
+      >
+        The server's identity will not be checked, so anyone on the network path can read or change
+        this connection, including your credentials. Use this only when you accept that risk.
+      </div>
+    {/if}
+  </div>
+{/snippet}
 
 <details
   class="bg-white/70 backdrop-blur-sm border border-slate-200/50 dark:bg-slate-800/60 dark:border-slate-700/60 rounded-xl shadow-sm group"
@@ -1123,11 +1138,12 @@ users:
             <input
               type="text"
               bind:value={oidcCaData}
-              placeholder="CA cert data (optional)"
+              placeholder="CA certificate data (required for remote clusters)"
               class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 col-span-2"
             />
           </div>
         </div>
+        {@render tlsSkipControl(oidcCaData)}
         <div class="space-y-2">
           <p class="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
             OIDC identity
@@ -1435,10 +1451,11 @@ users:
           <input
             type="text"
             bind:value={certCaData}
-            placeholder="CA certificate data (optional)"
+            placeholder="CA certificate data (required for remote clusters)"
             class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 col-span-2"
           />
         </div>
+        {@render tlsSkipControl(certCaData)}
         <p class="text-[10px] text-slate-500">
           Mutual TLS authentication. Highest security level. <a
             href="https://kubernetes.io/docs/reference/access-authn-authz/authentication/#x509-client-certificates"
@@ -1496,10 +1513,11 @@ users:
           <input
             type="text"
             bind:value={tokenCaData}
-            placeholder="CA certificate data (optional)"
+            placeholder="CA certificate data (required for remote clusters)"
             class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 col-span-2"
           />
         </div>
+        {@render tlsSkipControl(tokenCaData)}
         <div
           class="text-[10px] text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
         >
@@ -1592,11 +1610,12 @@ users:
             <input
               type="text"
               bind:value={execCaData}
-              placeholder="CA cert data (optional)"
+              placeholder="CA certificate data (required for remote clusters)"
               class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 col-span-2"
             />
           </div>
         </div>
+        {@render tlsSkipControl(execCaData)}
         {#if execPreset.primaryLabel || execPreset.secondaryLabel || execPreset.tertiaryLabel || execPreset.extraLabel || execKind === "generic"}
           <div class="space-y-2">
             <p class="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
@@ -1721,7 +1740,9 @@ users:
               </span>
             {/if}
           {/if}
-          {#if !previewYaml}
+          {#if preview.blockedReason}
+            <span class="text-[11px] text-rose-400">{preview.blockedReason}</span>
+          {:else if !previewYaml}
             <span class="text-[10px] text-slate-500">Fill required fields to enable</span>
           {/if}
         </div>

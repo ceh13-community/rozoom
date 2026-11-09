@@ -17,6 +17,8 @@
  *   - generic    : arbitrary command + args
  */
 
+import { kubeconfigTlsYaml } from "./tls-gate";
+
 export type ExecPluginKind =
   | "aws-eks"
   | "aws-iam"
@@ -30,6 +32,8 @@ export type ExecPluginConfig = {
   clusterName: string;
   serverUrl: string;
   caData?: string;
+  /** Explicit user choice to skip TLS verification. Never a default for a missing CA. */
+  skipTlsVerify?: boolean;
   /** aws-eks: cluster name. kubelogin: OIDC issuer URL. Meaning depends on kind. */
   primary?: string;
   /** aws-eks: region. kubelogin: client ID. gke-auth: ignored. */
@@ -241,9 +245,11 @@ export function generateExecKubeconfig(config: ExecPluginConfig): string {
   if (!config.serverUrl.trim()) throw new Error("serverUrl is required");
 
   const exec = buildExecBlock(config);
-  const caLine = config.caData?.trim()
-    ? `    certificate-authority-data: ${config.caData.trim()}`
-    : `    insecure-skip-tls-verify: true`;
+  const tls = kubeconfigTlsYaml({
+    server: config.serverUrl.trim(),
+    caData: config.caData,
+    skipVerification: config.skipTlsVerify,
+  });
 
   const argsYaml = exec.args.length
     ? "\n" + exec.args.map((a) => `      - ${JSON.stringify(a)}`).join("\n")
@@ -253,8 +259,7 @@ export function generateExecKubeconfig(config: ExecPluginConfig): string {
 kind: Config
 clusters:
 - cluster:
-    server: ${config.serverUrl.trim()}
-${caLine}
+    server: ${config.serverUrl.trim()}${tls}
   name: ${config.clusterName.trim()}
 contexts:
 - context:
