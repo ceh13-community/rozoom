@@ -1,5 +1,49 @@
-import { describe, expect, it } from "vitest";
-import { extractScalars } from "./prometheus-client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as kubectlProxy from "$shared/api/kubectl-proxy";
+import { extractScalars, instantQuery } from "./prometheus-client";
+
+vi.mock("$shared/api/kubectl-proxy");
+
+describe("instantQuery", () => {
+  const endpoint = {
+    namespace: "monitoring",
+    service: "prometheus-k8s",
+    port: 9090,
+    flavor: "kube-prometheus-stack" as const,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("passes the proxy path to --raw unquoted and URL-encoded as one argument", async () => {
+    vi.mocked(kubectlProxy.kubectlJson).mockResolvedValue({
+      status: "success",
+      data: { resultType: "vector", result: [] },
+    });
+
+    const result = await instantQuery(
+      "cluster-1",
+      endpoint,
+      'sum(rate(http_requests_total{job="api"}[5m]))',
+    );
+
+    expect(result?.status).toBe("success");
+    expect(kubectlProxy.kubectlJson).toHaveBeenCalledTimes(1);
+    const [cmd, options] = vi.mocked(kubectlProxy.kubectlJson).mock.calls[0];
+    expect(options).toEqual({ clusterId: "cluster-1" });
+    expect(cmd).toMatch(
+      /^get --raw=\/api\/v1\/namespaces\/monitoring\/services\/prometheus-k8s:9090\/proxy\/api\/v1\/query\?query=\S+ --request-timeout=15s$/,
+    );
+    expect(cmd).not.toMatch(/["']/);
+  });
+
+  it("returns null when kubectl reports an error string", async () => {
+    vi.mocked(kubectlProxy.kubectlJson).mockResolvedValue("kubectl error");
+
+    expect(await instantQuery("cluster-1", endpoint, "up")).toBeNull();
+  });
+});
 
 describe("extractScalars", () => {
   it("returns empty array for null input (query failed)", () => {

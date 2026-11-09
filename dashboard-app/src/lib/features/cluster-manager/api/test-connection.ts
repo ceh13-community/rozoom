@@ -7,7 +7,8 @@
  */
 import * as Sentry from "@sentry/sveltekit";
 import { appDataDir } from "@tauri-apps/api/path";
-import { BaseDirectory, mkdir, writeTextFile, remove } from "@tauri-apps/plugin-fs";
+import { BaseDirectory, exists, readDir, remove } from "@tauri-apps/plugin-fs";
+import { mkdirPrivate, writePrivateTextFile } from "$shared/lib/private-files";
 import { createCliCommand } from "$shared/api/cli";
 
 const TEST_DIR = "temp-connect-test";
@@ -62,8 +63,8 @@ export async function testKubeconfig(kubeconfigYaml: string): Promise<TestConnec
   let fileWritten = false;
 
   try {
-    await mkdir(TEST_DIR, { recursive: true, baseDir: BaseDirectory.AppData });
-    await writeTextFile(relPath, kubeconfigYaml, { baseDir: BaseDirectory.AppData });
+    await mkdirPrivate(TEST_DIR, BaseDirectory.AppData);
+    await writePrivateTextFile(relPath, kubeconfigYaml, BaseDirectory.AppData);
     fileWritten = true;
     const home = await appDataDir();
     absPath = `${home}/${relPath}`;
@@ -110,5 +111,25 @@ export async function testKubeconfig(kubeconfigYaml: string): Promise<TestConnec
         /* temp file cleanup is best-effort */
       }
     }
+  }
+}
+
+/**
+ * Connection-test copies are removed in `finally`, but a crash mid-test leaves one
+ * behind with the candidate's credentials. Called once per launch; never throws.
+ */
+export async function sweepTestKubeconfigs(): Promise<void> {
+  try {
+    if (!(await exists(TEST_DIR, { baseDir: BaseDirectory.AppData }))) return;
+    const entries = await readDir(TEST_DIR, { baseDir: BaseDirectory.AppData });
+    await Promise.all(
+      entries
+        .filter((entry) => entry.isFile)
+        .map((entry) =>
+          remove(`${TEST_DIR}/${entry.name}`, { baseDir: BaseDirectory.AppData }).catch(() => {}),
+        ),
+    );
+  } catch {
+    // best effort
   }
 }

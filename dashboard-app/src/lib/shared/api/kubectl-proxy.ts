@@ -14,6 +14,7 @@ import { isRuntimeDebugEnabled, writeRuntimeDebugLog } from "$shared/lib/runtime
 import { emitCliNotification, isUserFacingCommand } from "$shared/lib/cli-notification";
 import { isMutatingKubectlCommand } from "$shared/analytics/kubectl-mutation";
 import { buildReadOnlyBlockedResult, checkKubectlReadOnly } from "$shared/lib/readonly-guard";
+import { withJsonOutput } from "./kubectl-json-output";
 import { trackCoreAction } from "$shared/analytics/wau-c";
 
 type KubectlExecResult = {
@@ -543,7 +544,7 @@ export async function kubectlJson<T = unknown>(
   cmd: string,
   options?: KubectlOptions,
 ): Promise<T | string> {
-  const result = await kubectlRawFront(`${cmd} -o json`, options);
+  const result = await kubectlRawFront(withJsonOutput(cmd), options);
 
   if (result.errors.length > 0) {
     if (!isExpectedClusterProbeError(result.errors)) {

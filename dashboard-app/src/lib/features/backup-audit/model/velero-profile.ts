@@ -1,5 +1,6 @@
 import type { VeleroCloudProvider } from "$shared/api/helm";
-import { BaseDirectory, exists, mkdir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { BaseDirectory, exists, readTextFile } from "@tauri-apps/plugin-fs";
+import { mkdirPrivate, writePrivateTextFile } from "$shared/lib/private-files";
 import { CONFIG_DIR } from "$entities/config/model/appConfig";
 import { clusterKey } from "$shared/lib/cluster-key";
 
@@ -37,7 +38,7 @@ function sanitizeNamespace(value: string | undefined | null): string {
 async function ensureConfigDir(): Promise<void> {
   const dirExists = await exists(CONFIG_DIR, { baseDir: BaseDirectory.AppData });
   if (!dirExists) {
-    await mkdir(CONFIG_DIR, { baseDir: BaseDirectory.AppData, recursive: true });
+    await mkdirPrivate(CONFIG_DIR, BaseDirectory.AppData);
   }
 }
 
@@ -57,9 +58,12 @@ async function loadProfiles(): Promise<ProfileMap> {
 
 async function saveProfiles(profiles: ProfileMap): Promise<void> {
   await ensureConfigDir();
-  await writeTextFile(PROFILE_FILE, JSON.stringify(profiles, null, 2), {
-    baseDir: BaseDirectory.AppData,
-  });
+  // Profiles can carry object-storage credentials: owner-only like the kubeconfigs.
+  await writePrivateTextFile(
+    PROFILE_FILE,
+    JSON.stringify(profiles, null, 2),
+    BaseDirectory.AppData,
+  );
 }
 
 export async function readVeleroInstallProfile(clusterId: string): Promise<VeleroInstallProfile> {

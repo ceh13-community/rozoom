@@ -1,6 +1,6 @@
 import posthog from "posthog-js";
 import { env } from "$env/dynamic/public";
-import { getInstallId, computeAnonymousHash } from "./install-identity";
+import { getInstallId, getInstallHash, computeAnonymousHash } from "./install-identity";
 import { getTelemetryConsent, isDoNotTrack, isTelemetryEnabled } from "./consent";
 
 /**
@@ -116,7 +116,9 @@ export async function ensureAnalytics(): Promise<boolean> {
 
   initInFlight ??= (async () => {
     try {
-      const distinctId = await installIdentity();
+      // SHA-256(install_id), the same function Fleet Settings shows the user.
+      const distinctId = await getInstallHash();
+      if (!distinctId) throw new Error("install id unavailable");
       posthog.init(key, {
         api_host: env.PUBLIC_POSTHOG_HOST?.trim() || "https://eu.i.posthog.com",
         // Start already identified on the install hash: no anonymous id, no
@@ -153,15 +155,6 @@ export async function ensureAnalytics(): Promise<boolean> {
     return initialized;
   })();
   return initInFlight;
-}
-
-/**
- * Install-level identity: SHA-256(install_id). Stable across clusters and
- * sessions, so the activation funnel can join app-level and cluster-level
- * events by distinct_id. The raw install_id never leaves the app.
- */
-async function installIdentity(): Promise<string> {
-  return computeAnonymousHash("", getInstallId());
 }
 
 /**

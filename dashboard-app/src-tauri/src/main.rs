@@ -4,6 +4,7 @@
 use tauri::Manager;
 use tauri_plugin_log;
 
+mod private_files;
 mod support_logs;
 
 fn is_loopback_host(host: &str) -> bool {
@@ -170,7 +171,8 @@ fn main() {
             relax_webview_tls,
             support_logs::read_recent_log_tail,
             support_logs::open_logs_folder,
-            support_logs::logs_folder_path
+            support_logs::logs_folder_path,
+            private_files::harden_private_files
         ])
         .on_menu_event(|app, event| support_logs::handle_menu_event(app, event))
         .setup(move |app| {

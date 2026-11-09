@@ -68,8 +68,10 @@
   } from "$shared/lib/tauri-runtime";
   import {
     probeClusterConnection,
+    shortProbeReason,
     type ConnectionProbeResult,
   } from "$features/cluster-manager/api/probe-connection";
+  import { selectContextForCluster } from "$features/cluster-manager/model/kubeconfig-context";
   import {
     listCloudClusters,
     importCloudCluster,
@@ -101,8 +103,14 @@
     providerCategory: ClusterProviderCategory;
     region: string | null;
     authMethod: string;
-    status: "ready" | "auth-issue" | "unreachable";
+    // "not-checked" until the user clicks Check on the row: reading a kubeconfig
+    // must not contact anything or run the context's credential plugin.
+    status: "not-checked" | "checking" | "ready" | "auth-issue" | "unreachable";
     statusLabel: string;
+    /** Raw first stderr line of the last probe, shown in the chip tooltip. */
+    statusDetail: string | null;
+    /** One visible line under the chip, only for failure shapes measured live. */
+    statusReason: string | null;
     env: string;
     tags: string[];
     warnings: string[];
@@ -250,7 +258,8 @@
     }
   }
   let probeResults = $state<Record<string, ConnectionProbeResult>>({});
-  let isProbing = $state(false);
+  let probeInFlight = $state<Record<string, boolean>>({});
+  const isProbing = $derived(Object.values(probeInFlight).some(Boolean));
 
   // Cloud import state
   let cloudClusters = $state<CloudCluster[]>([]);
@@ -368,7 +377,9 @@
     if (providersScanAt !== null) {
       void loadDetectedClis();
     }
-    void probeDetectedClusters();
+    // Reachability is NOT probed here. A probe runs `kubectl cluster-info` with the
+    // context's credentials, which executes its exec plugin (aws, kubelogin, gcloud...)
+    // on the user's machine; that only happens from an explicit Check click.
   }
 
   // Refresh (kubeconfig) and Rescan (ConnectClusterWizard's local-runtime
@@ -381,6 +392,11 @@
   let showLocalScanHint = $state(false);
   async function handleKubeconfigRefresh() {
     showLocalScanHint = needsLocalScanConsent();
+    // The file may have changed (other server, other user): every earlier verdict is
+    // about something else now, and a probe still running belongs to the old file.
+    probeGeneration += 1;
+    probeResults = {};
+    probeInFlight = {};
     await loadData();
     if (hasLocalScanConsent()) {
       await runLocalDiscoveryScan();
@@ -410,35 +426,57 @@
     }
   }
 
-  async function probeDetectedClusters() {
+  // Bumped by Refresh; a probe that started under an older generation is dropped.
+  let probeGeneration = 0;
+  // Check all runs at most this many probes at once: each one holds one of the six
+  // shared kubectl slots until kubectl returns or the 35 s bound aborts it.
+  const MAX_PARALLEL_CHECKS = 3;
+
+  // User-initiated: asks one detected cluster's API server whether it answers.
+  // This is the only place on this screen that runs the context's credentials.
+  async function checkDetectedCluster(
+    cluster: Pick<DetectedCluster, "name" | "contextName">,
+    generation = probeGeneration,
+  ) {
     const config = $kubeConfigFile;
-    if (!config?.path || !config.clusters?.length) return;
+    if (!config || !cluster.contextName || probeInFlight[cluster.name]) return;
+    // A queue that started before Refresh must not start new probes after it.
+    if (generation !== probeGeneration) return;
 
-    isProbing = true;
-    const contextsByCluster = new Map<string, string>();
-    config.contexts?.forEach((ctx) => {
-      contextsByCluster.set(ctx.context.cluster, ctx.name);
-    });
+    probeInFlight = { ...probeInFlight, [cluster.name]: true };
+    // probeClusterConnection never throws: timeouts and failures come back as a result.
+    const result = await probeClusterConnection(cluster.contextName, config.path || null);
+    if (generation !== probeGeneration) return; // Refresh happened meanwhile
+    probeResults = { ...probeResults, [cluster.name]: result };
+    const rest = { ...probeInFlight };
+    delete rest[cluster.name];
+    probeInFlight = rest;
+  }
 
-    const probes = config.clusters.map(async (cluster) => {
-      const contextName = contextsByCluster.get(cluster.name);
-      if (!contextName) return;
-      try {
-        const result = await probeClusterConnection(contextName, config.path);
-        probeResults = { ...probeResults, [cluster.name]: result };
-      } catch {
-        probeResults = { ...probeResults, [cluster.name]: { status: "unreachable", latencyMs: 0 } };
-      }
-    });
-
-    await Promise.allSettled(probes);
-    isProbing = false;
+  async function checkAllDetectedClusters() {
+    // Fixed for the whole queue: Refresh bumps probeGeneration, which stops the workers
+    // and makes every probe they still hold drop its result.
+    const generation = probeGeneration;
+    const queue = detectedClusters.filter(
+      (cluster) => !cluster.alreadyAdded && cluster.contextName && !probeInFlight[cluster.name],
+    );
+    const workers = Array.from(
+      { length: Math.min(MAX_PARALLEL_CHECKS, queue.length) },
+      async () => {
+        while (queue.length > 0 && generation === probeGeneration) {
+          const next = queue.shift();
+          if (!next) break;
+          await checkDetectedCluster(next, generation);
+        }
+      },
+    );
+    await Promise.all(workers);
   }
 
   async function handleAddFromAvailableConfigs() {
     if (!$kubeConfigFile?.clusters) return;
 
-    await addClustersFromKubeconfig($kubeConfigFile, $kubeConfigFile.path);
+    await addClustersFromKubeconfig($kubeConfigFile, $kubeConfigFile.path || null);
   }
 
   async function handleAddSelectedClusters() {
@@ -462,7 +500,11 @@
     }
 
     errors = "";
-    await addClustersFromKubeconfigSelection($kubeConfigFile, $kubeConfigFile.path, selections);
+    await addClustersFromKubeconfigSelection(
+      $kubeConfigFile,
+      $kubeConfigFile.path || null,
+      selections,
+    );
   }
 
   async function handleAddAllDetected() {
@@ -485,7 +527,11 @@
     }
 
     errors = "";
-    await addClustersFromKubeconfigSelection($kubeConfigFile, $kubeConfigFile.path, selections);
+    await addClustersFromKubeconfigSelection(
+      $kubeConfigFile,
+      $kubeConfigFile.path || null,
+      selections,
+    );
   }
 
   async function handleAddSingleCluster(cluster: DetectedCluster) {
@@ -497,7 +543,7 @@
     }
 
     errors = "";
-    await addClustersFromKubeconfigSelection($kubeConfigFile, $kubeConfigFile.path, [
+    await addClustersFromKubeconfigSelection($kubeConfigFile, $kubeConfigFile.path || null, [
       {
         name: cluster.name,
         displayName: cluster.displayName.trim() || cluster.name,
@@ -530,7 +576,9 @@
 
     await addClustersFromText(rawConfigData);
 
-    if ($clustersList.length > 0) {
+    // Keep the text when the import reported an error: the file is already removed,
+    // so the textarea is the only copy the user has left to fix and retry.
+    if (!$clustersConfigError) {
       rawConfigData = "";
     }
   }
@@ -664,19 +712,21 @@
     "./.kube/config",
   ];
 
-  const detectedClusters = $derived.by<DetectedCluster[]>(() => {
-    const source = $kubeConfigFile?.path ?? "Unknown source";
-    const managedNames = new Set($clustersList.map((cluster) => cluster.name));
-    const contextsByCluster = new Map<string, string>();
+  // The merged view kubectl builds has no single file name; say so instead of
+  // claiming ~/.kube/config, which is wrong whenever $KUBECONFIG is set.
+  const DEFAULT_KUBECONFIG_SOURCE = "kubectl default kubeconfig ($KUBECONFIG or ~/.kube/config)";
 
-    $kubeConfigFile?.contexts?.forEach((context) => {
-      contextsByCluster.set(context.context.cluster, context.name);
-    });
+  const detectedClusters = $derived.by<DetectedCluster[]>(() => {
+    const source = $kubeConfigFile?.path || DEFAULT_KUBECONFIG_SOURCE;
+    const managedNames = new Set($clustersList.map((cluster) => cluster.name));
 
     return (
       $kubeConfigFile?.clusters?.map((cluster) => {
-        const contextName = contextsByCluster.get(cluster.name) ?? null;
-        const context = $kubeConfigFile?.contexts?.find((c) => c.context.cluster === cluster.name);
+        // One rule for the row, Check and Add: see kubeconfig-context.ts.
+        const context = $kubeConfigFile
+          ? selectContextForCluster($kubeConfigFile, cluster.name)
+          : null;
+        const contextName = context?.name ?? null;
         const user = context
           ? $kubeConfigFile?.users?.find((u) => u.name === context.context.user)
           : null;
@@ -694,7 +744,7 @@
         const region = detection.region;
         const authMethod = detection.authMethod;
         const providerCategory = detection.category;
-        const status = inferStatus(cluster.name, contextName);
+        const status = detectedStatus(cluster.name);
         const env = envOverrides[cluster.name] || inferEnv(cluster.name);
         const displayName = displayNameOverrides[cluster.name] || cluster.name;
         const warnings = inferWarnings(cluster.name, cluster.insecureSkipTlsVerify, user);
@@ -720,6 +770,11 @@
           authInfo,
           status,
           statusLabel: getStatusLabel(cluster.name, status),
+          statusDetail: probeResults[cluster.name]?.detail || null,
+          statusReason:
+            status === "unreachable" || status === "auth-issue"
+              ? shortProbeReason(probeResults[cluster.name]?.detail)
+              : null,
           env,
           tags,
           warnings,
@@ -733,7 +788,7 @@
   const detectedSourceGroups = $derived.by(() => {
     if (!detectedClusters.length) return [];
 
-    const source = $kubeConfigFile?.path ?? "Unknown source";
+    const source = $kubeConfigFile?.path || DEFAULT_KUBECONFIG_SOURCE;
     return [
       {
         source,
@@ -899,6 +954,8 @@
     const probe = probeResults[name];
     const latency = probe ? ` (${probe.latencyMs}ms)` : "";
     const labels: Record<DetectedCluster["status"], string> = {
+      "not-checked": "Not checked",
+      checking: "Checking…",
       ready: `Ready${latency}`,
       "auth-issue": `Auth issue${latency}`,
       unreachable: `Unreachable${latency}`,
@@ -906,21 +963,39 @@
     return labels[status];
   }
 
-  function inferStatus(name: string, contextName: string | null): DetectedCluster["status"] {
-    const probe = probeResults[name];
-    if (probe) return probe.status;
+  // Only a completed probe may claim anything about reachability. There is no
+  // guessing from the cluster name: a row the user has not checked says so.
+  function detectedStatus(name: string): DetectedCluster["status"] {
+    if (probeInFlight[name]) return "checking";
+    return probeResults[name]?.status ?? "not-checked";
+  }
 
-    const hint = `${name} ${contextName ?? ""}`.toLowerCase();
-
-    if (hint.includes("offline") || hint.includes("down") || hint.includes("unreachable")) {
-      return "unreachable";
+  function statusChipClass(status: DetectedCluster["status"]): string {
+    switch (status) {
+      case "ready":
+        return "bg-green-50 text-green-700 dark:bg-green-500/20 dark:text-green-200";
+      case "auth-issue":
+        return "bg-orange-50 text-orange-700 dark:bg-orange-500/20 dark:text-orange-200";
+      case "unreachable":
+        return "bg-red-50 text-red-700 dark:bg-red-500/20 dark:text-red-200";
+      // slate-600 on slate-100 clears WCAG AA for 12px text; slate-500 sat at ~4.4:1.
+      case "checking":
+        return "bg-slate-100 text-slate-600 dark:bg-slate-600/60 dark:text-slate-300 animate-pulse";
+      default:
+        return "bg-slate-100 text-slate-600 dark:bg-slate-600/60 dark:text-slate-300";
     }
+  }
 
-    if (hint.includes("auth") || hint.includes("forbidden")) {
-      return "auth-issue";
+  function checkButtonLabel(status: DetectedCluster["status"]): string {
+    switch (status) {
+      case "ready":
+        return "Check again";
+      case "auth-issue":
+      case "unreachable":
+        return "Retry";
+      default:
+        return "Check";
     }
-
-    return "ready";
   }
 
   function inferWarnings(
@@ -1085,8 +1160,8 @@
                   <strong>Cloud Providers</strong> - detected bundled tools, OS tools, and cloud credentials
                 </li>
                 <li>
-                  <strong>Detected kubeconfigs</strong> - auto-scanned contexts with provider, region,
-                  auth method, and security level
+                  <strong>Detected kubeconfigs</strong> - contexts read from ~/.kube/config with provider,
+                  region, auth method, and security level; reachability only on Check
                 </li>
                 <li>
                   <strong>Managed Clusters</strong> - per-cluster settings: default namespace, proxy,
@@ -1469,8 +1544,9 @@
             Detected kubeconfig files
           </h2>
           <p class="text-slate-500 dark:text-slate-400 mb-4 text-sm leading-relaxed">
-            ROZOOM discovers clusters, validates access, and shows where each context comes from
-            before you add it.
+            ROZOOM reads this file and shows where each context comes from. No cluster is contacted
+            until you click <strong>Check</strong> or add it. Either one runs the context's credential
+            plugin, if it has one.
           </p>
 
           {#if !hasAvailableConfigs}
@@ -1511,6 +1587,19 @@
                     </p>
                   </div>
                   <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <Button
+                      onclick={() => void checkAllDetectedClusters()}
+                      disabled={isLoading || isProbing}
+                      variant="outline"
+                      class="text-sm"
+                      title="Ask every not-yet-added cluster whether its API server answers. Runs each context's credential plugin."
+                    >
+                      {#if isProbing}
+                        <LoadingSpinner />
+                      {:else}
+                        Check all
+                      {/if}
+                    </Button>
                     <Button
                       onclick={handleAddSelectedClusters}
                       disabled={isLoading || selectedDetectedCount === 0}
@@ -1599,15 +1688,24 @@
                                   </span>
                                 {/if}
                                 <span
-                                  class="text-xs px-2 py-0.5 rounded-full {cluster.status ===
-                                  'ready'
-                                    ? 'bg-green-50 text-green-700 dark:bg-green-500/20 dark:text-green-200'
-                                    : cluster.status === 'auth-issue'
-                                      ? 'bg-orange-50 text-orange-700 dark:bg-orange-500/20 dark:text-orange-200'
-                                      : 'bg-red-50 text-red-700 dark:bg-red-500/20 dark:text-red-200'}"
+                                  class="text-xs px-2 py-0.5 rounded-full {statusChipClass(
+                                    cluster.status,
+                                  )}"
+                                  title={cluster.statusDetail ?? undefined}
+                                  data-testid="detected-status"
                                 >
                                   {cluster.statusLabel}
                                 </span>
+                                {#if cluster.contextName}
+                                  <Button
+                                    onclick={() => void checkDetectedCluster(cluster)}
+                                    disabled={cluster.status === "checking"}
+                                    class="text-gray-700 text-xs dark:text-white !bg-transparent border border-gray-200 dark:border-slate-500 hover:bg-gray-100 dark:hover:bg-slate-600"
+                                    title="Ask the API server whether it answers. Runs this context's credential plugin, if it has one."
+                                  >
+                                    {checkButtonLabel(cluster.status)}
+                                  </Button>
+                                {/if}
                                 <Button
                                   onclick={() => (activeCluster = cluster)}
                                   class="text-gray-700 text-xs dark:text-white !bg-transparent ml-auto border border-gray-200 dark:border-slate-500 hover:bg-gray-100 dark:hover:bg-slate-600"
@@ -1615,6 +1713,15 @@
                                   View identity
                                 </Button>
                               </div>
+                              {#if cluster.statusReason}
+                                <p
+                                  class="text-xs text-red-700 dark:text-red-200"
+                                  title={cluster.statusDetail ?? undefined}
+                                  data-testid="detected-status-reason"
+                                >
+                                  {cluster.statusReason}
+                                </p>
+                              {/if}
 
                               <div
                                 class="flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-300"

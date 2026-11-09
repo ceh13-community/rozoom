@@ -11,6 +11,7 @@ import {
 type RawYamlKubeConfig = {
   apiVersion?: string;
   kind?: string;
+  "current-context"?: string;
   clusters?: Array<{
     name?: string;
     cluster?: {
@@ -74,6 +75,7 @@ function enrichParsedConfig(raw: RawYamlKubeConfig): KubeConfigFileType {
     contexts,
     users,
     path: "",
+    currentContext: raw["current-context"] || undefined,
   });
 }
 

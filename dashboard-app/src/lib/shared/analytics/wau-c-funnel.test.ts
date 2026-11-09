@@ -10,6 +10,9 @@ vi.mock("posthog-js", () => ({
 
 vi.mock("./install-identity", () => ({
   getInstallId: () => "install-1",
+  // Distinct from computeAnonymousHash("", id) on purpose: proves the bootstrap id comes
+  // from getInstallHash, the function Fleet Settings shows, not from a parallel formula.
+  getInstallHash: async () => "install-hash:install-1",
   computeAnonymousHash: async (clusterId: string, installId: string) =>
     `hash:${clusterId}:${installId}`,
 }));
@@ -45,7 +48,7 @@ describe("activation funnel telemetry", () => {
     expect(posthog.init).toHaveBeenCalledWith(
       "phc_test_key",
       expect.objectContaining({
-        bootstrap: { distinctID: "hash::install-1", isIdentifiedID: true },
+        bootstrap: { distinctID: "install-hash:install-1", isIdentifiedID: true },
         persistence: "memory",
       }),
     );

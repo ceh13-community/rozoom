@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy, untrack } from "svelte";
+  import { PRIVATE_FILE_MODE } from "$shared/lib/private-files";
   import { writable } from "svelte/store";
   import {
     getBootstrapSteps,
@@ -377,7 +378,8 @@
     const { appDataDir } = await import("@tauri-apps/api/path");
     const appDir = await appDataDir();
     const path = `${appDir}/gitops-apply-temp-${Math.random().toString(36).slice(2, 8)}.yaml`;
-    await writeTextFile(path, text);
+    // Manifests may contain Secrets: owner-only while the file exists.
+    await writeTextFile(path, text, { mode: PRIVATE_FILE_MODE });
     return {
       path,
       cleanup: async () => {
