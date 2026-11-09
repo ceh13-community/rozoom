@@ -36,12 +36,15 @@ const AUTH_ISSUE = [
 ];
 
 // Visible one-line reasons, only for failure shapes measured on the bundled kubectl.
-// Anything else keeps the raw line in the tooltip only.
+// Anything else keeps the raw line in the tooltip only. The detail is kubectl's last
+// stderr line, e.g. "The connection to the server 127.0.0.1:1 was refused - did you
+// specify the right host or port?" (1.37.2, stand 09/11).
 const SHORT_REASONS: Array<[RegExp, string]> = [
-  [/connection refused/i, "Connection refused"],
+  [/connection refused|was refused/i, "Connection refused"],
   [/context deadline exceeded|Client\.Timeout exceeded|i\/o timeout/i, "No answer from the server"],
   [/no such host/i, "Host name not found"],
   [/getting credentials/i, "Credential plugin failed"],
+  [/^Gave up after \d+ s:/, "Check timed out"],
 ];
 
 /** Human-readable reason for a failed probe, or null when the shape was never measured. */

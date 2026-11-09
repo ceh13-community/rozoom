@@ -265,7 +265,7 @@ describe("probeClusterConnection", () => {
       expect(result.detail).toBe(
         "Gave up after 1 s: kubectl did not return. Its credential plugin may still be running.",
       );
-      expect(shortProbeReason(result.detail)).toBeNull();
+      expect(shortProbeReason(result.detail)).toBe("Check timed out");
     });
 
     it("defaults to a bound above kubectl's own 25 s of discovery retries", () => {
@@ -296,6 +296,12 @@ describe("shortProbeReason", () => {
     expect(
       shortProbeReason(
         "Unable to connect to the server: dial tcp 127.0.0.1:1: connect: connection refused",
+      ),
+    ).toBe("Connection refused");
+    // Last stderr line of kubectl 1.37.2 on the stand, 09/11: no "connection refused" in it.
+    expect(
+      shortProbeReason(
+        "The connection to the server 127.0.0.1:1 was refused - did you specify the right host or port?",
       ),
     ).toBe("Connection refused");
     expect(
