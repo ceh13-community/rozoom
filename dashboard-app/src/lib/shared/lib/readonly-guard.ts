@@ -132,8 +132,12 @@ const BOOLEAN_FLAGS: ReadonlySet<string> = new Set([
 type ParsedArgs = {
   /** Non-flag tokens, verb first. */
   positional: string[];
-  /** A flag before the verb that the tables do not know: it may hide the real verb. */
-  unknownFlagBeforeVerb: boolean;
+  /**
+   * Index of the first positional that follows a flag the tables do not know. The tool
+   * may give that positional to the flag as its value, so neither this position nor any
+   * later one can be trusted by the classifier.
+   */
+  unknownFlagAt?: number;
   /** An empty token: kubectl skips it, so `"" delete ...` is a delete. */
   emptyPositional: boolean;
 };
@@ -144,7 +148,7 @@ type ParsedArgs = {
  */
 function parseCliArgs(args: readonly string[]): ParsedArgs {
   const positional: string[] = [];
-  let unknownFlagBeforeVerb = false;
+  let unknownFlagAt: number | undefined;
   let emptyPositional = false;
   for (let i = 0; i < args.length; i++) {
     const raw = args[i] ?? "";
@@ -169,22 +173,44 @@ function parseCliArgs(args: readonly string[]): ParsedArgs {
         continue;
       }
       if (VALUE_FLAGS.has(name) || BOOLEAN_FLAGS.has(name)) continue;
-      if (positional.length === 0) unknownFlagBeforeVerb = true;
+      unknownFlagAt ??= positional.length;
       continue;
     }
     positional.push(token);
   }
-  return { positional, unknownFlagBeforeVerb, emptyPositional };
+  return { positional, unknownFlagAt, emptyPositional };
 }
 
-/** Positional tokens with global flags (and their values) removed. */
-function positionalArgs(args: readonly string[]): string[] {
-  return parseCliArgs(args).positional;
-}
+type Positionals = {
+  /** Lower-cased positional at `index`, "" past the end. Remembers how deep it was read. */
+  at(index: number): string;
+  /**
+   * A read verdict is kept only if no unknown flag sat before any position the classifier
+   * used; otherwise the verdict becomes a write. Writes are returned as they are.
+   */
+  trustRead(action: DestructiveAction | null): DestructiveAction | null;
+};
 
-/** The two parser verdicts that are writes on their own, before any verb is read. */
-function unsafeShape(parsed: ParsedArgs): boolean {
-  return parsed.unknownFlagBeforeVerb || parsed.emptyPositional;
+/**
+ * Positional access that tracks what the classifier looked at. An unknown flag before the
+ * verb was already a write; the same flag between the verb and its subcommand hid the real
+ * subcommand just as well (reviewer round 3, 09/11/2026: `kubectl rollout --field-manager
+ * status restart deployment/x` read `status`, kubectl gives `status` to the flag and
+ * restarts; `velero backup --confirm get delete x` likewise). Every position the verdict
+ * rests on must lie before the first unknown flag.
+ */
+function readPositionals(parsed: ParsedArgs): Positionals {
+  let deepest = -1;
+  return {
+    at(index) {
+      deepest = Math.max(deepest, index);
+      return parsed.positional[index]?.toLowerCase() ?? "";
+    },
+    trustRead(action) {
+      const tainted = parsed.unknownFlagAt !== undefined && parsed.unknownFlagAt <= deepest;
+      return action === null && tainted ? GENERIC_WRITE : action;
+    },
+  };
 }
 
 /**
@@ -246,17 +272,20 @@ const OC_READ_SUBCOMMANDS: Readonly<Record<string, ReadonlySet<string>>> = {
 };
 const OC_ADM_RELEASE_READ: ReadonlySet<string> = new Set(["info", "extract"]);
 
-// `kubectl proxy` only reads when it refuses every writing method itself. The app's own
-// proxy (kube-api-proxy.ts) passes exactly this; a terminal `kubectl proxy` does not.
-const PROXY_REJECTS_WRITES = /^--reject-methods=(.*)$/;
+/**
+ * `kubectl proxy` only reads when it refuses every writing method itself. The app's own
+ * proxy (kube-api-proxy.ts) passes exactly this flag, and only that exact form is trusted
+ * (reviewer round 3): kubectl keeps the last --reject-methods, so a second one reopens the
+ * methods; --disable-filter switches the whole filter off; --accept-paths and
+ * --reject-paths change which paths the filter judges (exec and attach are refused by
+ * path). A terminal `kubectl proxy` with anything else is a write.
+ */
+export const APP_PROXY_REJECT_METHODS = "--reject-methods=^(POST|PUT|PATCH|DELETE)$";
+const PROXY_FILTER_FLAGS = /^--(reject-methods|disable-filter|accept-paths|reject-paths)(=|$)/;
+
 function proxyRejectsWrites(args: readonly string[]): boolean {
-  for (const arg of args) {
-    const m = PROXY_REJECTS_WRITES.exec(arg.trim());
-    if (!m) continue;
-    const pattern = m[1];
-    return ["POST", "PUT", "PATCH", "DELETE"].every((method) => pattern.includes(method));
-  }
-  return false;
+  const filterFlags = args.map((arg) => arg.trim()).filter((arg) => PROXY_FILTER_FLAGS.test(arg));
+  return filterFlags.length === 1 && filterFlags[0] === APP_PROXY_REJECT_METHODS;
 }
 
 // Named writes, for the reason text and the UI category. Anything not listed here and
@@ -298,27 +327,35 @@ export function classifyKubectlAction(
 ): DestructiveAction | null {
   if (args.some((arg) => KUBERC_FLAGS.test(arg.trim()))) return GENERIC_WRITE;
   const parsed = parseCliArgs(args);
-  if (unsafeShape(parsed)) return GENERIC_WRITE;
-  const positional = parsed.positional.map((a) => a.toLowerCase());
-  const verb = positional[0];
+  if (parsed.emptyPositional) return GENERIC_WRITE;
+  const pos = readPositionals(parsed);
+  return pos.trustRead(kubectlAction(pos, tool, args));
+}
+
+function kubectlAction(
+  pos: Positionals,
+  tool: "kubectl" | "oc",
+  args: readonly string[],
+): DestructiveAction | null {
+  const verb = pos.at(0);
   if (!verb) return null;
   if (verb === "proxy") return proxyRejectsWrites(args) ? null : "exec-shell";
   if (KUBECTL_READ_VERBS.has(verb)) return null;
   if (tool === "oc" && OC_READ_VERBS.has(verb)) return null;
   if (tool === "oc" && Object.hasOwn(OC_READ_SUBCOMMANDS, verb)) {
-    return OC_READ_SUBCOMMANDS[verb].has(positional[1] ?? "") ? null : GENERIC_WRITE;
+    return OC_READ_SUBCOMMANDS[verb].has(pos.at(1)) ? null : GENERIC_WRITE;
   }
-  if (tool === "oc" && verb === "adm" && positional[1] === "release") {
-    return OC_ADM_RELEASE_READ.has(positional[2] ?? "") ? null : GENERIC_WRITE;
+  if (tool === "oc" && verb === "adm" && pos.at(1) === "release") {
+    return OC_ADM_RELEASE_READ.has(pos.at(2)) ? null : GENERIC_WRITE;
   }
   if (Object.hasOwn(KUBECTL_READ_SUBCOMMANDS, verb)) {
-    const subcommand = positional[1] ?? "";
+    const subcommand = pos.at(1);
     if (KUBECTL_READ_SUBCOMMANDS[verb].has(subcommand)) return null;
     if (verb === "rollout") return ROLLOUT_WRITE_ACTION[subcommand] ?? GENERIC_WRITE;
     return GENERIC_WRITE;
   }
   if (verb === "delete") {
-    const target = positional[1] ?? "";
+    const target = pos.at(1);
     const isPod = target === "pod" || target === "pods" || target.startsWith("pod/");
     return isPod ? "delete-pod" : "delete-resource";
   }
@@ -366,10 +403,11 @@ const HELM_WRITE_ACTION: Readonly<Record<string, DestructiveAction>> = {
 /** `helm <subcommand>`: null for the read list, a write action for everything else. */
 export function classifyHelmAction(args: readonly string[]): DestructiveAction | null {
   const parsed = parseCliArgs(args);
-  if (unsafeShape(parsed)) return GENERIC_WRITE;
-  const subcommand = parsed.positional[0]?.toLowerCase();
-  if (!subcommand) return null;
-  if (HELM_READ_SUBCOMMANDS.has(subcommand)) return null;
+  if (parsed.emptyPositional) return GENERIC_WRITE;
+  const pos = readPositionals(parsed);
+  const subcommand = pos.at(0);
+  if (!subcommand) return pos.trustRead(null);
+  if (HELM_READ_SUBCOMMANDS.has(subcommand)) return pos.trustRead(null);
   return HELM_WRITE_ACTION[subcommand] ?? GENERIC_WRITE;
 }
 
@@ -388,9 +426,13 @@ const VELERO_READ_VERBS: ReadonlySet<string> = new Set(["get", "describe", "logs
 /** velero: null for reads, a write action for everything else. */
 export function classifyVeleroAction(args: readonly string[]): DestructiveAction | null {
   const parsed = parseCliArgs(args);
-  if (unsafeShape(parsed)) return GENERIC_WRITE;
-  const positional = parsed.positional.map((a) => a.toLowerCase());
-  const first = positional[0];
+  if (parsed.emptyPositional) return GENERIC_WRITE;
+  const pos = readPositionals(parsed);
+  return pos.trustRead(veleroAction(pos));
+}
+
+function veleroAction(pos: Positionals): DestructiveAction | null {
+  const first = pos.at(0);
   if (!first) return null;
   if (VELERO_READ_COMMANDS.has(first)) return null;
   if (first === "install") return "apply-yaml";
@@ -399,7 +441,7 @@ export function classifyVeleroAction(args: readonly string[]): DestructiveAction
   if (VELERO_READ_VERBS.has(first)) return null;
   if (first === "create") return "apply-yaml";
   if (first === "delete") return "delete-resource";
-  const verb = positional[1] ?? "";
+  const verb = pos.at(1);
   if (VELERO_READ_VERBS.has(verb)) return null;
   if (verb === "create") return "apply-yaml";
   if (verb === "delete") return "delete-resource";
@@ -408,15 +450,32 @@ export function classifyVeleroAction(args: readonly string[]): DestructiveAction
 
 // `trivy k8s` deploys a node-collector (namespace + jobs) unless told not to; measured on
 // trivy 0.70.0: POST /api/v1/namespaces and POST .../trivy-temp/jobs. Image, fs and config
-// scans never touch the cluster.
-const TRIVY_NO_NODE_COLLECTOR = /^--disable-node-collector(=true)?$/;
+// scans never touch the cluster. The flag is a pflag boolean: bare or =true disables, any
+// other value does not, and the last occurrence wins (reviewer round 3:
+// `--disable-node-collector --disable-node-collector=false` deploys the collector).
+const DISABLE_NODE_COLLECTOR = "--disable-node-collector";
+const PFLAG_TRUE: ReadonlySet<string> = new Set(["true", "t", "1"]);
+
+function nodeCollectorDisabled(args: readonly string[]): boolean {
+  let disabled = false;
+  for (const raw of args) {
+    const arg = raw.trim();
+    if (arg === DISABLE_NODE_COLLECTOR) disabled = true;
+    else if (arg.startsWith(`${DISABLE_NODE_COLLECTOR}=`)) {
+      disabled = PFLAG_TRUE.has(arg.slice(DISABLE_NODE_COLLECTOR.length + 1).toLowerCase());
+    }
+  }
+  return disabled;
+}
 
 /** trivy: `k8s` without --disable-node-collector writes to the cluster. */
 export function classifyTrivyAction(args: readonly string[]): DestructiveAction | null {
-  const positional = positionalArgs(args).map((a) => a.toLowerCase());
-  const first = positional[0];
-  if (first !== "k8s" && first !== "kubernetes") return null;
-  return args.some((arg) => TRIVY_NO_NODE_COLLECTOR.test(arg.trim())) ? null : "apply-yaml";
+  const parsed = parseCliArgs(args);
+  if (parsed.emptyPositional) return GENERIC_WRITE;
+  const pos = readPositionals(parsed);
+  const first = pos.at(0);
+  const scansCluster = first === "k8s" || first === "kubernetes";
+  return pos.trustRead(scansCluster && !nodeCollectorDisabled(args) ? "apply-yaml" : null);
 }
 
 function evaluate(

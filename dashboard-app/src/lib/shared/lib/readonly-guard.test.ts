@@ -526,4 +526,132 @@ describe("readonly boundary for CLIs", () => {
       expect(classifyKubectlAction(["proxy", "--reject-methods=^POST$"])).toBe("exec-shell");
     });
   });
+
+  // Reviewer round 3 on #225 (fc3aebe0): an unknown flag between the verb and the position
+  // the classifier reads next hid the real subcommand; trivy's boolean flag was read as
+  // "present" instead of "last value"; the proxy check matched substrings of a regex.
+  describe("read-only parser shapes (round 3)", () => {
+    beforeEach(() => {
+      resetClusterSafetyRegistryForTests();
+      registerClusterSafetyInfo([LOCKED, OPEN]);
+    });
+
+    it("an unknown flag before any position the verdict rests on makes a read a write", () => {
+      // kubectl hands `status` to --field-manager and restarts the deployment.
+      expect(
+        classifyKubectlAction(["rollout", "--field-manager", "status", "restart", "deployment/x"]),
+      ).toBe("edit-resource");
+      // velero at the `backup` level takes `get` as --confirm's value and deletes x.
+      expect(classifyVeleroAction(["backup", "--confirm", "get", "delete", "x", "--help"])).toBe(
+        "edit-resource",
+      );
+      expect(
+        classifyKubectlAction(["auth", "--made-up", "can-i", "reconcile", "-f", "r.yaml"]),
+      ).toBe("edit-resource");
+      expect(classifyKubectlAction(["image", "--made-up", "info", "mirror", "a", "b"], "oc")).toBe(
+        "edit-resource",
+      );
+      expect(
+        classifyKubectlAction(
+          ["adm", "release", "--made-up", "info", "new", "--to-image", "x"],
+          "oc",
+        ),
+      ).toBe("edit-resource");
+      expect(classifyKubectlAction(["get", "--made-up", "pods"])).toBeNull();
+    });
+
+    it("an unknown flag after the positions it read leaves the verdict alone", () => {
+      expect(classifyKubectlAction(["get", "pods", "--made-up", "x"])).toBeNull();
+      expect(
+        classifyKubectlAction(["rollout", "status", "--made-up", "x", "deployment/x"]),
+      ).toBeNull();
+      expect(classifyVeleroAction(["backup", "get", "--made-up", "x"])).toBeNull();
+      expect(classifyHelmAction(["list", "--made-up", "x"])).toBeNull();
+      // Writes keep their name even when the flag sits before the position that named them.
+      expect(classifyKubectlAction(["delete", "--made-up", "pod", "x"])).toBe("delete-pod");
+      expect(classifyKubectlAction(["rollout", "--made-up", "restart", "deployment/x"])).toBe(
+        "restart-workload",
+      );
+    });
+
+    it("trivy: the parser shapes apply, and the last --disable-node-collector value wins", () => {
+      expect(classifyTrivyAction(["--timeout", "30s", "k8s", "--report", "all"])).toBe(
+        "edit-resource",
+      );
+      expect(classifyTrivyAction(["", "k8s", "--disable-node-collector"])).toBe("edit-resource");
+      expect(
+        classifyTrivyAction(["k8s", "--disable-node-collector", "--disable-node-collector=false"]),
+      ).toBe("apply-yaml");
+      expect(
+        classifyTrivyAction(["k8s", "--disable-node-collector=false", "--disable-node-collector"]),
+      ).toBeNull();
+      expect(classifyTrivyAction(["k8s", "--disable-node-collector=true"])).toBeNull();
+      expect(classifyTrivyAction(["k8s", "--disable-node-collector=TRUE"])).toBeNull();
+      expect(classifyTrivyAction(["k8s", "--disable-node-collector=0"])).toBe("apply-yaml");
+      expect(classifyTrivyAction(["k8s", "--disable-node-collector=f"])).toBe("apply-yaml");
+      // The panel's own argv (local-scan.ts) still reads: the flag is last and bare.
+      expect(
+        classifyTrivyAction([
+          "k8s",
+          "--kubeconfig",
+          "/x.yaml",
+          "--report",
+          "all",
+          "--format",
+          "json",
+          "--quiet",
+          "--timeout",
+          "5m",
+          "--disable-node-collector",
+        ]),
+      ).toBeNull();
+    });
+
+    it("kubectl proxy: only the app's exact reject-methods flag, once, with no other filter flag", () => {
+      const appProxy = [
+        "proxy",
+        "--kubeconfig",
+        "/x/configs/uuid-locked.yaml",
+        "--reject-methods=^(POST|PUT|PATCH|DELETE)$",
+        "--port=0",
+        "--address",
+        "127.0.0.1",
+        "--accept-hosts",
+        "^127\\.0\\.0\\.1$,^localhost$",
+      ];
+      expect(classifyKubectlAction(appProxy)).toBeNull();
+      // Looks like it names the four methods, matches none of them.
+      expect(classifyKubectlAction(["proxy", "--reject-methods=^XPOST|XPUT|XPATCH|XDELETE$"])).toBe(
+        "exec-shell",
+      );
+      // kubectl keeps the last value: the second flag reopens every method.
+      expect(classifyKubectlAction([...appProxy, "--reject-methods=^$"])).toBe("exec-shell");
+      expect(classifyKubectlAction([...appProxy, "--disable-filter"])).toBe("exec-shell");
+      expect(classifyKubectlAction([...appProxy, "--disable-filter=false"])).toBe("exec-shell");
+      expect(classifyKubectlAction([...appProxy, "--reject-paths=^$"])).toBe("exec-shell");
+      expect(classifyKubectlAction([...appProxy, "--accept-paths=^.*"])).toBe("exec-shell");
+      // The space form is not the app's form.
+      expect(
+        classifyKubectlAction(["proxy", "--reject-methods", "^(POST|PUT|PATCH|DELETE)$"]),
+      ).toBe("exec-shell");
+    });
+
+    it("blocks the reviewer's round-3 forms on a read-only cluster, as typed in the terminal", () => {
+      const forms: Array<[string, string[]]> = [
+        ["kubectl", ["rollout", "--field-manager", "status", "restart", "deployment/x"]],
+        ["velero", ["backup", "--confirm", "get", "delete", "x", "--help"]],
+        ["trivy", ["--timeout", "30s", "k8s", "--report", "all"]],
+        ["trivy", ["k8s", "--disable-node-collector", "--disable-node-collector=false"]],
+        ["kubectl", ["proxy", "--reject-methods=^XPOST|XPUT|XPATCH|XDELETE$"]],
+        ["kubectl", ["proxy", "--reject-methods=^(POST|PUT|PATCH|DELETE)$", "--reject-methods=^$"]],
+        ["kubectl", ["proxy", "--reject-methods=^(POST|PUT|PATCH|DELETE)$", "--disable-filter"]],
+        ["kubectl", ["", "delete", "--raw", "/api/v1/namespaces/default/configmaps/rozoom-canary"]],
+      ];
+      for (const [tool, args] of forms) {
+        expect(checkCliReadOnly("uuid-locked", tool, args).blocked, [tool, ...args].join(" ")).toBe(
+          true,
+        );
+      }
+    });
+  });
 });
