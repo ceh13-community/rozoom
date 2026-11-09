@@ -24,7 +24,9 @@
   import TableSurface from "$shared/ui/table-surface.svelte";
   import FileDown from "@lucide/svelte/icons/file-down";
   import { selectedNamespace } from "$features/namespace-management";
-  import ResourceActionsMenu, { type ResourceActionItem } from "../common/resource-actions-menu.svelte";
+  import ResourceActionsMenu, {
+    type ResourceActionItem,
+  } from "../common/resource-actions-menu.svelte";
   import FolderSearch from "@lucide/svelte/icons/folder-search";
   import CustomResourcesBulkActions from "./custom-resources-bulk-actions.svelte";
   import ResourceSelectionCheckbox from "../common/resource-selection-checkbox.svelte";
@@ -36,13 +38,16 @@
   } from "../common/resource-yaml-workbench-panel.svelte";
 
   type CrWorkbenchTarget = {
-    title: string; loadedLabel: string; errorLabel: string; copyLabel: string;
-    resource: string; name: string; namespace?: string; namespaceScoped: boolean;
+    title: string;
+    loadedLabel: string;
+    errorLabel: string;
+    copyLabel: string;
+    resource: string;
+    name: string;
+    namespace?: string;
+    namespaceScoped: boolean;
   };
-  import {
-    createCustomResourceRows,
-    filterCustomResourceRows,
-  } from "./model/custom-resources-row";
+  import { createCustomResourceRows, filterCustomResourceRows } from "./model/custom-resources-row";
   import {
     createCustomResourceInstanceRows,
     type CustomResourceInstanceRow,
@@ -84,9 +89,13 @@
   let deletingIds = $state(new Set<string>());
   let selectedRow = $state<CustomResourceRow | null>(null);
   let detailsOpen = $state(false);
-  import { notifySuccess, notifyError, type ActionNotification } from "$shared/lib/action-notification";
+  import {
+    notifySuccess,
+    notifyError,
+    type ActionNotification,
+  } from "$shared/lib/action-notification";
   let actionNotification = $state<ActionNotification>(null);
-  
+
   let workbenchRequest = $state<ResourceYamlWorkbenchRequest>(null);
   let workbenchRequestToken = 0;
   let activeInstancesDefinition = $state<CustomResourceRow | null>(null);
@@ -113,7 +122,9 @@
     { id: "summary", label: "Summary", visible: true },
     { id: "age", label: "Age", visible: true },
   ]);
-  let sortBy = $state<"problemScore" | "name" | "group" | "version" | "scope" | "resource" | "summary" | "age">("problemScore");
+  let sortBy = $state<
+    "problemScore" | "name" | "group" | "version" | "scope" | "resource" | "summary" | "age"
+  >("problemScore");
   let sortDirection = $state<"asc" | "desc">("desc");
   let instanceSortBy = $state<"name" | "namespace" | "status" | "age">("name");
   let instanceSortDirection = $state<"asc" | "desc">("asc");
@@ -275,7 +286,8 @@
       if (!raw) return DEFAULT_WATCHER_SETTINGS;
       const parsed = JSON.parse(raw) as Partial<WatcherSettings> | null;
       return {
-        enabled: typeof parsed?.enabled === "boolean" ? parsed.enabled : DEFAULT_WATCHER_SETTINGS.enabled,
+        enabled:
+          typeof parsed?.enabled === "boolean" ? parsed.enabled : DEFAULT_WATCHER_SETTINGS.enabled,
         refreshSeconds:
           typeof parsed?.refreshSeconds === "number"
             ? clampWatcherRefreshSeconds(parsed.refreshSeconds)
@@ -320,9 +332,12 @@
     setConfigurationSyncEnabled(data.slug, "customresourcedefinitions", watcherEnabled);
     markConfigurationSyncLoading(data.slug, "customresourcedefinitions");
     try {
-      const response = await kubectlRawArgsFront(["get", "customresourcedefinitions", "-o", "json"], {
-        clusterId: data.slug,
-      });
+      const response = await kubectlRawArgsFront(
+        ["get", "customresourcedefinitions", "-o", "json"],
+        {
+          clusterId: data.slug,
+        },
+      );
       if (response.errors) {
         throw new Error(response.errors);
       }
@@ -379,8 +394,7 @@
 
   function pruneSelection() {
     const next = new Set([...selectedIds].filter((id) => availableIds.includes(id)));
-    const changed =
-      next.size !== selectedIds.size || [...next].some((id) => !selectedIds.has(id));
+    const changed = next.size !== selectedIds.size || [...next].some((id) => !selectedIds.has(id));
     if (!changed) return;
     selectedIds = next;
   }
@@ -462,7 +476,10 @@
     return `${row.resource}.${row.group}`;
   }
 
-  function getInstanceTarget(definition: CustomResourceRow, row: CustomResourceInstanceRow): CrWorkbenchTarget {
+  function getInstanceTarget(
+    definition: CustomResourceRow,
+    row: CustomResourceInstanceRow,
+  ): CrWorkbenchTarget {
     const namespaceScoped = definition.scope.toLowerCase() === "namespaced";
     return {
       title: `${row.raw.kind ?? definition.resource} YAML`,
@@ -526,10 +543,13 @@
               return Array.isArray(parsed.items) ? parsed.items : [];
             })();
       instanceRows = createCustomResourceInstanceRows(items);
-      actionNotification = notifySuccess(`Loaded ${items.length} instance(s) for ${row.resource}.${row.group}.`);
+      actionNotification = notifySuccess(
+        `Loaded ${items.length} instance(s) for ${row.resource}.${row.group}.`,
+      );
     } catch (error) {
       instanceRows = [];
-      instancesError = error instanceof Error ? error.message : "Failed to load custom resource instances.";
+      instancesError =
+        error instanceof Error ? error.message : "Failed to load custom resource instances.";
     } finally {
       instancesLoading = false;
     }
@@ -557,7 +577,10 @@
     actionNotification = notifySuccess(`Copied kubectl get -o yaml for ${row.name}.`);
   }
 
-  async function copyInstanceDescribe(definition: CustomResourceRow, row: CustomResourceInstanceRow) {
+  async function copyInstanceDescribe(
+    definition: CustomResourceRow,
+    row: CustomResourceInstanceRow,
+  ) {
     await copyText(buildKubectlDescribeCommand(getInstanceTarget(definition, row)));
     actionNotification = notifySuccess(`Copied kubectl describe for ${row.name}.`);
   }
@@ -652,21 +675,25 @@
     for (const row of rowsToDelete) {
       setDeleting(row.uid, true);
       try {
-        const response = await kubectlRawArgsFront(["delete", "crd", row.name], {
+        const response = await kubectlRawArgsFront(["delete", "crd", "--", row.name], {
           clusterId: data.slug,
         });
         if (response.errors) {
           throw new Error(response.errors);
         }
       } catch (error) {
-        actionNotification = notifyError(error instanceof Error ? error.message : "Failed to delete custom resource definition.");
+        actionNotification = notifyError(
+          error instanceof Error ? error.message : "Failed to delete custom resource definition.",
+        );
         return;
       } finally {
         setDeleting(row.uid, false);
       }
     }
 
-    actionNotification = notifySuccess(`Deleted ${rowsToDelete.length} custom resource definition(s).`);
+    actionNotification = notifySuccess(
+      `Deleted ${rowsToDelete.length} custom resource definition(s).`,
+    );
     selectedIds = new Set();
     detailsOpen = false;
   }
@@ -684,7 +711,9 @@
       filename: "custom-resource-definitions.csv",
       csv: lines.join("\n"),
     });
-    actionNotification = notifySuccess(`CSV exported: ${result.pathHint} (${filteredRows.length} rows).`);
+    actionNotification = notifySuccess(
+      `CSV exported: ${result.pathHint} (${filteredRows.length} rows).`,
+    );
   }
 
   $effect(() => {
@@ -741,7 +770,12 @@
 </script>
 
 <div class="grid gap-4">
-  <ActionNotificationBar notification={actionNotification} onDismiss={() => { actionNotification = null; }} />
+  <ActionNotificationBar
+    notification={actionNotification}
+    onDismiss={() => {
+      actionNotification = null;
+    }}
+  />
 
   <ResourceSummaryStrip
     items={[
@@ -802,7 +836,7 @@
       </Button>
       <WatcherToolbarControls
         {watcherEnabled}
-        watcherRefreshSeconds={watcherRefreshSeconds}
+        {watcherRefreshSeconds}
         onToggleWatcher={toggleWatcher}
         onWatcherRefreshSecondsChange={setWatcherRefresh}
         onResetWatcherSettings={resetWatcherSettings}
@@ -813,46 +847,50 @@
   {#if selectedRows.length > 0}
     <WorkloadSelectionBar count={selectedRows.length}>
       {#snippet children()}
-      <CustomResourcesBulkActions
-        mode={bulkMode}
-        disabled={selectedRows.length === 0}
-        onShowDetails={() => {
-          const row = selectedRows[0];
-          if (!row) return;
-          openDetails(row);
-        }}
-        onOpenYaml={() => {
-          const row = selectedRows[0];
-          if (!row) return;
-          openYamlWorkbench(row);
-        }}
-        onBrowseInstances={() => {
-          const row = selectedRows[0];
-          if (!row) return;
-          void loadInstances(row);
-        }}
-        onCopyKubectlGetYaml={() => {
-          const row = selectedRows[0];
-          if (!row) return;
-          void copyGetYaml(row);
-        }}
-        onCopyKubectlDescribe={() => {
-          const row = selectedRows[0];
-          if (!row) return;
-          void copyDescribe(row);
-        }}
-        onRunDebugDescribe={() => {
-          const row = selectedRows[0];
-          if (!row) return;
-          openDebugDescribe(row);
-        }}
-        onDelete={() => {
-          void deleteRows(selectedRows);
-        }}
-      />
-      <Button variant="outline" size="sm" onclick={() => {
-        selectedIds = new Set();
-      }}>Clear</Button>
+        <CustomResourcesBulkActions
+          mode={bulkMode}
+          disabled={selectedRows.length === 0}
+          onShowDetails={() => {
+            const row = selectedRows[0];
+            if (!row) return;
+            openDetails(row);
+          }}
+          onOpenYaml={() => {
+            const row = selectedRows[0];
+            if (!row) return;
+            openYamlWorkbench(row);
+          }}
+          onBrowseInstances={() => {
+            const row = selectedRows[0];
+            if (!row) return;
+            void loadInstances(row);
+          }}
+          onCopyKubectlGetYaml={() => {
+            const row = selectedRows[0];
+            if (!row) return;
+            void copyGetYaml(row);
+          }}
+          onCopyKubectlDescribe={() => {
+            const row = selectedRows[0];
+            if (!row) return;
+            void copyDescribe(row);
+          }}
+          onRunDebugDescribe={() => {
+            const row = selectedRows[0];
+            if (!row) return;
+            openDebugDescribe(row);
+          }}
+          onDelete={() => {
+            void deleteRows(selectedRows);
+          }}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          onclick={() => {
+            selectedIds = new Set();
+          }}>Clear</Button
+        >
       {/snippet}
     </WorkloadSelectionBar>
   {/if}
@@ -946,34 +984,67 @@
                   name={row.name}
                   isBusy={deletingIds.has(row.uid)}
                   onShowDetails={() => openDetails(row)}
-                  onEditYaml={() => { openYamlWorkbench(row); }}
-                  onCopyKubectlGetYaml={() => { void copyGetYaml(row); }}
-                  onCopyDescribe={() => { void copyDescribe(row); }}
-                  onRunDebugDescribe={() => { openDebugDescribe(row); }}
-                  onDelete={() => { void deleteRows([row]); }}
-                  extraItems={[{ id: "browse-instances", label: "Browse instances", icon: FolderSearch, action: () => { void loadInstances(row); } }]}
+                  onEditYaml={() => {
+                    openYamlWorkbench(row);
+                  }}
+                  onCopyKubectlGetYaml={() => {
+                    void copyGetYaml(row);
+                  }}
+                  onCopyDescribe={() => {
+                    void copyDescribe(row);
+                  }}
+                  onRunDebugDescribe={() => {
+                    openDebugDescribe(row);
+                  }}
+                  onDelete={() => {
+                    void deleteRows([row]);
+                  }}
+                  extraItems={[
+                    {
+                      id: "browse-instances",
+                      label: "Browse instances",
+                      icon: FolderSearch,
+                      action: () => {
+                        void loadInstances(row);
+                      },
+                    },
+                  ]}
                 />
               </Table.TableCell>
               {#if isColumnVisible("name")}
-                <Table.TableCell class="min-w-0 truncate font-medium text-foreground">{row.name}</Table.TableCell>
+                <Table.TableCell class="min-w-0 truncate font-medium text-foreground"
+                  >{row.name}</Table.TableCell
+                >
               {/if}
               {#if isColumnVisible("group")}
-                <Table.TableCell class="min-w-0 truncate text-muted-foreground">{row.group}</Table.TableCell>
+                <Table.TableCell class="min-w-0 truncate text-muted-foreground"
+                  >{row.group}</Table.TableCell
+                >
               {/if}
               {#if isColumnVisible("version")}
-                <Table.TableCell class="min-w-0 truncate text-muted-foreground">{row.version}</Table.TableCell>
+                <Table.TableCell class="min-w-0 truncate text-muted-foreground"
+                  >{row.version}</Table.TableCell
+                >
               {/if}
               {#if isColumnVisible("scope")}
-                <Table.TableCell class="min-w-0 truncate text-muted-foreground">{row.scope}</Table.TableCell>
+                <Table.TableCell class="min-w-0 truncate text-muted-foreground"
+                  >{row.scope}</Table.TableCell
+                >
               {/if}
               {#if isColumnVisible("resource")}
-                <Table.TableCell class="min-w-0 truncate text-muted-foreground">{row.resource}</Table.TableCell>
+                <Table.TableCell class="min-w-0 truncate text-muted-foreground"
+                  >{row.resource}</Table.TableCell
+                >
               {/if}
               {#if isColumnVisible("summary")}
-                <Table.TableCell class="min-w-0 truncate text-muted-foreground">{row.summary}</Table.TableCell>
+                <Table.TableCell class="min-w-0 truncate text-muted-foreground"
+                  >{row.summary}</Table.TableCell
+                >
               {/if}
               {#if isColumnVisible("age")}
-                <Table.TableCell class="min-w-0 truncate text-muted-foreground">{row.age}</Table.TableCell>
+                <Table.TableCell class="min-w-0 truncate text-muted-foreground"
+                  >{row.age}</Table.TableCell
+                >
               {/if}
             </Table.TableRow>
           {/each}
@@ -990,7 +1061,8 @@
             Instances for {activeInstancesDefinition.resource}.{activeInstancesDefinition.group}
           </div>
           <div class="text-xs text-muted-foreground">
-            Scope: {activeInstancesDefinition.scope}. Namespace filter: {$selectedNamespace || "all namespaces"}.
+            Scope: {activeInstancesDefinition.scope}. Namespace filter: {$selectedNamespace ||
+              "all namespaces"}.
           </div>
         </div>
         <div class="flex items-center gap-2">
@@ -1021,12 +1093,16 @@
       </div>
 
       {#if instancesError}
-        <div class="border-b border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <div
+          class="border-b border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+        >
           {instancesError}
         </div>
       {/if}
 
-      <div class="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.7fr)_auto] gap-3 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <div
+        class="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.7fr)_auto] gap-3 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+      >
         <SortingButton label="Name" onclick={() => toggleInstanceSort("name")} />
         <SortingButton label="Namespace" onclick={() => toggleInstanceSort("namespace")} />
         <SortingButton label="Status" onclick={() => toggleInstanceSort("status")} />
@@ -1037,10 +1113,14 @@
       {#if instancesLoading && sortedInstanceRows.length === 0}
         <div class="px-4 py-6 text-sm text-muted-foreground">Loading instances…</div>
       {:else if sortedInstanceRows.length === 0}
-        <div class="px-4 py-6 text-sm text-muted-foreground">No instances found for this custom resource.</div>
+        <div class="px-4 py-6 text-sm text-muted-foreground">
+          No instances found for this custom resource.
+        </div>
       {:else}
         {#each sortedInstanceRows as instance (instance.uid)}
-          <div class="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.7fr)_auto] gap-3 border-t border-border/60 px-4 py-3 text-sm">
+          <div
+            class="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.7fr)_auto] gap-3 border-t border-border/60 px-4 py-3 text-sm"
+          >
             <div class="min-w-0 truncate font-medium text-foreground">{instance.name}</div>
             <div class="min-w-0 truncate text-muted-foreground">{instance.namespace}</div>
             <div class="min-w-0 truncate text-muted-foreground">{instance.status}</div>

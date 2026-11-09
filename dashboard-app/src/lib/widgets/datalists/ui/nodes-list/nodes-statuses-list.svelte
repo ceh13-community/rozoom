@@ -18,10 +18,7 @@
   import * as Alert from "$shared/ui/alert";
   import { Button } from "$shared/ui/button";
   import MultiPaneWorkbench from "$shared/ui/multi-pane-workbench.svelte";
-  import {
-    computeLayoutClosePlan,
-    orderPinnedTabs,
-  } from "$features/pods-workbench";
+  import { computeLayoutClosePlan, orderPinnedTabs } from "$features/pods-workbench";
 
   import type { NodeHealth } from "$features/check-health";
   import {
@@ -249,9 +246,13 @@
   let cordoningNodeIds = $state(new Set<string>());
   let drainingNodeIds = $state(new Set<string>());
   let deletingNodeIds = $state(new Set<string>());
-  import { notifySuccess, notifyError, type ActionNotification } from "$shared/lib/action-notification";
+  import {
+    notifySuccess,
+    notifyError,
+    type ActionNotification,
+  } from "$shared/lib/action-notification";
   let actionNotification = $state<ActionNotification>(null);
-  
+
   let runtimeSectionRefreshing = $state(false);
   let unschedulableOverrides = $state(new Map<string, boolean>());
   let taintsOverrides = $state(new Map<string, number>());
@@ -279,9 +280,7 @@
       !$clusterHealth.error &&
       allNodeData.every((node) => node.cpu === "N/A" && node.freeMemory === "N/A"),
   );
-  const shouldShowMetricsUnavailableBanner = $derived(
-    metricsUnavailable || cpuMemUnavailable,
-  );
+  const shouldShowMetricsUnavailableBanner = $derived(metricsUnavailable || cpuMemUnavailable);
   const metricsUnavailableBannerMessage = $derived(
     coreSourcesUnavailable ? METRICS_BANNER_SUMMARY : METRICS_BANNER_PIPELINE,
   );
@@ -307,7 +306,8 @@
     return `updated ${getTimeDifference(new Date($clusterHealth.lastUpdatedAt))} ago`;
   });
   const nodesRuntimeDetail = $derived.by(() => {
-    if (!watcherEnabled) return "Node diagnostics are paused until you refresh or re-enable the watcher.";
+    if (!watcherEnabled)
+      return "Node diagnostics are paused until you refresh or re-enable the watcher.";
     if (watcherError && allNodeData.length > 0) {
       return "Showing the last successful node snapshot while diagnostics are degraded.";
     }
@@ -438,7 +438,7 @@
       const freeMemory = live?.memoryUsage ?? (hasEverUpdated ? (cached?.mem ?? null) : null);
       const freeDisk = live?.diskUsage ?? (hasEverUpdated ? (cached?.disk ?? null) : null);
       const unschedulable = unschedulableOverrides.get(uid) ?? Boolean(node.spec?.unschedulable);
-      const taints = taintsOverrides.get(uid) ?? (node.spec?.taints?.length ?? 0);
+      const taints = taintsOverrides.get(uid) ?? node.spec?.taints?.length ?? 0;
       const conditions = getNodeConditions(node, unschedulable);
       const problem = buildNodeProblemSignals({
         conditions,
@@ -569,10 +569,7 @@
     runtimeSectionRefreshing = true;
     watcherError = null;
     try {
-      await Promise.all([
-        refreshNodesHealthNow(clusterId),
-        loadMetricsEndpointsStatus(),
-      ]);
+      await Promise.all([refreshNodesHealthNow(clusterId), loadMetricsEndpointsStatus()]);
     } finally {
       runtimeSectionRefreshing = false;
     }
@@ -843,7 +840,9 @@
       string | null,
     ];
     setPaneTabIdsIfChanged(nextPaneTabIds);
-    setCollapsedPaneIndexesIfChanged(collapsedPaneIndexes.filter((idx) => nextPaneTabIds[idx] !== null));
+    setCollapsedPaneIndexesIfChanged(
+      collapsedPaneIndexes.filter((idx) => nextPaneTabIds[idx] !== null),
+    );
 
     if (activeWorkbenchTabId !== tabId) return;
 
@@ -1110,10 +1109,9 @@
     const clusterId = data?.slug;
     if (!clusterId || !row.name) return;
     try {
-      const result = await kubectlRawArgsFront(
-        ["get", "node", row.name, "-o", "yaml"],
-        { clusterId },
-      );
+      const result = await kubectlRawArgsFront(["get", "node", row.name, "-o", "yaml"], {
+        clusterId,
+      });
       if (result.errors || result.code !== 0) {
         actionNotification = notifyError(result.errors || "Failed to fetch node YAML.");
         return;
@@ -1125,10 +1123,11 @@
       await writeTextFile(filePath, result.output, { baseDir: BaseDirectory.AppData });
       actionNotification = notifySuccess(`Downloaded YAML to ${filePath}`);
     } catch (err) {
-      actionNotification = notifyError(err instanceof Error ? err.message : "Failed to download YAML.");
+      actionNotification = notifyError(
+        err instanceof Error ? err.message : "Failed to download YAML.",
+      );
     }
   }
-
 
   async function openNodeYamlEditor(row: NodesStatusesData) {
     const node = findNodeByRow(row);
@@ -1152,7 +1151,12 @@
         },
       ];
     } else {
-      updateYamlTab(tabId, (current) => ({ ...current, target: { name }, yamlLoading: true, yamlError: null }));
+      updateYamlTab(tabId, (current) => ({
+        ...current,
+        target: { name },
+        yamlLoading: true,
+        yamlError: null,
+      }));
     }
 
     upsertWorkbenchTab({ id: tabId, kind: "yaml", title: `YAML ${name}`, subtitle: "cluster" });
@@ -1193,9 +1197,13 @@
         nextAction === "cordon",
       );
       await refreshNodeSchedulingState(node.metadata.name, row.uid);
-      actionNotification = notifySuccess(`Node ${node.metadata.name} ${nextAction === "cordon" ? "cordoned" : "uncordoned"}.`);
+      actionNotification = notifySuccess(
+        `Node ${node.metadata.name} ${nextAction === "cordon" ? "cordoned" : "uncordoned"}.`,
+      );
     } catch (error) {
-      actionNotification = notifyError(error instanceof Error ? error.message : `Failed to ${nextAction} node.`);
+      actionNotification = notifyError(
+        error instanceof Error ? error.message : `Failed to ${nextAction} node.`,
+      );
     } finally {
       cordoningNodeIds = setSetBusy(cordoningNodeIds, row.uid, false);
     }
@@ -1242,7 +1250,9 @@
       await refreshNodeSchedulingState(node.metadata.name, row.uid);
       actionNotification = notifySuccess(`Node ${node.metadata.name} drained.`);
     } catch (error) {
-      actionNotification = notifyError(error instanceof Error ? error.message : "Failed to drain node.");
+      actionNotification = notifyError(
+        error instanceof Error ? error.message : "Failed to drain node.",
+      );
     } finally {
       drainingNodeIds = setSetBusy(drainingNodeIds, row.uid, false);
     }
@@ -1268,7 +1278,7 @@
     actionNotification = null;
 
     try {
-      const response = await kubectlRawArgsFront(["delete", "node", node.metadata.name], {
+      const response = await kubectlRawArgsFront(["delete", "node", "--", node.metadata.name], {
         clusterId: data.slug,
       });
       const errorMessage = describeKubectlError(
@@ -1279,7 +1289,9 @@
 
       actionNotification = notifySuccess(`Node ${node.metadata.name} deleted.`);
     } catch (error) {
-      actionNotification = notifyError(error instanceof Error ? error.message : "Failed to delete node.");
+      actionNotification = notifyError(
+        error instanceof Error ? error.message : "Failed to delete node.",
+      );
     } finally {
       deletingNodeIds = setSetBusy(deletingNodeIds, row.uid, false);
     }
@@ -1313,7 +1325,9 @@
       },
       onShell: (row) => {
         actionNotification = null;
-        actionNotification = notifySuccess(`Shell for node ${row.name} will be connected via SSH soon.`);
+        actionNotification = notifySuccess(
+          `Shell for node ${row.name} will be connected via SSH soon.`,
+        );
       },
       onToggleCordon: (row) => {
         void handleToggleCordon(row);
@@ -1344,7 +1358,12 @@
 </script>
 
 {#if allNodeData.length}
-  <ActionNotificationBar notification={actionNotification} onDismiss={() => { actionNotification = null; }} />
+  <ActionNotificationBar
+    notification={actionNotification}
+    onDismiss={() => {
+      actionNotification = null;
+    }}
+  />
 
   <div class="text-sm font-medium mb-2">Nodes</div>
 
@@ -1381,7 +1400,9 @@
           }`}
           onclick={() => selectYamlForCompare(tab.id)}
           title={yamlCompareSourceTabId === tab.id ? "Selected for compare" : "Select for compare"}
-          aria-label={yamlCompareSourceTabId === tab.id ? "Selected for compare" : "Select for compare"}
+          aria-label={yamlCompareSourceTabId === tab.id
+            ? "Selected for compare"
+            : "Select for compare"}
         >
           <Target class="h-4 w-4" />
         </button>
@@ -1408,7 +1429,9 @@
       {/snippet}
       {#snippet body()}
         {#if !workbenchCollapsed && activeWorkbenchTab}
-          <div class={workbenchFullscreen ? "min-h-0 flex-1" : "h-[min(70dvh,760px)] min-h-[430px]"}>
+          <div
+            class={workbenchFullscreen ? "min-h-0 flex-1" : "h-[min(70dvh,760px)] min-h-[430px]"}
+          >
             {#if workbenchLayout === "single"}
               {@const currentYamlTab = getYamlTab(activeWorkbenchTab.id)}
               <ResourceYamlSheet
@@ -1419,7 +1442,8 @@
                 yamlText={currentYamlTab?.yamlText ?? ""}
                 loading={currentYamlTab?.yamlLoading ?? false}
                 saving={currentYamlTab?.yamlSaving ?? false}
-                hasChanges={(currentYamlTab?.yamlText ?? "") !== (currentYamlTab?.yamlOriginalText ?? "")}
+                hasChanges={(currentYamlTab?.yamlText ?? "") !==
+                  (currentYamlTab?.yamlOriginalText ?? "")}
                 externalDiffLines={currentYamlTab ? getYamlCompareDiffLines(currentYamlTab.id) : []}
                 error={currentYamlTab?.yamlError ?? null}
                 onYamlChange={(value) => {
@@ -1439,7 +1463,9 @@
               <div class="flex h-full gap-2 p-2">
                 {#each paneIndexes as paneIndex}
                   {@const paneTab = getPaneTab(paneIndex)}
-                  <div class={`${getPaneWrapperClass(paneIndex)} min-h-0 overflow-hidden rounded border`}>
+                  <div
+                    class={`${getPaneWrapperClass(paneIndex)} min-h-0 overflow-hidden rounded border`}
+                  >
                     <div class="flex items-center gap-2 border-b px-2 py-1.5 text-xs">
                       <span class="text-muted-foreground">Pane {paneIndex + 1}</span>
                       <select
@@ -1488,7 +1514,9 @@
                         }}
                       />
                     {:else}
-                      <div class="flex h-full items-center justify-center p-4 text-sm text-muted-foreground">
+                      <div
+                        class="flex h-full items-center justify-center p-4 text-sm text-muted-foreground"
+                      >
                         Select tab for pane {paneIndex + 1}
                       </div>
                     {/if}
@@ -1512,7 +1540,8 @@
           isCordoning={selectedNodes.some((node) => cordoningNodeIds.has(node.uid))}
           isDraining={selectedNodes.some((node) => drainingNodeIds.has(node.uid))}
           isDeleting={selectedNodes.some((node) => deletingNodeIds.has(node.uid))}
-          isUnschedulableSelection={selectedNodes.length > 0 && selectedNodes.every((node) => node.unschedulable)}
+          isUnschedulableSelection={selectedNodes.length > 0 &&
+            selectedNodes.every((node) => node.unschedulable)}
           onTopNode={() => {
             const selected = selectedNodes[0];
             const node = selected ? findNodeByRow(selected) : null;
@@ -1527,7 +1556,9 @@
             const selected = selectedNodes[0];
             if (!selected) return;
             actionNotification = null;
-            actionNotification = notifySuccess(`Shell for node ${selected.name} will be connected via SSH soon.`);
+            actionNotification = notifySuccess(
+              `Shell for node ${selected.name} will be connected via SSH soon.`,
+            );
           }}
           onToggleCordon={() => {
             void handleToggleCordonNodes(selectedNodes);
@@ -1570,7 +1601,9 @@
   {/if}
 
   {#if shouldShowMetricsUnavailableBanner}
-    <div class="mb-3 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+    <div
+      class="mb-3 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+    >
       {metricsUnavailableBannerMessage}
       {#if metricsUnavailableRecommendation}
         {metricsUnavailableRecommendation}
@@ -1599,7 +1632,11 @@
       sectionLabel="Nodes Runtime Status"
       profileLabel={nodesRuntimeProfileLabel}
       sourceState={nodesRuntimeSourceState}
-      mode={watcherEnabled ? (nodesResourceSyncPolicy.mode === "stream" ? "stream" : "poll") : "manual"}
+      mode={watcherEnabled
+        ? nodesResourceSyncPolicy.mode === "stream"
+          ? "stream"
+          : "poll"
+        : "manual"}
       budgetSummary={`sync ${watcherRefreshSeconds}s`}
       lastUpdatedLabel={nodesRuntimeLastUpdatedLabel}
       detail={nodesRuntimeDetail}
@@ -1609,7 +1646,9 @@
       onSecondaryAction={() => void refreshNodesRuntimeSection()}
       reason={nodesRuntimeReason}
       actionLabel={watcherEnabled ? "Pause section" : "Resume section"}
-      actionAriaLabel={watcherEnabled ? "Pause nodes runtime section" : "Resume nodes runtime section"}
+      actionAriaLabel={watcherEnabled
+        ? "Pause nodes runtime section"
+        : "Resume nodes runtime section"}
       onAction={toggleWatcher}
     />
   </div>
@@ -1642,12 +1681,14 @@
       const node = $selectedNode;
       if (!node?.metadata?.name) return;
       actionNotification = null;
-      actionNotification = notifySuccess(`Shell for node ${node.metadata.name} will be connected via SSH soon.`);
+      actionNotification = notifySuccess(
+        `Shell for node ${node.metadata.name} will be connected via SSH soon.`,
+      );
     }}
     onEditYaml={() => {
       const node = $selectedNode;
       const row = node?.metadata?.name
-        ? allNodeData.find((item) => item.name === node.metadata?.name) ?? null
+        ? (allNodeData.find((item) => item.name === node.metadata?.name) ?? null)
         : null;
       if (!row) return;
       void openNodeYamlEditor(row);
@@ -1655,28 +1696,28 @@
     onCopyDescribe={() => {
       const node = $selectedNode;
       const row = node?.metadata?.name
-        ? allNodeData.find((item) => item.name === node.metadata?.name) ?? null
+        ? (allNodeData.find((item) => item.name === node.metadata?.name) ?? null)
         : null;
       if (row) void copyDescribeForNode(row);
     }}
     onRunDebugDescribe={() => {
       const node = $selectedNode;
       const row = node?.metadata?.name
-        ? allNodeData.find((item) => item.name === node.metadata?.name) ?? null
+        ? (allNodeData.find((item) => item.name === node.metadata?.name) ?? null)
         : null;
       if (row) openDebugDescribeForNode(row);
     }}
     onDownloadYaml={() => {
       const node = $selectedNode;
       const row = node?.metadata?.name
-        ? allNodeData.find((item) => item.name === node.metadata?.name) ?? null
+        ? (allNodeData.find((item) => item.name === node.metadata?.name) ?? null)
         : null;
       if (row) void downloadYamlForNode(row);
     }}
     onToggleCordon={() => {
       const node = $selectedNode;
       const row = node?.metadata?.name
-        ? allNodeData.find((item) => item.name === node.metadata?.name) ?? null
+        ? (allNodeData.find((item) => item.name === node.metadata?.name) ?? null)
         : null;
       if (!row) return;
       void handleToggleCordon(row);
@@ -1684,7 +1725,7 @@
     onDrain={() => {
       const node = $selectedNode;
       const row = node?.metadata?.name
-        ? allNodeData.find((item) => item.name === node.metadata?.name) ?? null
+        ? (allNodeData.find((item) => item.name === node.metadata?.name) ?? null)
         : null;
       if (!row) return;
       void handleDrain(row);
@@ -1692,7 +1733,7 @@
     onDelete={() => {
       const node = $selectedNode;
       const row = node?.metadata?.name
-        ? allNodeData.find((item) => item.name === node.metadata?.name) ?? null
+        ? (allNodeData.find((item) => item.name === node.metadata?.name) ?? null)
         : null;
       if (!row) return;
       void handleDelete(row);

@@ -2971,11 +2971,14 @@
     output: "json" | "yaml",
   ): string[] {
     const resource = resourceByWorkload[workloadKey] ?? workloadKey;
-    const args = ["get", resource, target.name];
+    // Flags first, the name last after `--`, so a name such as `--all` stays a name.
+    // The read timeout is explicit: kubectl-proxy appends its default only when none is
+    // present, and it would land after `--`, where kubectl reads it as another name.
+    const args = ["get", resource];
     if (isNamespaceScoped && target.namespace !== "cluster") {
       args.push("-n", target.namespace);
     }
-    args.push("-o", output);
+    args.push("-o", output, "--request-timeout=10s", "--", target.name);
     return args;
   }
 
