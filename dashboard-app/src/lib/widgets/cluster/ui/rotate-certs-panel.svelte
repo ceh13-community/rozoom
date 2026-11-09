@@ -21,6 +21,10 @@
     buildAuditCreateArgs,
     buildAuditPatchArgs,
   } from "$features/rotate-certs/model/audit-args";
+  import {
+    createAuditWriter,
+    type AuditEntry,
+  } from "$features/rotate-certs/model/audit-writer";
   import { confirmAction } from "$shared/lib/confirm-action";
   import { toast } from "svelte-sonner";
   import { goto } from "$app/navigation";
@@ -60,12 +64,6 @@
     notAfter: string | null;
     daysLeft: number | null;
     error?: string;
-  };
-
-  type AuditEntry = {
-    ts: string;
-    action: string;
-    detail: string;
   };
 
   type AuditKind = "rotate" | "approve-all" | "approve-one";
@@ -354,47 +352,46 @@
     }
   }
 
-  async function appendAuditEntry(kind: AuditKind, detail: string) {
-    try {
-      const entry: AuditEntry = {
-        ts: new Date().toISOString(),
-        action: kind,
-        detail: detail.slice(0, 400),
-      };
-      const next = [...(auditLog ?? []).slice().reverse(), entry].slice(-50);
-      const payload = JSON.stringify(next);
-      // The payload embeds CSR names, which the API server does not validate. Argument
-      // arrays only: a name such as "z rev-wipe --patch='data': y" must stay inside the
-      // JSON, never become a flag (see audit-args.ts).
-      const patchRes = await kubectlRawArgsFront(buildAuditPatchArgs(AUDIT_TARGET, payload), {
+  // One write at a time: Renew All records approve-all and rotate back to back, and each
+  // payload must build on the entry written just before it (see audit-writer.ts).
+  // The payload embeds CSR names, which the API server does not validate. Argument
+  // arrays only: a name such as "z rev-wipe --patch='data': y" must stay inside the
+  // JSON, never become a flag (see audit-args.ts).
+  const auditWriter = createAuditWriter({
+    readLog: () => auditLog ?? [],
+    patch: (payload) =>
+      kubectlRawArgsFront(buildAuditPatchArgs(AUDIT_TARGET, payload), {
         clusterId,
         source: "rotate-certs:audit-patch",
-      });
-      if (patchRes.code !== 0) {
-        // ConfigMap may not exist yet - create it with the initial payload.
-        const createRes = await kubectlRawArgsFront(buildAuditCreateArgs(AUDIT_TARGET, payload), {
-          clusterId,
-          source: "rotate-certs:audit-create",
-        });
-        if (createRes.code !== 0) {
-          const humanized = humanizeCertError(createRes.errors || patchRes.errors || "");
-          toast.error(
-            `Audit trail not persisted: ${humanized.title}. Your action succeeded; only the audit ConfigMap is missing.`,
-            { duration: 8000 },
-          );
-          return;
-        }
-      }
-      await fetchAuditLog();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      }),
+    // ConfigMap may not exist yet - create it with the initial payload.
+    create: (payload) =>
+      kubectlRawArgsFront(buildAuditCreateArgs(AUDIT_TARGET, payload), {
+        clusterId,
+        source: "rotate-certs:audit-create",
+      }),
+    onWritten: fetchAuditLog,
+  });
+
+  async function appendAuditEntry(kind: AuditKind, detail: string) {
+    const outcome = await auditWriter.append({
+      ts: new Date().toISOString(),
+      action: kind,
+      detail: detail.slice(0, 400),
+    });
+    if (outcome.ok) return;
+    if (outcome.stage === "create") {
+      const humanized = humanizeCertError(outcome.message);
       toast.error(
-        `Audit trail write failed: ${message}. Action succeeded, only audit is missing.`,
-        {
-          duration: 8000,
-        },
+        `Audit trail not persisted: ${humanized.title}. Your action succeeded; only the audit ConfigMap is missing.`,
+        { duration: 8000 },
       );
+      return;
     }
+    toast.error(
+      `Audit trail write failed: ${outcome.message}. Action succeeded, only audit is missing.`,
+      { duration: 8000 },
+    );
   }
 
   const MANAGED_PROVIDERS = new Set(["eks", "gke", "aks", "doks", "hetzner", "oke"]);
@@ -517,7 +514,8 @@
     // name. Such a CSR is never handed to kubectl; it is listed as skipped instead.
     const approvable = batch.filter((c) => unsafeKubectlNameReason(c.name) === null);
     const skipped = batch.filter((c) => unsafeKubectlNameReason(c.name) !== null);
-    const signers = Array.from(new Set(batch.map((c) => c.signer ?? "(unknown signer)")));
+    // Signers of the CSRs that will be approved; a skipped CSR approves nothing.
+    const signers = Array.from(new Set(approvable.map((c) => c.signer ?? "(unknown signer)")));
 
     if (approvable.length === 0) {
       rotateResult = {
@@ -557,9 +555,15 @@
     rotateResult = null;
 
     const approved: string[] = [];
-    const failed: string[] = skipped.map(
-      (c) => `${quoteName(c.name)}: not approved, ${unsafeKubectlNameReason(c.name)}`,
-    );
+    // kubectl failures only; skipped CSRs were never sent and are reported on their own.
+    const failed: string[] = [];
+    const skippedSummary =
+      skipped.length > 0
+        ? `\n${skipped.length} skipped, unsafe name:\n` +
+          skipped
+            .map((c) => `  - ${quoteName(c.name)}: ${unsafeKubectlNameReason(c.name)}`)
+            .join("\n")
+        : "";
 
     for (const csr of approvable) {
       try {
@@ -581,15 +585,18 @@
     if (approved.length > 0 && failed.length === 0) {
       rotateResult = {
         ok: true,
-        message: `Approved ${approved.length} CSR(s). Certificates should renew shortly.`,
+        message: `Approved ${approved.length} CSR(s). Certificates should renew shortly.${skippedSummary}`,
       };
     } else if (approved.length > 0) {
       rotateResult = {
         ok: true,
-        message: `Approved ${approved.length} CSR(s). ${failed.length} failed:\n${failed.join("\n")}`,
+        message: `Approved ${approved.length} CSR(s). ${failed.length} failed:\n${failed.join("\n")}${skippedSummary}`,
       };
     } else {
-      rotateResult = { ok: false, message: `All CSR approvals failed:\n${failed.join("\n")}` };
+      rotateResult = {
+        ok: false,
+        message: `All CSR approvals failed:\n${failed.join("\n")}${skippedSummary}`,
+      };
     }
 
     approvingCsrs = false;
