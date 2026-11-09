@@ -15,7 +15,8 @@
   import { emitTlsCertNotifications } from "$features/check-health/model/cert-notification-emitter";
   import { humanizeCertError } from "$features/rotate-certs/model/humanize";
   import { daysSeverity } from "$features/rotate-certs/model/severity";
-  import { kubectlRawFront } from "$shared/api/kubectl-proxy";
+  import { kubectlRawFront, kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
+  import { unsafeKubectlNameReason } from "$shared/lib/kubectl-resource-name";
   import { confirmAction } from "$shared/lib/confirm-action";
   import { toast } from "svelte-sonner";
   import { goto } from "$app/navigation";
@@ -525,8 +526,15 @@
     const failed: string[] = [];
 
     for (const csr of pendingCsrs) {
+      // The API server does not validate CSR names: `pending-a --as=nobody` is a legal
+      // name. It goes to kubectl as one argument after `--`, or not at all.
+      const unsafeName = unsafeKubectlNameReason(csr.name);
+      if (unsafeName) {
+        failed.push(`${csr.name}: not approved, ${unsafeName}`);
+        continue;
+      }
       try {
-        const res = await kubectlRawFront(`certificate approve ${csr.name}`, {
+        const res = await kubectlRawArgsFront(["certificate", "approve", "--", csr.name], {
           clusterId,
           source: "rotate-certs:approve-csr",
         });
