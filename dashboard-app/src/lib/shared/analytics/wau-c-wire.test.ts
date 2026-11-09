@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // leaves the app, not at what we passed to a mocked SDK.
 vi.mock("./install-identity", () => ({
   getInstallId: () => "install-1",
+  // Distinct from computeAnonymousHash("", id) on purpose: proves the bootstrap id comes
+  // from getInstallHash, the function Fleet Settings shows, not from a parallel formula.
+  getInstallHash: async () => "install-hash:install-1",
   computeAnonymousHash: async (clusterId: string, installId: string) =>
     `hash:${clusterId}:${installId}`,
 }));
@@ -106,7 +109,7 @@ describe("WAU-C on the wire (real posthog-js)", () => {
     expect(ours).toBeDefined();
     const props = ours?.properties as Record<string, unknown>;
 
-    expect(props.distinct_id ?? ours?.distinct_id).toBe("hash::install-1");
+    expect(props.distinct_id ?? ours?.distinct_id).toBe("install-hash:install-1");
     expect(props.$geoip_disable).toBe(true);
     expect(props.source).toBe("web");
     expect(props.cluster_id).toBe("hash:prod:install-1");
