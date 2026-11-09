@@ -81,7 +81,14 @@ export class KubeConfig {
   clusters: KubeCluster[];
   contexts: KubeContext[];
   users: KubeUser[];
+  /**
+   * File the config was read from. Empty for the merged view kubectl builds from
+   * $KUBECONFIG and ~/.kube/config: kubectl calls about such a config pass no
+   * --kubeconfig so they resolve exactly as the list was built.
+   */
   path: string;
+  /** `current-context` from the file, when set. */
+  currentContext?: string;
 
   constructor({
     clusters,
@@ -90,6 +97,7 @@ export class KubeConfig {
     apiVersion,
     kind,
     path,
+    currentContext,
   }: {
     apiVersion: string;
     kind: string;
@@ -97,6 +105,7 @@ export class KubeConfig {
     contexts: KubeContext[];
     users: KubeUser[];
     path: string;
+    currentContext?: string;
   }) {
     this.apiVersion = apiVersion;
     this.kind = kind;
@@ -104,6 +113,7 @@ export class KubeConfig {
     this.contexts = contexts;
     this.users = users;
     this.path = path;
+    this.currentContext = currentContext;
   }
 }
 

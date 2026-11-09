@@ -10,6 +10,9 @@ vi.mock("posthog-js", () => ({
 
 vi.mock("./install-identity", () => ({
   getInstallId: () => "install-1",
+  // Distinct from computeAnonymousHash("", id) on purpose: proves the bootstrap id comes
+  // from getInstallHash, the function Fleet Settings shows, not from a parallel formula.
+  getInstallHash: async () => "install-hash:install-1",
   computeAnonymousHash: async (clusterId: string, installId: string) =>
     `hash:${clusterId}:${installId}`,
 }));
@@ -84,7 +87,7 @@ describe("WAU-C stays dark without a PostHog key", () => {
     const options = vi.mocked(posthog.init).mock.calls[0]?.[1];
     expect(options).toMatchObject({
       persistence: "memory",
-      bootstrap: { distinctID: "hash::install-1", isIdentifiedID: true },
+      bootstrap: { distinctID: "install-hash:install-1", isIdentifiedID: true },
       advanced_disable_flags: true,
       ip: false,
       autocapture: false,

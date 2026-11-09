@@ -1,25 +1,20 @@
 import * as Sentry from "@sentry/sveltekit";
 import { error } from "@tauri-apps/plugin-log";
 import { path } from "@tauri-apps/api";
-import {
-  exists,
-  writeTextFile,
-  BaseDirectory,
-  mkdir,
-  readTextFile,
-  remove,
-} from "@tauri-apps/plugin-fs";
+import { exists, BaseDirectory, readTextFile, remove } from "@tauri-apps/plugin-fs";
 
 import { CONFIG_DIR } from "$entities/config/";
+import { mkdirPrivate, writePrivateTextFile } from "$shared/lib/private-files";
 
+const PASTED_KUBECONFIG = `${CONFIG_DIR}/kubeconfig.yaml`;
+
+// Everything under configs/ carries credentials (flattened kubeconfigs embed tokens
+// and client keys), so the directory is 0700 and every file 0600.
 async function ensureConfigDirExists(): Promise<void> {
   const dirExists = await configExists();
 
   if (!dirExists) {
-    await mkdir(CONFIG_DIR, {
-      recursive: true,
-      baseDir: BaseDirectory.AppData,
-    });
+    await mkdirPrivate(CONFIG_DIR, BaseDirectory.AppData);
   }
 }
 
@@ -30,27 +25,38 @@ export async function configExists(): Promise<boolean> {
 export async function saveClusterOnDisk(uuid: string, data: string): Promise<void> {
   try {
     await ensureConfigDirExists();
-    await writeTextFile(`${CONFIG_DIR}/${uuid}.yaml`, data, {
-      baseDir: BaseDirectory.AppData,
-    });
+    await writePrivateTextFile(`${CONFIG_DIR}/${uuid}.yaml`, data, BaseDirectory.AppData);
   } catch (err) {
     await error(err instanceof Error ? err.message : String(err));
     Sentry.captureException(err);
   }
 }
 
+/**
+ * Stores a pasted or uploaded kubeconfig so kubectl can flatten each context out of it.
+ * Callers remove it with removePastedKubeConfig once the import is over: the per-cluster
+ * files are the copies the app keeps, this one would only be a second copy of every token.
+ */
 export async function saveKubeConfig(raw: string): Promise<string | undefined> {
   try {
     const home = await path.appDataDir();
     await ensureConfigDirExists();
-    await writeTextFile(`${CONFIG_DIR}/kubeconfig.yaml`, raw, {
-      baseDir: BaseDirectory.AppData,
-    });
+    await writePrivateTextFile(PASTED_KUBECONFIG, raw, BaseDirectory.AppData);
 
-    return await path.join(home, `${CONFIG_DIR}/kubeconfig.yaml`);
+    return await path.join(home, PASTED_KUBECONFIG);
   } catch (err) {
     await error(err instanceof Error ? err.message : String(err));
     Sentry.captureException(err);
+  }
+}
+
+export async function removePastedKubeConfig(): Promise<void> {
+  try {
+    if (await exists(PASTED_KUBECONFIG, { baseDir: BaseDirectory.AppData })) {
+      await remove(PASTED_KUBECONFIG, { baseDir: BaseDirectory.AppData });
+    }
+  } catch (err) {
+    await error(err instanceof Error ? err.message : String(err));
   }
 }
 

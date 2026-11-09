@@ -30,6 +30,7 @@
     selectLatestPortForwardsByTabId,
   } from "$shared/lib/port-forward-sync";
   import { BaseDirectory, mkdir, remove, writeTextFile } from "@tauri-apps/plugin-fs";
+  import { PRIVATE_DIR_MODE, PRIVATE_FILE_MODE } from "$shared/lib/private-files";
   import { load as parseYaml, YAMLException } from "js-yaml";
   import { writable } from "svelte/store";
   import type { PageData } from "$entities/cluster";
@@ -3667,8 +3668,15 @@
         return;
       }
 
-      await mkdir("tmp", { recursive: true, baseDir: BaseDirectory.AppData });
-      await writeTextFile(relativePath, fresh.yamlText, { baseDir: BaseDirectory.AppData });
+      await mkdir("tmp", {
+        recursive: true,
+        baseDir: BaseDirectory.AppData,
+        mode: PRIVATE_DIR_MODE,
+      });
+      await writeTextFile(relativePath, fresh.yamlText, {
+        baseDir: BaseDirectory.AppData,
+        mode: PRIVATE_FILE_MODE,
+      });
       const appDataPath = await path.appDataDir();
       const absolutePath = await path.join(appDataPath, relativePath);
       const dryRun = await kubectlRawArgsFront(["apply", "--dry-run=server", "-f", absolutePath], {
@@ -3790,8 +3798,15 @@
   async function applyManifestDocument(manifest: string, contextLabel: string): Promise<void> {
     const relativePath = `tmp/configuration-manifest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.yaml`;
     try {
-      await mkdir("tmp", { recursive: true, baseDir: BaseDirectory.AppData });
-      await writeTextFile(relativePath, manifest, { baseDir: BaseDirectory.AppData });
+      await mkdir("tmp", {
+        recursive: true,
+        baseDir: BaseDirectory.AppData,
+        mode: PRIVATE_DIR_MODE,
+      });
+      await writeTextFile(relativePath, manifest, {
+        baseDir: BaseDirectory.AppData,
+        mode: PRIVATE_FILE_MODE,
+      });
       const appDataPath = await path.appDataDir();
       const absolutePath = await path.join(appDataPath, relativePath);
       const dryRun = await kubectlRawArgsFront(["apply", "--dry-run=server", "-f", absolutePath], {
