@@ -11,6 +11,7 @@
     stopCertNotificationWatcher,
   } from "$features/check-health/model/cert-notification-watcher";
   import { sweepHelmValuesTempfiles } from "$shared/api/helm";
+  import { hardenPrivateFiles } from "$shared/lib/private-files";
   import { loadPluginState } from "$shared/plugins";
   import { initAnalytics, trackAppOpened } from "$shared/analytics/wau-c";
   import SplashScreen from "$shared/ui/splash-screen.svelte";
@@ -49,6 +50,9 @@
     // Best-effort sweep of stale helm-values-*.yaml tempfiles left by crashed
     // installs. Fire-and-forget; never blocks first paint.
     void sweepHelmValuesTempfiles();
+    // Kubeconfigs and connection-test copies written by earlier releases kept the
+    // umask (664/775); make them owner-only. New files are created that way.
+    void hardenPrivateFiles();
     // Hydrate plugin enable/disable state from persisted preferences. Without
     // this, disabledPlugins starts empty on every launch and Marketplace
     // toggles never survive a restart. Fire-and-forget - the sidebar will
