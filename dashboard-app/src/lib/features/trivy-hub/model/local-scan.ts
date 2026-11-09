@@ -14,6 +14,7 @@
  */
 
 import { execCliForCluster, resolveKubeconfigPath } from "$shared/api/cli";
+import { getClusterSafetyInfo } from "$shared/lib/readonly-guard";
 import type { ConsoleSession } from "$shared/ui/command-console";
 
 export type ScanSource = "operator" | "local";
@@ -155,6 +156,12 @@ export async function runLocalTrivyK8sScan(
     "--timeout",
     "5m",
   ];
+  // `trivy k8s` deploys a node-collector (namespace + jobs) by default. On a read-only
+  // cluster the scan runs without it: fewer findings (no node-level checks), no writes.
+  if (getClusterSafetyInfo(clusterId)?.readOnly) {
+    args.push("--disable-node-collector");
+    session.append("read-only cluster: node collector disabled, node-level checks skipped\n");
+  }
 
   session.append(`$ trivy ${args.join(" ")}\n`);
   const raw = await execCliForCluster("trivy", args, clusterId).catch((err: unknown) => ({

@@ -6,6 +6,10 @@ vi.mock("$shared/api/cli", () => ({
 }));
 
 import { execCliForCluster } from "$shared/api/cli";
+import {
+  registerClusterSafetyInfo,
+  resetClusterSafetyRegistryForTests,
+} from "$shared/lib/readonly-guard";
 import { runLocalTrivyK8sScan } from "./local-scan";
 
 function makeSession() {
@@ -35,6 +39,23 @@ function makeSession() {
 describe("runLocalTrivyK8sScan", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetClusterSafetyRegistryForTests();
+  });
+
+  // Reviewer round 2 on #225: trivy 0.70.0 with the panel's arguments POSTed a namespace
+  // and jobs for its node collector. On a read-only cluster the collector is off.
+  it("disables the node collector on a read-only cluster and not on a writable one", async () => {
+    vi.mocked(execCliForCluster).mockResolvedValue({ code: 0, stdout: "{}", stderr: "" });
+
+    registerClusterSafetyInfo([{ uuid: "ro", name: "ro", readOnly: true }]);
+    await runLocalTrivyK8sScan("ro", makeSession());
+    expect(vi.mocked(execCliForCluster).mock.calls[0]?.[1]).toContain("--disable-node-collector");
+
+    registerClusterSafetyInfo([{ uuid: "rw", name: "rw", readOnly: false }]);
+    await runLocalTrivyK8sScan("rw", makeSession());
+    expect(vi.mocked(execCliForCluster).mock.calls[1]?.[1]).not.toContain(
+      "--disable-node-collector",
+    );
   });
 
   it("parses trivy k8s output into VulnItem/MisconfigItem/SecretItem with source=local", async () => {

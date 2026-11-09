@@ -154,6 +154,7 @@ export async function execShellCommand(
 
 const KUBECONFIG_TOOLS: ReadonlySet<CliTool> = new Set([
   "kubectl",
+  "oc",
   "helm",
   "stern",
   "velero",

@@ -6,6 +6,7 @@ import {
   checkKubectlReadOnly,
   classifyHelmAction,
   classifyKubectlAction,
+  classifyTrivyAction,
   classifyVeleroAction,
   clusterIdFromKubeconfigArg,
   getClusterSafetyInfo,
@@ -255,9 +256,8 @@ describe("readonly boundary for CLIs", () => {
       expect(
         checkCliReadOnly("uuid-locked", "curl", ["-sI", "https://example.invalid"]).blocked,
       ).toBe(false);
-      expect(checkCliReadOnly("uuid-locked", "trivy", ["k8s", "--report", "summary"]).blocked).toBe(
-        false,
-      );
+      // trivy outside the cluster (image, fs) passes; `trivy k8s` is covered below.
+      expect(checkCliReadOnly("uuid-locked", "trivy", ["image", "nginx:1"]).blocked).toBe(false);
     });
 
     it("allows everything on a writable cluster, and calls that name no cluster", () => {
@@ -417,6 +417,113 @@ describe("readonly boundary for CLIs", () => {
       expect(
         checkCliReadOnly("uuid-locked", "kubectl", ["--kuberc", "f", "delete", "pod", "x"]).blocked,
       ).toBe(true);
+    });
+  });
+
+  // Reviewer round 2 on #225: the value-flag table was itself a block list. An unknown flag
+  // before the verb or an empty token now makes the command a write; oc image / adm release
+  // read only for info and extract; trivy k8s writes unless the node collector is off; the
+  // app's own kubectl proxy is allowed by its reject-methods flag.
+  describe("read-only parser shapes (round 2)", () => {
+    beforeEach(() => {
+      resetClusterSafetyRegistryForTests();
+      registerClusterSafetyInfo([LOCKED, OPEN]);
+    });
+
+    it("reads value flags the way the tools do, so the hidden verb is the real one", () => {
+      // Reviewer's live bypasses on 55ba4f66: each flag swallows the next token.
+      expect(classifyKubectlAction(["--as-user-extra", "get", "delete", "pod", "x"])).toBe(
+        "delete-pod",
+      );
+      expect(classifyHelmAction(["--content-cache", "list", "uninstall", "r"])).toBe(
+        "helm-uninstall",
+      );
+      expect(
+        classifyVeleroAction(["--log_dir", "A", "--log_file", "get", "delete", "backup", "x"]),
+      ).toBe("delete-resource");
+    });
+
+    it("treats a flag it does not know before the verb as a write", () => {
+      expect(classifyKubectlAction(["--made-up", "get", "pods"])).toBe("edit-resource");
+      expect(classifyKubectlAction(["--made-up=1", "get", "pods"])).toBe("edit-resource");
+      expect(classifyHelmAction(["--made-up", "x", "list"])).toBe("edit-resource");
+      expect(classifyVeleroAction(["--made-up", "backup", "get"])).toBe("edit-resource");
+    });
+
+    it("velero verb-first forms classify like resource-first ones", () => {
+      expect(classifyVeleroAction(["get", "backups"])).toBeNull();
+      expect(classifyVeleroAction(["describe", "backup", "b1"])).toBeNull();
+      expect(classifyVeleroAction(["create", "backup", "b1"])).toBe("apply-yaml");
+      expect(classifyVeleroAction(["delete", "schedule", "s1"])).toBe("delete-resource");
+    });
+
+    it("treats an empty token as a write", () => {
+      expect(classifyKubectlAction(["", "delete", "--raw", "/api/v1/namespaces/x/pods/y"])).toBe(
+        "edit-resource",
+      );
+      expect(classifyKubectlAction(["", "replace", "--raw", "/api/v1/x", "-f", "f"])).toBe(
+        "edit-resource",
+      );
+      expect(classifyKubectlAction(["get", "pods", ""])).toBe("edit-resource");
+      expect(classifyHelmAction(["", "list"])).toBe("edit-resource");
+      expect(classifyVeleroAction(["", "backup", "get"])).toBe("edit-resource");
+    });
+
+    it("still reads with known global flags in front, with or without =", () => {
+      expect(
+        classifyKubectlAction(["-n", "prod", "--request-timeout=5s", "get", "pods"]),
+      ).toBeNull();
+      expect(classifyKubectlAction(["--as", "admin", "--as-group", "g", "get", "pods"])).toBeNull();
+      expect(classifyKubectlAction(["--insecure-skip-tls-verify", "get", "pods"])).toBeNull();
+      expect(classifyKubectlAction(["-v", "6", "get", "pods"])).toBeNull();
+      expect(classifyHelmAction(["--kube-context", "c", "list"])).toBeNull();
+      expect(classifyVeleroAction(["--kubeconfig", "/x.yaml", "backup", "get"])).toBeNull();
+      // Unknown flags after the verb do not change the verb.
+      expect(classifyKubectlAction(["get", "pods", "--made-up", "x"])).toBeNull();
+    });
+
+    it("oc image and adm release: only info and extract read", () => {
+      expect(classifyKubectlAction(["image", "info", "quay.io/x"], "oc")).toBeNull();
+      expect(classifyKubectlAction(["image", "extract", "quay.io/x"], "oc")).toBeNull();
+      expect(classifyKubectlAction(["image", "mirror", "a", "b"], "oc")).toBe("edit-resource");
+      expect(classifyKubectlAction(["image", "append", "--to", "x"], "oc")).toBe("edit-resource");
+      expect(classifyKubectlAction(["adm", "release", "info", "4.17.0"], "oc")).toBeNull();
+      expect(classifyKubectlAction(["adm", "release", "extract", "--tools"], "oc")).toBeNull();
+      expect(classifyKubectlAction(["adm", "release", "new", "--to-image", "x"], "oc")).toBe(
+        "edit-resource",
+      );
+      expect(classifyKubectlAction(["registry", "info"], "oc")).toBeNull();
+      expect(classifyKubectlAction(["registry", "login"], "oc")).toBe("edit-resource");
+    });
+
+    it("trivy k8s writes unless the node collector is disabled", () => {
+      const panelArgs = ["k8s", "--kubeconfig", "/x.yaml", "--report", "all", "--format", "json"];
+      expect(classifyTrivyAction(panelArgs)).toBe("apply-yaml");
+      expect(classifyTrivyAction([...panelArgs, "--disable-node-collector"])).toBeNull();
+      expect(classifyTrivyAction(["image", "nginx:1"])).toBeNull();
+      expect(classifyTrivyAction(["fs", "."])).toBeNull();
+      expect(checkCliReadOnly("uuid-locked", "trivy", panelArgs).blocked).toBe(true);
+      expect(
+        checkCliReadOnly("uuid-locked", "trivy", [...panelArgs, "--disable-node-collector"])
+          .blocked,
+      ).toBe(false);
+      expect(checkCliReadOnly("uuid-open", "trivy", panelArgs).blocked).toBe(false);
+    });
+
+    it("kubectl proxy reads only when it rejects every writing method", () => {
+      const appProxy = [
+        "proxy",
+        "--kubeconfig",
+        "/x/configs/uuid-locked.yaml",
+        "--reject-methods=^(POST|PUT|PATCH|DELETE)$",
+        "--port=0",
+        "--address",
+        "127.0.0.1",
+      ];
+      expect(classifyKubectlAction(appProxy)).toBeNull();
+      expect(checkCliReadOnly("uuid-locked", "kubectl", appProxy).blocked).toBe(false);
+      expect(classifyKubectlAction(["proxy", "--port=8001"])).toBe("exec-shell");
+      expect(classifyKubectlAction(["proxy", "--reject-methods=^POST$"])).toBe("exec-shell");
     });
   });
 });

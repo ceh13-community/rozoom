@@ -48,6 +48,9 @@ export async function acquireKubeApiProxy(clusterId: string): Promise<string> {
     "proxy",
     "--kubeconfig",
     kubeconfigPath,
+    // The app only GETs and watches through this proxy. Refusing every writing method
+    // here is what lets the read-only guard allow `kubectl proxy` for this caller.
+    "--reject-methods=^(POST|PUT|PATCH|DELETE)$",
     "--port=0",
     "--address",
     LOCALHOST_HOST,

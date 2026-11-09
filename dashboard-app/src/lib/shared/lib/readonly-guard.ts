@@ -91,24 +91,100 @@ const VALUE_FLAGS: ReadonlySet<string> = new Set([
   "--qps",
   "--kubecontext",
   "--features",
+  "--as-user-extra",
+  "--content-cache",
+  "--log_dir",
+  "--log_file",
+  "--reject-methods",
+  "--accept-hosts",
+  "--accept-paths",
+  "--reject-paths",
+  "--address",
+  "--port",
+  "--api-prefix",
+  "--unix-socket",
+  "--keepalive",
+  "--www",
+  "--www-prefix",
 ]);
 
-/** Positional tokens with leading global flags (and their values) removed. */
-function positionalArgs(args: readonly string[]): string[] {
-  const out: string[] = [];
+// Global flags that take no value. Anything else that starts with "-" and appears before
+// the verb must be a known value flag, or the command counts as a write: an unknown flag
+// may swallow the next token (`--as-user-extra get delete pod x` deletes), and the guard
+// cannot know which tokens a flag it has never seen will eat.
+const BOOLEAN_FLAGS: ReadonlySet<string> = new Set([
+  "-h",
+  "--help",
+  "--insecure-skip-tls-verify",
+  "--kube-insecure-skip-tls-verify",
+  "--match-server-version",
+  "--warnings-as-errors",
+  "--disable-compression",
+  "--debug",
+  "--alsologtostderr",
+  "--logtostderr",
+  "--skip-headers",
+  "--skip-log-headers",
+  "--one-output",
+  "--add-dir-header",
+]);
+
+type ParsedArgs = {
+  /** Non-flag tokens, verb first. */
+  positional: string[];
+  /** A flag before the verb that the tables do not know: it may hide the real verb. */
+  unknownFlagBeforeVerb: boolean;
+  /** An empty token: kubectl skips it, so `"" delete ...` is a delete. */
+  emptyPositional: boolean;
+};
+
+/**
+ * Splits a CLI invocation into positionals and the two shapes that must count as a
+ * write on a read-only cluster regardless of the verb they seem to carry.
+ */
+function parseCliArgs(args: readonly string[]): ParsedArgs {
+  const positional: string[] = [];
+  let unknownFlagBeforeVerb = false;
+  let emptyPositional = false;
   for (let i = 0; i < args.length; i++) {
-    const token = args[i]?.trim() ?? "";
+    const raw = args[i] ?? "";
+    const token = raw.trim();
+    if (token === "") {
+      emptyPositional = true;
+      continue;
+    }
     if (token === "--") {
-      out.push(...args.slice(i + 1).map((a) => a.trim()));
+      for (const rest of args.slice(i + 1)) {
+        const t = rest.trim();
+        if (t === "") emptyPositional = true;
+        else positional.push(t);
+      }
       break;
     }
     if (token.startsWith("-")) {
-      if (!token.includes("=") && VALUE_FLAGS.has(token)) i++;
+      const eq = token.indexOf("=");
+      const name = eq === -1 ? token : token.slice(0, eq);
+      if (eq === -1 && VALUE_FLAGS.has(name)) {
+        i++; // the next token is this flag's value
+        continue;
+      }
+      if (VALUE_FLAGS.has(name) || BOOLEAN_FLAGS.has(name)) continue;
+      if (positional.length === 0) unknownFlagBeforeVerb = true;
       continue;
     }
-    out.push(token);
+    positional.push(token);
   }
-  return out;
+  return { positional, unknownFlagBeforeVerb, emptyPositional };
+}
+
+/** Positional tokens with global flags (and their values) removed. */
+function positionalArgs(args: readonly string[]): string[] {
+  return parseCliArgs(args).positional;
+}
+
+/** The two parser verdicts that are writes on their own, before any verb is read. */
+function unsafeShape(parsed: ParsedArgs): boolean {
+  return parsed.unknownFlagBeforeVerb || parsed.emptyPositional;
 }
 
 /**
@@ -149,7 +225,8 @@ const KUBECTL_READ_SUBCOMMANDS: Readonly<Record<string, ReadonlySet<string>>> = 
   config: new Set(["view", "get-contexts", "get-clusters", "get-users", "current-context"]),
   plugin: new Set(["list"]),
   // oc only: the cluster-admin tree. Inspections read; everything else there writes.
-  adm: new Set(["top", "inspect", "node-logs", "release"]),
+  // `adm release` is handled below: only `info` and `extract` read.
+  adm: new Set(["top", "inspect", "node-logs"]),
 };
 
 // oc verbs that read on top of the kubectl set.
@@ -159,9 +236,28 @@ const OC_READ_VERBS: ReadonlySet<string> = new Set([
   "projects",
   "project",
   "explain",
-  "image",
-  "registry",
 ]);
+
+// oc verbs whose subcommands split: `image mirror|append` and `adm release new` push to a
+// registry, `registry login` writes local config. Only these subcommands read.
+const OC_READ_SUBCOMMANDS: Readonly<Record<string, ReadonlySet<string>>> = {
+  image: new Set(["info", "extract"]),
+  registry: new Set(["info"]),
+};
+const OC_ADM_RELEASE_READ: ReadonlySet<string> = new Set(["info", "extract"]);
+
+// `kubectl proxy` only reads when it refuses every writing method itself. The app's own
+// proxy (kube-api-proxy.ts) passes exactly this; a terminal `kubectl proxy` does not.
+const PROXY_REJECTS_WRITES = /^--reject-methods=(.*)$/;
+function proxyRejectsWrites(args: readonly string[]): boolean {
+  for (const arg of args) {
+    const m = PROXY_REJECTS_WRITES.exec(arg.trim());
+    if (!m) continue;
+    const pattern = m[1];
+    return ["POST", "PUT", "PATCH", "DELETE"].every((method) => pattern.includes(method));
+  }
+  return false;
+}
 
 // Named writes, for the reason text and the UI category. Anything not listed here and
 // not in the read sets is a generic write.
@@ -201,11 +297,20 @@ export function classifyKubectlAction(
   tool: "kubectl" | "oc" = "kubectl",
 ): DestructiveAction | null {
   if (args.some((arg) => KUBERC_FLAGS.test(arg.trim()))) return GENERIC_WRITE;
-  const positional = positionalArgs(args).map((a) => a.toLowerCase());
+  const parsed = parseCliArgs(args);
+  if (unsafeShape(parsed)) return GENERIC_WRITE;
+  const positional = parsed.positional.map((a) => a.toLowerCase());
   const verb = positional[0];
   if (!verb) return null;
+  if (verb === "proxy") return proxyRejectsWrites(args) ? null : "exec-shell";
   if (KUBECTL_READ_VERBS.has(verb)) return null;
   if (tool === "oc" && OC_READ_VERBS.has(verb)) return null;
+  if (tool === "oc" && Object.hasOwn(OC_READ_SUBCOMMANDS, verb)) {
+    return OC_READ_SUBCOMMANDS[verb].has(positional[1] ?? "") ? null : GENERIC_WRITE;
+  }
+  if (tool === "oc" && verb === "adm" && positional[1] === "release") {
+    return OC_ADM_RELEASE_READ.has(positional[2] ?? "") ? null : GENERIC_WRITE;
+  }
   if (Object.hasOwn(KUBECTL_READ_SUBCOMMANDS, verb)) {
     const subcommand = positional[1] ?? "";
     if (KUBECTL_READ_SUBCOMMANDS[verb].has(subcommand)) return null;
@@ -260,7 +365,9 @@ const HELM_WRITE_ACTION: Readonly<Record<string, DestructiveAction>> = {
 
 /** `helm <subcommand>`: null for the read list, a write action for everything else. */
 export function classifyHelmAction(args: readonly string[]): DestructiveAction | null {
-  const subcommand = positionalArgs(args)[0]?.toLowerCase();
+  const parsed = parseCliArgs(args);
+  if (unsafeShape(parsed)) return GENERIC_WRITE;
+  const subcommand = parsed.positional[0]?.toLowerCase();
   if (!subcommand) return null;
   if (HELM_READ_SUBCOMMANDS.has(subcommand)) return null;
   return HELM_WRITE_ACTION[subcommand] ?? GENERIC_WRITE;
@@ -280,17 +387,36 @@ const VELERO_READ_VERBS: ReadonlySet<string> = new Set(["get", "describe", "logs
 
 /** velero: null for reads, a write action for everything else. */
 export function classifyVeleroAction(args: readonly string[]): DestructiveAction | null {
-  const positional = positionalArgs(args).map((a) => a.toLowerCase());
+  const parsed = parseCliArgs(args);
+  if (unsafeShape(parsed)) return GENERIC_WRITE;
+  const positional = parsed.positional.map((a) => a.toLowerCase());
   const first = positional[0];
   if (!first) return null;
   if (VELERO_READ_COMMANDS.has(first)) return null;
   if (first === "install") return "apply-yaml";
   if (first === "uninstall") return "delete-resource";
+  // Verb-first form (`velero get backups`, `velero delete backup x`) is valid too.
+  if (VELERO_READ_VERBS.has(first)) return null;
+  if (first === "create") return "apply-yaml";
+  if (first === "delete") return "delete-resource";
   const verb = positional[1] ?? "";
   if (VELERO_READ_VERBS.has(verb)) return null;
   if (verb === "create") return "apply-yaml";
   if (verb === "delete") return "delete-resource";
   return GENERIC_WRITE;
+}
+
+// `trivy k8s` deploys a node-collector (namespace + jobs) unless told not to; measured on
+// trivy 0.70.0: POST /api/v1/namespaces and POST .../trivy-temp/jobs. Image, fs and config
+// scans never touch the cluster.
+const TRIVY_NO_NODE_COLLECTOR = /^--disable-node-collector(=true)?$/;
+
+/** trivy: `k8s` without --disable-node-collector writes to the cluster. */
+export function classifyTrivyAction(args: readonly string[]): DestructiveAction | null {
+  const positional = positionalArgs(args).map((a) => a.toLowerCase());
+  const first = positional[0];
+  if (first !== "k8s" && first !== "kubernetes") return null;
+  return args.some((arg) => TRIVY_NO_NODE_COLLECTOR.test(arg.trim())) ? null : "apply-yaml";
 }
 
 function evaluate(
@@ -316,9 +442,9 @@ function evaluate(
 
 /**
  * Read-only check for any CLI the app runs against a cluster's kubeconfig (terminal,
- * panels, helm/velero wrappers). Tools that never take the cluster kubeconfig (cloud
- * CLIs, curl, yq...) are not cluster writes and pass; the terminal refuses the shell
- * and names the cloud CLIs in the Read-only tooltip instead.
+ * panels, helm/velero wrappers, trivy k8s). Tools that never take the cluster kubeconfig
+ * (cloud CLIs, curl, yq...) are not cluster writes and pass; the terminal refuses the
+ * shell and names the cloud CLIs in the Read-only tooltip instead.
  */
 export function checkCliReadOnly(
   clusterId: string | undefined | null,
@@ -334,6 +460,8 @@ export function checkCliReadOnly(
       return evaluate(clusterId, classifyHelmAction(args));
     case "velero":
       return evaluate(clusterId, classifyVeleroAction(args));
+    case "trivy":
+      return evaluate(clusterId, classifyTrivyAction(args));
     default:
       return { blocked: false };
   }
