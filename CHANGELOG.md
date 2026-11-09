@@ -10,9 +10,10 @@ The release build fails if the section for the released version is missing.
 
 ## [0.26.2] - 2026-11-11
 
-Security release. On a read-only cluster no write reaches the cluster from any
-surface, including the terminal and helm; the credential files the app writes
-are readable only by you; resource names go to kubectl as one argument.
+Security release. Read-only clusters: kubectl, oc, helm, velero and the
+terminal are now checked before they start. This is a guard in the app, not an
+access boundary: for a hard limit use RBAC. The credential files the app writes
+are readable only by you, and resource names go to kubectl as one argument.
 Performance and Capacity Intelligence open with data again, and the first
 screen probes a cluster only when you click Check. On Linux (.deb, .rpm) the
 app does not update itself: download the new package from the release page and
@@ -27,11 +28,12 @@ install it the way you installed this one. We recommend this update.
 
 ### Changed
 
-- Read-only clusters: kubectl, oc, helm and velero are checked before they
-  start, from the debug terminal, the command console, the GitOps and backup
-  panels and every helm wrapper. helm install on a read-only cluster is
-  blocked, not confirmed. The Trivy Quick scan runs without the node collector
-  on a read-only cluster, so it creates no namespace and no job.
+- Read-only clusters: kubectl, oc, helm, velero and the terminal are checked
+  before they start, in the debug terminal, the command console, the GitOps
+  and backup panels and every helm wrapper. This is a guard in the app, not an
+  access boundary: for a hard limit use RBAC. helm install on a read-only
+  cluster is blocked, not confirmed. The Trivy Quick scan runs without the
+  node collector on a read-only cluster, so it creates no namespace and no job.
 - Ready on the first screen appears only when the API server answered.
   Connection refused, timeout and DNS failures show as unreachable with the
   reason in the row tooltip.
