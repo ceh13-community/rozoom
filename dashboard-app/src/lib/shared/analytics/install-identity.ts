@@ -8,10 +8,16 @@
  */
 const INSTALL_ID_KEY = "rozoom.install_id";
 
+/** The persisted install id, or null when none was created yet. Never writes. */
+export function peekInstallId(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(INSTALL_ID_KEY);
+}
+
 /** Return the persisted install id, generating and storing one on first use. */
 export function getInstallId(): string {
   if (typeof window === "undefined") return "";
-  let id = window.localStorage.getItem(INSTALL_ID_KEY);
+  let id = peekInstallId();
   if (!id) {
     id = crypto.randomUUID();
     window.localStorage.setItem(INSTALL_ID_KEY, id);
@@ -26,4 +32,16 @@ export async function computeAnonymousHash(clusterId: string, installId: string)
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+}
+
+/**
+ * SHA-256(install_id): the distinct_id PostHog stores for this install. One function
+ * for the sender (wau-c) and for the Fleet Settings row, so what is shown is what is sent.
+ * `create: false` only reads: null when no install id exists yet, so a screen can show
+ * the hash without minting an id for someone who never opted in.
+ */
+export async function getInstallHash(options: { create?: boolean } = {}): Promise<string | null> {
+  const id = options.create === false ? peekInstallId() : getInstallId();
+  if (!id) return null;
+  return computeAnonymousHash("", id);
 }
