@@ -101,8 +101,11 @@
     providerCategory: ClusterProviderCategory;
     region: string | null;
     authMethod: string;
-    status: "ready" | "auth-issue" | "unreachable";
+    // "not-checked" until the user clicks Check on the row: reading a kubeconfig
+    // must not contact anything or run the context's credential plugin.
+    status: "not-checked" | "checking" | "ready" | "auth-issue" | "unreachable";
     statusLabel: string;
+    statusDetail: string | null;
     env: string;
     tags: string[];
     warnings: string[];
@@ -250,7 +253,8 @@
     }
   }
   let probeResults = $state<Record<string, ConnectionProbeResult>>({});
-  let isProbing = $state(false);
+  let probeInFlight = $state<Record<string, boolean>>({});
+  const isProbing = $derived(Object.values(probeInFlight).some(Boolean));
 
   // Cloud import state
   let cloudClusters = $state<CloudCluster[]>([]);
@@ -368,7 +372,9 @@
     if (providersScanAt !== null) {
       void loadDetectedClis();
     }
-    void probeDetectedClusters();
+    // Reachability is NOT probed here. A probe runs `kubectl cluster-info` with the
+    // context's credentials, which executes its exec plugin (aws, kubelogin, gcloud...)
+    // on the user's machine; that only happens from an explicit Check click.
   }
 
   // Refresh (kubeconfig) and Rescan (ConnectClusterWizard's local-runtime
@@ -410,29 +416,38 @@
     }
   }
 
-  async function probeDetectedClusters() {
+  // User-initiated: asks one detected cluster's API server whether it answers.
+  // This is the only place that runs the context's credentials.
+  async function checkDetectedCluster(cluster: Pick<DetectedCluster, "name" | "contextName">) {
     const config = $kubeConfigFile;
-    if (!config?.path || !config.clusters?.length) return;
+    if (!config?.path || !cluster.contextName || probeInFlight[cluster.name]) return;
 
-    isProbing = true;
-    const contextsByCluster = new Map<string, string>();
-    config.contexts?.forEach((ctx) => {
-      contextsByCluster.set(ctx.context.cluster, ctx.name);
-    });
+    probeInFlight = { ...probeInFlight, [cluster.name]: true };
+    try {
+      const result = await probeClusterConnection(cluster.contextName, config.path);
+      probeResults = { ...probeResults, [cluster.name]: result };
+    } catch (error) {
+      probeResults = {
+        ...probeResults,
+        [cluster.name]: {
+          status: "unreachable",
+          latencyMs: 0,
+          detail: error instanceof Error ? error.message : String(error),
+        },
+      };
+    } finally {
+      const rest = { ...probeInFlight };
+      delete rest[cluster.name];
+      probeInFlight = rest;
+    }
+  }
 
-    const probes = config.clusters.map(async (cluster) => {
-      const contextName = contextsByCluster.get(cluster.name);
-      if (!contextName) return;
-      try {
-        const result = await probeClusterConnection(contextName, config.path);
-        probeResults = { ...probeResults, [cluster.name]: result };
-      } catch {
-        probeResults = { ...probeResults, [cluster.name]: { status: "unreachable", latencyMs: 0 } };
-      }
-    });
-
-    await Promise.allSettled(probes);
-    isProbing = false;
+  async function checkAllDetectedClusters() {
+    await Promise.allSettled(
+      detectedClusters
+        .filter((cluster) => !cluster.alreadyAdded && cluster.contextName)
+        .map((cluster) => checkDetectedCluster(cluster)),
+    );
   }
 
   async function handleAddFromAvailableConfigs() {
@@ -694,7 +709,7 @@
         const region = detection.region;
         const authMethod = detection.authMethod;
         const providerCategory = detection.category;
-        const status = inferStatus(cluster.name, contextName);
+        const status = detectedStatus(cluster.name);
         const env = envOverrides[cluster.name] || inferEnv(cluster.name);
         const displayName = displayNameOverrides[cluster.name] || cluster.name;
         const warnings = inferWarnings(cluster.name, cluster.insecureSkipTlsVerify, user);
@@ -720,6 +735,7 @@
           authInfo,
           status,
           statusLabel: getStatusLabel(cluster.name, status),
+          statusDetail: probeResults[cluster.name]?.detail || null,
           env,
           tags,
           warnings,
@@ -899,6 +915,8 @@
     const probe = probeResults[name];
     const latency = probe ? ` (${probe.latencyMs}ms)` : "";
     const labels: Record<DetectedCluster["status"], string> = {
+      "not-checked": "Not checked",
+      checking: "Checking…",
       ready: `Ready${latency}`,
       "auth-issue": `Auth issue${latency}`,
       unreachable: `Unreachable${latency}`,
@@ -906,21 +924,26 @@
     return labels[status];
   }
 
-  function inferStatus(name: string, contextName: string | null): DetectedCluster["status"] {
-    const probe = probeResults[name];
-    if (probe) return probe.status;
+  // Only a completed probe may claim anything about reachability. There is no
+  // guessing from the cluster name: a row the user has not checked says so.
+  function detectedStatus(name: string): DetectedCluster["status"] {
+    if (probeInFlight[name]) return "checking";
+    return probeResults[name]?.status ?? "not-checked";
+  }
 
-    const hint = `${name} ${contextName ?? ""}`.toLowerCase();
-
-    if (hint.includes("offline") || hint.includes("down") || hint.includes("unreachable")) {
-      return "unreachable";
+  function statusChipClass(status: DetectedCluster["status"]): string {
+    switch (status) {
+      case "ready":
+        return "bg-green-50 text-green-700 dark:bg-green-500/20 dark:text-green-200";
+      case "auth-issue":
+        return "bg-orange-50 text-orange-700 dark:bg-orange-500/20 dark:text-orange-200";
+      case "unreachable":
+        return "bg-red-50 text-red-700 dark:bg-red-500/20 dark:text-red-200";
+      case "checking":
+        return "bg-slate-100 text-slate-500 dark:bg-slate-600/60 dark:text-slate-300 animate-pulse";
+      default:
+        return "bg-slate-100 text-slate-500 dark:bg-slate-600/60 dark:text-slate-300";
     }
-
-    if (hint.includes("auth") || hint.includes("forbidden")) {
-      return "auth-issue";
-    }
-
-    return "ready";
   }
 
   function inferWarnings(
@@ -1085,8 +1108,8 @@
                   <strong>Cloud Providers</strong> - detected bundled tools, OS tools, and cloud credentials
                 </li>
                 <li>
-                  <strong>Detected kubeconfigs</strong> - auto-scanned contexts with provider, region,
-                  auth method, and security level
+                  <strong>Detected kubeconfigs</strong> - contexts read from ~/.kube/config with provider,
+                  region, auth method, and security level; reachability only on Check
                 </li>
                 <li>
                   <strong>Managed Clusters</strong> - per-cluster settings: default namespace, proxy,
@@ -1469,8 +1492,9 @@
             Detected kubeconfig files
           </h2>
           <p class="text-slate-500 dark:text-slate-400 mb-4 text-sm leading-relaxed">
-            ROZOOM discovers clusters, validates access, and shows where each context comes from
-            before you add it.
+            ROZOOM reads this file and shows where each context comes from. It contacts a cluster
+            only when you click <strong>Check</strong>; that runs the context's credential plugin,
+            if it has one.
           </p>
 
           {#if !hasAvailableConfigs}
@@ -1511,6 +1535,19 @@
                     </p>
                   </div>
                   <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <Button
+                      onclick={() => void checkAllDetectedClusters()}
+                      disabled={isLoading || isProbing}
+                      variant="outline"
+                      class="text-sm"
+                      title="Ask every not-yet-added cluster whether its API server answers. Runs each context's credential plugin."
+                    >
+                      {#if isProbing}
+                        <LoadingSpinner />
+                      {:else}
+                        Check all
+                      {/if}
+                    </Button>
                     <Button
                       onclick={handleAddSelectedClusters}
                       disabled={isLoading || selectedDetectedCount === 0}
@@ -1599,15 +1636,27 @@
                                   </span>
                                 {/if}
                                 <span
-                                  class="text-xs px-2 py-0.5 rounded-full {cluster.status ===
-                                  'ready'
-                                    ? 'bg-green-50 text-green-700 dark:bg-green-500/20 dark:text-green-200'
-                                    : cluster.status === 'auth-issue'
-                                      ? 'bg-orange-50 text-orange-700 dark:bg-orange-500/20 dark:text-orange-200'
-                                      : 'bg-red-50 text-red-700 dark:bg-red-500/20 dark:text-red-200'}"
+                                  class="text-xs px-2 py-0.5 rounded-full {statusChipClass(
+                                    cluster.status,
+                                  )}"
+                                  title={cluster.statusDetail ?? undefined}
+                                  data-testid="detected-status"
                                 >
                                   {cluster.statusLabel}
                                 </span>
+                                {#if cluster.contextName}
+                                  <Button
+                                    onclick={() => void checkDetectedCluster(cluster)}
+                                    disabled={cluster.status === "checking"}
+                                    class="text-gray-700 text-xs dark:text-white !bg-transparent border border-gray-200 dark:border-slate-500 hover:bg-gray-100 dark:hover:bg-slate-600"
+                                    title="Ask the API server whether it answers. Runs this context's credential plugin, if it has one."
+                                  >
+                                    {cluster.status === "not-checked" ||
+                                    cluster.status === "checking"
+                                      ? "Check"
+                                      : "Retry"}
+                                  </Button>
+                                {/if}
                                 <Button
                                   onclick={() => (activeCluster = cluster)}
                                   class="text-gray-700 text-xs dark:text-white !bg-transparent ml-auto border border-gray-200 dark:border-slate-500 hover:bg-gray-100 dark:hover:bg-slate-600"
