@@ -7,9 +7,12 @@
 # installs untouched. tauri-action only knows how to write latest.json, so
 # the slim manifest is assembled here, one platform entry per slim job.
 #
-# The slim platform jobs (darwin, windows; Linux ships no updater-replaceable
-# package) may write concurrently; a lost update is detected by re-downloading
-# after upload and retried.
+# The slim platform jobs (darwin, windows, linux) may write concurrently; a lost
+# update is detected by re-downloading after upload and retried. Linux registers
+# its .deb and .rpm under linux-x86_64-deb / linux-x86_64-rpm only: the bare
+# linux-x86_64 key makes clients up to 0.26.1 install or overwrite things
+# (assert-no-bare-linux-key.sh), the per-package keys only feed the 0.26.2+
+# "new version" notice.
 #
 # Usage: register-in-latest-slim-json.sh <tag> <platform-key> <artifact-path>
 #   e.g. register-in-latest-slim-json.sh app-v0.25.0 darwin-aarch64 \
@@ -18,7 +21,10 @@
 set -euo pipefail
 
 TAG="${1:?release tag required, e.g. app-v0.25.0}"
-PLATFORM_KEY="${2:?platform key required, e.g. linux-x86_64}"
+PLATFORM_KEY="${2:?platform key required, e.g. darwin-aarch64 or linux-x86_64-deb}"
+case "$PLATFORM_KEY" in
+  linux-x86_64) echo "refusing the bare linux-x86_64 key: Linux packages are not updater-replaceable (use linux-x86_64-deb or -rpm)" >&2; exit 1 ;;
+esac
 ARTIFACT="${3:?artifact path required}"
 REPO="${GITHUB_REPOSITORY:-ceh13-community/rozoom}"
 MANIFEST="latest-slim.json"

@@ -658,11 +658,15 @@ jobs:
           [[ ${#files[@]} -gt 0 ]] || { echo "no slim artifacts found to upload" >&2; exit 1; }
           gh release upload "$TAG" "${files[@]}" --clobber
 
-      # No Linux entry: the AppImage was the only updater-replaceable Linux
-      # package and it is no longer shipped (WebKit/EGL abort on launch, both
-      # headless and on real GPUs), so Linux installs update via deb/rpm.
+      # Linux registers its slim .deb and .rpm under the per-package keys
+      # linux-x86_64-deb / linux-x86_64-rpm, never under the bare linux-x86_64
+      # key (finalize-release-assets removes that one). Clients up to 0.26.1
+      # read only the bare key on Linux and see "platform linux-x86_64 was not
+      # found" (ckfnqZe5, T8), so these entries change nothing for them;
+      # 0.26.2+ reads its key to announce the release and never downloads on
+      # Linux (app-updater.ts). The AppImage, the only package the updater
+      # could replace, is no longer shipped (WebKit/EGL abort on launch).
       - name: Register in latest-slim.json
-        if: runner.os != 'Linux'
         shell: bash
         working-directory: ./dashboard-app
         env:
@@ -670,12 +674,16 @@ jobs:
           TAG: app-v${{ env.APP_VERSION }}
         run: |
           case "${{ matrix.updater-platform }}" in
-            darwin-aarch64) pattern='*_slim.app.tar.gz' ;;
-            windows-x86_64) pattern='*_slim_en-US.msi' ;;
+            darwin-aarch64) entries='darwin-aarch64=*_slim.app.tar.gz' ;;
+            windows-x86_64) entries='windows-x86_64=*_slim_en-US.msi' ;;
+            linux-x86_64)   entries='linux-x86_64-deb=*_slim.deb linux-x86_64-rpm=*_slim.rpm' ;;
           esac
-          artifact="$(find src-tauri/target -path '*/bundle/*' -name "$pattern" -type f | head -n1)"
-          [[ -n "$artifact" ]] || { echo "no updater artifact matching $pattern" >&2; exit 1; }
-          bash ./scripts/register-in-latest-slim-json.sh "$TAG" "${{ matrix.updater-platform }}" "$artifact"
+          for entry in $entries; do
+            key="${entry%%=*}"; pattern="${entry#*=}"
+            artifact="$(find src-tauri/target -path '*/bundle/*' -name "$pattern" -type f | head -n1)"
+            [[ -n "$artifact" ]] || { echo "no updater artifact matching $pattern" >&2; exit 1; }
+            bash ./scripts/register-in-latest-slim-json.sh "$TAG" "$key" "$artifact"
+          done
 
       - name: Upload slim .deb for render smoke
         if: runner.os == 'Linux'
