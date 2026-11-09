@@ -69,7 +69,15 @@ for attempt in 1 2 3 4 5; do
     "$tmp/$MANIFEST" > "$tmp/merged.json"
   mv "$tmp/merged.json" "$tmp/$MANIFEST"
 
-  gh release upload "$TAG" "$tmp/$MANIFEST" --repo "$REPO" --clobber
+  # Two jobs uploading the same asset at the same time make one of them fail
+  # (422, or a delete that the other already did); under `set -e` that would
+  # kill the job before the retry loop ever looks, finalize is skipped and the
+  # release goes red on a healthy build. A failed upload is just this attempt.
+  if ! gh release upload "$TAG" "$tmp/$MANIFEST" --repo "$REPO" --clobber; then
+    echo "upload of $MANIFEST failed (attempt $attempt), probably a concurrent writer; retrying" >&2
+    sleep $((attempt * 5))
+    continue
+  fi
 
   # Concurrent platform jobs can clobber each other; confirm our entry
   # survived, otherwise merge and upload again on a fresh download.
