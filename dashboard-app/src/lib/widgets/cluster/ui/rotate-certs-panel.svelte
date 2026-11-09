@@ -17,6 +17,10 @@
   import { daysSeverity } from "$features/rotate-certs/model/severity";
   import { kubectlRawFront, kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
   import { unsafeKubectlNameReason } from "$shared/lib/kubectl-resource-name";
+  import {
+    buildAuditCreateArgs,
+    buildAuditPatchArgs,
+  } from "$features/rotate-certs/model/audit-args";
   import { confirmAction } from "$shared/lib/confirm-action";
   import { toast } from "svelte-sonner";
   import { goto } from "$app/navigation";
@@ -69,6 +73,7 @@
   const AUDIT_NAMESPACE = "kube-system";
   const AUDIT_CM_NAME = "rozoom-cert-rotation-audit";
   const AUDIT_CM_KEY = "entries.json";
+  const AUDIT_TARGET = { name: AUDIT_CM_NAME, namespace: AUDIT_NAMESPACE, key: AUDIT_CM_KEY };
 
   let report = $state<CertificatesReport | null>(null);
   let tlsScanResult = $state<TlsCertScanResult | null>(null);
@@ -358,18 +363,19 @@
       };
       const next = [...(auditLog ?? []).slice().reverse(), entry].slice(-50);
       const payload = JSON.stringify(next);
-      const patch = JSON.stringify({ data: { [AUDIT_CM_KEY]: payload } });
-      const patchArgs = `patch configmap ${AUDIT_CM_NAME} -n ${AUDIT_NAMESPACE} --type merge -p ${JSON.stringify(patch)} --request-timeout=10s`;
-      const patchRes = await kubectlRawFront(patchArgs, {
+      // The payload embeds CSR names, which the API server does not validate. Argument
+      // arrays only: a name such as "z rev-wipe --patch='data': y" must stay inside the
+      // JSON, never become a flag (see audit-args.ts).
+      const patchRes = await kubectlRawArgsFront(buildAuditPatchArgs(AUDIT_TARGET, payload), {
         clusterId,
         source: "rotate-certs:audit-patch",
       });
       if (patchRes.code !== 0) {
         // ConfigMap may not exist yet - create it with the initial payload.
-        const createRes = await kubectlRawFront(
-          `create configmap ${AUDIT_CM_NAME} -n ${AUDIT_NAMESPACE} --from-literal=${AUDIT_CM_KEY}=${JSON.stringify(payload)} --request-timeout=10s`,
-          { clusterId, source: "rotate-certs:audit-create" },
-        );
+        const createRes = await kubectlRawArgsFront(buildAuditCreateArgs(AUDIT_TARGET, payload), {
+          clusterId,
+          source: "rotate-certs:audit-create",
+        });
         if (createRes.code !== 0) {
           const humanized = humanizeCertError(createRes.errors || patchRes.errors || "");
           toast.error(
@@ -496,23 +502,51 @@
   const strategy = $derived(STRATEGY[distributionHint ?? ""] ?? STRATEGY.kubeadm);
   const rotateHint = $derived(strategy.command);
 
+  // Names come from the cluster and may contain spaces, dashes or quotes; shown
+  // quoted so a crafted name cannot pose as a second line of the banner or dialog.
+  function quoteName(name: string) {
+    return JSON.stringify(name);
+  }
+
   async function approveAllPendingCsrs(options?: { skipConfirm?: boolean }) {
     if (approvingCsrs || pendingCsrs.length === 0) return;
+    // Snapshot before anything runs: fetchCsrs() later replaces pendingCsrs, and the
+    // audit line must describe the set that was actually acted on.
+    const batch = pendingCsrs.slice();
+    // The API server does not validate CSR names: `pending-a --as=nobody` is a legal
+    // name. Such a CSR is never handed to kubectl; it is listed as skipped instead.
+    const approvable = batch.filter((c) => unsafeKubectlNameReason(c.name) === null);
+    const skipped = batch.filter((c) => unsafeKubectlNameReason(c.name) !== null);
+    const signers = Array.from(new Set(batch.map((c) => c.signer ?? "(unknown signer)")));
+
+    if (approvable.length === 0) {
+      rotateResult = {
+        ok: false,
+        message:
+          `No CSR approved. ${skipped.length} skipped, unsafe name:\n` +
+          skipped
+            .map((c) => `  - ${quoteName(c.name)}: ${unsafeKubectlNameReason(c.name)}`)
+            .join("\n"),
+      };
+      return;
+    }
+
     if (!options?.skipConfirm) {
-      const signerSummary = Array.from(
-        new Set(pendingCsrs.map((c) => c.signer ?? "(unknown signer)")),
-      )
-        .map((s) => `  - ${s}`)
-        .join("\n");
-      const preview = pendingCsrs
+      const signerSummary = signers.map((s) => `  - ${s}`).join("\n");
+      const preview = approvable
         .slice(0, 10)
-        .map((c) => `  - ${c.name} by ${c.requestor} (${c.age})`)
+        .map((c) => `  - ${quoteName(c.name)} by ${c.requestor} (${c.age})`)
         .join("\n");
-      const extra = pendingCsrs.length > 10 ? `\n  ... and ${pendingCsrs.length - 10} more` : "";
+      const extra = approvable.length > 10 ? `\n  ... and ${approvable.length - 10} more` : "";
+      const skippedNote =
+        skipped.length > 0
+          ? `\n\nSkipped (unsafe name, not sent to kubectl):\n` +
+            skipped.map((c) => `  - ${quoteName(c.name)}`).join("\n")
+          : "";
       const confirmed = await confirmAction(
-        `Approve ${pendingCsrs.length} pending CSR(s)?\n\n` +
+        `Approve ${approvable.length} pending CSR(s)?\n\n` +
           `Signers:\n${signerSummary}\n\n` +
-          `Requests:\n${preview}${extra}\n\n` +
+          `Requests:\n${preview}${extra}${skippedNote}\n\n` +
           `Approved CSRs immediately get a signed certificate. Only approve CSRs you ` +
           `recognise - auto-approving the wrong kubelet signer can let a node impersonate another.`,
         "Approve all CSRs",
@@ -523,17 +557,13 @@
     rotateResult = null;
 
     const approved: string[] = [];
-    const failed: string[] = [];
+    const failed: string[] = skipped.map(
+      (c) => `${quoteName(c.name)}: not approved, ${unsafeKubectlNameReason(c.name)}`,
+    );
 
-    for (const csr of pendingCsrs) {
-      // The API server does not validate CSR names: `pending-a --as=nobody` is a legal
-      // name. It goes to kubectl as one argument after `--`, or not at all.
-      const unsafeName = unsafeKubectlNameReason(csr.name);
-      if (unsafeName) {
-        failed.push(`${csr.name}: not approved, ${unsafeName}`);
-        continue;
-      }
+    for (const csr of approvable) {
       try {
+        // One argument after `--`: the name can never be read as a flag.
         const res = await kubectlRawArgsFront(["certificate", "approve", "--", csr.name], {
           clusterId,
           source: "rotate-certs:approve-csr",
@@ -541,10 +571,10 @@
         if (res.code === 0) {
           approved.push(csr.name);
         } else {
-          failed.push(`${csr.name}: ${res.errors || "unknown error"}`);
+          failed.push(`${quoteName(csr.name)}: ${res.errors || "unknown error"}`);
         }
       } catch (e) {
-        failed.push(`${csr.name}: ${e instanceof Error ? e.message : "unknown error"}`);
+        failed.push(`${quoteName(csr.name)}: ${e instanceof Error ? e.message : "unknown error"}`);
       }
     }
 
@@ -566,9 +596,7 @@
     await fetchCsrs();
     void appendAuditEntry(
       "approve-all",
-      `approved=${approved.length} failed=${failed.length} signers=${Array.from(
-        new Set(pendingCsrs.map((c) => c.signer ?? "?")),
-      ).join(",")}`,
+      `approved=${approved.length} failed=${failed.length} skipped=${skipped.length} signers=${signers.join(",")}`,
     );
   }
 
@@ -595,8 +623,10 @@
       const cpPod = podsRes.output?.replace(/'/g, "").trim();
 
       if (cpPod) {
-        const execRes = await kubectlRawFront(
-          `exec -n kube-system ${cpPod} -- kubeadm certs renew all`,
+        // Pod names are validated by the API server, but the name still travels as one
+        // argument, like every other name this panel takes from the cluster.
+        const execRes = await kubectlRawArgsFront(
+          ["exec", "-n", "kube-system", cpPod, "--", "kubeadm", "certs", "renew", "all"],
           { clusterId, source: "rotate-certs:renew" },
         );
 
