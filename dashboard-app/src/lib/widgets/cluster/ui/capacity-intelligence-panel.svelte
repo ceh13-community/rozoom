@@ -124,12 +124,14 @@
         kubectlJson<{ items?: unknown[] }>("get pods --all-namespaces --request-timeout=30s", {
           clusterId,
         }),
+        // No shell between us and kubectl: quotes around the path would reach
+        // it literally and fail with "--raw must be a valid URL path".
         kubectlJson<{ items?: unknown[] }>(
-          'get --raw="/apis/metrics.k8s.io/v1beta1/pods" --request-timeout=15s',
+          "get --raw=/apis/metrics.k8s.io/v1beta1/pods --request-timeout=15s",
           { clusterId },
         ),
         kubectlJson<{ items?: unknown[] }>(
-          'get --raw="/apis/metrics.k8s.io/v1beta1/nodes" --request-timeout=15s',
+          "get --raw=/apis/metrics.k8s.io/v1beta1/nodes --request-timeout=15s",
           { clusterId },
         ),
       ]);
