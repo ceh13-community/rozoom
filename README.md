@@ -42,6 +42,8 @@ You're now looking at fleet health, RBAC risks, Helm releases, and triaged workl
 
 > **macOS:** builds are unsigned and not notarized, so macOS blocks the app on first launch. Launch it once and click Done, then open System Settings > Privacy & Security, scroll to Security and click **Open Anyway**. Launch ROZOOM again and click Open. macOS remembers the choice. Do not remove the quarantine attribute with `xattr`: it strips a system protection from the whole bundle.
 
+Something confusing or broken? [Tell us what's wrong](https://github.com/ceh13-community/rozoom/discussions).
+
 ---
 
 ## Nothing runs on your cluster
