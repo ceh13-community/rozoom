@@ -1,6 +1,16 @@
+import { load as parse } from "js-yaml";
 import { describe, expect, it } from "vitest";
 import { generateKubeloginExecConfig, generateOidcKubeconfig, OIDC_PRESETS } from "./oidc-config";
 import { TlsBlockedError } from "./tls-gate";
+
+const LINE_BREAKS = [
+  ["NEL", "\u0085"],
+  ["LS", "\u2028"],
+  ["PS", "\u2029"],
+  ["LF", "\n"],
+] as const;
+const smuggle = (value: string, br: string) =>
+  `${value}${br}    insecure-skip-tls-verify:${br}      true`;
 
 describe("oidc-config", () => {
   it("has presets for all major providers", () => {
@@ -67,13 +77,13 @@ describe("oidc-config", () => {
       const yaml = generateOidcKubeconfig(
         "prod-cluster",
         "https://k8s.example.com:6443",
-        "LS0tLS1CRUdJTi...",
+        "LS0tLS1CRUdJTiBD",
         { provider: "generic", issuerUrl: "https://sso.example.com", clientId: "k8s" },
       );
 
       expect(yaml).toContain("kind: Config");
       expect(yaml).toContain("server: https://k8s.example.com:6443");
-      expect(yaml).toContain("certificate-authority-data: LS0tLS1CRUdJTi...");
+      expect(yaml).toContain("certificate-authority-data: LS0tLS1CRUdJTiBD");
       expect(yaml).toContain("command: kubelogin");
       expect(yaml).toContain("get-token");
       expect(yaml).toContain("--oidc-issuer-url=https://sso.example.com");
@@ -100,5 +110,38 @@ describe("oidc-config", () => {
       });
       expect(yaml).toContain("insecure-skip-tls-verify: true");
     });
+  });
+});
+
+describe.each(LINE_BREAKS)("a %s in the OIDC form", (_name, br) => {
+  const remote = "https://api.example.com:6443";
+  const oidc = {
+    provider: "generic",
+    issuerUrl: "https://sso.example.com",
+    clientId: "c",
+  } as const;
+
+  it("is refused in the cluster name and the server URL", () => {
+    expect(() => generateOidcKubeconfig(smuggle("p", br), remote, "LS0t", oidc)).toThrow(
+      TlsBlockedError,
+    );
+    expect(() => generateOidcKubeconfig("p", smuggle(`${remote}/k8s`, br), "LS0t", oidc)).toThrow(
+      TlsBlockedError,
+    );
+  });
+
+  it("stays inside one quoted arg, also after a closing quote", () => {
+    const secret = `x"${smuggle("", br)}`;
+    const yaml = generateOidcKubeconfig("p", remote, "LS0t", { ...oidc, clientSecret: secret });
+    expect(yaml).not.toMatch(/[\u0085\u2028\u2029]/);
+    const config = parse(yaml) as {
+      clusters: Array<{ cluster: Record<string, unknown> }>;
+      users: Array<{ user: { exec: { args: string[] } } }>;
+    };
+    expect(config.clusters[0].cluster).toEqual({
+      server: remote,
+      "certificate-authority-data": "LS0t",
+    });
+    expect(config.users[0].user.exec.args).toContain(`--oidc-client-secret=${secret}`);
   });
 });

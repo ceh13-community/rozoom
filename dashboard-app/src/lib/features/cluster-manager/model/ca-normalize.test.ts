@@ -1,5 +1,8 @@
+import { load as parse } from "js-yaml";
 import { describe, expect, it } from "vitest";
-import { normalizeCaCertToBase64 } from "./ca-normalize";
+import { caDataFromForm, normalizeCaCertToBase64 } from "./ca-normalize";
+import { generateTokenKubeconfig } from "./direct-credentials-kubeconfig";
+import { TlsBlockedError } from "./tls-gate";
 
 const PEM_SINGLE = `-----BEGIN CERTIFICATE-----
 MIIBezCCASGgAwIBAgIUAexample1example2example3example4example5ex
@@ -73,5 +76,69 @@ describe("normalizeCaCertToBase64", () => {
     const notACert = btoa("just some plain text, validly base64 but not a cert");
     const result = normalizeCaCertToBase64(notACert);
     expect(result.ok).toBe(false);
+  });
+});
+
+describe("normalizeCaCertToBase64 on awkward pastes", () => {
+  const LONG_BODY = "A".repeat(100);
+  const WRAPPED = `-----BEGIN CERTIFICATE-----\n${"A".repeat(64)}\n${"A".repeat(36)}\n-----END CERTIFICATE-----`;
+
+  it.each([
+    [
+      "line breaks turned into spaces",
+      `-----BEGIN CERTIFICATE----- ${LONG_BODY} -----END CERTIFICATE-----`,
+    ],
+    ["line breaks dropped", `-----BEGIN CERTIFICATE-----${LONG_BODY}-----END CERTIFICATE-----`],
+    [
+      "spaces inside the body",
+      `-----BEGIN CERTIFICATE----- ${"A".repeat(64)} ${"A".repeat(36)} -----END CERTIFICATE-----`,
+    ],
+  ])("restores a PEM with %s", (_name, flat) => {
+    expect(normalizeCaCertToBase64(flat)).toMatchObject({ ok: true, data: btoa(WRAPPED) });
+  });
+
+  it("restores every certificate of a flattened chain", () => {
+    const flat = `${PEM_SINGLE} ${PEM_SINGLE}`.replace(/\n/g, " ");
+    const result = normalizeCaCertToBase64(flat);
+    if (!result.ok) throw new Error(result.reason);
+    expect(atob(result.data).match(/-----BEGIN CERTIFICATE-----\n/g)).toHaveLength(2);
+    expect(atob(result.data).match(/\n-----END CERTIFICATE-----/g)).toHaveLength(2);
+  });
+
+  it("joins wrapped base64 into one line", () => {
+    const encoded = btoa(PEM_SINGLE);
+    const wrapped = encoded.replace(/(.{20})/g, "$1\n");
+    expect(normalizeCaCertToBase64(wrapped)).toMatchObject({ ok: true, data: encoded });
+  });
+
+  it("refuses a PEM with characters outside Latin-1 instead of throwing", () => {
+    expect(normalizeCaCertToBase64(`${PEM_SINGLE}\u2028`.replace("MIIB", "M\u2028IB")).ok).toBe(
+      false,
+    );
+  });
+});
+
+describe("caDataFromForm", () => {
+  it("turns a pasted PEM into the base64 a generator accepts", () => {
+    const caData = caDataFromForm(PEM_SINGLE);
+    expect(caData).toBe(btoa(PEM_SINGLE));
+    const config = parse(
+      generateTokenKubeconfig({
+        clusterName: "prod",
+        serverUrl: "https://api.example.com:6443",
+        caData,
+        token: "t0ken",
+      }),
+    ) as { clusters: Array<{ cluster: Record<string, unknown> }> };
+    expect(config.clusters[0].cluster["certificate-authority-data"]).toBe(btoa(PEM_SINGLE));
+  });
+
+  it("is undefined for an empty field", () => {
+    expect(caDataFromForm("  \n ")).toBeUndefined();
+  });
+
+  it("refuses anything that is not a certificate, with the reason", () => {
+    expect(() => caDataFromForm("not a certificate")).toThrow(TlsBlockedError);
+    expect(() => caDataFromForm("not a certificate")).toThrow(/PEM certificate/);
   });
 });

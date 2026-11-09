@@ -1,10 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertKubeconfigValues,
   evaluateTlsGate,
   kubeconfigTlsYaml,
   TlsBlockedError,
   type TlsGateResult,
+  yamlQuoted,
 } from "./tls-gate";
+
+const LINE_BREAKS = [
+  ["NEL", "\u0085"],
+  ["LS", "\u2028"],
+  ["PS", "\u2029"],
+  ["LF", "\n"],
+] as const;
+const smuggle = (value: string, br: string) =>
+  `${value}${br}    insecure-skip-tls-verify:${br}      true`;
 
 /** Assert the gate blocked and narrow to the blocking variant so `reason` is typed. */
 function expectBlocked(gate: TlsGateResult): { allowed: false; reason: string } {
@@ -157,5 +168,45 @@ describe("kubeconfigTlsYaml", () => {
     expect(() => kubeconfigTlsYaml({ server: "not a url", caData: "LS0t" })).toThrow(
       TlsBlockedError,
     );
+  });
+});
+
+describe.each(LINE_BREAKS)("a %s in a kubeconfig value", (_name, br) => {
+  const remote = "https://api.prod.example.com:6443";
+
+  it("is refused in the server URL, also where the URL parser would accept it", () => {
+    expect(() =>
+      kubeconfigTlsYaml({ server: smuggle(`${remote}/k8s`, br), caData: "LS0t" }),
+    ).toThrow(/API server URL/);
+  });
+
+  it("is refused in the CA", () => {
+    expect(() => kubeconfigTlsYaml({ server: remote, caData: smuggle("LS0t", br) })).toThrow(
+      TlsBlockedError,
+    );
+  });
+
+  it("is refused by the field check, which names the field and not the value", () => {
+    expect(() => assertKubeconfigValues({ Token: `s3cret${br}x` })).toThrow(/^Token .*U\+/);
+    expect(() => assertKubeconfigValues({ Token: `s3cret${br}x` })).not.toThrow(/s3cret/);
+  });
+
+  it("is written only as an escape inside a quoted value", () => {
+    const quoted = yamlQuoted(`a${br}b`);
+    expect(quoted).toMatch(/^"a\\[nu][0-9a-f]*b"$/);
+    expect(quoted).not.toContain(br);
+  });
+});
+
+describe("kubeconfigTlsYaml CA encoding", () => {
+  const server = "https://api.prod.example.com:6443";
+
+  it.each([
+    ["raw PEM", "-----BEGIN CERTIFICATE-----"],
+    ["inner space", "LS0t LS0t"],
+    ["bad padding", "LS0tL"],
+    ["padding in the middle", "LS==LS0t"],
+  ])("refuses %s", (_name, caData) => {
+    expect(() => kubeconfigTlsYaml({ server, caData })).toThrow(/base64/);
   });
 });

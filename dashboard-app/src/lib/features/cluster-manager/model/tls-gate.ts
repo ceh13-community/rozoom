@@ -79,6 +79,35 @@ export class TlsBlockedError extends Error {
   override name = "TlsBlockedError";
 }
 
+const NOT_VISIBLE_ASCII = /[^\x21-\x7e]/;
+const BASE64_CHARS = /^[A-Za-z0-9+/]+={0,2}$/;
+
+/**
+ * Refuses values that a generated kubeconfig cannot hold as one plain YAML scalar.
+ * js-yaml keeps NEL, LS and PS inside a value while kubectl ends the line there,
+ * so a single pasted character can add a key the gate never saw.
+ * The message never quotes the value: it may be a credential.
+ */
+export function assertKubeconfigValues(fields: Record<string, string>): void {
+  for (const [label, value] of Object.entries(fields)) {
+    const found = NOT_VISIBLE_ASCII.exec(value)?.[0];
+    if (found === undefined) continue;
+    const code = found.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0");
+    throw new TlsBlockedError(
+      `${label} contains a space, a line break or another character that is not plain ASCII ` +
+        `(U+${code}). Remove it and try again.`,
+    );
+  }
+}
+
+/** A double-quoted YAML scalar in pure ASCII, so a line-break character can only be an escape. */
+export function yamlQuoted(value: string): string {
+  return JSON.stringify(value).replace(
+    /[\u007f-\uffff]/g,
+    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
+}
+
 export type KubeconfigTlsInput = {
   server: string;
   caData?: string | null;
@@ -93,7 +122,11 @@ export type KubeconfigTlsInput = {
  * Throws TlsBlockedError with the gate's reason when the connection is refused.
  */
 export function kubeconfigTlsYaml(input: KubeconfigTlsInput): string {
+  assertKubeconfigValues({ "API server URL": input.server });
   const caData = input.caData?.trim();
+  if (caData && !(BASE64_CHARS.test(caData) && caData.length % 4 === 0)) {
+    throw new TlsBlockedError("CA certificate data must be valid base64.");
+  }
   const skip = !caData && input.skipVerification === true;
   const gate = evaluateTlsGate({
     server: input.server,

@@ -1,4 +1,4 @@
-import { kubeconfigTlsYaml } from "./tls-gate";
+import { assertKubeconfigValues, kubeconfigTlsYaml } from "./tls-gate";
 
 type DirectCredentialConfig = {
   clusterName: string;
@@ -10,6 +10,7 @@ type DirectCredentialConfig = {
 
 function renderKubeconfig(config: DirectCredentialConfig, userName: string, userYaml: string) {
   const { clusterName, serverUrl } = config;
+  assertKubeconfigValues({ "Cluster name": clusterName });
   const tls = kubeconfigTlsYaml({
     server: serverUrl,
     caData: config.caData,
@@ -37,12 +38,17 @@ ${userYaml}
 export function generateTokenKubeconfig(
   config: DirectCredentialConfig & { token: string },
 ): string {
+  assertKubeconfigValues({ Token: config.token });
   return renderKubeconfig(config, "token-user", `    token: ${config.token}`);
 }
 
 export function generateCertificateKubeconfig(
   config: DirectCredentialConfig & { clientCert: string; clientKey: string },
 ): string {
+  assertKubeconfigValues({
+    "Client certificate": config.clientCert,
+    "Client key": config.clientKey,
+  });
   return renderKubeconfig(
     config,
     "cert-user",

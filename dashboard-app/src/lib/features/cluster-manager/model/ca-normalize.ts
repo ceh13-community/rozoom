@@ -11,11 +11,35 @@
  * returns it unchanged.
  */
 
+import { TlsBlockedError } from "./tls-gate";
+
 const PEM_CERT_MARKER = "BEGIN CERTIFICATE";
+const PEM_BLOCK = /-----BEGIN CERTIFICATE-----([\s\S]*?)-----END CERTIFICATE-----/g;
 
 export type CaNormalizeResult =
   | { ok: true; data: string; wasAlreadyEncoded: boolean }
   | { ok: false; reason: string };
+
+/**
+ * A single-line input turns pasted line breaks into spaces or drops them, and
+ * PEM does not parse without the break after BEGIN and before END.
+ */
+function restorePemLineBreaks(flat: string): string {
+  return [...flat.matchAll(PEM_BLOCK)]
+    .map(([, body]) => {
+      const lines = body.replace(/\s+/g, "").match(/.{1,64}/g) ?? [];
+      return ["-----BEGIN CERTIFICATE-----", ...lines, "-----END CERTIFICATE-----"].join("\n");
+    })
+    .join("\n");
+}
+
+function tryEncodeBase64(value: string): string | null {
+  try {
+    return btoa(value);
+  } catch {
+    return null; // Characters outside Latin-1 cannot be part of a PEM file.
+  }
+}
 
 function tryDecodeBase64(value: string): string | null {
   try {
@@ -38,14 +62,21 @@ export function normalizeCaCertToBase64(input: string): CaNormalizeResult {
   // Raw PEM: the textual marker is present, so base64-encode the whole blob
   // (chains with multiple BEGIN/END blocks are encoded together, as-is).
   if (trimmed.includes(PEM_CERT_MARKER)) {
-    return { ok: true, data: btoa(trimmed), wasAlreadyEncoded: false };
+    const data = tryEncodeBase64(trimmed.includes("\n") ? trimmed : restorePemLineBreaks(trimmed));
+    if (data) return { ok: true, data, wasAlreadyEncoded: false };
+    return {
+      ok: false,
+      reason: "CA certificate contains characters a PEM file cannot have. Copy it again.",
+    };
   }
 
   // Otherwise it may already be base64-encoded PEM — decode and confirm it
   // really wraps a certificate before trusting it.
-  const decoded = tryDecodeBase64(trimmed);
+  // Wrapped output of `base64` is common, and a kubeconfig value has to be one line.
+  const compact = trimmed.replace(/\s+/g, "");
+  const decoded = tryDecodeBase64(compact);
   if (decoded && decoded.includes(PEM_CERT_MARKER)) {
-    return { ok: true, data: trimmed, wasAlreadyEncoded: true };
+    return { ok: true, data: compact, wasAlreadyEncoded: true };
   }
 
   return {
@@ -54,4 +85,16 @@ export function normalizeCaCertToBase64(input: string): CaNormalizeResult {
       "Input is neither a PEM certificate nor a base64-encoded PEM certificate. " +
       "Paste the CA certificate (-----BEGIN CERTIFICATE-----) or its base64-encoded form.",
   };
+}
+
+/**
+ * What a connect form hands to a kubeconfig generator: base64 from PEM or base64,
+ * undefined when the field is empty.
+ * Throws TlsBlockedError with a form-ready reason when the field holds anything else.
+ */
+export function caDataFromForm(input: string): string | undefined {
+  if (!input.trim()) return undefined;
+  const result = normalizeCaCertToBase64(input);
+  if (!result.ok) throw new TlsBlockedError(result.reason);
+  return result.data;
 }

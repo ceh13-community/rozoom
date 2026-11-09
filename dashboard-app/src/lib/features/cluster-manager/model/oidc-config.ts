@@ -7,7 +7,7 @@
  * Supports Azure AD, Okta, Keycloak, Google Workspace, and generic OIDC providers.
  */
 
-import { kubeconfigTlsYaml } from "./tls-gate";
+import { assertKubeconfigValues, kubeconfigTlsYaml, yamlQuoted } from "./tls-gate";
 
 export type OidcProvider = "azure-ad" | "okta" | "keycloak" | "google" | "generic";
 
@@ -120,6 +120,7 @@ export function generateOidcKubeconfig(
   config: OidcConfig,
   options: { skipTlsVerify?: boolean } = {},
 ): string {
+  assertKubeconfigValues({ "Cluster name": clusterName });
   const exec = generateKubeloginExecConfig(config);
   const tls = kubeconfigTlsYaml({
     server: serverUrl,
@@ -146,5 +147,5 @@ users:
       apiVersion: ${exec.apiVersion}
       command: ${exec.command}
       args:
-${exec.args.map((a) => `      - "${a}"`).join("\n")}`;
+${exec.args.map((a) => `      - ${yamlQuoted(a)}`).join("\n")}`;
 }

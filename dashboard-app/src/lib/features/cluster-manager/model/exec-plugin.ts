@@ -17,7 +17,7 @@
  *   - generic    : arbitrary command + args
  */
 
-import { kubeconfigTlsYaml } from "./tls-gate";
+import { assertKubeconfigValues, kubeconfigTlsYaml, yamlQuoted } from "./tls-gate";
 
 export type ExecPluginKind =
   | "aws-eks"
@@ -243,6 +243,7 @@ export function buildExecBlock(config: ExecPluginConfig): {
 export function generateExecKubeconfig(config: ExecPluginConfig): string {
   if (!config.clusterName.trim()) throw new Error("clusterName is required");
   if (!config.serverUrl.trim()) throw new Error("serverUrl is required");
+  assertKubeconfigValues({ "Cluster name": config.clusterName.trim() });
 
   const exec = buildExecBlock(config);
   const tls = kubeconfigTlsYaml({
@@ -252,7 +253,7 @@ export function generateExecKubeconfig(config: ExecPluginConfig): string {
   });
 
   const argsYaml = exec.args.length
-    ? "\n" + exec.args.map((a) => `      - ${JSON.stringify(a)}`).join("\n")
+    ? "\n" + exec.args.map((a) => `      - ${yamlQuoted(a)}`).join("\n")
     : " []";
 
   return `apiVersion: v1
@@ -272,7 +273,7 @@ users:
   user:
     exec:
       apiVersion: ${exec.apiVersion}
-      command: ${exec.command}
+      command: ${yamlQuoted(exec.command)}
       args:${argsYaml}
       interactiveMode: IfAvailable
 `;

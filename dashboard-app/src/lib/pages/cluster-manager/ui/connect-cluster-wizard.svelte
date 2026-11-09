@@ -17,6 +17,7 @@
   } from "$features/cluster-manager/model/exec-plugin";
   import { humanizeConnectError } from "$features/cluster-manager/model/humanize-connect-error";
   import { TlsBlockedError } from "$features/cluster-manager/model/tls-gate";
+  import { caDataFromForm } from "$features/cluster-manager/model/ca-normalize";
   import {
     generateCertificateKubeconfig,
     generateTokenKubeconfig,
@@ -164,7 +165,7 @@
     return generateCertificateKubeconfig({
       clusterName: certClusterName.trim(),
       serverUrl: certServerUrl.trim(),
-      caData: certCaData,
+      caData: caDataFromForm(certCaData),
       skipTlsVerify,
       clientCert: certClientCert.trim(),
       clientKey: certClientKey.trim(),
@@ -175,7 +176,7 @@
     return generateTokenKubeconfig({
       clusterName: tokenClusterName.trim(),
       serverUrl: tokenServerUrl.trim(),
-      caData: tokenCaData,
+      caData: caDataFromForm(tokenCaData),
       skipTlsVerify,
       token: tokenValue.trim(),
     });
@@ -194,7 +195,7 @@
         return generateOidcKubeconfig(
           oidcClusterName.trim(),
           oidcServerUrl.trim(),
-          oidcCaData.trim() || null,
+          caDataFromForm(oidcCaData) ?? null,
           {
             provider: oidcProvider,
             issuerUrl: oidcIssuerUrl.trim(),
@@ -210,7 +211,7 @@
           kind: execKind,
           clusterName: execClusterName.trim(),
           serverUrl: execServerUrl.trim(),
-          caData: execCaData.trim() || undefined,
+          caData: caDataFromForm(execCaData),
           skipTlsVerify,
           primary: execPrimary.trim() || undefined,
           secondary: execSecondary.trim() || undefined,
@@ -571,7 +572,7 @@
       const yaml = generateOidcKubeconfig(
         oidcClusterName.trim(),
         oidcServerUrl.trim(),
-        oidcCaData.trim() || null,
+        caDataFromForm(oidcCaData) ?? null,
         {
           provider: oidcProvider,
           issuerUrl: oidcIssuerUrl.trim(),
@@ -735,7 +736,7 @@
         kind: execKind,
         clusterName: execClusterName.trim(),
         serverUrl: execServerUrl.trim(),
-        caData: execCaData.trim() || undefined,
+        caData: caDataFromForm(execCaData),
         skipTlsVerify,
         primary: execPrimary.trim() || undefined,
         secondary: execSecondary.trim() || undefined,
@@ -802,7 +803,7 @@
     </label>
     {#if skipTlsVerify && caData.trim().length === 0}
       <div
-        class="text-[10px] text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
+        class="text-[10px] text-amber-800 dark:text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
       >
         The server's identity will not be checked, so anyone on the network path can read or change
         this connection, including your credentials. Use this only when you accept that risk.
