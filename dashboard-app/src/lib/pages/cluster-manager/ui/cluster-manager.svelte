@@ -71,6 +71,7 @@
     shortProbeReason,
     type ConnectionProbeResult,
   } from "$features/cluster-manager/api/probe-connection";
+  import { selectContextForCluster } from "$features/cluster-manager/model/kubeconfig-context";
   import {
     listCloudClusters,
     importCloudCluster,
@@ -391,6 +392,11 @@
   let showLocalScanHint = $state(false);
   async function handleKubeconfigRefresh() {
     showLocalScanHint = needsLocalScanConsent();
+    // The file may have changed (other server, other user): every earlier verdict is
+    // about something else now, and a probe still running belongs to the old file.
+    probeGeneration += 1;
+    probeResults = {};
+    probeInFlight = {};
     await loadData();
     if (hasLocalScanConsent()) {
       await runLocalDiscoveryScan();
@@ -420,44 +426,50 @@
     }
   }
 
+  // Bumped by Refresh; a probe that started under an older generation is dropped.
+  let probeGeneration = 0;
+  // Check all runs at most this many probes at once: each one holds one of the six
+  // shared kubectl slots until kubectl returns or the 35 s bound aborts it.
+  const MAX_PARALLEL_CHECKS = 3;
+
   // User-initiated: asks one detected cluster's API server whether it answers.
-  // This is the only place that runs the context's credentials.
+  // This is the only place on this screen that runs the context's credentials.
   async function checkDetectedCluster(cluster: Pick<DetectedCluster, "name" | "contextName">) {
     const config = $kubeConfigFile;
-    if (!config?.path || !cluster.contextName || probeInFlight[cluster.name]) return;
+    if (!config || !cluster.contextName || probeInFlight[cluster.name]) return;
 
+    const generation = probeGeneration;
     probeInFlight = { ...probeInFlight, [cluster.name]: true };
-    try {
-      const result = await probeClusterConnection(cluster.contextName, config.path);
-      probeResults = { ...probeResults, [cluster.name]: result };
-    } catch (error) {
-      probeResults = {
-        ...probeResults,
-        [cluster.name]: {
-          status: "unreachable",
-          latencyMs: 0,
-          detail: error instanceof Error ? error.message : String(error),
-        },
-      };
-    } finally {
-      const rest = { ...probeInFlight };
-      delete rest[cluster.name];
-      probeInFlight = rest;
-    }
+    // probeClusterConnection never throws: timeouts and failures come back as a result.
+    const result = await probeClusterConnection(cluster.contextName, config.path || null);
+    if (generation !== probeGeneration) return; // Refresh happened meanwhile
+    probeResults = { ...probeResults, [cluster.name]: result };
+    const rest = { ...probeInFlight };
+    delete rest[cluster.name];
+    probeInFlight = rest;
   }
 
   async function checkAllDetectedClusters() {
-    await Promise.allSettled(
-      detectedClusters
-        .filter((cluster) => !cluster.alreadyAdded && cluster.contextName)
-        .map((cluster) => checkDetectedCluster(cluster)),
+    const queue = detectedClusters.filter(
+      (cluster) => !cluster.alreadyAdded && cluster.contextName && !probeInFlight[cluster.name],
     );
+    const workers = Array.from(
+      { length: Math.min(MAX_PARALLEL_CHECKS, queue.length) },
+      async () => {
+        while (queue.length > 0) {
+          const next = queue.shift();
+          if (!next) break;
+          await checkDetectedCluster(next);
+        }
+      },
+    );
+    await Promise.all(workers);
   }
 
   async function handleAddFromAvailableConfigs() {
     if (!$kubeConfigFile?.clusters) return;
 
-    await addClustersFromKubeconfig($kubeConfigFile, $kubeConfigFile.path);
+    await addClustersFromKubeconfig($kubeConfigFile, $kubeConfigFile.path || null);
   }
 
   async function handleAddSelectedClusters() {
@@ -481,7 +493,11 @@
     }
 
     errors = "";
-    await addClustersFromKubeconfigSelection($kubeConfigFile, $kubeConfigFile.path, selections);
+    await addClustersFromKubeconfigSelection(
+      $kubeConfigFile,
+      $kubeConfigFile.path || null,
+      selections,
+    );
   }
 
   async function handleAddAllDetected() {
@@ -504,7 +520,11 @@
     }
 
     errors = "";
-    await addClustersFromKubeconfigSelection($kubeConfigFile, $kubeConfigFile.path, selections);
+    await addClustersFromKubeconfigSelection(
+      $kubeConfigFile,
+      $kubeConfigFile.path || null,
+      selections,
+    );
   }
 
   async function handleAddSingleCluster(cluster: DetectedCluster) {
@@ -516,7 +536,7 @@
     }
 
     errors = "";
-    await addClustersFromKubeconfigSelection($kubeConfigFile, $kubeConfigFile.path, [
+    await addClustersFromKubeconfigSelection($kubeConfigFile, $kubeConfigFile.path || null, [
       {
         name: cluster.name,
         displayName: cluster.displayName.trim() || cluster.name,
@@ -683,19 +703,21 @@
     "./.kube/config",
   ];
 
-  const detectedClusters = $derived.by<DetectedCluster[]>(() => {
-    const source = $kubeConfigFile?.path ?? "Unknown source";
-    const managedNames = new Set($clustersList.map((cluster) => cluster.name));
-    const contextsByCluster = new Map<string, string>();
+  // The merged view kubectl builds has no single file name; say so instead of
+  // claiming ~/.kube/config, which is wrong whenever $KUBECONFIG is set.
+  const DEFAULT_KUBECONFIG_SOURCE = "kubectl default kubeconfig ($KUBECONFIG or ~/.kube/config)";
 
-    $kubeConfigFile?.contexts?.forEach((context) => {
-      contextsByCluster.set(context.context.cluster, context.name);
-    });
+  const detectedClusters = $derived.by<DetectedCluster[]>(() => {
+    const source = $kubeConfigFile?.path || DEFAULT_KUBECONFIG_SOURCE;
+    const managedNames = new Set($clustersList.map((cluster) => cluster.name));
 
     return (
       $kubeConfigFile?.clusters?.map((cluster) => {
-        const contextName = contextsByCluster.get(cluster.name) ?? null;
-        const context = $kubeConfigFile?.contexts?.find((c) => c.context.cluster === cluster.name);
+        // One rule for the row, Check and Add: see kubeconfig-context.ts.
+        const context = $kubeConfigFile
+          ? selectContextForCluster($kubeConfigFile, cluster.name)
+          : null;
+        const contextName = context?.name ?? null;
         const user = context
           ? $kubeConfigFile?.users?.find((u) => u.name === context.context.user)
           : null;
@@ -757,7 +779,7 @@
   const detectedSourceGroups = $derived.by(() => {
     if (!detectedClusters.length) return [];
 
-    const source = $kubeConfigFile?.path ?? "Unknown source";
+    const source = $kubeConfigFile?.path || DEFAULT_KUBECONFIG_SOURCE;
     return [
       {
         source,
@@ -1513,9 +1535,9 @@
             Detected kubeconfig files
           </h2>
           <p class="text-slate-500 dark:text-slate-400 mb-4 text-sm leading-relaxed">
-            ROZOOM reads this file and shows where each context comes from. Nothing is contacted
-            until you click <strong>Check</strong>; that runs the context's credential plugin, if it
-            has one.
+            ROZOOM reads this file and shows where each context comes from. No cluster is contacted
+            until you click <strong>Check</strong> or add it. Either one runs the context's credential
+            plugin, if it has one.
           </p>
 
           {#if !hasAvailableConfigs}

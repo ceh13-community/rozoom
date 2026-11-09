@@ -6,11 +6,11 @@ import {
   type KubeConfigFileType,
 } from "$entities/config";
 import { kubectlRawFront } from "$shared/api/kubectl-proxy";
-import { path } from "@tauri-apps/api";
 
 type RawKubeConfig = {
   apiVersion?: string;
   kind?: string;
+  "current-context"?: string;
   clusters?: Array<{
     name?: string;
     cluster?: {
@@ -32,7 +32,7 @@ type RawKubeConfig = {
   }>;
 };
 
-function parseRawKubeConfig(raw: RawKubeConfig, configPath: string): KubeConfigFileType {
+function parseRawKubeConfig(raw: RawKubeConfig): KubeConfigFileType {
   const clusters = (raw.clusters ?? [])
     .filter((e) => e.name)
     .map(
@@ -73,7 +73,11 @@ function parseRawKubeConfig(raw: RawKubeConfig, configPath: string): KubeConfigF
     clusters,
     contexts,
     users,
-    path: configPath,
+    // `config view` merges $KUBECONFIG and ~/.kube/config; there is no single file to
+    // name, and naming ~/.kube/config made Check and Add read a different file than the
+    // list came from. Empty path = "whatever kubectl resolves by default".
+    path: "",
+    currentContext: raw["current-context"] || undefined,
   });
 }
 
@@ -83,9 +87,8 @@ async function getKubeConfigData() {
   if (!output.length || output.trim() === "") return null;
 
   const raw = JSON.parse(output) as RawKubeConfig;
-  const configPath = await path.join(await path.homeDir(), `.kube/config`);
 
-  return parseRawKubeConfig(raw, configPath);
+  return parseRawKubeConfig(raw);
 }
 
 export async function scanKubeconfigs(): Promise<KubeConfigFileType | null> {
