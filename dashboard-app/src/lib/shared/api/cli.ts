@@ -5,6 +5,7 @@ import {
   checkCliReadOnly,
   clusterIdFromKubeconfigArg,
 } from "$shared/lib/readonly-guard";
+import { clusterKey } from "$shared/lib/cluster-key";
 // eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { CONFIG_DIR } from "$entities/config/model/appConfig";
 
@@ -65,6 +66,12 @@ export async function spawnCli(
     onError?: (e: unknown) => void;
   },
 ): Promise<SpawnResult> {
+  // Same boundary as execCli: a streaming caller (helm.ts runKubectl, log tails) that
+  // names the cluster through --kubeconfig is checked before anything is spawned.
+  const readOnlyCheck = checkCliReadOnly(clusterIdFromKubeconfigArg(args), tool, args);
+  if (readOnlyCheck.blocked) {
+    throw new Error(buildReadOnlyBlockedResult(readOnlyCheck.reason).errors);
+  }
   const command = await createCliCommand(tool, args);
 
   if (handlers?.onStdoutLine) {
@@ -156,8 +163,10 @@ const KUBECONFIG_TOOLS: ReadonlySet<CliTool> = new Set([
 
 export async function resolveKubeconfigPath(clusterId: string): Promise<string> {
   const dataDir = await appDataDir();
-  const safeId = clusterId.replace(/[^a-zA-Z0-9_-]/g, "-");
-  return `${dataDir}/${CONFIG_DIR}/${safeId}.yaml`;
+  // Same key as kubectl-proxy, helm and the read-only registry (clusterKey): one
+  // sanitiser, one file per cluster. The old `-` replacement diverged for names with
+  // spaces or dots.
+  return `${dataDir}/${CONFIG_DIR}/${clusterKey(clusterId)}.yaml`;
 }
 
 export async function execCliForCluster(

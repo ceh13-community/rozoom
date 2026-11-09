@@ -102,8 +102,12 @@ describe("readonly-guard", () => {
       expect(checkKubectlReadOnly("uuid-open", ["delete", "pod", "x"]).blocked).toBe(false);
     });
 
-    it("does not block unknown clusters (no registry entry)", () => {
-      expect(checkKubectlReadOnly("unknown", ["delete", "pod", "x"]).blocked).toBe(false);
+    it("fails closed: a write aimed at a cluster the registry does not know is refused", () => {
+      const result = checkKubectlReadOnly("unknown", ["delete", "pod", "x"]);
+      expect(result.blocked).toBe(true);
+      expect(result.reason).toContain("not registered");
+      // Reads on an unknown cluster and calls that name no cluster at all still pass.
+      expect(checkKubectlReadOnly("unknown", ["get", "pods"]).blocked).toBe(false);
       expect(checkKubectlReadOnly(undefined, ["delete", "pod", "x"]).blocked).toBe(false);
     });
   });
@@ -165,7 +169,7 @@ describe("readonly boundary for CLIs", () => {
     });
 
     it("treats auth reconcile and oc adm mutations as writes, oc adm reads as reads", () => {
-      expect(classifyKubectlAction(["auth", "reconcile", "-f", "rbac.yaml"])).toBe("apply-yaml");
+      expect(classifyKubectlAction(["auth", "reconcile", "-f", "rbac.yaml"])).toBe("edit-resource");
       expect(classifyKubectlAction(["auth", "can-i", "delete", "pods"])).toBeNull();
       expect(classifyKubectlAction(["adm", "certificate", "approve", "csr-1"])).toBe(
         "edit-resource",
@@ -256,10 +260,15 @@ describe("readonly boundary for CLIs", () => {
       );
     });
 
-    it("allows everything on a writable or unknown cluster", () => {
+    it("allows everything on a writable cluster, and calls that name no cluster", () => {
       expect(checkCliReadOnly("uuid-open", "helm", ["install", "x", "y"]).blocked).toBe(false);
-      expect(checkCliReadOnly("nope", "kubectl", ["delete", "pod", "x"]).blocked).toBe(false);
       expect(checkCliReadOnly(undefined, "velero", ["install"]).blocked).toBe(false);
+    });
+
+    it("fails closed for an unregistered cluster id", () => {
+      expect(checkCliReadOnly("nope", "kubectl", ["delete", "pod", "x"]).blocked).toBe(true);
+      expect(checkCliReadOnly("nope", "helm", ["install", "x", "y"]).blocked).toBe(true);
+      expect(checkCliReadOnly("nope", "kubectl", ["get", "pods"]).blocked).toBe(false);
     });
 
     it("carries the cluster name in the reason", () => {
@@ -270,6 +279,19 @@ describe("readonly boundary for CLIs", () => {
   });
 
   describe("clusterIdFromKubeconfigArg", () => {
+    it("takes the last --kubeconfig, as kubectl does", () => {
+      expect(
+        clusterIdFromKubeconfigArg([
+          "--kubeconfig",
+          "/x/configs/uuid-open.yaml",
+          "delete",
+          "pod",
+          "x",
+          "--kubeconfig=/x/configs/uuid-locked.yaml",
+        ]),
+      ).toBe("uuid-locked");
+    });
+
     it("recovers the registry key from the kubeconfig file name", () => {
       expect(
         clusterIdFromKubeconfigArg([
@@ -289,6 +311,112 @@ describe("readonly boundary for CLIs", () => {
     it("lets execCli-style callers be checked through the file name", () => {
       const args = ["backup", "create", "b1", "--kubeconfig", "/x/configs/uuid-locked.yaml"];
       expect(checkCliReadOnly(clusterIdFromKubeconfigArg(args), "velero", args).blocked).toBe(true);
+    });
+  });
+
+  // Allow list (decision 09/11/2026): a verb reads only when listed; everything else is a
+  // write. Reviewer BLOCK on #225 named the gaps a block list left open.
+  describe("read-only allow list", () => {
+    beforeEach(() => {
+      resetClusterSafetyRegistryForTests();
+      registerClusterSafetyInfo([LOCKED, OPEN]);
+    });
+
+    it("refuses verbs and plugins it does not know", () => {
+      expect(classifyKubectlAction(["frobnicate", "x"])).toBe("edit-resource");
+      expect(classifyKubectlAction(["krew", "install", "x"])).toBe("edit-resource");
+      expect(classifyKubectlAction(["label", "pods", "--list"])).toBe("edit-resource");
+      expect(classifyKubectlAction(["apply", "view-last-applied", "-f", "x.yaml"])).toBe(
+        "apply-yaml",
+      );
+      expect(classifyKubectlAction(["apply", "--dry-run=server", "-f", "x.yaml"])).toBe(
+        "apply-yaml",
+      );
+    });
+
+    it("refuses any --kuberc, even with a read verb", () => {
+      expect(classifyKubectlAction(["--kuberc", "f", "delete", "pod", "x"])).toBe("edit-resource");
+      expect(classifyKubectlAction(["--kuberc=f", "get", "pods"])).toBe("edit-resource");
+      expect(classifyKubectlAction(["get", "pods", "--kuberc", "f"])).toBe("edit-resource");
+    });
+
+    it("keeps port-forward and the other reads, refuses proxy", () => {
+      expect(classifyKubectlAction(["port-forward", "svc/x", "8080:80"])).toBeNull();
+      expect(classifyKubectlAction(["proxy", "--port=8001"])).toBe("exec-shell");
+      for (const args of [
+        ["events", "-A"],
+        ["wait", "--for=condition=Ready", "pod/x"],
+        ["diff", "-f", "x.yaml"],
+        ["api-resources"],
+        ["cluster-info"],
+        ["config", "view", "--minify"],
+        ["config", "current-context"],
+        ["auth", "whoami"],
+        ["rollout", "history", "deployment/x"],
+        ["explain", "pods"],
+        ["top", "pods"],
+        ["--burst-limit", "5", "get", "pods"],
+      ]) {
+        expect(classifyKubectlAction(args), args.join(" ")).toBeNull();
+      }
+      expect(classifyKubectlAction(["config", "set-context", "x"])).toBe("edit-resource");
+      expect(classifyKubectlAction(["certificate", "approve", "--", "csr-1"])).toBe(
+        "edit-resource",
+      );
+    });
+
+    it("oc: reads and admin inspections pass, the rest is refused", () => {
+      for (const args of [
+        ["status"],
+        ["whoami"],
+        ["projects"],
+        ["adm", "top", "nodes"],
+        ["adm", "inspect", "ns/openshift-etcd"],
+        ["adm", "node-logs", "node-1"],
+      ]) {
+        expect(classifyKubectlAction(args, "oc"), args.join(" ")).toBeNull();
+      }
+      for (const args of [
+        ["new-app", "nginx"],
+        ["adm", "must-gather"],
+        ["adm", "drain", "node-1"],
+        ["idle", "svc/x"],
+        ["login", "https://x"],
+      ]) {
+        expect(classifyKubectlAction(args, "oc"), args.join(" ")).not.toBeNull();
+      }
+      // kubectl itself does not have oc's read verbs.
+      expect(classifyKubectlAction(["status"], "kubectl")).toBe("edit-resource");
+    });
+
+    it("helm: test and unknown subcommands are writes", () => {
+      expect(classifyHelmAction(["test", "rel"])).toBe("edit-resource");
+      expect(classifyHelmAction(["frob", "rel"])).toBe("edit-resource");
+      expect(classifyHelmAction(["upgrade", "--install", "rel", "chart"])).toBe("helm-install");
+      expect(classifyHelmAction(["registry", "login", "ghcr.io"])).toBeNull();
+      expect(classifyHelmAction(["--burst-limit", "10", "list"])).toBeNull();
+    });
+
+    it("velero: pause, set, plugin add and unknown commands are writes", () => {
+      expect(classifyVeleroAction(["schedule", "pause", "s1"])).toBe("edit-resource");
+      expect(classifyVeleroAction(["backup-location", "set", "default", "--default"])).toBe(
+        "edit-resource",
+      );
+      expect(classifyVeleroAction(["plugin", "add", "image"])).toBe("edit-resource");
+      expect(classifyVeleroAction(["repo", "get"])).toBeNull();
+      expect(classifyVeleroAction(["backup", "download", "b1"])).toBeNull();
+      expect(classifyVeleroAction(["client", "config", "get"])).toBeNull();
+      expect(classifyVeleroAction(["frob"])).toBe("edit-resource");
+    });
+
+    it("blocks the reviewer's two new live cases on a read-only cluster", () => {
+      expect(
+        checkCliReadOnly("uuid-locked", "kubectl", ["certificate", "approve", "--", "csr-1"])
+          .blocked,
+      ).toBe(true);
+      expect(
+        checkCliReadOnly("uuid-locked", "kubectl", ["--kuberc", "f", "delete", "pod", "x"]).blocked,
+      ).toBe(true);
     });
   });
 });

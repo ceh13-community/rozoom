@@ -167,6 +167,9 @@ async function runKubectl(args: string[]): Promise<HelmCommandResult> {
 
 async function ensurePrivilegedNamespace(clusterId: string, namespace: string): Promise<void> {
   if (!PRIVILEGED_NAMESPACES.has(namespace)) return;
+  // Creating and labelling a namespace is a write; the install wrappers check before
+  // calling, this is the second line for any caller that does not.
+  if (checkCliReadOnly(clusterId, "kubectl", ["create", "namespace", namespace]).blocked) return;
   const kubeconfigPath = await getKubeconfigPath(clusterId);
   await runKubectl(["create", "namespace", namespace, "--kubeconfig", kubeconfigPath]);
   await runKubectl([
@@ -618,6 +621,15 @@ export async function installOrUpgradeHelmRelease(
   const namespace = params.namespace.trim();
   if (!releaseName || !chart || !namespace) {
     return { success: false, error: "Release name, chart and namespace are required" };
+  }
+  // Decided before any process runs: ensurePrivilegedNamespace below creates the
+  // namespace and labels it privileged through kubectl, which must not happen on a
+  // read-only cluster even though helm itself would be refused later.
+  const readOnlyCheck = checkHelmActionReadOnly(clusterId, "helm-install");
+  if (readOnlyCheck.blocked) {
+    const blocked = buildReadOnlyBlockedResult(readOnlyCheck.reason);
+    params.onOutput?.(`${blocked.errors}\n`);
+    return { success: false, error: readOnlyCheck.reason };
   }
 
   // Add/refresh repo so Helm can resolve `<repo>/<chart>`. Collect errors
