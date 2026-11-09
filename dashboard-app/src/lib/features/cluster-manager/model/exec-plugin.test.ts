@@ -21,7 +21,9 @@ const smuggle = (value: string, br: string) =>
 describe("generateExecKubeconfig TLS", () => {
   it("writes the CA when given", () => {
     const yaml = generateExecKubeconfig({ ...base, serverUrl: remote, caData: "LS0t" });
-    expect(yaml).toContain(`server: ${remote}\n    certificate-authority-data: LS0t\n  name: prod`);
+    expect(yaml).toContain(
+      `server: ${remote}\n    certificate-authority-data: LS0t\n  name: "prod"`,
+    );
     expect(yaml).not.toContain("insecure-skip-tls-verify");
   });
 
@@ -68,5 +70,45 @@ describe.each(LINE_BREAKS)("a %s in the exec plugin form", (_name, br) => {
     });
     expect(config.users[0].user.exec.command).toBe(value);
     expect(config.users[0].user.exec.args).toEqual([value]);
+  });
+});
+
+const OK_NAMES = ["мій кластер", "prod east", 'a: "b" #c', "кластер 🚀"];
+type NamedConfig = {
+  clusters: Array<{ name: string }>;
+  contexts: Array<{ name: string; context: { cluster: string } }>;
+  "current-context": string;
+};
+const allNames = (config: NamedConfig) => [
+  config.clusters[0].name,
+  config.contexts[0].name,
+  config.contexts[0].context.cluster,
+  config["current-context"],
+];
+
+describe.each(OK_NAMES)("the cluster name %s in an exec kubeconfig", (name) => {
+  it("is kept in all four places", () => {
+    const config = parse(
+      generateExecKubeconfig({ ...base, clusterName: name, serverUrl: remote, caData: "LS0t" }),
+    ) as NamedConfig;
+    expect(allNames(config)).toEqual([name, name, name, name]);
+  });
+});
+
+describe("an emoji in the exec plugin form", () => {
+  it("is written as UTF-8 in the command and the args", () => {
+    const value = "x🚀";
+    const yaml = generateExecKubeconfig({
+      ...base,
+      serverUrl: remote,
+      caData: "LS0t",
+      command: value,
+      args: [value],
+    });
+    expect(yaml).not.toMatch(/\\ud[89ab]/i);
+    const exec = (parse(yaml) as { users: Array<{ user: { exec: Record<string, unknown> } }> })
+      .users[0].user.exec;
+    expect(exec.command).toBe(value);
+    expect(exec.args).toEqual([value]);
   });
 });

@@ -15,6 +15,7 @@ import { TlsBlockedError } from "./tls-gate";
 
 const PEM_CERT_MARKER = "BEGIN CERTIFICATE";
 const PEM_BLOCK = /-----BEGIN CERTIFICATE-----([\s\S]*?)-----END CERTIFICATE-----/g;
+const NOT_IN_A_PEM_FILE = /[^\x20-\x7e\t\r\n]/;
 
 export type CaNormalizeResult =
   | { ok: true; data: string; wasAlreadyEncoded: boolean }
@@ -31,14 +32,6 @@ function restorePemLineBreaks(flat: string): string {
       return ["-----BEGIN CERTIFICATE-----", ...lines, "-----END CERTIFICATE-----"].join("\n");
     })
     .join("\n");
-}
-
-function tryEncodeBase64(value: string): string | null {
-  try {
-    return btoa(value);
-  } catch {
-    return null; // Characters outside Latin-1 cannot be part of a PEM file.
-  }
 }
 
 function tryDecodeBase64(value: string): string | null {
@@ -59,15 +52,19 @@ export function normalizeCaCertToBase64(input: string): CaNormalizeResult {
     return { ok: false, reason: "CA certificate is empty." };
   }
 
-  // Raw PEM: the textual marker is present, so base64-encode the whole blob
-  // (chains with multiple BEGIN/END blocks are encoded together, as-is).
-  if (trimmed.includes(PEM_CERT_MARKER)) {
-    const data = tryEncodeBase64(trimmed.includes("\n") ? trimmed : restorePemLineBreaks(trimmed));
-    if (data) return { ok: true, data, wasAlreadyEncoded: false };
+  // Checked before anything is stripped, so NEL, LS and PS are refused and not cleaned up.
+  if (NOT_IN_A_PEM_FILE.test(input)) {
     return {
       ok: false,
       reason: "CA certificate contains characters a PEM file cannot have. Copy it again.",
     };
+  }
+
+  // Raw PEM: the textual marker is present, so base64-encode the whole blob
+  // (chains with multiple BEGIN/END blocks are encoded together, as-is).
+  if (trimmed.includes(PEM_CERT_MARKER)) {
+    const pem = trimmed.includes("\n") ? trimmed : restorePemLineBreaks(trimmed);
+    return { ok: true, data: btoa(pem), wasAlreadyEncoded: false };
   }
 
   // Otherwise it may already be base64-encoded PEM — decode and confirm it

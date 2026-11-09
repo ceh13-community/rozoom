@@ -1520,7 +1520,7 @@
         </div>
         {@render tlsSkipControl(tokenCaData)}
         <div
-          class="text-[10px] text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
+          class="text-[10px] text-amber-800 dark:text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
         >
           Static tokens don't auto-rotate. Consider using OIDC or exec plugins for production.
         </div>

@@ -101,3 +101,30 @@ describe("a pasted line break in the token textarea", () => {
     ).toThrow(TlsBlockedError);
   });
 });
+
+const OK_NAMES = ["мій кластер", "prod east", 'a: "b" #c', "кластер 🚀"];
+type NamedConfig = {
+  clusters: Array<{ name: string }>;
+  contexts: Array<{ name: string; context: { cluster: string } }>;
+  "current-context": string;
+};
+const allNames = (config: NamedConfig) => [
+  config.clusters[0].name,
+  config.contexts[0].name,
+  config.contexts[0].context.cluster,
+  config["current-context"],
+];
+
+describe.each(OK_NAMES)("the cluster name %s", (name) => {
+  const clean = { clusterName: name, serverUrl: remote, caData: "LS0t" };
+
+  it("is kept in all four places of a token kubeconfig", () => {
+    const config = parse(generateTokenKubeconfig({ ...token, ...clean })) as NamedConfig;
+    expect(allNames(config)).toEqual([name, name, name, name]);
+  });
+
+  it("is kept in all four places of a certificate kubeconfig", () => {
+    const config = parse(generateCertificateKubeconfig({ ...cert, ...clean })) as NamedConfig;
+    expect(allNames(config)).toEqual([name, name, name, name]);
+  });
+});

@@ -118,6 +118,31 @@ describe("normalizeCaCertToBase64 on awkward pastes", () => {
   });
 });
 
+describe.each([
+  ["NEL", "\u0085"],
+  ["LS", "\u2028"],
+  ["PS", "\u2029"],
+])("a %s in the CA field", (_name, br) => {
+  const encoded = btoa(PEM_SINGLE);
+  const flat = PEM_SINGLE.replace(/\n/g, " ");
+
+  it.each([
+    ["inside base64", `${encoded.slice(0, 20)}${br}${encoded.slice(20)}`],
+    ["after base64", `${encoded}${br}`],
+    ["inside a multi-line PEM", PEM_SINGLE.replace("MIIB", `M${br}IIB`)],
+    ["inside a flattened PEM", flat.replace("MIIB", `M${br}IIB`)],
+    [
+      "after the kubeconfig key it tries to add",
+      `~${br}    insecure-skip-tls-verify:${br}      true`,
+    ],
+  ])("is refused %s", (_where, value) => {
+    expect(normalizeCaCertToBase64(value)).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining("Copy it again"),
+    });
+  });
+});
+
 describe("caDataFromForm", () => {
   it("turns a pasted PEM into the base64 a generator accepts", () => {
     const caData = caDataFromForm(PEM_SINGLE);

@@ -80,30 +80,54 @@ export class TlsBlockedError extends Error {
 }
 
 const NOT_VISIBLE_ASCII = /[^\x21-\x7e]/;
+const NOT_ALLOWED_IN_NAME = /[\p{Cc}\u2028\u2029]/u;
 const BASE64_CHARS = /^[A-Za-z0-9+/]+={0,2}$/;
+
+/** The message never quotes the value: it may be a credential. */
+function refuseFirstMatch(label: string, value: string, pattern: RegExp, problem: string): void {
+  const found = pattern.exec(value)?.[0];
+  if (found === undefined) return;
+  const code = found.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0");
+  throw new TlsBlockedError(`${label} contains ${problem} (U+${code}). Remove it and try again.`);
+}
 
 /**
  * Refuses values that a generated kubeconfig cannot hold as one plain YAML scalar.
  * js-yaml keeps NEL, LS and PS inside a value while kubectl ends the line there,
  * so a single pasted character can add a key the gate never saw.
- * The message never quotes the value: it may be a credential.
  */
 export function assertKubeconfigValues(fields: Record<string, string>): void {
   for (const [label, value] of Object.entries(fields)) {
-    const found = NOT_VISIBLE_ASCII.exec(value)?.[0];
-    if (found === undefined) continue;
-    const code = found.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0");
-    throw new TlsBlockedError(
-      `${label} contains a space, a line break or another character that is not plain ASCII ` +
-        `(U+${code}). Remove it and try again.`,
+    refuseFirstMatch(
+      label,
+      value,
+      NOT_VISIBLE_ASCII,
+      "a space, a line break or another character that is not plain ASCII",
     );
   }
 }
 
-/** A double-quoted YAML scalar in pure ASCII, so a line-break character can only be an escape. */
+/**
+ * Spaces and non-ASCII letters are valid in a cluster name, so it is written quoted.
+ * Control characters and line breaks are refused: after a round trip through
+ * kubectl a NEL comes back as a different name.
+ */
+export function assertClusterName(name: string): void {
+  refuseFirstMatch(
+    "Cluster name",
+    name,
+    NOT_ALLOWED_IN_NAME,
+    "a line break or a control character",
+  );
+}
+
+/**
+ * A double-quoted YAML scalar where a line-break character can only be an escape.
+ * Surrogate pairs stay raw: kubectl cannot read an emoji written as two \u escapes.
+ */
 export function yamlQuoted(value: string): string {
   return JSON.stringify(value).replace(
-    /[\u007f-\uffff]/g,
+    /[\u007f-\ud7ff\ue000-\uffff]/g,
     (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`,
   );
 }

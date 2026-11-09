@@ -1,4 +1,9 @@
-import { assertKubeconfigValues, kubeconfigTlsYaml } from "./tls-gate";
+import {
+  assertClusterName,
+  assertKubeconfigValues,
+  kubeconfigTlsYaml,
+  yamlQuoted,
+} from "./tls-gate";
 
 type DirectCredentialConfig = {
   clusterName: string;
@@ -9,8 +14,9 @@ type DirectCredentialConfig = {
 };
 
 function renderKubeconfig(config: DirectCredentialConfig, userName: string, userYaml: string) {
-  const { clusterName, serverUrl } = config;
-  assertKubeconfigValues({ "Cluster name": clusterName });
+  const { serverUrl } = config;
+  assertClusterName(config.clusterName);
+  const name = yamlQuoted(config.clusterName);
   const tls = kubeconfigTlsYaml({
     server: serverUrl,
     caData: config.caData,
@@ -21,13 +27,13 @@ kind: Config
 clusters:
 - cluster:
     server: ${serverUrl}${tls}
-  name: ${clusterName}
+  name: ${name}
 contexts:
 - context:
-    cluster: ${clusterName}
+    cluster: ${name}
     user: ${userName}
-  name: ${clusterName}
-current-context: ${clusterName}
+  name: ${name}
+current-context: ${name}
 users:
 - name: ${userName}
   user:

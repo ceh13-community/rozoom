@@ -101,7 +101,7 @@ describe("oidc-config", () => {
       const yaml = generateOidcKubeconfig("dev", "https://localhost:6443", null, oidc);
       expect(yaml).not.toContain("insecure-skip-tls-verify");
       expect(yaml).not.toContain("certificate-authority-data");
-      expect(yaml).toContain("server: https://localhost:6443\n  name: dev");
+      expect(yaml).toContain('server: https://localhost:6443\n  name: "dev"');
     });
 
     it("writes the skip flag only on an explicit request", () => {
@@ -143,5 +143,41 @@ describe.each(LINE_BREAKS)("a %s in the OIDC form", (_name, br) => {
       "certificate-authority-data": "LS0t",
     });
     expect(config.users[0].user.exec.args).toContain(`--oidc-client-secret=${secret}`);
+  });
+});
+
+const OK_NAMES = ["мій кластер", "prod east", 'a: "b" #c', "кластер 🚀"];
+type NamedConfig = {
+  clusters: Array<{ name: string }>;
+  contexts: Array<{ name: string; context: { cluster: string } }>;
+  "current-context": string;
+};
+const allNames = (config: NamedConfig) => [
+  config.clusters[0].name,
+  config.contexts[0].name,
+  config.contexts[0].context.cluster,
+  config["current-context"],
+];
+
+describe("names and emoji in an OIDC kubeconfig", () => {
+  const remote = "https://api.example.com:6443";
+  const oidc = {
+    provider: "generic",
+    issuerUrl: "https://sso.example.com",
+    clientId: "c",
+  } as const;
+
+  it.each(OK_NAMES)("keeps the cluster name %s in all four places", (name) => {
+    const config = parse(generateOidcKubeconfig(name, remote, "LS0t", oidc)) as NamedConfig;
+    expect(allNames(config)).toEqual([name, name, name, name]);
+  });
+
+  it("writes an emoji in the secret as UTF-8", () => {
+    const yaml = generateOidcKubeconfig("p", remote, "LS0t", { ...oidc, clientSecret: "x🚀" });
+    expect(yaml).not.toMatch(/\\ud[89ab]/i);
+    expect(
+      (parse(yaml) as { users: Array<{ user: { exec: { args: string[] } } }> }).users[0].user.exec
+        .args,
+    ).toContain("--oidc-client-secret=x🚀");
   });
 });

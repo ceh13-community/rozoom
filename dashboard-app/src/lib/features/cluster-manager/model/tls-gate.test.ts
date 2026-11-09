@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertClusterName,
   assertKubeconfigValues,
   evaluateTlsGate,
   kubeconfigTlsYaml,
@@ -195,6 +196,42 @@ describe.each(LINE_BREAKS)("a %s in a kubeconfig value", (_name, br) => {
     const quoted = yamlQuoted(`a${br}b`);
     expect(quoted).toMatch(/^"a\\[nu][0-9a-f]*b"$/);
     expect(quoted).not.toContain(br);
+  });
+});
+
+describe("assertClusterName", () => {
+  it.each(["prod", "prod east", "мій кластер", "кластер 🚀"])("allows %s", (name) => {
+    expect(() => assertClusterName(name)).not.toThrow();
+  });
+
+  it.each([
+    ["NEL", "\u0085"],
+    ["LS", "\u2028"],
+    ["PS", "\u2029"],
+    ["LF", "\n"],
+    ["CR", "\r"],
+    ["TAB", "\t"],
+    ["NUL", "\u0000"],
+    ["DEL", "\u007f"],
+  ])("refuses %s, and names it", (_name, char) => {
+    const code = char.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0");
+    expect(() => assertClusterName(`a${char}b`)).toThrow(TlsBlockedError);
+    expect(() => assertClusterName(`a${char}b`)).toThrow(`U+${code}`);
+  });
+});
+
+describe("yamlQuoted outside ASCII", () => {
+  it("keeps an emoji as UTF-8, because kubectl cannot read surrogate escapes", () => {
+    expect(yamlQuoted("a🚀b")).toBe('"a🚀b"');
+  });
+
+  it.each([
+    ["DEL", "\u007f", "\\u007f"],
+    ["Cyrillic", "я", "\\u044f"],
+    ["BOM", "\ufeff", "\\ufeff"],
+    ["last BMP code point", "\uffff", "\\uffff"],
+  ])("escapes %s", (_name, char, escaped) => {
+    expect(yamlQuoted(char)).toBe(`"${escaped}"`);
   });
 });
 
