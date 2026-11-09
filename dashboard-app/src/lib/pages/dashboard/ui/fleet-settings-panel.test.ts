@@ -1,5 +1,5 @@
 import { fireEvent, render } from "@testing-library/svelte";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import FleetSettingsPanel from "./fleet-settings-panel.svelte";
 import {
   clearDashboardRuntimeControlPlane,
@@ -64,5 +64,34 @@ describe("fleet-settings-panel", () => {
 
     await fireEvent.click(getByRole("button", { name: "Reset global overrides" }));
     expect(getDashboardRuntimeControlPlane()).toEqual({});
+  });
+
+  // Card 0gM0FvqM: the privacy notice promised the ID and its hash would be visible so a
+  // user can quote the hash in a deletion request.
+  it("shows the install ID and the hash PostHog stores, with copy buttons", async () => {
+    window.localStorage.setItem("rozoom.install_id", "11111111-2222-4333-8444-555555555555");
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+
+    const { getByTestId, getByLabelText, findByText } = render(FleetSettingsPanel);
+
+    expect(getByTestId("install-id").textContent).toBe("11111111-2222-4333-8444-555555555555");
+    // SHA-256 of the raw id, the same value wau-c reports as distinct_id.
+    const expectedHash = Array.from(
+      new Uint8Array(
+        await crypto.subtle.digest(
+          "SHA-256",
+          new TextEncoder().encode("11111111-2222-4333-8444-555555555555"),
+        ),
+      ),
+    )
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    expect((await findByText(expectedHash)).textContent).toBe(expectedHash);
+
+    await fireEvent.click(getByLabelText("Copy install hash"));
+    expect(writeText).toHaveBeenCalledWith(expectedHash);
+    await fireEvent.click(getByLabelText("Copy install ID"));
+    expect(writeText).toHaveBeenLastCalledWith("11111111-2222-4333-8444-555555555555");
   });
 });

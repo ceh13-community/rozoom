@@ -3,6 +3,7 @@
   import { Button } from "$shared/ui/button";
   import PrivacyPolicyLink from "$shared/analytics/privacy-policy-link.svelte";
   import { TELEMETRY_SETTINGS_DESCRIPTION } from "$shared/analytics/telemetry-copy";
+  import { computeAnonymousHash, getInstallId } from "$shared/analytics/install-identity";
   import {
     envSortPriority,
     moveEnv,
@@ -21,7 +22,11 @@
     setDashboardRuntimeControlPlane,
     type DashboardDataProfileId,
   } from "$shared/lib/dashboard-data-profile.svelte";
-  import { getLogsFolderPath, openLogsFolder } from "$shared/lib/support-diagnostics";
+  import {
+    copyToClipboard,
+    getLogsFolderPath,
+    openLogsFolder,
+  } from "$shared/lib/support-diagnostics";
   import {
     getTelemetryConsent,
     isDoNotTrack,
@@ -85,6 +90,23 @@
     telemetryConsent = getTelemetryConsent();
     telemetryDnt = isDoNotTrack();
   });
+
+  // The install ID stays on this machine; PostHog stores events under its SHA-256
+  // (distinct_id). Showing both lets the user quote the hash in a deletion request,
+  // which is the only handle the analytics service has for their events.
+  let installId = $state("");
+  let installHash = $state("");
+  let copiedIdentity = $state<"id" | "hash" | null>(null);
+  $effect(() => {
+    const id = getInstallId();
+    installId = id;
+    void computeAnonymousHash("", id).then((hash) => (installHash = hash));
+  });
+
+  async function copyIdentity(kind: "id" | "hash") {
+    const ok = await copyToClipboard(kind === "id" ? installId : installHash);
+    copiedIdentity = ok ? kind : null;
+  }
 
   function handleTelemetryToggle(checked: boolean) {
     setTelemetryConsent(checked ? "granted" : "denied");
@@ -435,6 +457,43 @@
         </label>
       {/if}
     </div>
+    {#if installId}
+      <div class="mt-3 space-y-1.5 text-xs" data-testid="install-identity">
+        <div class="text-muted-foreground">
+          Events are stored under the hash below, never under the ID itself. To ask for your events
+          to be found or deleted, quote the hash.
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="w-20 shrink-0 text-muted-foreground">Install ID</span>
+          <code class="break-all font-mono" data-testid="install-id">{installId}</code>
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-6 px-2 text-[11px]"
+            aria-label="Copy install ID"
+            onclick={() => void copyIdentity("id")}
+          >
+            {copiedIdentity === "id" ? "Copied" : "Copy"}
+          </Button>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="w-20 shrink-0 text-muted-foreground">Hash sent</span>
+          <code class="break-all font-mono" data-testid="install-hash"
+            >{installHash || "computing…"}</code
+          >
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-6 px-2 text-[11px]"
+            aria-label="Copy install hash"
+            disabled={!installHash}
+            onclick={() => void copyIdentity("hash")}
+          >
+            {copiedIdentity === "hash" ? "Copied" : "Copy"}
+          </Button>
+        </div>
+      </div>
+    {/if}
   </div>
 
   <!-- Environment Sort Priority -->
