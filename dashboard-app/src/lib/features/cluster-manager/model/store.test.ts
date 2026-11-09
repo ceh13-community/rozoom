@@ -37,6 +37,7 @@ vi.mock("../api/config-storage-repo", () => ({
 
 vi.mock("$shared/api/kubectl-proxy", () => ({
   kubectlRawFront: (...args: unknown[]) => mockKubectlRawFront(...args),
+  kubectlRawArgsFront: (...args: unknown[]) => mockKubectlRawFront(...args),
 }));
 
 const baseConfig: KubeConfigFileType = {

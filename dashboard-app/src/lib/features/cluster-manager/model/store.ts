@@ -3,13 +3,14 @@ import type { AppClusterConfig, KubeCluster, KubeConfigFileType } from "$entitie
 import { saveClusterOnDisk, saveKubeConfig, getClusterFromDisk } from "../api/disk";
 import { formatResultMessages } from "../ui/formatters";
 import { parseKubeconfigText } from "$entities/config";
+import { kubeconfigArgs, selectContextForCluster } from "./kubeconfig-context";
 import {
   loadConfig,
   saveConfig,
   loadRemovedConfig,
   saveRemovedConfig,
 } from "../api/config-storage-repo";
-import { kubectlRawFront } from "$shared/api/kubectl-proxy";
+import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
 import { registerClusterSafetyInfo } from "$shared/lib/readonly-guard";
 import { trackClusterAddAttempted, trackClusterAddFailed } from "$shared/analytics/wau-c";
 import { classifyConnectErrorClass } from "./humanize-connect-error";
@@ -109,7 +110,7 @@ async function triggerInitialHealthCheck(uuid: string): Promise<void> {
 
 export async function addClustersFromKubeconfig(
   loadedConfig: KubeConfigFileType,
-  kubeconfigPath: string,
+  kubeconfigPath: string | null,
 ): Promise<void> {
   clearClustersConfigMessages();
 
@@ -124,7 +125,7 @@ export async function addClustersFromKubeconfig(
 
 export async function addClustersFromKubeconfigSelection(
   loadedConfig: KubeConfigFileType,
-  kubeconfigPath: string,
+  kubeconfigPath: string | null,
   selections: Array<{
     name: string;
     displayName?: string;
@@ -177,7 +178,7 @@ export async function addClustersFromText(configText: string): Promise<void> {
 
 async function addClusters(
   config: KubeConfigFileType,
-  kubeconfigPath: string,
+  kubeconfigPath: string | null,
   options?: {
     selectedNames?: Set<string>;
     metaByName?: Record<string, Partial<AppClusterConfig>>;
@@ -208,14 +209,25 @@ async function addClusters(
           return;
         }
 
-        const context = config.contexts.find((ctx) => ctx.context.cluster === cluster.name);
+        // Same context the row showed and Check probed; see kubeconfig-context.ts.
+        const context = selectContextForCluster(config, cluster.name);
         if (!context?.name) {
           throw new Error(`No kubeconfig context found for cluster "${cluster.name}"`);
         }
 
-        const yaml = await kubectlRawFront(
-          `config view --flatten --minify --context=${context.name} -o yaml --kubeconfig=${kubeconfigPath}`,
-        );
+        // Array form: a context name or a path with spaces stays one argument. No
+        // --kubeconfig for the merged default config, so kubectl reads what the list
+        // was built from ($KUBECONFIG or ~/.kube/config).
+        const yaml = await kubectlRawArgsFront([
+          "config",
+          "view",
+          "--flatten",
+          "--minify",
+          `--context=${context.name}`,
+          "-o",
+          "yaml",
+          ...kubeconfigArgs(kubeconfigPath),
+        ]);
         if (yaml.errors.trim()) {
           throw new Error(yaml.errors.trim());
         }
