@@ -8,6 +8,51 @@ the user-facing change in plain language. The in-app update notification
 deliberately shows fixed copy and never displays these notes.
 The release build fails if the section for the released version is missing.
 
+## [0.26.2] - 2026-11-11
+
+Security release. Read-only clusters: kubectl, oc, helm, velero and the
+terminal are now checked before they start. This is a guard in the app, not an
+access boundary: for a hard limit use RBAC. The credential files the app writes
+are readable only by you, and resource names go to kubectl as one argument.
+Performance and Capacity Intelligence open with data again, and the first
+screen probes a cluster only when you click Check. On Linux (.deb, .rpm) the
+app does not update itself: download the new package from the release page and
+install it the way you installed this one. We recommend this update.
+
+### Added
+
+- Fleet Settings shows the Install ID and the hash PostHog stores, each with a
+  Copy button. A deletion request quotes the hash.
+- Check and Check all on the first screen. A detected cluster starts as Not
+  checked and is probed only when you ask.
+
+### Changed
+
+- Read-only clusters: kubectl, oc, helm, velero and the terminal are checked
+  before they start, in the debug terminal, the command console, the GitOps
+  and backup panels and every helm wrapper. This is a guard in the app, not an
+  access boundary: for a hard limit use RBAC. helm install on a read-only
+  cluster is blocked, not confirmed. The Trivy Quick scan runs without the
+  node collector on a read-only cluster and creates no objects there.
+- Ready on the first screen appears only when the API server answered.
+  Connection refused, timeout and DNS failures show as unreachable with the
+  reason in the row tooltip.
+- Credential files (per-cluster kubeconfig copies, the pasted kubeconfig,
+  connect-test files, helm values and YAML backups) are created owner-only,
+  and existing ones are fixed on launch. The pasted kubeconfig is removed
+  after the import.
+
+### Fixed
+
+- Scale accepts a replica count you edited. Before, only an unchanged value
+  went through and the dialog showed no error.
+- Performance and Capacity Intelligence: kubectl --raw requests no longer get
+  -o json appended and raw paths are passed unquoted, so both panels show data.
+- CSR approve, node delete and CRD delete pass the resource name after `--`.
+  A name that starts with a dash or contains whitespace is refused.
+
+Something confusing or broken? [Tell us what's wrong](https://github.com/ceh13-community/rozoom/discussions).
+
 ## [0.26.1] - 2026-11-05
 
 Fixes how Debug describe and Delete in the configuration lists run kubectl for
