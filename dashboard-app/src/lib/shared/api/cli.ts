@@ -1,5 +1,10 @@
 import { Command, type IOPayload, type Child } from "@tauri-apps/plugin-shell";
 import { appDataDir } from "@tauri-apps/api/path";
+import {
+  buildReadOnlyBlockedResult,
+  checkCliReadOnly,
+  clusterIdFromKubeconfigArg,
+} from "$shared/lib/readonly-guard";
 // eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { CONFIG_DIR } from "$entities/config/model/appConfig";
 
@@ -160,15 +165,29 @@ export async function execCliForCluster(
   args: string[],
   clusterId: string,
 ): Promise<{ code: number; stdout: string; stderr: string }> {
+  const readOnlyCheck = checkCliReadOnly(clusterId, tool, args);
+  if (readOnlyCheck.blocked) return blockedResult(readOnlyCheck.reason);
   const kubeconfigPath = await resolveKubeconfigPath(clusterId);
   const fullArgs = KUBECONFIG_TOOLS.has(tool) ? ["--kubeconfig", kubeconfigPath, ...args] : args;
   return execCli(tool, fullArgs);
 }
 
+function blockedResult(reason?: string): { code: number; stdout: string; stderr: string } {
+  const blocked = buildReadOnlyBlockedResult(reason);
+  return { code: blocked.code, stdout: blocked.output, stderr: blocked.errors };
+}
+
+/**
+ * Runs a bundled CLI. This is the execution boundary for read-only clusters: a caller
+ * that names the cluster only through `--kubeconfig <configs>/<key>.yaml` is still
+ * checked, because the file name is the cluster key.
+ */
 export async function execCli(
   tool: CliTool,
   args: string[],
 ): Promise<{ code: number; stdout: string; stderr: string }> {
+  const readOnlyCheck = checkCliReadOnly(clusterIdFromKubeconfigArg(args), tool, args);
+  if (readOnlyCheck.blocked) return blockedResult(readOnlyCheck.reason);
   const command = await createCliCommand(tool, args);
 
   let stdout = "";

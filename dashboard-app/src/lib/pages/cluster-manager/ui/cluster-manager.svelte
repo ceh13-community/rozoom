@@ -2214,7 +2214,10 @@
                               })}
                           />
                         </div>
-                        <label class="flex items-center gap-1 cursor-pointer">
+                        <label
+                          class="flex items-center gap-1 cursor-pointer"
+                          title="Nothing is written to this cluster from ROZOOM: panels, Helm installs and mutating commands in the terminal are refused. Reads keep working. Clear it to make changes."
+                        >
                           <input
                             type="checkbox"
                             class="w-3 h-3 rounded border-slate-400 accent-amber-500"

@@ -33,14 +33,11 @@ describe("cluster-safety", () => {
       }
     });
 
-    it("requires confirmation for cautious actions on read-only clusters", () => {
-      const cautious: DestructiveAction[] = ["helm-install"];
-
-      for (const action of cautious) {
-        const result = checkActionSafety(readOnlyCluster, action);
-        expect(result.allowed, `${action} should be allowed`).toBe(true);
-        expect(result.requiresConfirmation, `${action} should require confirmation`).toBe(true);
-      }
+    it("blocks helm install on read-only clusters like every other write", () => {
+      const result = checkActionSafety(readOnlyCluster, "helm-install");
+      expect(result.allowed).toBe(false);
+      expect(result.requiresConfirmation).toBe(false);
+      expect(result.reason).toContain("read-only");
     });
 
     it("requires confirmation for destructive actions on prod clusters", () => {

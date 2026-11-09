@@ -3,7 +3,12 @@ import { spawnCli } from "$shared/api/cli";
 // eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { CONFIG_DIR } from "$entities/config/model/appConfig";
 import { clusterKey } from "$shared/lib/cluster-key";
-import { checkHelmActionReadOnly } from "$shared/lib/readonly-guard";
+import {
+  buildReadOnlyBlockedResult,
+  checkCliReadOnly,
+  checkHelmActionReadOnly,
+  clusterIdFromKubeconfigArg,
+} from "$shared/lib/readonly-guard";
 import { getClusterNodesNames } from "$shared/api/tauri";
 import { emitCliNotification } from "$shared/lib/cli-notification";
 import {
@@ -189,6 +194,20 @@ async function runHelmCommand(
   onOutput?: (chunk: string) => void,
 ): Promise<HelmCommandResult> {
   onOutput?.(`$ helm ${args.join(" ")}\n`);
+  // Every helm wrapper in this file ends up here with `--kubeconfig <configs>/<key>.yaml`,
+  // so this is where read-only is enforced for install, upgrade, uninstall and rollback.
+  const readOnlyCheck = checkCliReadOnly(clusterIdFromKubeconfigArg(args), "helm", args);
+  if (readOnlyCheck.blocked) {
+    const blocked = buildReadOnlyBlockedResult(readOnlyCheck.reason);
+    onOutput?.(`${blocked.errors}\n`);
+    return {
+      success: false,
+      code: blocked.code,
+      stdout: "",
+      stderr: blocked.errors,
+      error: readOnlyCheck.reason,
+    };
+  }
   let stdout = "";
   let stderr = "";
   let resolveClose: ((code: number) => void) | undefined;

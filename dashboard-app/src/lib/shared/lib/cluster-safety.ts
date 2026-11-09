@@ -14,6 +14,10 @@ export type DestructiveAction =
   | "exec-shell"
   | "edit-resource";
 
+// Read-only means no write reaches the cluster from ROZOOM: not from a panel, not from a
+// Helm wrapper, not from the terminal. Reads keep working. To change something the user
+// clears the Read-only flag first. (Until 0.26.2 helm install only asked for confirmation
+// on a read-only cluster, and only when the panel remembered to ask.)
 const ALWAYS_BLOCKED_IN_READONLY: ReadonlySet<DestructiveAction> = new Set([
   "delete-pod",
   "delete-resource",
@@ -21,13 +25,14 @@ const ALWAYS_BLOCKED_IN_READONLY: ReadonlySet<DestructiveAction> = new Set([
   "restart-workload",
   "rollback-workload",
   "apply-yaml",
+  "helm-install",
   "helm-uninstall",
   "helm-rollback",
   "exec-shell",
   "edit-resource",
 ]);
 
-const REQUIRES_CONFIRMATION: ReadonlySet<DestructiveAction> = new Set(["helm-install"]);
+const REQUIRES_CONFIRMATION: ReadonlySet<DestructiveAction> = new Set();
 
 export type SafetyCheckResult = {
   allowed: boolean;
