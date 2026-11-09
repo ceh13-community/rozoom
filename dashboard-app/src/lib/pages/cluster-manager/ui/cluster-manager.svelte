@@ -1513,9 +1513,9 @@
             Detected kubeconfig files
           </h2>
           <p class="text-slate-500 dark:text-slate-400 mb-4 text-sm leading-relaxed">
-            ROZOOM reads this file and shows where each context comes from. It contacts a cluster
-            only when you click <strong>Check</strong>; that runs the context's credential plugin,
-            if it has one.
+            ROZOOM reads this file and shows where each context comes from. Nothing is contacted
+            until you click <strong>Check</strong>; that runs the context's credential plugin, if it
+            has one.
           </p>
 
           {#if !hasAvailableConfigs}
