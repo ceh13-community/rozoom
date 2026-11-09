@@ -13,6 +13,20 @@ export type ConnectionProbeResult = {
 // non-empty stdout alone proves nothing.
 const CONTROL_PLANE_ANSWERED = /is running at/i;
 
+// Visible one-line reasons, only for failure shapes measured on the bundled kubectl
+// (ready-badge-check.txt, 05/11/2026). Anything else keeps the raw line in the tooltip only.
+const SHORT_REASONS: Array<[RegExp, string]> = [
+  [/connection refused/i, "Connection refused"],
+  [/context deadline exceeded/i, "No answer within 5 s"],
+  [/no such host/i, "Host name not found"],
+];
+
+/** Human-readable reason for a failed probe, or null when the shape was never measured. */
+export function shortProbeReason(detail: string | undefined | null): string | null {
+  if (!detail) return null;
+  return SHORT_REASONS.find(([pattern]) => pattern.test(detail))?.[1] ?? null;
+}
+
 function firstLine(text: string): string {
   return (
     text

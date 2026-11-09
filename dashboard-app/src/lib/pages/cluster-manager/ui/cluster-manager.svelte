@@ -68,6 +68,7 @@
   } from "$shared/lib/tauri-runtime";
   import {
     probeClusterConnection,
+    shortProbeReason,
     type ConnectionProbeResult,
   } from "$features/cluster-manager/api/probe-connection";
   import {
@@ -105,7 +106,10 @@
     // must not contact anything or run the context's credential plugin.
     status: "not-checked" | "checking" | "ready" | "auth-issue" | "unreachable";
     statusLabel: string;
+    /** Raw first stderr line of the last probe, shown in the chip tooltip. */
     statusDetail: string | null;
+    /** One visible line under the chip, only for failure shapes measured live. */
+    statusReason: string | null;
     env: string;
     tags: string[];
     warnings: string[];
@@ -736,6 +740,10 @@
           status,
           statusLabel: getStatusLabel(cluster.name, status),
           statusDetail: probeResults[cluster.name]?.detail || null,
+          statusReason:
+            status === "unreachable" || status === "auth-issue"
+              ? shortProbeReason(probeResults[cluster.name]?.detail)
+              : null,
           env,
           tags,
           warnings,
@@ -939,10 +947,23 @@
         return "bg-orange-50 text-orange-700 dark:bg-orange-500/20 dark:text-orange-200";
       case "unreachable":
         return "bg-red-50 text-red-700 dark:bg-red-500/20 dark:text-red-200";
+      // slate-600 on slate-100 clears WCAG AA for 12px text; slate-500 sat at ~4.4:1.
       case "checking":
-        return "bg-slate-100 text-slate-500 dark:bg-slate-600/60 dark:text-slate-300 animate-pulse";
+        return "bg-slate-100 text-slate-600 dark:bg-slate-600/60 dark:text-slate-300 animate-pulse";
       default:
-        return "bg-slate-100 text-slate-500 dark:bg-slate-600/60 dark:text-slate-300";
+        return "bg-slate-100 text-slate-600 dark:bg-slate-600/60 dark:text-slate-300";
+    }
+  }
+
+  function checkButtonLabel(status: DetectedCluster["status"]): string {
+    switch (status) {
+      case "ready":
+        return "Check again";
+      case "auth-issue":
+      case "unreachable":
+        return "Retry";
+      default:
+        return "Check";
     }
   }
 
@@ -1651,10 +1672,7 @@
                                     class="text-gray-700 text-xs dark:text-white !bg-transparent border border-gray-200 dark:border-slate-500 hover:bg-gray-100 dark:hover:bg-slate-600"
                                     title="Ask the API server whether it answers. Runs this context's credential plugin, if it has one."
                                   >
-                                    {cluster.status === "not-checked" ||
-                                    cluster.status === "checking"
-                                      ? "Check"
-                                      : "Retry"}
+                                    {checkButtonLabel(cluster.status)}
                                   </Button>
                                 {/if}
                                 <Button
@@ -1664,6 +1682,15 @@
                                   View identity
                                 </Button>
                               </div>
+                              {#if cluster.statusReason}
+                                <p
+                                  class="text-xs text-red-700 dark:text-red-200"
+                                  title={cluster.statusDetail ?? undefined}
+                                  data-testid="detected-status-reason"
+                                >
+                                  {cluster.statusReason}
+                                </p>
+                              {/if}
 
                               <div
                                 class="flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-300"

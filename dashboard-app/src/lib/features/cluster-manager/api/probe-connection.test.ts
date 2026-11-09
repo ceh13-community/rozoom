@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { probeClusterConnection } from "./probe-connection";
+import { probeClusterConnection, shortProbeReason } from "./probe-connection";
 
 const mockKubectlRawFront = vi.fn();
 
@@ -197,5 +197,44 @@ describe("probeClusterConnection", () => {
     const result = await probeClusterConnection("my-context", "/tmp/kubeconfig");
     expect(result.status).toBe("unreachable");
     expect(result.detail).toBe("process killed");
+  });
+});
+
+describe("shortProbeReason", () => {
+  // Only the three failure shapes measured live on 05/11 get a visible line.
+  it("maps connection refused", () => {
+    expect(
+      shortProbeReason(
+        'E1105 07:53:25.488772 2041723 memcache.go:381] "Couldn\'t get current server API group list" err="Get \"https://127.0.0.1:1/api?timeout=5s\": dial tcp 127.0.0.1:1: connect: connection refused"',
+      ),
+    ).toBe("Connection refused");
+  });
+
+  it("maps a request timeout", () => {
+    expect(
+      shortProbeReason(
+        'E1105 07:53:30.554283 2041761 memcache.go:381] "Couldn\'t get current server API group list" err="Get \"https://192.0.2.1:6443/api?timeout=5s\": context deadline exceeded"',
+      ),
+    ).toBe("No answer within 5 s");
+  });
+
+  it("maps an unresolvable host", () => {
+    expect(
+      shortProbeReason(
+        "Unable to connect to the server: dial tcp: lookup no-such-host.invalid on 127.0.0.53:53: no such host",
+      ),
+    ).toBe("Host name not found");
+  });
+
+  it("returns null for unmeasured shapes and empty input", () => {
+    expect(
+      shortProbeReason("error: You must be logged in to the server (Unauthorized)"),
+    ).toBeNull();
+    expect(
+      shortProbeReason("Unable to connect: x509: certificate signed by unknown authority"),
+    ).toBeNull();
+    expect(shortProbeReason("process killed")).toBeNull();
+    expect(shortProbeReason("")).toBeNull();
+    expect(shortProbeReason(undefined)).toBeNull();
   });
 });
