@@ -2321,7 +2321,10 @@
                               })}
                           />
                         </div>
-                        <label class="flex items-center gap-1 cursor-pointer">
+                        <label
+                          class="flex items-center gap-1 cursor-pointer"
+                          title="kubectl, oc, helm and velero may only read this cluster from ROZOOM: panels, Helm installs and commands in the terminal that would write are refused, and the terminal shell is off. Not covered: cloud CLIs such as aws, gcloud, az or doctl, which talk to the provider, not to this cluster. Clear it to make changes."
+                        >
                           <input
                             type="checkbox"
                             class="w-3 h-3 rounded border-slate-400 accent-amber-500"

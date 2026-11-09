@@ -1,5 +1,11 @@
 import { Command, type IOPayload, type Child } from "@tauri-apps/plugin-shell";
 import { appDataDir } from "@tauri-apps/api/path";
+import {
+  buildReadOnlyBlockedResult,
+  checkCliReadOnly,
+  clusterIdFromKubeconfigArg,
+} from "$shared/lib/readonly-guard";
+import { clusterKey } from "$shared/lib/cluster-key";
 // eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { CONFIG_DIR } from "$entities/config/model/appConfig";
 
@@ -60,6 +66,12 @@ export async function spawnCli(
     onError?: (e: unknown) => void;
   },
 ): Promise<SpawnResult> {
+  // Same boundary as execCli: a streaming caller (helm.ts runKubectl, log tails) that
+  // names the cluster through --kubeconfig is checked before anything is spawned.
+  const readOnlyCheck = checkCliReadOnly(clusterIdFromKubeconfigArg(args), tool, args);
+  if (readOnlyCheck.blocked) {
+    throw new Error(buildReadOnlyBlockedResult(readOnlyCheck.reason).errors);
+  }
   const command = await createCliCommand(tool, args);
 
   if (handlers?.onStdoutLine) {
@@ -142,6 +154,7 @@ export async function execShellCommand(
 
 const KUBECONFIG_TOOLS: ReadonlySet<CliTool> = new Set([
   "kubectl",
+  "oc",
   "helm",
   "stern",
   "velero",
@@ -151,8 +164,10 @@ const KUBECONFIG_TOOLS: ReadonlySet<CliTool> = new Set([
 
 export async function resolveKubeconfigPath(clusterId: string): Promise<string> {
   const dataDir = await appDataDir();
-  const safeId = clusterId.replace(/[^a-zA-Z0-9_-]/g, "-");
-  return `${dataDir}/${CONFIG_DIR}/${safeId}.yaml`;
+  // Same key as kubectl-proxy, helm and the read-only registry (clusterKey): one
+  // sanitiser, one file per cluster. The old `-` replacement diverged for names with
+  // spaces or dots.
+  return `${dataDir}/${CONFIG_DIR}/${clusterKey(clusterId)}.yaml`;
 }
 
 export async function execCliForCluster(
@@ -160,15 +175,29 @@ export async function execCliForCluster(
   args: string[],
   clusterId: string,
 ): Promise<{ code: number; stdout: string; stderr: string }> {
+  const readOnlyCheck = checkCliReadOnly(clusterId, tool, args);
+  if (readOnlyCheck.blocked) return blockedResult(readOnlyCheck.reason);
   const kubeconfigPath = await resolveKubeconfigPath(clusterId);
   const fullArgs = KUBECONFIG_TOOLS.has(tool) ? ["--kubeconfig", kubeconfigPath, ...args] : args;
   return execCli(tool, fullArgs);
 }
 
+function blockedResult(reason?: string): { code: number; stdout: string; stderr: string } {
+  const blocked = buildReadOnlyBlockedResult(reason);
+  return { code: blocked.code, stdout: blocked.output, stderr: blocked.errors };
+}
+
+/**
+ * Runs a bundled CLI. This is the execution boundary for read-only clusters: a caller
+ * that names the cluster only through `--kubeconfig <configs>/<key>.yaml` is still
+ * checked, because the file name is the cluster key.
+ */
 export async function execCli(
   tool: CliTool,
   args: string[],
 ): Promise<{ code: number; stdout: string; stderr: string }> {
+  const readOnlyCheck = checkCliReadOnly(clusterIdFromKubeconfigArg(args), tool, args);
+  if (readOnlyCheck.blocked) return blockedResult(readOnlyCheck.reason);
   const command = await createCliCommand(tool, args);
 
   let stdout = "";

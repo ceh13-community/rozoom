@@ -30,6 +30,10 @@ import {
 } from "./helm";
 import * as tauriPath from "@tauri-apps/api/path";
 import * as cli from "$shared/api/cli";
+import {
+  registerClusterSafetyInfo,
+  resetClusterSafetyRegistryForTests,
+} from "$shared/lib/readonly-guard";
 import * as tauriApi from "$shared/api/tauri";
 import type { Child, Command, IOPayload } from "@tauri-apps/plugin-shell";
 
@@ -47,8 +51,33 @@ describe("helm api", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetClusterSafetyRegistryForTests();
+    // Every test cluster is registered and writable; the read-only cases register their
+    // own. An unregistered id would now fail closed.
+    registerClusterSafetyInfo([{ uuid: clusterId, name: clusterId, readOnly: false }]);
     vi.mocked(tauriPath.appDataDir).mockResolvedValue(mockAppDataDir);
     vi.mocked(tauriApi.getClusterNodesNames).mockResolvedValue([]);
+  });
+
+  // Reviewer BLOCK on #225: ensurePrivilegedNamespace created the namespace and set
+  // enforce=privileged through kubectl before helm itself was refused.
+  it("installOrUpgradeHelmRelease on a read-only cluster runs no CLI at all", async () => {
+    registerClusterSafetyInfo([{ uuid: "ro", name: "ro-cluster", readOnly: true }]);
+    const output: string[] = [];
+
+    const result = await installOrUpgradeHelmRelease("ro", {
+      releaseName: "kubearmor",
+      chart: "kubearmor/kubearmor",
+      namespace: "kubearmor",
+      repoName: "kubearmor",
+      repoUrl: "https://kubearmor.github.io/charts",
+      onOutput: (chunk) => output.push(chunk),
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("read-only");
+    expect(cli.spawnCli).not.toHaveBeenCalled();
+    expect(output.join("")).toContain("[BLOCKED]");
   });
 
   it("installs kube-state-metrics via helm with kubeconfig", async () => {

@@ -3,7 +3,12 @@ import { spawnCli } from "$shared/api/cli";
 // eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { CONFIG_DIR } from "$entities/config/model/appConfig";
 import { clusterKey } from "$shared/lib/cluster-key";
-import { checkHelmActionReadOnly } from "$shared/lib/readonly-guard";
+import {
+  buildReadOnlyBlockedResult,
+  checkCliReadOnly,
+  checkHelmActionReadOnly,
+  clusterIdFromKubeconfigArg,
+} from "$shared/lib/readonly-guard";
 import { PRIVATE_FILE_MODE } from "$shared/lib/private-files";
 import { getClusterNodesNames } from "$shared/api/tauri";
 import { emitCliNotification } from "$shared/lib/cli-notification";
@@ -163,6 +168,9 @@ async function runKubectl(args: string[]): Promise<HelmCommandResult> {
 
 async function ensurePrivilegedNamespace(clusterId: string, namespace: string): Promise<void> {
   if (!PRIVILEGED_NAMESPACES.has(namespace)) return;
+  // Creating and labelling a namespace is a write; the install wrappers check before
+  // calling, this is the second line for any caller that does not.
+  if (checkCliReadOnly(clusterId, "kubectl", ["create", "namespace", namespace]).blocked) return;
   const kubeconfigPath = await getKubeconfigPath(clusterId);
   await runKubectl(["create", "namespace", namespace, "--kubeconfig", kubeconfigPath]);
   await runKubectl([
@@ -190,6 +198,20 @@ async function runHelmCommand(
   onOutput?: (chunk: string) => void,
 ): Promise<HelmCommandResult> {
   onOutput?.(`$ helm ${args.join(" ")}\n`);
+  // Every helm wrapper in this file ends up here with `--kubeconfig <configs>/<key>.yaml`,
+  // so this is where read-only is enforced for install, upgrade, uninstall and rollback.
+  const readOnlyCheck = checkCliReadOnly(clusterIdFromKubeconfigArg(args), "helm", args);
+  if (readOnlyCheck.blocked) {
+    const blocked = buildReadOnlyBlockedResult(readOnlyCheck.reason);
+    onOutput?.(`${blocked.errors}\n`);
+    return {
+      success: false,
+      code: blocked.code,
+      stdout: "",
+      stderr: blocked.errors,
+      error: readOnlyCheck.reason,
+    };
+  }
   let stdout = "";
   let stderr = "";
   let resolveClose: ((code: number) => void) | undefined;
@@ -600,6 +622,15 @@ export async function installOrUpgradeHelmRelease(
   const namespace = params.namespace.trim();
   if (!releaseName || !chart || !namespace) {
     return { success: false, error: "Release name, chart and namespace are required" };
+  }
+  // Decided before any process runs: ensurePrivilegedNamespace below creates the
+  // namespace and labels it privileged through kubectl, which must not happen on a
+  // read-only cluster even though helm itself would be refused later.
+  const readOnlyCheck = checkHelmActionReadOnly(clusterId, "helm-install");
+  if (readOnlyCheck.blocked) {
+    const blocked = buildReadOnlyBlockedResult(readOnlyCheck.reason);
+    params.onOutput?.(`${blocked.errors}\n`);
+    return { success: false, error: readOnlyCheck.reason };
   }
 
   // Add/refresh repo so Helm can resolve `<repo>/<chart>`. Collect errors

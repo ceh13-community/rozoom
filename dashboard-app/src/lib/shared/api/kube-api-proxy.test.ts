@@ -41,6 +41,8 @@ describe("kube-api-proxy", () => {
 
     await expect(acquireKubeApiProxy("cluster-a")).resolves.toBe("http://127.0.0.1:39123");
     expect(spawnCliMock).toHaveBeenCalledTimes(1);
+    // Read-only by construction: the guard allows `proxy` only with this flag.
+    expect(spawnCliMock.mock.calls[0]?.[1]).toContain("--reject-methods=^(POST|PUT|PATCH|DELETE)$");
     expect(getActiveKubeApiProxyCount()).toBe(1);
 
     await releaseKubeApiProxy("cluster-a");

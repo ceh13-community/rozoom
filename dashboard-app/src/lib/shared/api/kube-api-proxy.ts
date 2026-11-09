@@ -1,5 +1,6 @@
 import { appDataDir } from "@tauri-apps/api/path";
 import type { Child, Command, IOPayload } from "@tauri-apps/plugin-shell";
+import { APP_PROXY_REJECT_METHODS } from "$shared/lib/readonly-guard";
 import { spawnCli } from "./cli";
 
 const CONFIG_DIR = "configs";
@@ -48,6 +49,10 @@ export async function acquireKubeApiProxy(clusterId: string): Promise<string> {
     "proxy",
     "--kubeconfig",
     kubeconfigPath,
+    // The app only GETs and watches through this proxy. Refusing every writing method
+    // here is what lets the read-only guard allow `kubectl proxy` for this caller; the
+    // guard trusts exactly this flag and nothing else.
+    APP_PROXY_REJECT_METHODS,
     "--port=0",
     "--address",
     LOCALHOST_HOST,

@@ -3,6 +3,7 @@
   import { Button } from "$shared/ui/button";
   import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
   import { execCliForCluster, execShellCommand } from "$shared/api/cli";
+  import { buildReadOnlyBlockedResult, getClusterSafetyInfo } from "$shared/lib/readonly-guard";
   import { confirmAction } from "$shared/lib/confirm-action";
   import { buildTextExportFilename, exportTextArtifact } from "$shared/lib/text-export";
   import {
@@ -535,6 +536,16 @@
     const parsed = parseCliCommand(command, isWindowsPlatform() ? "windows" : "posix");
     if (parsed.kind === "invalid") {
       throw new Error(`Not run: ${parsed.error}`);
+    }
+    if (parsed.kind === "shell" && getClusterSafetyInfo(sessionClusterId)?.readOnly) {
+      // `sh -c` / `cmd /C` runs anything: env, time, loops, a full path to a binary. None
+      // of that passes the read-only guard, so on a read-only cluster the shell is off.
+      throw new Error(
+        buildReadOnlyBlockedResult(
+          `Cluster "${getClusterSafetyInfo(sessionClusterId)?.name ?? sessionClusterId}" is read-only. ` +
+            `Shell commands are not available here; run kubectl, helm, velero or oc directly.`,
+        ).errors,
+      );
     }
     reportCommandResult(
       parsed.kind === "cli"
