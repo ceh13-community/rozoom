@@ -31,12 +31,12 @@
    - **Arch Linux** (no AUR package yet) — build it from the repository: `git clone --depth 1 https://github.com/ceh13-community/rozoom.git && cd rozoom/packaging/arch && makepkg -si` (details in [packaging/arch](packaging/arch/README.md))
    - **Windows** — `.msi` or `.exe` installer (x64)
 2. Install and launch ROZOOM. No sign-in, no cloud account.
-3. On first run, click **Connect a cluster** and pick your path:
-   - **Local cluster** — ROZOOM auto-detects local clusters (minikube, kind, k3d, Docker Desktop) with a one-click, read-only scan, then connects in one more click.
-   - **Remote cluster** — paste the API server **URL + a service-account token**. No OIDC setup, no kubeconfig editing.
-   - **Existing kubeconfig** — contexts from `~/.kube/config` (and `$KUBECONFIG`) work as before, alongside OIDC, cloud import, exec plugins, and Vault.
+3. On the first screen, **Manage Kubernetes Clusters**, pick your path:
+   - **Local cluster**: open **Connect Cluster** at the bottom of the page and click **Scan local clusters**. A read-only scan finds minikube, kind, k3d and Docker Desktop, then **Connect** on a row adds that cluster.
+   - **Remote cluster**: in the same panel pick **Bearer Token** and paste the API server **URL + a service-account token**. No OIDC setup, no kubeconfig editing. The token must be allowed to list nodes: with only the built-in `view` role the app shows the cluster as offline.
+   - **Existing kubeconfig**: contexts from `~/.kube/config` (and `$KUBECONFIG`) are listed under **Detected kubeconfig files**, ready to check and add. OIDC, cloud import, exec plugins and Vault are in **Connect Cluster**.
 
-You're now looking at fleet health, RBAC risks, Helm releases, and triaged workloads across every connected cluster.
+You're now looking at fleet health, Helm releases, and triaged workloads across every connected cluster. RBAC risks come with the free **Security Suite** plugin: enable it under **Marketplace > Plugin Marketplace**.
 
 **Full user documentation:** https://rozoom.app/docs
 
