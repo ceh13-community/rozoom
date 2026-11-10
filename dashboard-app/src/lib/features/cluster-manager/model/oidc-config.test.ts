@@ -1,5 +1,16 @@
+import { load as parse } from "js-yaml";
 import { describe, expect, it } from "vitest";
 import { generateKubeloginExecConfig, generateOidcKubeconfig, OIDC_PRESETS } from "./oidc-config";
+import { TlsBlockedError } from "./tls-gate";
+
+const LINE_BREAKS = [
+  ["NEL", "\u0085"],
+  ["LS", "\u2028"],
+  ["PS", "\u2029"],
+  ["LF", "\n"],
+] as const;
+const smuggle = (value: string, br: string) =>
+  `${value}${br}    insecure-skip-tls-verify:${br}      true`;
 
 describe("oidc-config", () => {
   it("has presets for all major providers", () => {
@@ -66,27 +77,107 @@ describe("oidc-config", () => {
       const yaml = generateOidcKubeconfig(
         "prod-cluster",
         "https://k8s.example.com:6443",
-        "LS0tLS1CRUdJTi...",
+        "LS0tLS1CRUdJTiBD",
         { provider: "generic", issuerUrl: "https://sso.example.com", clientId: "k8s" },
       );
 
       expect(yaml).toContain("kind: Config");
       expect(yaml).toContain("server: https://k8s.example.com:6443");
-      expect(yaml).toContain("certificate-authority-data: LS0tLS1CRUdJTi...");
+      expect(yaml).toContain("certificate-authority-data: LS0tLS1CRUdJTiBD");
       expect(yaml).toContain("command: kubelogin");
       expect(yaml).toContain("get-token");
       expect(yaml).toContain("--oidc-issuer-url=https://sso.example.com");
     });
 
-    it("uses insecure-skip-tls when no CA data", () => {
-      const yaml = generateOidcKubeconfig("dev", "https://localhost:6443", null, {
-        provider: "generic",
-        issuerUrl: "https://sso.dev",
-        clientId: "dev",
-      });
+    const oidc = { provider: "generic", issuerUrl: "https://sso.dev", clientId: "dev" } as const;
 
-      expect(yaml).toContain("insecure-skip-tls-verify: true");
-      expect(yaml).not.toContain("certificate-authority-data");
+    it("refuses a remote cluster with no CA", () => {
+      expect(() =>
+        generateOidcKubeconfig("prod", "https://api.example.com:6443", null, oidc),
+      ).toThrow(TlsBlockedError);
     });
+
+    it("writes no skip flag for loopback with no CA", () => {
+      const yaml = generateOidcKubeconfig("dev", "https://localhost:6443", null, oidc);
+      expect(yaml).not.toContain("insecure-skip-tls-verify");
+      expect(yaml).not.toContain("certificate-authority-data");
+      expect(yaml).toContain('server: https://localhost:6443\n  name: "dev"');
+    });
+
+    it("writes the skip flag only on an explicit request", () => {
+      const yaml = generateOidcKubeconfig("prod", "https://api.example.com:6443", null, oidc, {
+        skipTlsVerify: true,
+      });
+      expect(yaml).toContain("insecure-skip-tls-verify: true");
+    });
+  });
+});
+
+describe.each(LINE_BREAKS)("a %s in the OIDC form", (_name, br) => {
+  const remote = "https://api.example.com:6443";
+  const oidc = {
+    provider: "generic",
+    issuerUrl: "https://sso.example.com",
+    clientId: "c",
+  } as const;
+
+  it("is refused in the cluster name and the server URL", () => {
+    expect(() => generateOidcKubeconfig(smuggle("p", br), remote, "LS0t", oidc)).toThrow(
+      TlsBlockedError,
+    );
+    expect(() => generateOidcKubeconfig("p", smuggle(`${remote}/k8s`, br), "LS0t", oidc)).toThrow(
+      TlsBlockedError,
+    );
+  });
+
+  it("stays inside one quoted arg, also after a closing quote", () => {
+    const secret = `x"${smuggle("", br)}`;
+    const yaml = generateOidcKubeconfig("p", remote, "LS0t", { ...oidc, clientSecret: secret });
+    expect(yaml).not.toMatch(/[\u0085\u2028\u2029]/);
+    const config = parse(yaml) as {
+      clusters: Array<{ cluster: Record<string, unknown> }>;
+      users: Array<{ user: { exec: { args: string[] } } }>;
+    };
+    expect(config.clusters[0].cluster).toEqual({
+      server: remote,
+      "certificate-authority-data": "LS0t",
+    });
+    expect(config.users[0].user.exec.args).toContain(`--oidc-client-secret=${secret}`);
+  });
+});
+
+const OK_NAMES = ["мій кластер", "prod east", 'a: "b" #c', "кластер 🚀"];
+type NamedConfig = {
+  clusters: Array<{ name: string }>;
+  contexts: Array<{ name: string; context: { cluster: string } }>;
+  "current-context": string;
+};
+const allNames = (config: NamedConfig) => [
+  config.clusters[0].name,
+  config.contexts[0].name,
+  config.contexts[0].context.cluster,
+  config["current-context"],
+];
+
+describe("names and emoji in an OIDC kubeconfig", () => {
+  const remote = "https://api.example.com:6443";
+  const oidc = {
+    provider: "generic",
+    issuerUrl: "https://sso.example.com",
+    clientId: "c",
+  } as const;
+
+  it.each(OK_NAMES)("keeps the cluster name %s in all four places", (name) => {
+    const config = parse(generateOidcKubeconfig(name, remote, "LS0t", oidc)) as NamedConfig;
+    expect(allNames(config)).toEqual([name, name, name, name]);
+  });
+
+  it("writes an emoji in the secret as UTF-8", () => {
+    const yaml = generateOidcKubeconfig("p", remote, "LS0t", { ...oidc, clientSecret: "x🚀" });
+    expect(yaml).not.toMatch(/\\ud[89ab]/i);
+    expect(
+      (parse(yaml) as { users: Array<{ user: { exec: { args: string[] } } }> }).users[0].user.exec
+        .args,
+    ).toContain("--oidc-client-secret=x🚀");
   });
 });

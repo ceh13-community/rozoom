@@ -17,6 +17,8 @@
  *   - generic    : arbitrary command + args
  */
 
+import { assertClusterName, kubeconfigTlsYaml, yamlQuoted } from "./tls-gate";
+
 export type ExecPluginKind =
   | "aws-eks"
   | "aws-iam"
@@ -30,6 +32,8 @@ export type ExecPluginConfig = {
   clusterName: string;
   serverUrl: string;
   caData?: string;
+  /** Explicit user choice to skip TLS verification. Never a default for a missing CA. */
+  skipTlsVerify?: boolean;
   /** aws-eks: cluster name. kubelogin: OIDC issuer URL. Meaning depends on kind. */
   primary?: string;
   /** aws-eks: region. kubelogin: client ID. gke-auth: ignored. */
@@ -239,35 +243,38 @@ export function buildExecBlock(config: ExecPluginConfig): {
 export function generateExecKubeconfig(config: ExecPluginConfig): string {
   if (!config.clusterName.trim()) throw new Error("clusterName is required");
   if (!config.serverUrl.trim()) throw new Error("serverUrl is required");
+  assertClusterName(config.clusterName.trim());
+  const name = yamlQuoted(config.clusterName.trim());
 
   const exec = buildExecBlock(config);
-  const caLine = config.caData?.trim()
-    ? `    certificate-authority-data: ${config.caData.trim()}`
-    : `    insecure-skip-tls-verify: true`;
+  const tls = kubeconfigTlsYaml({
+    server: config.serverUrl.trim(),
+    caData: config.caData,
+    skipVerification: config.skipTlsVerify,
+  });
 
   const argsYaml = exec.args.length
-    ? "\n" + exec.args.map((a) => `      - ${JSON.stringify(a)}`).join("\n")
+    ? "\n" + exec.args.map((a) => `      - ${yamlQuoted(a)}`).join("\n")
     : " []";
 
   return `apiVersion: v1
 kind: Config
 clusters:
 - cluster:
-    server: ${config.serverUrl.trim()}
-${caLine}
-  name: ${config.clusterName.trim()}
+    server: ${config.serverUrl.trim()}${tls}
+  name: ${name}
 contexts:
 - context:
-    cluster: ${config.clusterName.trim()}
+    cluster: ${name}
     user: exec-user
-  name: ${config.clusterName.trim()}
-current-context: ${config.clusterName.trim()}
+  name: ${name}
+current-context: ${name}
 users:
 - name: exec-user
   user:
     exec:
       apiVersion: ${exec.apiVersion}
-      command: ${exec.command}
+      command: ${yamlQuoted(exec.command)}
       args:${argsYaml}
       interactiveMode: IfAvailable
 `;

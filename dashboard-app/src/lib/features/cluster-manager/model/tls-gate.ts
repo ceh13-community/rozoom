@@ -3,7 +3,8 @@
  *
  * Policy (PRD frictionless connection, P1 token closeout):
  *   - `insecure-skip-tls-verify` is never silently honored — it is an
- *     explicit block with an explanation, not a warning.
+ *     explicit block with an explanation, not a warning, unless the user
+ *     asked for it for this connection.
  *   - A CA certificate is mandatory for remote clusters; loopback dev
  *     clusters (localhost / 127.x / ::1) are exempt.
  *   - Remote clusters must be reached over HTTPS.
@@ -17,6 +18,8 @@ export type TlsGateInput = {
   server: string;
   hasCertificateAuthority: boolean;
   insecureSkipTlsVerify: boolean;
+  /** The user explicitly chose to skip verification for this connection. */
+  insecureSkipAccepted?: boolean;
 };
 
 export type TlsGateResult = { allowed: true } | { allowed: false; reason: string };
@@ -28,7 +31,7 @@ function isLoopbackHost(hostname: string): boolean {
 }
 
 export function evaluateTlsGate(input: TlsGateInput): TlsGateResult {
-  if (input.insecureSkipTlsVerify) {
+  if (input.insecureSkipTlsVerify && !input.insecureSkipAccepted) {
     return {
       allowed: false,
       reason:
@@ -60,7 +63,7 @@ export function evaluateTlsGate(input: TlsGateInput): TlsGateResult {
     return { allowed: false, reason: `Unsupported cluster server scheme: ${url.protocol}` };
   }
 
-  if (!input.hasCertificateAuthority && !loopback) {
+  if (!input.hasCertificateAuthority && !loopback && !input.insecureSkipAccepted) {
     return {
       allowed: false,
       reason:
@@ -70,4 +73,92 @@ export function evaluateTlsGate(input: TlsGateInput): TlsGateResult {
   }
 
   return { allowed: true };
+}
+
+export class TlsBlockedError extends Error {
+  override name = "TlsBlockedError";
+}
+
+const NOT_VISIBLE_ASCII = /[^\x21-\x7e]/;
+const NOT_ALLOWED_IN_NAME = /[\p{Cc}\u2028\u2029]/u;
+const BASE64_CHARS = /^[A-Za-z0-9+/]+={0,2}$/;
+
+/** The message never quotes the value: it may be a credential. */
+function refuseFirstMatch(label: string, value: string, pattern: RegExp, problem: string): void {
+  const found = pattern.exec(value)?.[0];
+  if (found === undefined) return;
+  const code = found.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0");
+  throw new TlsBlockedError(`${label} contains ${problem} (U+${code}). Remove it and try again.`);
+}
+
+/**
+ * Refuses values that a generated kubeconfig cannot hold as one plain YAML scalar.
+ * js-yaml keeps NEL, LS and PS inside a value while kubectl ends the line there,
+ * so a single pasted character can add a key the gate never saw.
+ */
+export function assertKubeconfigValues(fields: Record<string, string>): void {
+  for (const [label, value] of Object.entries(fields)) {
+    refuseFirstMatch(
+      label,
+      value,
+      NOT_VISIBLE_ASCII,
+      "a space, a line break or another character that is not plain ASCII",
+    );
+  }
+}
+
+/**
+ * Spaces and non-ASCII letters are valid in a cluster name, so it is written quoted.
+ * Control characters and line breaks are refused: after a round trip through
+ * kubectl a NEL comes back as a different name.
+ */
+export function assertClusterName(name: string): void {
+  refuseFirstMatch(
+    "Cluster name",
+    name,
+    NOT_ALLOWED_IN_NAME,
+    "a line break or a control character",
+  );
+}
+
+/**
+ * A double-quoted YAML scalar where a line-break character can only be an escape.
+ * Surrogate pairs stay raw: kubectl cannot read an emoji written as two \u escapes.
+ */
+export function yamlQuoted(value: string): string {
+  return JSON.stringify(value).replace(
+    /[\u007f-\ud7ff\ue000-\uffff]/g,
+    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
+}
+
+export type KubeconfigTlsInput = {
+  server: string;
+  caData?: string | null;
+  /** Set only by an explicit user action, never as a fallback for a missing CA. */
+  skipVerification?: boolean;
+};
+
+/**
+ * The TLS part of a generated kubeconfig cluster entry, to append right after
+ * the `server:` line. The only writer of `insecure-skip-tls-verify`.
+ * A CA always wins over a skip, because kubectl refuses to have both.
+ * Throws TlsBlockedError with the gate's reason when the connection is refused.
+ */
+export function kubeconfigTlsYaml(input: KubeconfigTlsInput): string {
+  assertKubeconfigValues({ "API server URL": input.server });
+  const caData = input.caData?.trim();
+  if (caData && !(BASE64_CHARS.test(caData) && caData.length % 4 === 0)) {
+    throw new TlsBlockedError("CA certificate data must be valid base64.");
+  }
+  const skip = !caData && input.skipVerification === true;
+  const gate = evaluateTlsGate({
+    server: input.server,
+    hasCertificateAuthority: Boolean(caData),
+    insecureSkipTlsVerify: skip,
+    insecureSkipAccepted: skip,
+  });
+  if (!gate.allowed) throw new TlsBlockedError(gate.reason);
+  if (caData) return `\n    certificate-authority-data: ${caData}`;
+  return skip ? "\n    insecure-skip-tls-verify: true" : "";
 }

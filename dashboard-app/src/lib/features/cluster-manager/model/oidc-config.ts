@@ -7,6 +7,8 @@
  * Supports Azure AD, Okta, Keycloak, Google Workspace, and generic OIDC providers.
  */
 
+import { assertClusterName, kubeconfigTlsYaml, yamlQuoted } from "./tls-gate";
+
 export type OidcProvider = "azure-ad" | "okta" | "keycloak" | "google" | "generic";
 
 export type OidcConfig = {
@@ -116,25 +118,29 @@ export function generateOidcKubeconfig(
   serverUrl: string,
   caData: string | null,
   config: OidcConfig,
+  options: { skipTlsVerify?: boolean } = {},
 ): string {
+  assertClusterName(clusterName);
+  const name = yamlQuoted(clusterName);
   const exec = generateKubeloginExecConfig(config);
-  const caLine = caData
-    ? `    certificate-authority-data: ${caData}`
-    : `    insecure-skip-tls-verify: true`;
+  const tls = kubeconfigTlsYaml({
+    server: serverUrl,
+    caData,
+    skipVerification: options.skipTlsVerify,
+  });
 
   return `apiVersion: v1
 kind: Config
 clusters:
 - cluster:
-    server: ${serverUrl}
-${caLine}
-  name: ${clusterName}
+    server: ${serverUrl}${tls}
+  name: ${name}
 contexts:
 - context:
-    cluster: ${clusterName}
+    cluster: ${name}
     user: oidc-user
-  name: ${clusterName}
-current-context: ${clusterName}
+  name: ${name}
+current-context: ${name}
 users:
 - name: oidc-user
   user:
@@ -142,5 +148,5 @@ users:
       apiVersion: ${exec.apiVersion}
       command: ${exec.command}
       args:
-${exec.args.map((a) => `      - "${a}"`).join("\n")}`;
+${exec.args.map((a) => `      - ${yamlQuoted(a)}`).join("\n")}`;
 }
