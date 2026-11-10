@@ -8,7 +8,7 @@ the user-facing change in plain language. The in-app update notification
 deliberately shows fixed copy and never displays these notes.
 The release build fails if the section for the released version is missing.
 
-## [0.26.3] - 2026-11-12
+## [0.26.3] - 2026-11-10
 
 Security release. When you connected a remote cluster through the Bearer Token,
 X.509 Certificate, Exec Plugin or Manual OIDC form and left the CA field empty,
@@ -49,7 +49,7 @@ install it the way you installed this one. We recommend this update.
 
 Something confusing or broken? [Tell us what's wrong](https://github.com/ceh13-community/rozoom/discussions).
 
-## [0.26.2] - 2026-11-11
+## [0.26.2] - 2026-11-09
 
 Security release. Read-only clusters: kubectl, oc, helm, velero and the
 terminal are now checked before they start. This is a guard in the app, not an
