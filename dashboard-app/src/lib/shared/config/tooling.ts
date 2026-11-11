@@ -74,6 +74,29 @@ export function isToolEnabled(tool: string): boolean {
   return !ENABLED_TOOLS_SET || ENABLED_TOOLS_SET.has(tool);
 }
 
+// Tools whose real binaries are downloaded only for Linux; other platforms
+// get a stub (see download-binaries.js).
+const LINUX_ONLY_TOOLS: ReadonlySet<string> = new Set(["aws", "az"]);
+
+function platformIsLinux(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent.toLowerCase();
+  return ua.includes("linux") || ua.includes("x11");
+}
+
+/**
+ * True when the tool ships as a working bundled binary in THIS build on
+ * THIS platform: enabled by the build filter, marked "bundled" in the
+ * registry, and not replaced by a stub on this platform.
+ */
+export function isToolBundled(tool: string): boolean {
+  const entry = FULL_TOOL_REGISTRY.find((t) => t.tool === tool);
+  if (!entry || entry.status !== "bundled") return false;
+  if (!isToolEnabled(tool)) return false;
+  if (LINUX_ONLY_TOOLS.has(tool)) return platformIsLinux();
+  return true;
+}
+
 const FULL_TOOL_REGISTRY: readonly ToolEntry[] = [
   // Core K8s
   { tool: "kubectl", provider: null, status: "bundled", probeArgs: ["version", "--client"] },

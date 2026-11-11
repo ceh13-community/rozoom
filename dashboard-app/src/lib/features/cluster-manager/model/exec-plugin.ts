@@ -9,12 +9,16 @@
  * ExecCredential object with a short-lived token.
  *
  * Supported presets:
- *   - aws-eks    : `aws eks get-token`           (bundled aws CLI, no extra install)
+ *   - aws-eks    : `aws eks get-token`           (aws CLI)
  *   - aws-iam    : `aws-iam-authenticator token` (external binary, user-installed)
  *   - gke-auth   : `gke-gcloud-auth-plugin`      (ships with gcloud SDK)
  *   - kubelogin  : `kubelogin get-token`         (external binary, user-installed)
  *   - oc-login   : `oc login`                    (OpenShift)
  *   - generic    : arbitrary command + args
+ *
+ * No preset is bundled: the generated kubeconfig writes the bare command
+ * name and kubectl resolves the binary from the OS PATH. The app's own
+ * bundled copies are never used for exec auth.
  */
 
 import { assertClusterName, kubeconfigTlsYaml, yamlQuoted } from "./tls-gate";
@@ -73,8 +77,7 @@ export const EXEC_PLUGIN_PRESETS: ExecPluginPreset[] = [
   {
     kind: "aws-eks",
     label: "AWS EKS (aws eks get-token)",
-    description:
-      "Uses the bundled AWS CLI to obtain a short-lived EKS token before every API call.",
+    description: "Uses the AWS CLI to obtain a short-lived EKS token before every API call.",
     primaryLabel: "EKS cluster name *",
     primaryPlaceholder: "prod-cluster",
     secondaryLabel: "AWS region *",
@@ -82,21 +85,21 @@ export const EXEC_PLUGIN_PRESETS: ExecPluginPreset[] = [
     extraLabel: "AWS profile (optional)",
     extraPlaceholder: "default",
     docsUrl: "https://docs.aws.amazon.com/eks/latest/userguide/install-kubectl.html#get-token",
-    bundled: true,
+    bundled: false,
     security: "high",
     securityDetail:
-      "Tokens live ~15 minutes and are generated on demand by the bundled aws CLI. No secrets on disk.",
+      "Tokens live ~15 minutes and are generated on demand by the aws CLI. No secrets on disk.",
   },
   {
     kind: "gke-auth",
     label: "GKE (gke-gcloud-auth-plugin)",
     description:
-      "Uses the bundled gcloud SDK plugin to exchange your gcloud identity for short-lived GKE tokens.",
+      "Uses the gcloud SDK plugin to exchange your gcloud identity for short-lived GKE tokens.",
     docsUrl: "https://cloud.google.com/kubernetes-engine/docs/how-to/cluster-access-for-kubectl",
-    bundled: true,
+    bundled: false,
     security: "high",
     securityDetail:
-      "Tokens are generated per-call by the bundled gcloud SDK. Requires `gcloud auth login` once.",
+      "Tokens are generated per-call by the gcloud SDK. Requires the gcloud SDK and `gcloud auth login` once.",
   },
   {
     kind: "kubelogin",
@@ -133,11 +136,10 @@ export const EXEC_PLUGIN_PRESETS: ExecPluginPreset[] = [
   {
     kind: "oc-login",
     label: "OpenShift (oc)",
-    description:
-      "Uses the bundled `oc` CLI to obtain short-lived OpenShift tokens via its login flow.",
+    description: "Uses the `oc` CLI to obtain short-lived OpenShift tokens via its login flow.",
     docsUrl:
       "https://docs.openshift.com/container-platform/latest/cli_reference/openshift_cli/getting-started-cli.html",
-    bundled: true,
+    bundled: false,
     security: "high",
     securityDetail:
       "Token lifetime follows the OpenShift OAuth token TTL (default 24h). Rotated automatically on re-login.",
@@ -156,7 +158,7 @@ export const EXEC_PLUGIN_PRESETS: ExecPluginPreset[] = [
     bundled: false,
     security: "medium",
     securityDetail:
-      "Security depends entirely on the plugin you provide. Prefer a bundled preset when one fits.",
+      "Security depends entirely on the plugin you provide. No preset is bundled: kubectl resolves every command from the OS PATH.",
   },
 ];
 

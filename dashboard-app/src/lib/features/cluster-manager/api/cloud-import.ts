@@ -297,6 +297,11 @@ export function getSupportedCloudProviders(): string[] {
   return Object.keys(PROVIDERS);
 }
 
+/** Tool the provider's import flow needs (bundled or PATH). */
+export function getProviderTool(provider: string): string | null {
+  return provider in PROVIDERS ? PROVIDERS[provider].tool : null;
+}
+
 /**
  * Execute a single CLI command and return stdout/stderr.
  * Shared helper for list and region-discovery calls.

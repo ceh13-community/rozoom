@@ -5,6 +5,7 @@ import {
   listCloudClustersAllScopes,
   importCloudCluster,
   getSupportedCloudProviders,
+  getProviderTool,
   parseAwsEksList,
   parseAwsRegions,
   parseAwsProfiles,
@@ -62,6 +63,23 @@ describe("getSupportedCloudProviders", () => {
     expect(providers).toContain("AKS");
     expect(providers).toContain("DigitalOcean");
     expect(providers.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getProviderTool
+// ---------------------------------------------------------------------------
+
+describe("getProviderTool", () => {
+  it("maps each provider to its CLI tool", () => {
+    expect(getProviderTool("AWS EKS")).toBe("aws");
+    expect(getProviderTool("GKE")).toBe("gcloud");
+    expect(getProviderTool("AKS")).toBe("az");
+    expect(getProviderTool("DigitalOcean")).toBe("doctl");
+  });
+
+  it("returns null for an unknown provider", () => {
+    expect(getProviderTool("Unknown")).toBeNull();
   });
 });
 

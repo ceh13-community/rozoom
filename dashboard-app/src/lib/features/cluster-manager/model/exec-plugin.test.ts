@@ -1,6 +1,6 @@
 import { load as parse } from "js-yaml";
 import { describe, expect, it } from "vitest";
-import { generateExecKubeconfig } from "./exec-plugin";
+import { EXEC_PLUGIN_PRESETS, generateExecKubeconfig } from "./exec-plugin";
 import { TlsBlockedError } from "./tls-gate";
 
 const base = {
@@ -110,5 +110,38 @@ describe("an emoji in the exec plugin form", () => {
       .users[0].user.exec;
     expect(exec.command).toBe(value);
     expect(exec.args).toEqual([value]);
+  });
+});
+
+describe("bundled flags", () => {
+  it("no exec preset is bundled: every kubeconfig writes a bare command resolved from PATH", () => {
+    for (const preset of EXEC_PLUGIN_PRESETS) {
+      expect(preset.bundled, preset.kind).toBe(false);
+    }
+  });
+
+  it("aws-eks and oc-login kubeconfigs name the PATH binary, not the bundled copy", () => {
+    const aws = generateExecKubeconfig({
+      kind: "aws-eks",
+      clusterName: "prod",
+      serverUrl: remote,
+      caData: "LS0t",
+      primary: "prod-cluster",
+      secondary: "us-east-1",
+    });
+    expect(
+      (parse(aws) as { users: Array<{ user: { exec: { command: string } } }> }).users[0].user.exec
+        .command,
+    ).toBe("aws");
+    const oc = generateExecKubeconfig({
+      kind: "oc-login",
+      clusterName: "prod",
+      serverUrl: remote,
+      caData: "LS0t",
+    });
+    expect(
+      (parse(oc) as { users: Array<{ user: { exec: { command: string } } }> }).users[0].user.exec
+        .command,
+    ).toBe("oc");
   });
 });
