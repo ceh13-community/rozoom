@@ -1577,16 +1577,22 @@
               <div
                 class="rounded-lg border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-600/80 p-4"
               >
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
+                <!-- Wrap instead of breakpoints: this card sits in a half-width column from
+                     the lg breakpoint, so a viewport rule put three nowrap buttons in one row
+                     on a ~450px card and pushed them past its edge. -->
+                <div
+                  class="flex flex-wrap items-center justify-between gap-3"
+                  data-testid="quick-actions-row"
+                >
+                  <div class="shrink-0">
                     <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">
                       Quick actions
                     </p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                    <p class="whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
                       {detectedClusters.length} detected · {selectedDetectedCount} selected
                     </p>
                   </div>
-                  <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                  <div class="flex flex-wrap gap-2">
                     <Button
                       onclick={() => void checkAllDetectedClusters()}
                       disabled={isLoading || isProbing}
