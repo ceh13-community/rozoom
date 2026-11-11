@@ -5,7 +5,7 @@ scanning for Kubernetes clusters.
 
 > **Looking for the app's own security posture** (how ROZOOM stores
 > credentials, what it sends to Sentry, enterprise compliance status)?
-> See [enterprise-readiness.md](enterprise-readiness.md).
+> See [SECURITY.md](../SECURITY.md).
 
 ---
 
@@ -52,7 +52,7 @@ Container image vulnerability scanning:
 - **History**: previous scan results
 - **Summary cards**: 5 diagnostic cards showing scan status and findings
 
-### New in v0.17: Advanced Security Models
+### Advanced Security Models
 
 #### RBAC Risk Scanner (`rbac-risk-scanner.ts`)
 

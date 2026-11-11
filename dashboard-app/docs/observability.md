@@ -27,7 +27,7 @@ Observability pipeline health checker:
 - **4 probe targets**: Kubelet, metrics-server, kube-state-metrics, node-exporter
 - Per-source status: Available / Unavailable / Error
 - Direct healthz endpoint checks via kubectl proxy
-- In-app documentation link (`/docs/metrics-sources-hardening.md`)
+- Operator notes: [internal/metrics-sources-hardening.md](internal/metrics-sources-hardening.md)
 - Summary cards with overall pipeline health
 
 ### Pod Restarts (68 lines)

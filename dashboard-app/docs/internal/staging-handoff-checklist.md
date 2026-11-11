@@ -24,14 +24,14 @@ Use this checklist for the first staging candidate of `0.7.1`.
 
 ## QA Matrix
 
-- run [manual-qa-matrix.md](static/docs/manual-qa-matrix.md)
+- run [manual-qa-matrix.md](manual-qa-matrix.md)
 - attach screenshots for any failure
 - attach desktop log excerpts for any runtime failure
 - note whether issue reproduced in packaged app or only in dev/runtime build
 
 ## Soak
 
-- run [staging-soak-template.md](static/docs/staging-soak-template.md)
+- run [staging-soak-template.md](staging-soak-template.md)
 - keep the session long enough to cover:
   - section switching
   - cluster switching
@@ -75,4 +75,4 @@ Use this checklist for the first staging candidate of `0.7.1`.
 - degraded smoke: `pass`
 - Sentry verification: `pass`
 - distribution sign-off: `pass`
-- final release decision recorded in [release-execution-checklist.md](static/docs/release-execution-checklist.md)
+- final release decision recorded in [release-execution-checklist.md](release-execution-checklist.md)
