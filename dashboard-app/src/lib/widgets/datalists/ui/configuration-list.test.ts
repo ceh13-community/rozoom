@@ -1515,4 +1515,84 @@ describe("configuration-list", () => {
         .mock.calls.some((call) => Array.isArray(call[0]) && call[0][0] === "delete"),
     ).toBe(false);
   });
+
+  describe("delete confirmation", () => {
+    const roleData = {
+      title: "Roles - Cluster: minikube",
+      slug: "minikube",
+      uuid: "cluster-a",
+      workload: "roles",
+      sort_field: null,
+      workloadKey: "roles",
+      items: [{ metadata: { name: "--all", namespace: "team-a" } }],
+    };
+    const dryRunNames = [
+      "role.rbac.authorization.k8s.io/reader",
+      "role.rbac.authorization.k8s.io/writer",
+      "role.rbac.authorization.k8s.io/admin",
+    ];
+
+    function mockKubectl() {
+      vi.mocked(kubectlProxy.kubectlRawArgsFront).mockReset();
+      vi.mocked(kubectlProxy.kubectlRawArgsFront).mockImplementation(async (args) => {
+        const argv = args as string[];
+        if (argv[0] === "delete" && argv.includes("--dry-run=server")) {
+          return { code: 0, output: dryRunNames.join("\n"), errors: "" };
+        }
+        if (argv[0] === "delete") {
+          return {
+            code: 0,
+            output: dryRunNames
+              .map((name) => `role.rbac.authorization.k8s.io "${name.split("/")[1]}" deleted`)
+              .join("\n"),
+            errors: "",
+          };
+        }
+        return { code: 0, output: "apiVersion: v1\nkind: Role\n", errors: "" };
+      });
+    }
+
+    function realDeleteCalls() {
+      return vi
+        .mocked(kubectlProxy.kubectlRawArgsFront)
+        .mock.calls.filter(
+          (call) =>
+            Array.isArray(call[0]) &&
+            call[0][0] === "delete" &&
+            !(call[0] as string[]).includes("--dry-run=server"),
+        );
+    }
+
+    it("shows what the server would delete and deletes nothing when declined", async () => {
+      mockKubectl();
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+      const { getByText, getByRole } = render(ConfigurationList, { props: { data: roleData } });
+
+      await fireEvent.click(getByText("--all"));
+      await fireEvent.click(getByRole("button", { name: "Delete Role" }));
+
+      await waitFor(() => expect(confirmSpy).toHaveBeenCalledTimes(1));
+      const message = String(confirmSpy.mock.calls[0][0]);
+      expect(message).toContain("Delete 3 objects? This cannot be undone.");
+      for (const name of dryRunNames) expect(message).toContain(name);
+      expect(realDeleteCalls()).toHaveLength(0);
+      confirmSpy.mockRestore();
+    });
+
+    it("deletes after confirmation and reports the count kubectl deleted", async () => {
+      mockKubectl();
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+      const { getByText, getByRole, findByText } = render(ConfigurationList, {
+        props: { data: roleData },
+      });
+
+      await fireEvent.click(getByText("--all"));
+      await fireEvent.click(getByRole("button", { name: "Delete Role" }));
+
+      expect(await findByText("Deleted 3 resources")).toBeInTheDocument();
+      expect(realDeleteCalls()).toHaveLength(1);
+      expect(confirmSpy).toHaveBeenCalledTimes(1);
+      confirmSpy.mockRestore();
+    });
+  });
 });
