@@ -70,4 +70,28 @@ describe("DeleteConfirmDialog", () => {
     expect(getByText("Delete 2 resources")).toBeInTheDocument();
     expect(getByText("$ kubectl delete pod redis-xyz -n cache")).toBeInTheDocument();
   });
+
+  it("shows the scope note when the targets span pages", () => {
+    const { getByText } = render(DeleteConfirmDialog, {
+      props: {
+        open: true,
+        targets: [podTarget],
+        scopeNote: "120 pods across all pages: 20 of them are not on the current page.",
+        onConfirm: vi.fn(),
+        onCancel: vi.fn(),
+      },
+    });
+
+    expect(
+      getByText("120 pods across all pages: 20 of them are not on the current page."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no scope note by default", () => {
+    const { queryByText } = render(DeleteConfirmDialog, {
+      props: { open: true, targets: [podTarget], onConfirm: vi.fn(), onCancel: vi.fn() },
+    });
+
+    expect(queryByText(/across all pages/)).not.toBeInTheDocument();
+  });
 });

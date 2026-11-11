@@ -59,6 +59,7 @@
     buildPodDescribeCommand,
     buildPodEvictArgs,
     buildPodEvictFallbackDeleteArgs,
+    describeOffPageSelection,
     pruneSelection,
   } from "./pod-actions";
   import { getPodRef, getPodUid } from "./model/pod-row-adapter";
@@ -82,8 +83,6 @@
     refreshSeconds: 30,
     enrichedTableEnabled: false,
   };
-  const ENABLE_PODS_SAFE_MODE_HOTFIX = true;
-  const PODS_SAFE_MODE_MAX_ROWS = 400;
   const BROWSER_SNAPSHOT_REFRESH_TIMEOUT_MS = 2_000;
   const RUNTIME_SNAPSHOT_REFRESH_TIMEOUT_MS = 12_000;
 
@@ -137,12 +136,11 @@
       namespaceMatches($selectedNamespace, pod.metadata?.namespace),
     ),
   );
-  const pods = $derived.by(() => getPodsDisplaySlice(sourcePods));
-  const rows = $derived.by(() => createPodListRows(pods));
+  const rows = $derived.by(() => createPodListRows(sourcePods));
   const filteredRows = $derived.by(() => filterPodListRows(rows, query));
   const sourcePodByUid = $derived.by(() => {
     const next = new Map<string, Partial<PodItem>>();
-    for (const pod of pods) {
+    for (const pod of sourcePods) {
       next.set(getPodUid(pod), pod);
     }
     return next;
@@ -152,7 +150,10 @@
       .map((id) => sourcePodByUid.get(id))
       .filter((pod): pod is Partial<PodItem> => Boolean(pod)),
   );
-  const availableIds = $derived.by(() => filteredRows.map((row) => row.uid).filter(Boolean));
+  // Pods the table can show after search, its NS checklist and the grouped-view cap.
+  // DataTable reports them, so Select all never reaches a pod hidden by the NS checklist.
+  let availableIds = $state<string[]>([]);
+  let currentPageIds = $state<string[]>([]);
   const areAllSelected = $derived(
     availableIds.length > 0 && availableIds.every((id) => selectedPodIds.has(id)),
   );
@@ -405,12 +406,6 @@
   function clampWatcherRefreshSeconds(value: number) {
     if (!Number.isFinite(value)) return DEFAULT_WATCHER_SETTINGS.refreshSeconds;
     return Math.min(600, Math.max(5, Math.round(value)));
-  }
-
-  function getPodsDisplaySlice(sourcePods: Partial<PodItem>[]) {
-    if (!ENABLE_PODS_SAFE_MODE_HOTFIX) return sourcePods;
-    if (sourcePods.length <= PODS_SAFE_MODE_MAX_ROWS) return sourcePods;
-    return sourcePods.slice(0, PODS_SAFE_MODE_MAX_ROWS);
   }
 
   function hasBrowserInvoke() {
@@ -694,6 +689,7 @@
   }
 
   let deleteDialogTargets = $state<DeleteTarget[]>([]);
+  let deleteDialogScopeNote = $state<string | null>(null);
   let deleteDialogResolve: ((confirmed: boolean) => void) | null = null;
   const deleteDialogOpen = $derived(deleteDialogTargets.length > 0);
 
@@ -711,9 +707,13 @@
     };
   }
 
-  function requestDeleteConfirmation(targets: DeleteTarget[]): Promise<boolean> {
+  function requestDeleteConfirmation(
+    targets: DeleteTarget[],
+    scopeNote: string | null,
+  ): Promise<boolean> {
     return new Promise((resolve) => {
       deleteDialogResolve = resolve;
+      deleteDialogScopeNote = scopeNote;
       deleteDialogTargets = targets;
     });
   }
@@ -722,6 +722,7 @@
     const resolve = deleteDialogResolve;
     deleteDialogResolve = null;
     deleteDialogTargets = [];
+    deleteDialogScopeNote = null;
     resolve?.(confirmed);
   }
 
@@ -731,7 +732,10 @@
       .map((pod) => buildDeleteTarget(pod))
       .filter((target): target is DeleteTarget => target !== null);
     if (targets.length === 0) return;
-    const confirmed = await requestDeleteConfirmation(targets);
+    const confirmed = await requestDeleteConfirmation(
+      targets,
+      describeOffPageSelection(podsToDelete.map(getPodUid), currentPageIds),
+    );
     if (!confirmed) return;
 
     for (const pod of podsToDelete) {
@@ -766,7 +770,13 @@
 
   async function evictPods(podsToEvict: Partial<PodItem>[]) {
     if (!data.slug || podsToEvict.length === 0) return;
-    const confirmed = await confirmAction(`Evict ${podsToEvict.length} pod(s)?`, "Confirm evict");
+    const offPageNote = describeOffPageSelection(podsToEvict.map(getPodUid), currentPageIds);
+    const confirmed = await confirmAction(
+      offPageNote
+        ? `Evict ${podsToEvict.length} pod(s)?\n\n${offPageNote}`
+        : `Evict ${podsToEvict.length} pod(s)?`,
+      "Confirm evict",
+    );
     if (!confirmed) return;
 
     for (const pod of podsToEvict) {
@@ -949,13 +959,6 @@
 </script>
 
 <div class="grid w-full grid-cols-1 gap-4 overflow-visible">
-  {#if ENABLE_PODS_SAFE_MODE_HOTFIX && pods.length < sourcePods.length}
-    <InlineNotice class="border-amber-300/60 bg-amber-50 text-amber-950" title="Safe mode">
-      Rendering first {PODS_SAFE_MODE_MAX_ROWS} of {sourcePods.length} pods while the page stays in safe
-      mode.
-    </InlineNotice>
-  {/if}
-
   {#if showPodsCacheBanner && podsCacheBanner}
     <InlineNotice class="border-border/60 bg-background text-muted-foreground">
       {podsCacheBanner}
@@ -1119,6 +1122,10 @@
     onToggleAll={(next) => {
       toggleAllSelection(next);
     }}
+    onSelectableIdsChange={(ids, pageIds) => {
+      availableIds = ids;
+      currentPageIds = pageIds;
+    }}
     onOpenDetails={(row) => {
       openDetails(row.uid);
     }}
@@ -1278,6 +1285,7 @@
   <DeleteConfirmDialog
     open={deleteDialogOpen}
     targets={deleteDialogTargets}
+    scopeNote={deleteDialogScopeNote}
     onConfirm={() => resolveDeleteDialog(true)}
     onCancel={() => resolveDeleteDialog(false)}
   />

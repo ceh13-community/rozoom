@@ -50,6 +50,21 @@ export function buildPodLogsArgs(pod: PodIdentifier): string[] | null {
   });
 }
 
+/**
+ * Note for a bulk delete or evict whose pods are not all on the current page,
+ * so the confirmation says the action reaches pods the user cannot see.
+ */
+export function describeOffPageSelection(
+  podIds: string[],
+  currentPageIds: string[],
+): string | null {
+  const onPage = new Set(currentPageIds);
+  const offPageCount = podIds.filter((id) => !onPage.has(id)).length;
+  if (offPageCount === 0) return null;
+  const total = podIds.length;
+  return `${total} pods across all pages: ${offPageCount} of them are not on the current page.`;
+}
+
 export function pruneSelection(selected: Set<string>, available: string[]): Set<string> {
   if (selected.size === 0) return selected;
   const availableSet = new Set(available);

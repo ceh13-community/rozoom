@@ -15,7 +15,7 @@
   import PodSelectionCheckbox from "./pod-selection-checkbox.svelte";
   import { buildPodMetricsSummary } from "./model/pod-runtime-ui";
   import { getPodMetricsKey, type PodMetricsValue } from "./model/pod-row-adapter";
-  import type { PodListRow } from "./model/pod-list-row";
+  import { GROUPED_VIEW_MAX_ROWS, type PodListRow } from "./model/pod-list-row";
 
   type DataTableProps = {
     rows: PodListRow[];
@@ -34,6 +34,7 @@
     isSomeSelected: boolean;
     onToggleSelect: (id: string, next: boolean) => void;
     onToggleAll: (next: boolean) => void;
+    onSelectableIdsChange: (ids: string[], currentPageIds: string[]) => void;
     onOpenDetails: (row: PodListRow) => void;
     onEvents: (row: PodListRow) => void;
     onShell: (row: PodListRow) => void;
@@ -93,6 +94,7 @@
     isSomeSelected,
     onToggleSelect,
     onToggleAll,
+    onSelectableIdsChange,
     onOpenDetails,
     onEvents,
     onShell,
@@ -220,6 +222,16 @@
 
   const sortedRows = $derived.by(() => [...namespaceFilteredRows].sort(compareRows));
 
+  const isGroupedView = $derived(viewMode === "namespace" || viewMode === "node");
+  const groupedViewRows = $derived(sortedRows.slice(0, GROUPED_VIEW_MAX_ROWS));
+  const isGroupedViewCapped = $derived(isGroupedView && sortedRows.length > GROUPED_VIEW_MAX_ROWS);
+  // Select all, and the selection kept across refreshes, cover exactly the rows this
+  // view can show: search and the NS checklist applied, and the cap in grouped views.
+  const selectableIds = $derived(
+    (isGroupedView ? groupedViewRows : sortedRows).map((row) => row.uid).filter(Boolean),
+  );
+
+
   const VIRTUAL_ROW_HEIGHT = 42;
   let tableScrollTop = $state(0);
   let tableViewportHeight = $state(560);
@@ -240,6 +252,15 @@
     sortedRows.slice(podPageIndex * podPageSize, (podPageIndex + 1) * podPageSize),
   );
 
+  // Rows on screen now: the current page of the flat list, or every capped row in a grouped view.
+  const currentPageIds = $derived(
+    (isGroupedView ? groupedViewRows : paginatedPods).map((row) => row.uid).filter(Boolean),
+  );
+
+  $effect(() => {
+    onSelectableIdsChange(selectableIds, currentPageIds);
+  });
+
   const flatVirtualWindow = $derived.by(() =>
     computeVirtualWindow({
       totalCount: paginatedPods.length,
@@ -255,7 +276,7 @@
 
   function getGroupedRows() {
     const groups = new Map<string, PodListRow[]>();
-    for (const row of sortedRows) {
+    for (const row of groupedViewRows) {
       const groupKey = viewMode === "node" ? row.node?.trim() || "Unscheduled" : row.namespace;
       const bucket = groups.get(groupKey) ?? [];
       bucket.push(row);
@@ -530,7 +551,7 @@
         {onWatcherRefreshSecondsChange}
         {onResetWatcherSettings}
       />
-      {#if (viewMode === "namespace" || viewMode === "node") && getGroupedRows().length > 0}
+      {#if isGroupedView && getGroupedRows().length > 0}
         <Button variant="outline" size="sm" onclick={toggleAllGroups}>
           {getToggleAllGroupsLabel()}
         </Button>
@@ -549,6 +570,13 @@
     </div>
     <div class="min-w-[18rem] flex-1">{metricsSummary}</div>
   </div>
+
+  {#if isGroupedViewCapped}
+    <InlineNotice class="border-amber-300/60 bg-amber-50 text-amber-950" title="Grouped view limit">
+      Grouped view shows the first {GROUPED_VIEW_MAX_ROWS} of {sortedRows.length} pods. Switch to the flat
+      list to page through all of them, or narrow the NS filter or search.
+    </InlineNotice>
+  {/if}
 
   {#if watcherError}
     <div
@@ -634,7 +662,7 @@
         <div class="px-4 py-6 text-sm text-muted-foreground">
           No pods found for the current filter.
         </div>
-      {:else if viewMode === "namespace" || viewMode === "node"}
+      {:else if isGroupedView}
         {#each getGroupedRows() as [groupKey, groupRows] (groupKey)}
           <div class="border-b border-border/60">
             <button
