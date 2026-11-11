@@ -8,7 +8,7 @@ the user-facing change in plain language. The in-app update notification
 deliberately shows fixed copy and never displays these notes.
 The release build fails if the section for the released version is missing.
 
-## [0.26.3] - 2026-11-10
+## [0.26.3] - 2026-11-11
 
 Security release. When you connected a remote cluster through the Bearer Token,
 X.509 Certificate, Exec Plugin or Manual OIDC form and left the CA field empty,
