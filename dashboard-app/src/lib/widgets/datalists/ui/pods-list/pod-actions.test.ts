@@ -178,4 +178,13 @@ describe("describeOffPageSelection", () => {
       "5 pods across all pages: 3 of them are not on the current page.",
     );
   });
+
+  it("uses singular wording when one pod is off the page", () => {
+    expect(describeOffPageSelection(["a", "x"], ["a"])).toBe(
+      "2 pods across all pages: 1 of them is not on the current page.",
+    );
+    expect(describeOffPageSelection(["x"], [])).toBe(
+      "1 pod across all pages: 1 of them is not on the current page.",
+    );
+  });
 });

@@ -62,7 +62,9 @@ export function describeOffPageSelection(
   const offPageCount = podIds.filter((id) => !onPage.has(id)).length;
   if (offPageCount === 0) return null;
   const total = podIds.length;
-  return `${total} pods across all pages: ${offPageCount} of them are not on the current page.`;
+  const podWord = total === 1 ? "pod" : "pods";
+  const verb = offPageCount === 1 ? "is" : "are";
+  return `${total} ${podWord} across all pages: ${offPageCount} of them ${verb} not on the current page.`;
 }
 
 export function pruneSelection(selected: Set<string>, available: string[]): Set<string> {
