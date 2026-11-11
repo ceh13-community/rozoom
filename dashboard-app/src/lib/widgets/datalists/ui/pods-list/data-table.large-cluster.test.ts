@@ -1,7 +1,7 @@
 import { fireEvent, render, waitFor } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 import DataTable from "./data-table.svelte";
-import type { PodListRow } from "./model/pod-list-row";
+import { filterPodListRows, type PodListRow } from "./model/pod-list-row";
 
 // jsdom needs seconds per hundred grouped rows, so the grouped cap is lowered
 // here. The production value is pinned by the pods list row cap contract test.
@@ -70,6 +70,7 @@ const baseProps = {
   isSomeSelected: false,
   onToggleSelect: vi.fn(),
   onToggleAll: vi.fn(),
+  onSelectableIdsChange: vi.fn(),
   onOpenDetails: vi.fn(),
   onEvents: vi.fn(),
   onShell: vi.fn(),
@@ -133,5 +134,47 @@ describe("pods data-table on a 492-pod cluster", () => {
     expect(getByText(/shows the first 20 of 92 pods/)).toBeInTheDocument();
     expect(container.querySelectorAll(".pods-k9s-table__row")).toHaveLength(20);
     expect([...getRenderedRowNamespaces(container)]).toEqual(["zz-batch"]);
+  }, 20_000);
+
+  it("offers Select all only the pods that passed search and the NS checklist", async () => {
+    const rows = buildLargeClusterRows();
+    const hiddenIds = new Set(
+      rows.filter((row) => row.namespace === "zz-batch").map((row) => row.uid),
+    );
+    const onSelectableIdsChange = vi.fn();
+    const onToggleAll = vi.fn();
+    const { getByLabelText, getByRole, rerender } = render(DataTable, {
+      props: { rows, ...baseProps, onSelectableIdsChange, onToggleAll },
+    });
+    const lastIds = () => (onSelectableIdsChange.mock.lastCall?.[0] ?? []) as string[];
+
+    await waitFor(() => {
+      expect(lastIds()).toHaveLength(492);
+    });
+
+    await fireEvent.click(getByRole("button", { name: "NS (9/9)" }));
+    await waitFor(() => {
+      expect(getByLabelText("zz-batch")).toBeInTheDocument();
+    });
+    await fireEvent.click(getByLabelText("zz-batch"));
+
+    await waitFor(() => {
+      expect(lastIds()).toHaveLength(400);
+    });
+    expect(lastIds().some((id) => hiddenIds.has(id))).toBe(false);
+
+    await fireEvent.click(getByLabelText("Select all pods"));
+    expect(onToggleAll).toHaveBeenCalledWith(true);
+
+    await rerender({ rows: filterPodListRows(rows, "pod-01") });
+    await waitFor(() => {
+      expect(lastIds()).toEqual(Array.from({ length: 10 }, (_, index) => `pod-${10 + index}`));
+    });
+
+    await rerender({ rows });
+    await fireEvent.click(getByLabelText("Group by namespace"));
+    await waitFor(() => {
+      expect(lastIds()).toHaveLength(20);
+    });
   }, 20_000);
 });

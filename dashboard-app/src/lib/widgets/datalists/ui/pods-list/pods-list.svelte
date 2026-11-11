@@ -149,7 +149,9 @@
       .map((id) => sourcePodByUid.get(id))
       .filter((pod): pod is Partial<PodItem> => Boolean(pod)),
   );
-  const availableIds = $derived.by(() => filteredRows.map((row) => row.uid).filter(Boolean));
+  // Pods the table can show after search, its NS checklist and the grouped-view cap.
+  // DataTable reports them, so Select all never reaches a pod hidden by the NS checklist.
+  let availableIds = $state<string[]>([]);
   const areAllSelected = $derived(
     availableIds.length > 0 && availableIds.every((id) => selectedPodIds.has(id)),
   );
@@ -1102,6 +1104,9 @@
     }}
     onToggleAll={(next) => {
       toggleAllSelection(next);
+    }}
+    onSelectableIdsChange={(ids) => {
+      availableIds = ids;
     }}
     onOpenDetails={(row) => {
       openDetails(row.uid);

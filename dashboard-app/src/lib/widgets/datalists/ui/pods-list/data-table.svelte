@@ -34,6 +34,7 @@
     isSomeSelected: boolean;
     onToggleSelect: (id: string, next: boolean) => void;
     onToggleAll: (next: boolean) => void;
+    onSelectableIdsChange: (ids: string[]) => void;
     onOpenDetails: (row: PodListRow) => void;
     onEvents: (row: PodListRow) => void;
     onShell: (row: PodListRow) => void;
@@ -93,6 +94,7 @@
     isSomeSelected,
     onToggleSelect,
     onToggleAll,
+    onSelectableIdsChange,
     onOpenDetails,
     onEvents,
     onShell,
@@ -223,6 +225,15 @@
   const isGroupedView = $derived(viewMode === "namespace" || viewMode === "node");
   const groupedViewRows = $derived(sortedRows.slice(0, GROUPED_VIEW_MAX_ROWS));
   const isGroupedViewCapped = $derived(isGroupedView && sortedRows.length > GROUPED_VIEW_MAX_ROWS);
+  // Select all, and the selection kept across refreshes, cover exactly the rows this
+  // view can show: search and the NS checklist applied, and the cap in grouped views.
+  const selectableIds = $derived(
+    (isGroupedView ? groupedViewRows : sortedRows).map((row) => row.uid).filter(Boolean),
+  );
+
+  $effect(() => {
+    onSelectableIdsChange(selectableIds);
+  });
 
   const VIRTUAL_ROW_HEIGHT = 42;
   let tableScrollTop = $state(0);

@@ -26,6 +26,7 @@ describe("pods data-table", () => {
     isSomeSelected: false,
     onToggleSelect: vi.fn(),
     onToggleAll: vi.fn(),
+    onSelectableIdsChange: vi.fn(),
     onOpenDetails: vi.fn(),
     onEvents: vi.fn(),
     onShell: vi.fn(),

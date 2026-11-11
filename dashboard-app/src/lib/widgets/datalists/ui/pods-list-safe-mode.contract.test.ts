@@ -31,4 +31,13 @@ describe("pods list row cap contract", () => {
     );
     expect(dataTableSource).toContain("for (const row of groupedViewRows) {");
   });
+
+  it("selects only the pods the table reports after search and its NS checklist", () => {
+    expect(podsListSource).toContain("let availableIds = $state<string[]>([]);");
+    expect(podsListSource).toContain("onSelectableIdsChange={(ids) => {");
+    expect(podsListSource).toContain("availableIds = ids;");
+    expect(podsListSource).toContain("selectedPodIds = new Set(availableIds);");
+    expect(podsListSource).not.toContain("filteredRows.map((row) => row.uid)");
+    expect(dataTableSource).toContain("onSelectableIdsChange(selectableIds);");
+  });
 });
