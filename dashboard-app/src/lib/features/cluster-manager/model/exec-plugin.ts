@@ -16,12 +16,10 @@
  *   - oc-login   : `oc login`                    (OpenShift)
  *   - generic    : arbitrary command + args
  *
- * The `bundled` flag reflects the actual build: aws and oc are bundled in
- * full builds only, gcloud is planned and never bundled, the rest are
- * user-installed binaries.
+ * No preset is bundled: the generated kubeconfig writes the bare command
+ * name and kubectl resolves the binary from the OS PATH. The app's own
+ * bundled copies are never used for exec auth.
  */
-
-import { isToolEnabled } from "$shared/config/tooling";
 
 import { assertClusterName, kubeconfigTlsYaml, yamlQuoted } from "./tls-gate";
 
@@ -87,7 +85,7 @@ export const EXEC_PLUGIN_PRESETS: ExecPluginPreset[] = [
     extraLabel: "AWS profile (optional)",
     extraPlaceholder: "default",
     docsUrl: "https://docs.aws.amazon.com/eks/latest/userguide/install-kubectl.html#get-token",
-    bundled: isToolEnabled("aws"),
+    bundled: false,
     security: "high",
     securityDetail:
       "Tokens live ~15 minutes and are generated on demand by the aws CLI. No secrets on disk.",
@@ -141,7 +139,7 @@ export const EXEC_PLUGIN_PRESETS: ExecPluginPreset[] = [
     description: "Uses the `oc` CLI to obtain short-lived OpenShift tokens via its login flow.",
     docsUrl:
       "https://docs.openshift.com/container-platform/latest/cli_reference/openshift_cli/getting-started-cli.html",
-    bundled: isToolEnabled("oc"),
+    bundled: false,
     security: "high",
     securityDetail:
       "Token lifetime follows the OpenShift OAuth token TTL (default 24h). Rotated automatically on re-login.",
@@ -160,7 +158,7 @@ export const EXEC_PLUGIN_PRESETS: ExecPluginPreset[] = [
     bundled: false,
     security: "medium",
     securityDetail:
-      "Security depends entirely on the plugin you provide. Prefer a bundled preset when one fits.",
+      "Security depends entirely on the plugin you provide. No preset is bundled: kubectl resolves every command from the OS PATH.",
   },
 ];
 

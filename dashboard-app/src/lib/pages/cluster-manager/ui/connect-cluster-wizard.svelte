@@ -16,7 +16,7 @@
     type ExecPluginKind,
   } from "$features/cluster-manager/model/exec-plugin";
   import { humanizeConnectError } from "$features/cluster-manager/model/humanize-connect-error";
-  import { isToolEnabled } from "$shared/config/tooling";
+  import { isToolBundled } from "$shared/config/tooling";
   import { TlsBlockedError } from "$features/cluster-manager/model/tls-gate";
   import { caDataFromForm } from "$features/cluster-manager/model/ca-normalize";
   import {
@@ -94,6 +94,7 @@
 
   // ── Cloud state ──
   let cloudProvider = $state("AWS EKS");
+  const cloudProviderTool = $derived(getProviderTool(cloudProvider));
   let cloudRegion = $state("");
   let cloudScope = $state("");
   let cloudScopes = $state<CloudScope[]>([]);
@@ -1220,72 +1221,71 @@
               {#each getSupportedCloudProviders() as p}<option value={p}>{p}</option>{/each}
             </select>
           </div>
-          <div>
-            <!-- svelte-ignore a11y_label_has_associated_control -->
-            <label class="text-[10px] text-slate-500 block mb-0.5">Region (optional)</label>
-            <input
-              type="text"
-              bind:value={cloudRegion}
-              placeholder="all regions"
-              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 w-32"
-            />
-          </div>
-          <div>
-            <!-- svelte-ignore a11y_label_has_associated_control -->
-            <label class="text-[10px] text-slate-500 block mb-0.5"
-              >{cloudScopeLabel} (optional)</label
-            >
-            {#if cloudScopes.length > 0}
-              <select
-                bind:value={cloudScope}
-                class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200"
-              >
-                <option value="">default credentials</option>
-                {#each cloudScopes as s (s.id)}
-                  <option value={s.id}>{s.label}</option>
-                {/each}
-              </select>
-            {:else}
+          {#if cloudProviderTool !== null && !isToolBundled(cloudProviderTool)}
+            <div class="text-[10px] text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1 max-w-64">
+              Cloud import is not available in this build: the {cloudProviderTool} CLI is not
+              bundled.
+            </div>
+          {:else}
+            <div>
+              <!-- svelte-ignore a11y_label_has_associated_control -->
+              <label class="text-[10px] text-slate-500 block mb-0.5">Region (optional)</label>
               <input
                 type="text"
-                bind:value={cloudScope}
-                placeholder={cloudScopesLoading
-                  ? "loading..."
-                  : `${cloudScopeLabel.toLowerCase()} name`}
-                class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 w-36"
+                bind:value={cloudRegion}
+                placeholder="all regions"
+                class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 w-32"
               />
-            {/if}
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            class="text-xs h-7"
-            disabled={cloudLoading}
-            onclick={listClouds}
-          >
-            {cloudLoading ? "Loading" : "List clusters"}
-          </Button>
-          {#if cloudScopes.length > 0}
+            </div>
+            <div>
+              <!-- svelte-ignore a11y_label_has_associated_control -->
+              <label class="text-[10px] text-slate-500 block mb-0.5"
+                >{cloudScopeLabel} (optional)</label
+              >
+              {#if cloudScopes.length > 0}
+                <select
+                  bind:value={cloudScope}
+                  class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200"
+                >
+                  <option value="">default credentials</option>
+                  {#each cloudScopes as s (s.id)}
+                    <option value={s.id}>{s.label}</option>
+                  {/each}
+                </select>
+              {:else}
+                <input
+                  type="text"
+                  bind:value={cloudScope}
+                  placeholder={cloudScopesLoading
+                    ? "loading..."
+                    : `${cloudScopeLabel.toLowerCase()} name`}
+                  class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 w-36"
+                />
+              {/if}
+            </div>
             <Button
               size="sm"
               variant="outline"
               class="text-xs h-7"
               disabled={cloudLoading}
-              onclick={scanAllScopes}
-              title="Scan every {cloudScopeLabel.toLowerCase()} and every region"
+              onclick={listClouds}
             >
-              Scan all
+              {cloudLoading ? "Loading" : "List clusters"}
             </Button>
+            {#if cloudScopes.length > 0}
+              <Button
+                size="sm"
+                variant="outline"
+                class="text-xs h-7"
+                disabled={cloudLoading}
+                onclick={scanAllScopes}
+                title="Scan every {cloudScopeLabel.toLowerCase()} and every region"
+              >
+                Scan all
+              </Button>
+            {/if}
           {/if}
         </div>
-        {#if getProviderTool(cloudProvider) && !isToolEnabled(getProviderTool(cloudProvider)!)}
-          <div
-            class="text-[10px] text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
-          >
-            The {getProviderTool(cloudProvider)} CLI is not bundled with this build. Install it
-            in PATH to use {cloudProvider} import.
-          </div>
-        {/if}
         {#if cloudClusters.length > 0}
           <div class="space-y-1 max-h-48 overflow-y-auto">
             {#each cloudClusters as cluster (cluster.scope ? `${cluster.scope}::${cluster.region}::${cluster.name}` : `${cluster.region}::${cluster.name}`)}
