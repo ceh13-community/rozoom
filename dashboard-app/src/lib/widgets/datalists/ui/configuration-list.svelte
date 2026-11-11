@@ -122,6 +122,11 @@
     buildKubectlGetYamlCommand as buildKubectlGetYamlCliCommand,
     canCopyKubectlCommand,
   } from "./common/kubectl-command-builder";
+  import {
+    buildDeleteConfirmMessage,
+    countDeletedObjects,
+    parseDeleteDryRunNames,
+  } from "./common/delete-confirmation";
   import { COPY_BLOCKED_MESSAGE } from "$shared/lib/format-command-line";
   import { runDebugDescribe } from "$features/resource-debug-runtime";
   import { invalidateWorkloadSnapshotCache } from "./common/workload-cache-invalidation";
@@ -4016,6 +4021,9 @@ spec:
     actionInFlight = true;
     errorMessage = null;
     try {
+      // Ask the API server what each delete would remove, then show that list before
+      // anything is deleted. The dialog is built from the dry run, not from the rows.
+      const plannedObjects: string[] = [];
       for (const row of rows) {
         if (isNamespacesWorkload && !canDeleteNamespaceRow(row)) {
           throw new Error(`Namespace "${row.name}" is protected and cannot be deleted from UI.`);
@@ -4029,13 +4037,30 @@ spec:
             dryRun.errors || dryRun.output || `Dry-run delete failed for ${row.name}`,
           );
         }
-        const result = await kubectlRawArgsFront(buildKubectlDeleteArgs(target), { clusterId });
+        plannedObjects.push(...parseDeleteDryRunNames(dryRun.output));
+      }
+      if (plannedObjects.length === 0) {
+        throw new Error("Nothing to delete: the API server found none of the selected objects.");
+      }
+      const confirmed = await confirmAction(
+        buildDeleteConfirmMessage(plannedObjects, { namespaces: isNamespacesWorkload }),
+        "Confirm delete",
+      );
+      if (!confirmed) return;
+
+      let deletedCount = 0;
+      for (const row of rows) {
+        const result = await kubectlRawArgsFront(buildKubectlDeleteArgs(getKubectlTarget(row)), {
+          clusterId,
+        });
         if (result.errors || result.code !== 0) {
           throw new Error(result.errors || result.output || `Failed to delete ${row.name}`);
         }
+        deletedCount += countDeletedObjects(result.output);
       }
+      if (deletedCount === 0) deletedCount = plannedObjects.length;
       actionNotification = notifySuccess(
-        `Deleted ${rows.length} resource${rows.length === 1 ? "" : "s"}`,
+        `Deleted ${deletedCount} resource${deletedCount === 1 ? "" : "s"}`,
       );
       selectedRowIds = new Set();
       removeRowsFromSnapshot(rows);
