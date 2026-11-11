@@ -33,7 +33,7 @@
 2. Install and launch ROZOOM. No sign-in, no cloud account.
 3. On the first screen, **Manage Kubernetes Clusters**, pick your path:
    - **Local cluster**: open **Connect Cluster** at the bottom of the page and click **Scan local clusters**. A read-only scan finds minikube, kind, k3d and Docker Desktop, then **Connect** on a row adds that cluster.
-   - **Remote cluster**: in the same panel pick **Bearer Token** and paste the API server **URL + a service-account token**. No OIDC setup, no kubeconfig editing. The token must be allowed to list nodes: with only the built-in `view` role the app shows the cluster as offline.
+   - **Remote cluster**: in the same panel pick **Bearer Token** and paste the API server **URL, a service-account token and the cluster's CA certificate**. No OIDC setup, no kubeconfig editing. `kubectl get configmap kube-root-ca.crt -o jsonpath='{.data.ca\.crt}'` prints the CA. From 0.26.3 a remote cluster without a CA is refused, unless you tick **Skip TLS verification (insecure)**. The token must be allowed to list nodes: with only the built-in `view` role the app shows the cluster as offline.
    - **Existing kubeconfig**: contexts from `~/.kube/config` (and `$KUBECONFIG`) are listed under **Detected kubeconfig files**, ready to check and add. OIDC, cloud import, exec plugins and Vault are in **Connect Cluster**.
 
 You're now looking at fleet health, Helm releases, and triaged workloads across every connected cluster. RBAC risks come with the free **Security Suite** plugin: enable it under **Marketplace > Plugin Marketplace**.
@@ -66,7 +66,7 @@ The primary application lives in `dashboard-app/`. See the detailed developer gu
 
 ## What this project delivers
 
-- **Frictionless connection**: auto-detect local clusters or paste a URL + token for remote ones — connected in under a minute, with nothing installed on the cluster.
+- **Frictionless connection**: auto-detect local clusters or paste a URL, token and CA for remote ones. Connected in under a minute, with nothing installed on the cluster.
 - **Runtime Health Score**: shows what is failing right now across control plane, nodes, workloads, observability, and platform hygiene.
 - **Config Reliability & Security Score**: highlights configuration risks that can cause incidents.
 - **Actionable remediation**: top issues are ranked by impact with minimal fix guidance.
