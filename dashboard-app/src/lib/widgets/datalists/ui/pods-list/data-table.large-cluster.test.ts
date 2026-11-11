@@ -177,4 +177,17 @@ describe("pods data-table on a 492-pod cluster", () => {
       expect(lastIds()).toHaveLength(20);
     });
   }, 20_000);
+
+  it("reports the current page apart from the selectable pods", async () => {
+    const onSelectableIdsChange = vi.fn();
+    render(DataTable, {
+      props: { rows: buildLargeClusterRows(), ...baseProps, onSelectableIdsChange },
+    });
+
+    await waitFor(() => {
+      const [selectable, currentPage] = onSelectableIdsChange.mock.lastCall ?? [[], []];
+      expect(selectable).toHaveLength(492);
+      expect(currentPage).toHaveLength(100);
+    });
+  }, 20_000);
 });

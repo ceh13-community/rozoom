@@ -6,6 +6,7 @@ import {
   buildPodEvictFallbackDeleteArgs,
   buildPodEvictArgs,
   buildPodLogsArgs,
+  describeOffPageSelection,
   pruneSelection,
 } from "./pod-actions";
 
@@ -164,5 +165,17 @@ describe("buildPodLogsArgs", () => {
       "--all-containers=true",
       "-f",
     ]);
+  });
+});
+
+describe("describeOffPageSelection", () => {
+  it("returns nothing when every pod is on the current page", () => {
+    expect(describeOffPageSelection(["a", "b"], ["a", "b", "c"])).toBeNull();
+  });
+
+  it("counts the pods outside the current page", () => {
+    expect(describeOffPageSelection(["a", "b", "x", "y", "z"], ["a", "b"])).toBe(
+      "5 pods across all pages: 3 of them are not on the current page.",
+    );
   });
 });

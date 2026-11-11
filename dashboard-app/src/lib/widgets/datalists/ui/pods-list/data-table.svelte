@@ -34,7 +34,7 @@
     isSomeSelected: boolean;
     onToggleSelect: (id: string, next: boolean) => void;
     onToggleAll: (next: boolean) => void;
-    onSelectableIdsChange: (ids: string[]) => void;
+    onSelectableIdsChange: (ids: string[], currentPageIds: string[]) => void;
     onOpenDetails: (row: PodListRow) => void;
     onEvents: (row: PodListRow) => void;
     onShell: (row: PodListRow) => void;
@@ -231,9 +231,6 @@
     (isGroupedView ? groupedViewRows : sortedRows).map((row) => row.uid).filter(Boolean),
   );
 
-  $effect(() => {
-    onSelectableIdsChange(selectableIds);
-  });
 
   const VIRTUAL_ROW_HEIGHT = 42;
   let tableScrollTop = $state(0);
@@ -254,6 +251,15 @@
   const paginatedPods = $derived(
     sortedRows.slice(podPageIndex * podPageSize, (podPageIndex + 1) * podPageSize),
   );
+
+  // Rows on screen now: the current page of the flat list, or every capped row in a grouped view.
+  const currentPageIds = $derived(
+    (isGroupedView ? groupedViewRows : paginatedPods).map((row) => row.uid).filter(Boolean),
+  );
+
+  $effect(() => {
+    onSelectableIdsChange(selectableIds, currentPageIds);
+  });
 
   const flatVirtualWindow = $derived.by(() =>
     computeVirtualWindow({

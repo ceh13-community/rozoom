@@ -34,10 +34,20 @@ describe("pods list row cap contract", () => {
 
   it("selects only the pods the table reports after search and its NS checklist", () => {
     expect(podsListSource).toContain("let availableIds = $state<string[]>([]);");
-    expect(podsListSource).toContain("onSelectableIdsChange={(ids) => {");
+    expect(podsListSource).toContain("onSelectableIdsChange={(ids, pageIds) => {");
     expect(podsListSource).toContain("availableIds = ids;");
     expect(podsListSource).toContain("selectedPodIds = new Set(availableIds);");
     expect(podsListSource).not.toContain("filteredRows.map((row) => row.uid)");
-    expect(dataTableSource).toContain("onSelectableIdsChange(selectableIds);");
+    expect(dataTableSource).toContain("onSelectableIdsChange(selectableIds, currentPageIds);");
+  });
+
+  it("warns in the delete and evict confirmations when the pods span pages", () => {
+    expect(podsListSource).toContain(
+      "describeOffPageSelection(podsToDelete.map(getPodUid), currentPageIds)",
+    );
+    expect(podsListSource).toContain(
+      "describeOffPageSelection(podsToEvict.map(getPodUid), currentPageIds)",
+    );
+    expect(podsListSource).toContain("scopeNote={deleteDialogScopeNote}");
   });
 });

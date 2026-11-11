@@ -59,6 +59,7 @@
     buildPodDescribeCommand,
     buildPodEvictArgs,
     buildPodEvictFallbackDeleteArgs,
+    describeOffPageSelection,
     pruneSelection,
   } from "./pod-actions";
   import { getPodRef, getPodUid } from "./model/pod-row-adapter";
@@ -152,6 +153,7 @@
   // Pods the table can show after search, its NS checklist and the grouped-view cap.
   // DataTable reports them, so Select all never reaches a pod hidden by the NS checklist.
   let availableIds = $state<string[]>([]);
+  let currentPageIds = $state<string[]>([]);
   const areAllSelected = $derived(
     availableIds.length > 0 && availableIds.every((id) => selectedPodIds.has(id)),
   );
@@ -687,6 +689,7 @@
   }
 
   let deleteDialogTargets = $state<DeleteTarget[]>([]);
+  let deleteDialogScopeNote = $state<string | null>(null);
   let deleteDialogResolve: ((confirmed: boolean) => void) | null = null;
   const deleteDialogOpen = $derived(deleteDialogTargets.length > 0);
 
@@ -704,9 +707,13 @@
     };
   }
 
-  function requestDeleteConfirmation(targets: DeleteTarget[]): Promise<boolean> {
+  function requestDeleteConfirmation(
+    targets: DeleteTarget[],
+    scopeNote: string | null,
+  ): Promise<boolean> {
     return new Promise((resolve) => {
       deleteDialogResolve = resolve;
+      deleteDialogScopeNote = scopeNote;
       deleteDialogTargets = targets;
     });
   }
@@ -715,6 +722,7 @@
     const resolve = deleteDialogResolve;
     deleteDialogResolve = null;
     deleteDialogTargets = [];
+    deleteDialogScopeNote = null;
     resolve?.(confirmed);
   }
 
@@ -724,7 +732,10 @@
       .map((pod) => buildDeleteTarget(pod))
       .filter((target): target is DeleteTarget => target !== null);
     if (targets.length === 0) return;
-    const confirmed = await requestDeleteConfirmation(targets);
+    const confirmed = await requestDeleteConfirmation(
+      targets,
+      describeOffPageSelection(podsToDelete.map(getPodUid), currentPageIds),
+    );
     if (!confirmed) return;
 
     for (const pod of podsToDelete) {
@@ -759,7 +770,13 @@
 
   async function evictPods(podsToEvict: Partial<PodItem>[]) {
     if (!data.slug || podsToEvict.length === 0) return;
-    const confirmed = await confirmAction(`Evict ${podsToEvict.length} pod(s)?`, "Confirm evict");
+    const offPageNote = describeOffPageSelection(podsToEvict.map(getPodUid), currentPageIds);
+    const confirmed = await confirmAction(
+      offPageNote
+        ? `Evict ${podsToEvict.length} pod(s)?\n\n${offPageNote}`
+        : `Evict ${podsToEvict.length} pod(s)?`,
+      "Confirm evict",
+    );
     if (!confirmed) return;
 
     for (const pod of podsToEvict) {
@@ -1105,8 +1122,9 @@
     onToggleAll={(next) => {
       toggleAllSelection(next);
     }}
-    onSelectableIdsChange={(ids) => {
+    onSelectableIdsChange={(ids, pageIds) => {
       availableIds = ids;
+      currentPageIds = pageIds;
     }}
     onOpenDetails={(row) => {
       openDetails(row.uid);
@@ -1267,6 +1285,7 @@
   <DeleteConfirmDialog
     open={deleteDialogOpen}
     targets={deleteDialogTargets}
+    scopeNote={deleteDialogScopeNote}
     onConfirm={() => resolveDeleteDialog(true)}
     onCancel={() => resolveDeleteDialog(false)}
   />

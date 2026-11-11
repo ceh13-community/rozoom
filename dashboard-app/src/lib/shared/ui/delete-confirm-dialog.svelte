@@ -15,11 +15,19 @@
   type DeleteConfirmDialogProps = {
     open: boolean;
     targets: DeleteTarget[];
+    /** Extra warning shown above the command, e.g. when targets span pages the user cannot see. */
+    scopeNote?: string | null;
     onConfirm: () => void;
     onCancel: () => void;
   };
 
-  const { open = false, targets, onConfirm, onCancel }: DeleteConfirmDialogProps = $props();
+  const {
+    open = false,
+    targets,
+    scopeNote = null,
+    onConfirm,
+    onCancel,
+  }: DeleteConfirmDialogProps = $props();
 
   const count = $derived(targets.length);
   const kindLabel = $derived(count === 1 ? (targets[0]?.kind ?? "resource") : `${count} resources`);
@@ -43,6 +51,13 @@
     </Dialog.Header>
 
     <div class="flex flex-col gap-4 px-1 py-3">
+      {#if scopeNote}
+        <p
+          class="rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-950"
+        >
+          {scopeNote}
+        </p>
+      {/if}
       <section class="flex flex-col gap-1.5">
         <span class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Command to run
