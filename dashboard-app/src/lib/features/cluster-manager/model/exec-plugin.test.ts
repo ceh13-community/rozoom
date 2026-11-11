@@ -1,6 +1,7 @@
 import { load as parse } from "js-yaml";
 import { describe, expect, it } from "vitest";
-import { generateExecKubeconfig } from "./exec-plugin";
+import { EXEC_PLUGIN_PRESETS, generateExecKubeconfig } from "./exec-plugin";
+import { isToolEnabled } from "$shared/config/tooling";
 import { TlsBlockedError } from "./tls-gate";
 
 const base = {
@@ -110,5 +111,25 @@ describe("an emoji in the exec plugin form", () => {
       .users[0].user.exec;
     expect(exec.command).toBe(value);
     expect(exec.args).toEqual([value]);
+  });
+});
+
+describe("bundled flags match the build", () => {
+  it("gke-auth is never bundled: gcloud is planned, not shipped", () => {
+    const gke = EXEC_PLUGIN_PRESETS.find((p) => p.kind === "gke-auth");
+    expect(gke?.bundled).toBe(false);
+  });
+
+  it("aws-eks and oc-login follow the build's tool filter", () => {
+    const aws = EXEC_PLUGIN_PRESETS.find((p) => p.kind === "aws-eks");
+    const oc = EXEC_PLUGIN_PRESETS.find((p) => p.kind === "oc-login");
+    expect(aws?.bundled).toBe(isToolEnabled("aws"));
+    expect(oc?.bundled).toBe(isToolEnabled("oc"));
+  });
+
+  it("user-installed presets are never bundled", () => {
+    for (const kind of ["aws-iam", "kubelogin", "generic"] as const) {
+      expect(EXEC_PLUGIN_PRESETS.find((p) => p.kind === kind)?.bundled).toBe(false);
+    }
   });
 });

@@ -16,6 +16,7 @@
     type ExecPluginKind,
   } from "$features/cluster-manager/model/exec-plugin";
   import { humanizeConnectError } from "$features/cluster-manager/model/humanize-connect-error";
+  import { isToolEnabled } from "$shared/config/tooling";
   import { TlsBlockedError } from "$features/cluster-manager/model/tls-gate";
   import { caDataFromForm } from "$features/cluster-manager/model/ca-normalize";
   import {
@@ -28,6 +29,7 @@
     listCloudClustersAllScopes,
     importCloudCluster,
     getSupportedCloudProviders,
+    getProviderTool,
     type CloudCluster,
     type CloudScope,
   } from "$features/cluster-manager/api/cloud-import";
@@ -1276,6 +1278,14 @@
             </Button>
           {/if}
         </div>
+        {#if getProviderTool(cloudProvider) && !isToolEnabled(getProviderTool(cloudProvider)!)}
+          <div
+            class="text-[10px] text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
+          >
+            The {getProviderTool(cloudProvider)} CLI is not bundled with this build. Install it
+            in PATH to use {cloudProvider} import.
+          </div>
+        {/if}
         {#if cloudClusters.length > 0}
           <div class="space-y-1 max-h-48 overflow-y-auto">
             {#each cloudClusters as cluster (cluster.scope ? `${cluster.scope}::${cluster.region}::${cluster.name}` : `${cluster.region}::${cluster.name}`)}
