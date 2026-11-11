@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from "svelte";
   import { Button } from "$shared/ui/button";
   import { Input } from "$shared/ui/input";
 
@@ -43,10 +44,17 @@
     step="1"
     class="w-24"
     value={String(watcherRefreshSeconds)}
-    oninput={(event) => {
-      const raw = Number(event.currentTarget.value);
-      if (!Number.isFinite(raw)) return;
-      onWatcherRefreshSecondsChange(raw);
+    onchange={async (event) => {
+      // Apply on change (Enter, blur, arrows), not per keystroke: the parent clamps to at
+      // least 5 s, so applying "4" while typing "45" rewrote the field to "5" and gave "55".
+      const field = event.currentTarget;
+      const raw = Number(field.value);
+      if (field.value.trim() !== "" && Number.isFinite(raw)) {
+        onWatcherRefreshSecondsChange(raw);
+      }
+      // Show the value that took effect, also when clamping left the stored value unchanged.
+      await tick();
+      field.value = String(watcherRefreshSeconds);
     }}
   />
 </div>
