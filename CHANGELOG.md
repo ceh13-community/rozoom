@@ -8,7 +8,48 @@ the user-facing change in plain language. The in-app update notification
 deliberately shows fixed copy and never displays these notes.
 The release build fails if the section for the released version is missing.
 
-## [0.26.2] - 2026-11-11
+## [0.26.3] - 2026-11-10
+
+Security release. When you connected a remote cluster through the Bearer Token,
+X.509 Certificate, Exec Plugin or Manual OIDC form and left the CA field empty,
+TLS verification was silently turned off, so your credentials went to a server
+whose identity was never checked. Now a remote cluster without a CA is refused
+and the form says why. Add the cluster's CA certificate, or tick Skip TLS
+verification (insecure) if you accept the risk for this connection. Clusters
+added earlier keep the settings they were saved with: if you left the CA empty,
+remove the cluster and add it again with its CA. On Linux (.deb, .rpm) the app
+does not update itself: download the new package from the release page and
+install it the way you installed this one. We recommend this update.
+
+### Changed
+
+- A remote cluster added through the Bearer Token, X.509 Certificate, Exec
+  Plugin or Manual OIDC form needs its CA certificate. Skip TLS verification
+  (insecure) is a checkbox with a warning on each of these forms. It applies to
+  one connection and cannot be ticked while the CA field has text. Plain HTTP
+  to a remote host stays refused.
+- A local cluster (localhost, 127.x, ::1) still connects without a CA, but
+  verification now stays on. A local cluster with a self-signed certificate and
+  no CA fails verification and shows auth-error: add the CA or tick the
+  checkbox.
+
+### Fixed
+
+- The CA field accepts a PEM certificate as well as base64, also when it is
+  pasted as several lines.
+- Values pasted into these forms are checked before anything is written. A
+  space, line break or control character in the server URL, token, client
+  certificate or key is refused with the name of the field, and so is a CA with
+  characters a PEM file cannot have. One such character could add settings to
+  the generated kubeconfig.
+- Cluster names with quotes, colons or # are written correctly to the generated
+  kubeconfig.
+- The skip-verification and static-token warnings are readable on the light
+  theme.
+
+Something confusing or broken? [Tell us what's wrong](https://github.com/ceh13-community/rozoom/discussions).
+
+## [0.26.2] - 2026-11-09
 
 Security release. Read-only clusters: kubectl, oc, helm, velero and the
 terminal are now checked before they start. This is a guard in the app, not an
