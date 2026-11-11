@@ -137,7 +137,7 @@ All workload tables (Pods, Deployments, etc.) sort by **problem severity**:
 
 ### Pagination
 
-All tables paginated at **100 rows per page** (configurable: 50/100/200/500).
+Lists on the shared pager show **100 rows per page** (configurable: 50/100/200/500). Not every list uses it.
 Page navigation at bottom: first/prev/1-2-3-4-5/next/last.
 
 ---

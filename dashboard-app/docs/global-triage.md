@@ -1,6 +1,6 @@
 # Global Triage - Cross-Resource Problem Scanner
 
-Scans ~46 Kubernetes resource types across the entire cluster, scores each
+Scans 45 Kubernetes resource types across the entire cluster, scores each
 resource for problems, and presents a ranked table of findings sorted by
 severity.
 
@@ -40,7 +40,7 @@ Three badges at the top showing aggregate counts:
 
 ---
 
-## Scanned Resource Types (46)
+## Scanned Resource Types (45)
 
 ### Core Workloads
 
@@ -52,7 +52,7 @@ Namespaces, Nodes, PriorityClasses, RuntimeClasses, Leases
 
 ### Configuration
 
-ConfigMaps, Secrets, ResourceQuotas, LimitRanges
+ConfigMaps, Secrets, ResourceQuotas, LimitRanges, HorizontalPodAutoscalers, PodDisruptionBudgets
 
 ### RBAC
 
@@ -123,7 +123,7 @@ $widgets/datalists/ui/triage/
 
 $features/workloads-management/model/
   triage-manifest.ts                - Manifest: which resources to scan, scorer mapping
-  triage-scorers.ts                 - 46 scorer functions (one per resource type)
+  triage-scorers.ts                 - 38 scorer functions (some resource types share one)
   triage-discovery.ts               - API resource discovery + cache
   triage.ts                         - ProblemResource type, sort, classify errors
 ```

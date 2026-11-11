@@ -95,14 +95,13 @@ This is acceptable in production as long as destructive flows and manual refresh
 
 Supporting documents:
 
-- `static/docs/release-execution-checklist.md`
-- `static/docs/release-go-no-go-memo.md`
-- `static/docs/staging-handoff-checklist.md`
-- `static/docs/manual-qa-matrix.md`
-- `static/docs/staging-soak-template.md`
-- `static/docs/sentry-rollout-and-monitoring.md`
-- `static/docs/packaging-distribution-audit.md`
-- `static/docs/operator-troubleshooting-runbook.md`
+- `docs/internal/release-execution-checklist.md`
+- `docs/internal/staging-handoff-checklist.md`
+- `docs/internal/manual-qa-matrix.md`
+- `docs/internal/staging-soak-template.md`
+- `docs/internal/sentry-rollout-and-monitoring.md`
+- `docs/internal/packaging-distribution-audit.md`
+- `docs/internal/operator-troubleshooting-runbook.md`
 
 ## Post-Release Monitoring
 

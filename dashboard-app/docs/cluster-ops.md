@@ -123,7 +123,7 @@ The panel auto-detects cluster distribution and applies the appropriate rotation
 
 **Multi-strategy fallback:** kubeadm exec -> CSR approval -> manual instructions.
 
-### Helm Catalog - New Charts (v0.17)
+### Helm Catalog - New Charts
 
 8 new charts added to the curated catalog (25 total across 5 categories):
 
@@ -137,7 +137,7 @@ The panel auto-detects cluster distribution and applies the appropriate rotation
 | **Flux2**                     | Infrastructure | GitOps toolkit with Helm/OCI support                  |
 | **Prometheus Adapter**        | Autoscaling    | Custom Prometheus metrics for HPA                     |
 
-### GitOps Bootstrap (v0.17)
+### GitOps Bootstrap
 
 One-click GitOps setup with YAML generators:
 
@@ -145,7 +145,7 @@ One-click GitOps setup with YAML generators:
 - **Flux**: GitRepository source + Kustomization with pruning
 - Configurable repo URL, branch, path, namespace (`gitops-bootstrap.ts`)
 
-### Fix Templates (v0.17)
+### Fix Templates
 
 YAML template generator for "Fix this" actions from health checks:
 

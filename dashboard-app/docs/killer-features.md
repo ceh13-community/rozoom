@@ -132,7 +132,7 @@ pure function (input → result) with full test coverage.
 
 ---
 
-## New Modules (v0.17.0)
+## Analysis Modules
 
 ### Capacity Intelligence
 
@@ -161,7 +161,7 @@ pure function (input → result) with full test coverage.
 
 ---
 
-## UI Panels (v0.17)
+## UI Panels
 
 Cluster Ops pages that expose analysis modules in the sidebar navigation:
 

@@ -32,7 +32,7 @@ Use this document as the release gate for the next production build. Every item 
 ### 2. Manual QA Matrix
 
 - status: `partial`
-- gate: full regression pass completed from `static/docs/manual-qa-matrix.md`
+- gate: full regression pass completed from `docs/internal/manual-qa-matrix.md`
 - evidence:
   - cluster manager
   - overview
@@ -53,13 +53,13 @@ Use this document as the release gate for the next production build. Every item 
     - observed activity includes `kubectl`, `helm`, and `velero` sidecars only
     - healthy cluster metrics path verified via read-only `kubectl top pod -A` on:
       - `minikube`
-      - `arn:aws:eks:us-east-2:123456789012:cluster/test-cluster`
+      - `arn:aws:eks:us-east-2:123456789012:cluster/<eks-cluster>`
     - local Playwright smoke harness is present in `e2e/`, but this sandbox blocks `vite preview` with `listen EPERM`, so browser automation cannot be used here as final release evidence
 
 ### 3. Staging Soak
 
 - status: `partial`
-- gate: soak sheet completed from `static/docs/staging-soak-template.md`
+- gate: soak sheet completed from `docs/internal/staging-soak-template.md`
 - minimum expectation:
   - repeated route changes
   - cluster switching
@@ -161,7 +161,7 @@ Use this document as the release gate for the next production build. Every item 
 ### 8. Packaging Audit
 
 - status: `partial`
-- gate: packaged release artifact verified using `static/docs/packaging-distribution-audit.md`
+- gate: packaged release artifact verified using `docs/internal/packaging-distribution-audit.md`
 - evidence:
   - `pnpm exec tauri build`
   - DEB / RPM output
@@ -190,7 +190,7 @@ Use this document as the release gate for the next production build. Every item 
         - rpm: `f14c8b86d82bce674f4d2872aa2e815fdf84504a6308a7139756de19da4ed616`
       - known Tauri packaging issue remains:
         - `pnpm exec tauri build --bundles rpm -v` can stall after claiming RPM bundling started
-        - release workaround is documented in `static/docs/packaging-distribution-audit.md`
+        - release workaround is documented in `docs/internal/packaging-distribution-audit.md`
       - local `vite preview` for browser smoke is blocked by sandbox `listen EPERM`, so packaged-web smoke still needs host-level sign-off
 
 ### 9. Supportability
