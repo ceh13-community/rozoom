@@ -130,7 +130,7 @@ kubectl get pod my-pod -n prod -o yaml
 **Goal:** See all unhealthy resources in one place.
 
 1. Navigate to **Global Triage** (sidebar -> Global Triage)
-2. The scanner checks 46+ resource types automatically
+2. The scanner checks 45 resource types automatically
 3. Results sorted by severity score (Critical > Warning > Low)
 4. Click any row to see details
 5. Use **Group by** to organize by namespace, workload type, or severity

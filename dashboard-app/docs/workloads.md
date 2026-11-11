@@ -183,18 +183,18 @@ Full cluster resource dependency map accessible from Cluster Ops sidebar. Shows 
 
 ## Table Features
 
-| Feature                  | Pods | Deploy/DS/STS/RS/Jobs/CJ |        Nodes         |
-| ------------------------ | :--: | :----------------------: | :------------------: |
-| Sorting                  |  Y   |       Y (TanStack)       |     Y (TanStack)     |
-| Search / filter          |  Y   |            Y             |          Y           |
-| Column visibility toggle |  Y   |            Y             |          Y           |
-| CSV export               |  Y   |            Y             |          Y           |
-| Selection checkboxes     |  Y   |            Y             |          Y           |
-| Virtual scrolling        |  Y   |            Y             | Pagination (15/page) |
-| Namespace grouping       |  Y   |            Y             | N/A (cluster-scoped) |
-| Node grouping            |  Y   |     Deployments only     |         N/A          |
-| Watcher controls         |  Y   |            Y             |          Y           |
-| Background sync          |  Y   |            Y             |          Y           |
+| Feature                  | Pods | Deploy/DS/STS/RS/Jobs/CJ |         Nodes         |
+| ------------------------ | :--: | :----------------------: | :-------------------: |
+| Sorting                  |  Y   |       Y (TanStack)       |     Y (TanStack)      |
+| Search / filter          |  Y   |            Y             |           Y           |
+| Column visibility toggle |  Y   |            Y             |           Y           |
+| CSV export               |  Y   |            Y             |           Y           |
+| Selection checkboxes     |  Y   |            Y             |           Y           |
+| Virtual scrolling        |  Y   |            Y             | Pagination (100/page) |
+| Namespace grouping       |  Y   |            Y             | N/A (cluster-scoped)  |
+| Node grouping            |  Y   |     Deployments only     |          N/A          |
+| Watcher controls         |  Y   |            Y             |           Y           |
+| Background sync          |  Y   |            Y             |           Y           |
 
 ---
 
