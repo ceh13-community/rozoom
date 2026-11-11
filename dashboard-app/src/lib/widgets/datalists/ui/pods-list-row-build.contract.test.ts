@@ -12,7 +12,7 @@ describe("pods list row build contract", () => {
     expect(source).toContain(
       'import { createPodListRows, filterPodListRows } from "./model/pod-list-row";',
     );
-    expect(source).toContain("const rows = $derived.by(() => createPodListRows(pods));");
+    expect(source).toContain("const rows = $derived.by(() => createPodListRows(sourcePods));");
     expect(source).toContain(
       "const filteredRows = $derived.by(() => filterPodListRows(rows, query));",
     );

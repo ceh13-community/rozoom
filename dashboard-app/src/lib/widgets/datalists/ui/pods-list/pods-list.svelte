@@ -82,8 +82,6 @@
     refreshSeconds: 30,
     enrichedTableEnabled: false,
   };
-  const ENABLE_PODS_SAFE_MODE_HOTFIX = true;
-  const PODS_SAFE_MODE_MAX_ROWS = 400;
   const BROWSER_SNAPSHOT_REFRESH_TIMEOUT_MS = 2_000;
   const RUNTIME_SNAPSHOT_REFRESH_TIMEOUT_MS = 12_000;
 
@@ -137,12 +135,11 @@
       namespaceMatches($selectedNamespace, pod.metadata?.namespace),
     ),
   );
-  const pods = $derived.by(() => getPodsDisplaySlice(sourcePods));
-  const rows = $derived.by(() => createPodListRows(pods));
+  const rows = $derived.by(() => createPodListRows(sourcePods));
   const filteredRows = $derived.by(() => filterPodListRows(rows, query));
   const sourcePodByUid = $derived.by(() => {
     const next = new Map<string, Partial<PodItem>>();
-    for (const pod of pods) {
+    for (const pod of sourcePods) {
       next.set(getPodUid(pod), pod);
     }
     return next;
@@ -405,12 +402,6 @@
   function clampWatcherRefreshSeconds(value: number) {
     if (!Number.isFinite(value)) return DEFAULT_WATCHER_SETTINGS.refreshSeconds;
     return Math.min(600, Math.max(5, Math.round(value)));
-  }
-
-  function getPodsDisplaySlice(sourcePods: Partial<PodItem>[]) {
-    if (!ENABLE_PODS_SAFE_MODE_HOTFIX) return sourcePods;
-    if (sourcePods.length <= PODS_SAFE_MODE_MAX_ROWS) return sourcePods;
-    return sourcePods.slice(0, PODS_SAFE_MODE_MAX_ROWS);
   }
 
   function hasBrowserInvoke() {
@@ -949,13 +940,6 @@
 </script>
 
 <div class="grid w-full grid-cols-1 gap-4 overflow-visible">
-  {#if ENABLE_PODS_SAFE_MODE_HOTFIX && pods.length < sourcePods.length}
-    <InlineNotice class="border-amber-300/60 bg-amber-50 text-amber-950" title="Safe mode">
-      Rendering first {PODS_SAFE_MODE_MAX_ROWS} of {sourcePods.length} pods while the page stays in safe
-      mode.
-    </InlineNotice>
-  {/if}
-
   {#if showPodsCacheBanner && podsCacheBanner}
     <InlineNotice class="border-border/60 bg-background text-muted-foreground">
       {podsCacheBanner}
