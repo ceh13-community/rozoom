@@ -1,0 +1,70 @@
+<!-- App icon source (wheel mark, no wordmark) for every size.
+     Regenerate: cd dashboard-app && pnpm tauri icon ../design-system/assets/app-icon.svg -o <tmp>
+     and copy over the files that already exist in src-tauri/icons. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <radialGradient id="tileBg" cx="50%" cy="42%" r="75%">
+      <stop offset="0%" stop-color="#1c3d70"/>
+      <stop offset="42%" stop-color="#0d2140"/>
+      <stop offset="100%" stop-color="#040c1a"/>
+    </radialGradient>
+    <linearGradient id="wheelFill" gradientUnits="userSpaceOnUse" x1="-81" y1="-135" x2="81" y2="135">
+      <stop offset="0%"   stop-color="#c8e4ff"/>
+      <stop offset="18%"  stop-color="#5daaf6"/>
+      <stop offset="55%"  stop-color="#1555cc"/>
+      <stop offset="100%" stop-color="#0a3098"/>
+    </linearGradient>
+    <radialGradient id="hubFill" cx="40%" cy="35%" r="65%">
+      <stop offset="0%"   stop-color="#4888d8"/>
+      <stop offset="100%" stop-color="#0b2880"/>
+    </radialGradient>
+    <filter id="depthShadow" x="-8%" y="-8%" width="120%" height="130%">
+      <feDropShadow dx="0"  dy="7"  stdDeviation="14" flood-color="#0028b8" flood-opacity="0.85"/>
+      <feDropShadow dx="0"  dy="2"  stdDeviation="4"  flood-color="#00114d" flood-opacity="0.6"/>
+    </filter>
+    <clipPath id="tileClip"><rect x="102.4" y="102.4" width="819.2" height="819.2" rx="180"/></clipPath>
+  </defs>
+  <rect x="102.4" y="102.4" width="819.2" height="819.2" rx="180" fill="url(#tileBg)"/>
+  <g clip-path="url(#tileClip)">
+  <g transform="translate(512,512) scale(2.55)" filter="url(#depthShadow)">
+
+      <!-- 8 spokes -->
+      <line x1="0"    y1="-110" x2="0"    y2="110"  stroke="url(#wheelFill)" stroke-width="18" stroke-linecap="round"/>
+      <line x1="-110" y1="0"    x2="110"  y2="0"    stroke="url(#wheelFill)" stroke-width="18" stroke-linecap="round"/>
+      <line x1="-78"  y1="-78"  x2="78"   y2="78"   stroke="url(#wheelFill)" stroke-width="18" stroke-linecap="round"/>
+      <line x1="78"   y1="-78"  x2="-78"  y2="78"   stroke="url(#wheelFill)" stroke-width="18" stroke-linecap="round"/>
+
+      <!-- Outer rim ring -->
+      <circle r="110" fill="none" stroke="url(#wheelFill)" stroke-width="26"/>
+
+      <!-- Spoke tip handles (small knobs protruding beyond rim) -->
+      <circle cx="0"   cy="-125" r="10" fill="url(#wheelFill)"/>
+      <circle cx="0"   cy="125"  r="10" fill="url(#wheelFill)"/>
+      <circle cx="-125" cy="0"   r="10" fill="url(#wheelFill)"/>
+      <circle cx="125"  cy="0"   r="10" fill="url(#wheelFill)"/>
+      <circle cx="-88"  cy="-88" r="10" fill="url(#wheelFill)"/>
+      <circle cx="88"   cy="-88" r="10" fill="url(#wheelFill)"/>
+      <circle cx="-88"  cy="88"  r="10" fill="url(#wheelFill)"/>
+      <circle cx="88"   cy="88"  r="10" fill="url(#wheelFill)"/>
+
+      <!-- Inner hub circle -->
+      <circle r="42" fill="url(#hubFill)"/>
+      <circle r="42" fill="none" stroke="#6aaaee" stroke-width="2.5" opacity="0.5"/>
+
+      <!-- Hub dark inset -->
+      <circle r="28" fill="#0a1e60"/>
+
+      <!-- Hub square decorative cutout (same as original) -->
+      <rect x="-11" y="-11" width="22" height="22" rx="3" fill="#1a3890"/>
+      <rect x="-6"  y="-6"  width="12" height="12" rx="2" fill="#070e34"/>
+
+      <!-- Wheel rim highlight arc (top-left gloss) -->
+      <path d="M -68,-88 A 110 110 0 0 1 68,-88"
+        fill="none" stroke="white" stroke-width="6"
+        stroke-linecap="round" opacity="0.35"/>
+
+      <!-- Hub top gloss dot -->
+      <ellipse cx="-8" cy="-16" rx="9" ry="6" fill="white" opacity="0.28"/>
+    </g>
+  </g>
+</svg>
