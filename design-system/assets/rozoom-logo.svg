@@ -2,139 +2,150 @@
 <svg viewBox="0 0 1320 660" width="1320" height="660" xmlns="http://www.w3.org/2000/svg">
   <defs>
 
-    
+    <!-- ── Background ── -->
     <radialGradient id="bgGrad" cx="50%" cy="50%" r="70%">
-      <stop offset="0%" stop-color="#1c3d70"></stop>
-      <stop offset="42%" stop-color="#0d2140"></stop>
-      <stop offset="100%" stop-color="#040c1a"></stop>
+      <stop offset="0%"   stop-color="#1c3d70"/>
+      <stop offset="42%"  stop-color="#0d2140"/>
+      <stop offset="100%" stop-color="#040c1a"/>
     </radialGradient>
 
-    
+    <!-- ── Letter fill gradient ── -->
     <linearGradient id="letterFill" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#d8eeff"></stop>
-      <stop offset="10%" stop-color="#92c8fa"></stop>
-      <stop offset="38%" stop-color="#2b7be0"></stop>
-      <stop offset="68%" stop-color="#1148b8"></stop>
-      <stop offset="100%" stop-color="#082590"></stop>
+      <stop offset="0%"   stop-color="#d8eeff"/>
+      <stop offset="10%"  stop-color="#92c8fa"/>
+      <stop offset="38%"  stop-color="#2b7be0"/>
+      <stop offset="68%"  stop-color="#1148b8"/>
+      <stop offset="100%" stop-color="#082590"/>
     </linearGradient>
 
-    
-    <linearGradient id="wheelFill" x1="0.2" y1="0" x2="0.8" y2="1">
-      <stop offset="0%" stop-color="#c8e4ff"></stop>
-      <stop offset="18%" stop-color="#5daaf6"></stop>
-      <stop offset="55%" stop-color="#1555cc"></stop>
-      <stop offset="100%" stop-color="#0a3098"></stop>
+    <!-- ── Wheel gradient (same hue, slightly brighter top) ── -->
+    <linearGradient id="wheelFill" gradientUnits="userSpaceOnUse" x1="-81" y1="-135" x2="81" y2="135">
+      <stop offset="0%"   stop-color="#c8e4ff"/>
+      <stop offset="18%"  stop-color="#5daaf6"/>
+      <stop offset="55%"  stop-color="#1555cc"/>
+      <stop offset="100%" stop-color="#0a3098"/>
     </linearGradient>
 
-    
+    <!-- ── Hub fill ── -->
     <radialGradient id="hubFill" cx="40%" cy="35%" r="65%">
-      <stop offset="0%" stop-color="#4888d8"></stop>
-      <stop offset="100%" stop-color="#0b2880"></stop>
+      <stop offset="0%"   stop-color="#4888d8"/>
+      <stop offset="100%" stop-color="#0b2880"/>
     </radialGradient>
 
-    
+    <!-- ── Shine overlay (top ⅓ of letters) ── -->
     <linearGradient id="shineGrad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="white" stop-opacity="0.55"></stop>
-      <stop offset="55%" stop-color="white" stop-opacity="0.06"></stop>
-      <stop offset="100%" stop-color="white" stop-opacity="0"></stop>
+      <stop offset="0%"  stop-color="white" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="white" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0"/>
     </linearGradient>
 
-    
+    <!-- ── Drop-shadow / depth ── -->
     <filter id="depthShadow" x="-8%" y="-8%" width="120%" height="130%">
-      <feDropShadow dx="0" dy="7" stdDeviation="14" flood-color="#0028b8" flood-opacity="0.85"></feDropShadow>
-      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#00114d" flood-opacity="0.6"></feDropShadow>
+      <feDropShadow dx="0"  dy="7"  stdDeviation="14" flood-color="#0028b8" flood-opacity="0.85"/>
+      <feDropShadow dx="0"  dy="2"  stdDeviation="4"  flood-color="#00114d" flood-opacity="0.6"/>
     </filter>
 
-    
+    <!-- ── Soft glow behind whole logo ── -->
     <filter id="logoGlow" x="-25%" y="-35%" width="150%" height="170%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="22" result="blur"></feGaussianBlur>
-      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.05  0 0 0 0 0.28  0 0 0 0 1   0 0 0 0.55 0" result="coloredBlur"></feColorMatrix>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="22" result="blur"/>
+      <feColorMatrix in="blur" type="matrix"
+        values="0 0 0 0 0.05  0 0 0 0 0.28  0 0 0 0 1   0 0 0 0.55 0"
+        result="coloredBlur"/>
       <feMerge>
-        <feMergeNode in="coloredBlur"></feMergeNode>
-        <feMergeNode in="SourceGraphic"></feMergeNode>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
 
-    
+    <!-- ── Clip for shine on letters (top portion only) ── -->
     <clipPath id="shineClip">
-      <rect x="0" y="250" width="1320" height="110"></rect>
+      <rect x="0" y="250" width="1320" height="110"/>
     </clipPath>
+
+    <!-- Wordmark outlines: Anton (SIL OFL 1.1), converted to paths so the
+         render does not depend on installed fonts. -->
+    <path id="rz-r" d="M229.61 430L191.20 430L191.20 240.08L249.47 240.08Q264.04 240.08 271.48 246.71Q278.93 253.35 281.46 265.28Q284 277.20 284 293.28L284 293.28Q284 308.82 280.06 318.10Q276.12 327.38 265.22 330.94L265.22 330.94Q274.18 332.77 277.80 339.84Q281.41 346.91 281.41 358.13L281.41 358.13L281.41 430L243.97 430L243.97 355.65Q243.97 347.34 240.57 345.34Q237.17 343.35 229.61 343.35L229.61 343.35L229.61 430ZM229.83 275.26L229.83 310.44L239.00 310.44Q246.88 310.44 246.88 293.28L246.88 293.28Q246.88 282.16 245.15 278.71Q243.43 275.26 238.68 275.26L238.68 275.26L229.83 275.26Z"/>
+    <path id="rz-zoom" d="M603.69 430L522 430L522 395.47L565.49 275.04L526.21 275.04L526.21 240.08L605.52 240.08L605.52 273.31L561.28 395.04L603.69 395.04L603.69 430ZM662.93 431.73L662.93 431.73Q640.16 431.73 628.13 417.97Q616.10 404.21 616.10 378.20L616.10 378.20L616.10 287.99Q616.10 263.60 628.02 250.98Q639.95 238.35 662.93 238.35L662.93 238.35Q685.92 238.35 697.84 250.98Q709.76 263.60 709.76 287.99L709.76 287.99L709.76 378.20Q709.76 404.21 697.73 417.97Q685.70 431.73 662.93 431.73ZM663.25 396.76L663.25 396.76Q671.89 396.76 671.89 380.04L671.89 380.04L671.89 287.34Q671.89 273.31 663.47 273.31L663.47 273.31Q653.97 273.31 653.97 287.67L653.97 287.67L653.97 380.25Q653.97 389.10 656.13 392.93Q658.29 396.76 663.25 396.76ZM770.41 431.73L770.41 431.73Q747.64 431.73 735.61 417.97Q723.58 404.21 723.58 378.20L723.58 378.20L723.58 287.99Q723.58 263.60 735.50 250.98Q747.42 238.35 770.41 238.35L770.41 238.35Q793.39 238.35 805.32 250.98Q817.24 263.60 817.24 287.99L817.24 287.99L817.24 378.20Q817.24 404.21 805.21 417.97Q793.18 431.73 770.41 431.73ZM770.73 396.76L770.73 396.76Q779.37 396.76 779.37 380.04L779.37 380.04L779.37 287.34Q779.37 273.31 770.95 273.31L770.95 273.31Q761.45 273.31 761.45 287.67L761.45 287.67L761.45 380.25Q761.45 389.10 763.61 392.93Q765.77 396.76 770.73 396.76ZM866.88 430L832.57 430L832.57 240.08L890.41 240.08L906.38 355.87L922.24 240.08L980.62 240.08L980.62 430L945.87 430L945.87 293.17L924.07 430L889.97 430L866.88 293.17L866.88 430Z"/>
 
   </defs>
 
-  
-  <rect width="1320" height="660" fill="url(#bgGrad)"></rect>
+  <!-- ════════════════ BACKGROUND ════════════════ -->
+  <rect width="1320" height="660" fill="url(#bgGrad)"/>
 
-  
-  <ellipse cx="660" cy="332" rx="560" ry="195" fill="#1a48cc" opacity="0.10"></ellipse>
-  <ellipse cx="660" cy="332" rx="360" ry="130" fill="#2255dd" opacity="0.08"></ellipse>
+  <!-- Radial ambient glow behind logo -->
+  <ellipse cx="660" cy="332" rx="560" ry="195" fill="#1a48cc" opacity="0.10"/>
+  <ellipse cx="660" cy="332" rx="360" ry="130" fill="#2255dd" opacity="0.08"/>
 
-  
+  <!-- ════════════════ LOGO GROUP ════════════════ -->
+  <g transform="translate(74.09,0)">
   <g filter="url(#logoGlow)">
 
-    
+    <!-- ── Stroke "ghost" layer for 3-D depth ── -->
     <g opacity="0.45" transform="translate(0,5)">
-      <text x="166" y="430" font-family="Impact,&#39;Arial Black&#39;,sans-serif" font-size="240" font-weight="900" fill="#04128a" stroke="#04128a" stroke-width="6">R</text>
-      <text x="492" y="430" font-family="Impact,&#39;Arial Black&#39;,sans-serif" font-size="240" font-weight="900" fill="#04128a" stroke="#04128a" stroke-width="6">ZOOM</text>
+      <use href="#rz-r" fill="#04128a" stroke="#04128a" stroke-width="6"/>
+      <use href="#rz-zoom" fill="#04128a" stroke="#04128a" stroke-width="6"/>
     </g>
 
-    
-    <text x="166" y="430" font-family="Impact,&#39;Arial Black&#39;,sans-serif" font-size="240" font-weight="900" fill="url(#letterFill)" filter="url(#depthShadow)">R</text>
+    <!-- ── "R" (outline) ── -->
+    <use href="#rz-r" fill="url(#letterFill)" filter="url(#depthShadow)"/>
 
-    
-    <text x="492" y="430" font-family="Impact,&#39;Arial Black&#39;,sans-serif" font-size="240" font-weight="900" fill="url(#letterFill)" filter="url(#depthShadow)">ZOOM</text>
+    <!-- ── "ZOOM" (after wheel gap) ── -->
+    <use href="#rz-zoom" fill="url(#letterFill)" filter="url(#depthShadow)"/>
 
-    
+    <!-- ── SHIP WHEEL (replaces first "O", centre ≈ 403, 342) ── -->
     <g transform="translate(403,342)" filter="url(#depthShadow)">
 
-      
-      <line x1="0" y1="-110" x2="0" y2="110" stroke="url(#wheelFill)" stroke-width="18" stroke-linecap="round"></line>
-      <line x1="-110" y1="0" x2="110" y2="0" stroke="url(#wheelFill)" stroke-width="18" stroke-linecap="round"></line>
-      <line x1="-78" y1="-78" x2="78" y2="78" stroke="url(#wheelFill)" stroke-width="18" stroke-linecap="round"></line>
-      <line x1="78" y1="-78" x2="-78" y2="78" stroke="url(#wheelFill)" stroke-width="18" stroke-linecap="round"></line>
+      <!-- 8 spokes -->
+      <line x1="0"    y1="-110" x2="0"    y2="110"  stroke="url(#wheelFill)" stroke-width="18" stroke-linecap="round"/>
+      <line x1="-110" y1="0"    x2="110"  y2="0"    stroke="url(#wheelFill)" stroke-width="18" stroke-linecap="round"/>
+      <line x1="-78"  y1="-78"  x2="78"   y2="78"   stroke="url(#wheelFill)" stroke-width="18" stroke-linecap="round"/>
+      <line x1="78"   y1="-78"  x2="-78"  y2="78"   stroke="url(#wheelFill)" stroke-width="18" stroke-linecap="round"/>
 
-      
-      <circle r="110" fill="none" stroke="url(#wheelFill)" stroke-width="26"></circle>
+      <!-- Outer rim ring -->
+      <circle r="110" fill="none" stroke="url(#wheelFill)" stroke-width="26"/>
 
-      
-      <circle cx="0" cy="-125" r="10" fill="url(#wheelFill)"></circle>
-      <circle cx="0" cy="125" r="10" fill="url(#wheelFill)"></circle>
-      <circle cx="-125" cy="0" r="10" fill="url(#wheelFill)"></circle>
-      <circle cx="125" cy="0" r="10" fill="url(#wheelFill)"></circle>
-      <circle cx="-88" cy="-88" r="10" fill="url(#wheelFill)"></circle>
-      <circle cx="88" cy="-88" r="10" fill="url(#wheelFill)"></circle>
-      <circle cx="-88" cy="88" r="10" fill="url(#wheelFill)"></circle>
-      <circle cx="88" cy="88" r="10" fill="url(#wheelFill)"></circle>
+      <!-- Spoke tip handles (small knobs protruding beyond rim) -->
+      <circle cx="0"   cy="-125" r="10" fill="url(#wheelFill)"/>
+      <circle cx="0"   cy="125"  r="10" fill="url(#wheelFill)"/>
+      <circle cx="-125" cy="0"   r="10" fill="url(#wheelFill)"/>
+      <circle cx="125"  cy="0"   r="10" fill="url(#wheelFill)"/>
+      <circle cx="-88"  cy="-88" r="10" fill="url(#wheelFill)"/>
+      <circle cx="88"   cy="-88" r="10" fill="url(#wheelFill)"/>
+      <circle cx="-88"  cy="88"  r="10" fill="url(#wheelFill)"/>
+      <circle cx="88"   cy="88"  r="10" fill="url(#wheelFill)"/>
 
-      
-      <circle r="42" fill="url(#hubFill)"></circle>
-      <circle r="42" fill="none" stroke="#6aaaee" stroke-width="2.5" opacity="0.5"></circle>
+      <!-- Inner hub circle -->
+      <circle r="42" fill="url(#hubFill)"/>
+      <circle r="42" fill="none" stroke="#6aaaee" stroke-width="2.5" opacity="0.5"/>
 
-      
-      <circle r="28" fill="#0a1e60"></circle>
+      <!-- Hub dark inset -->
+      <circle r="28" fill="#0a1e60"/>
 
-      
-      <rect x="-11" y="-11" width="22" height="22" rx="3" fill="#1a3890"></rect>
-      <rect x="-6" y="-6" width="12" height="12" rx="2" fill="#070e34"></rect>
+      <!-- Hub square decorative cutout (same as original) -->
+      <rect x="-11" y="-11" width="22" height="22" rx="3" fill="#1a3890"/>
+      <rect x="-6"  y="-6"  width="12" height="12" rx="2" fill="#070e34"/>
 
-      
-      <path d="M -68,-88 A 110 110 0 0 1 68,-88" fill="none" stroke="white" stroke-width="6" stroke-linecap="round" opacity="0.35"></path>
+      <!-- Wheel rim highlight arc (top-left gloss) -->
+      <path d="M -68,-88 A 110 110 0 0 1 68,-88"
+        fill="none" stroke="white" stroke-width="6"
+        stroke-linecap="round" opacity="0.35"/>
 
-      
-      <ellipse cx="-8" cy="-16" rx="9" ry="6" fill="white" opacity="0.28"></ellipse>
+      <!-- Hub top gloss dot -->
+      <ellipse cx="-8" cy="-16" rx="9" ry="6" fill="white" opacity="0.28"/>
     </g>
 
-    
+    <!-- ── Shine overlay on letters (upper gloss strip) ── -->
     <g clip-path="url(#shineClip)" opacity="0.9">
-      <text x="166" y="430" font-family="Impact,&#39;Arial Black&#39;,sans-serif" font-size="240" font-weight="900" fill="url(#shineGrad)">R</text>
-      <text x="492" y="430" font-family="Impact,&#39;Arial Black&#39;,sans-serif" font-size="240" font-weight="900" fill="url(#shineGrad)">ZOOM</text>
+      <use href="#rz-r" fill="url(#shineGrad)"/>
+      <use href="#rz-zoom" fill="url(#shineGrad)"/>
     </g>
 
-    
+    <!-- ── Top edge highlight line on letters ── -->
     <g opacity="0.5">
-      <text x="166" y="430" font-family="Impact,&#39;Arial Black&#39;,sans-serif" font-size="240" font-weight="900" fill="none" stroke="#b0d8ff" stroke-width="1.5">R</text>
-      <text x="492" y="430" font-family="Impact,&#39;Arial Black&#39;,sans-serif" font-size="240" font-weight="900" fill="none" stroke="#b0d8ff" stroke-width="1.5">ZOOM</text>
+      <use href="#rz-r" fill="none" stroke="#b0d8ff" stroke-width="1.5"/>
+      <use href="#rz-zoom" fill="none" stroke="#b0d8ff" stroke-width="1.5"/>
     </g>
 
+  </g>
   </g>
 </svg>
