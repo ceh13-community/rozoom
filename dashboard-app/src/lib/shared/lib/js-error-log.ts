@@ -11,7 +11,8 @@ import { isTauriAvailable } from "./tauri-runtime";
  * paint problem. With it, an empty log for that minute rules the JS side out.
  *
  * Bounded on purpose: a render loop can throw hundreds of times a second, so repeats of
- * the same error are counted instead of written, and there is a per-minute line cap.
+ * the same error within a minute are counted and written as one summary line when the
+ * minute ends, and there is a per-minute line cap.
  */
 
 export type JsErrorSource = "window.error" | "unhandledrejection" | "render";
@@ -20,6 +21,8 @@ export const JS_ERROR_LIMIT_PER_MINUTE = 20;
 const WINDOW_MS = 60_000;
 const MAX_STACK_FRAMES = 12;
 const MAX_LINE_CHARS = 4_000;
+// Dedup key length: long messages that differ only at the end count as one error.
+const MAX_KEY_CHARS = 200;
 
 export function describeError(value: unknown): string {
   if (value instanceof Error) {
@@ -50,13 +53,28 @@ interface LoggerOptions {
   /** May return a promise; a rejection is swallowed. */
   write: (line: string) => unknown;
   now?: () => number;
+  /** Timer used to write pending repeat counts; injectable for tests. */
+  schedule?: (callback: () => void, delayMs: number) => void;
 }
 
-export function createJsErrorLogger({ write, now = Date.now }: LoggerOptions): JsErrorLogger {
-  const lastWritten = new Map<string, { at: number; suppressed: number }>();
+interface WrittenEntry {
+  at: number;
+  header: string;
+  suppressed: number;
+}
+
+export function createJsErrorLogger({
+  write,
+  now = Date.now,
+  schedule = (callback, delayMs) => {
+    setTimeout(callback, delayMs);
+  },
+}: LoggerOptions): JsErrorLogger {
+  const lastWritten = new Map<string, WrittenEntry>();
   let windowStart = Number.NEGATIVE_INFINITY;
   let linesInWindow = 0;
   let capNoticeWritten = false;
+  let flushPending = false;
 
   function safeWrite(line: string) {
     try {
@@ -69,25 +87,61 @@ export function createJsErrorLogger({ write, now = Date.now }: LoggerOptions): J
     }
   }
 
+  // An entry lives for one window after its line was written. When it expires, its repeat
+  // count (if any) is written and the entry is dropped, so the map stays small and a count
+  // is never lost just because the error stopped happening.
+  function flushExpired(at: number) {
+    for (const [key, entry] of lastWritten) {
+      if (at - entry.at < WINDOW_MS) continue;
+      if (entry.suppressed > 0) {
+        safeWrite(
+          `${entry.header} (repeated ${entry.suppressed} more times within a minute, not logged)`,
+        );
+      }
+      lastWritten.delete(key);
+    }
+  }
+
+  function scheduleFlush() {
+    if (flushPending) return;
+    let earliest = Number.POSITIVE_INFINITY;
+    for (const entry of lastWritten.values()) {
+      if (entry.suppressed > 0) earliest = Math.min(earliest, entry.at + WINDOW_MS);
+    }
+    if (earliest === Number.POSITIVE_INFINITY) return;
+    flushPending = true;
+    schedule(
+      () => {
+        flushPending = false;
+        try {
+          flushExpired(now());
+          scheduleFlush();
+        } catch {
+          // Never throw from a timer either.
+        }
+      },
+      Math.max(0, earliest - now()),
+    );
+  }
+
   return {
     report(source, error, where) {
       try {
         const at = now();
+        flushExpired(at);
         if (at - windowStart >= WINDOW_MS) {
           windowStart = at;
           linesInWindow = 0;
           capNoticeWritten = false;
-          for (const [key, entry] of lastWritten) {
-            if (at - entry.at >= WINDOW_MS && entry.suppressed === 0) lastWritten.delete(key);
-          }
         }
 
         const description = redactSecrets(describeError(error));
         const [firstLine, ...rest] = description.split("\n");
-        const key = `${source}|${firstLine}`;
+        const key = `${source}|${firstLine.slice(0, MAX_KEY_CHARS)}`;
         const previous = lastWritten.get(key);
-        if (previous && at - previous.at < WINDOW_MS) {
+        if (previous) {
           previous.suppressed += 1;
+          scheduleFlush();
           return;
         }
 
@@ -101,11 +155,10 @@ export function createJsErrorLogger({ write, now = Date.now }: LoggerOptions): J
           return;
         }
 
-        const repeats = previous?.suppressed ? ` (${previous.suppressed} repeats not logged)` : "";
-        const place = where ? `${where} ` : "";
-        lastWritten.set(key, { at, suppressed: 0 });
+        const header = `[js:${source}] ${where ? `${where} ` : ""}${firstLine}`;
+        lastWritten.set(key, { at, header, suppressed: 0 });
         linesInWindow += 1;
-        safeWrite([`[js:${source}] ${place}${firstLine}${repeats}`, ...rest].join("\n"));
+        safeWrite([header, ...rest].join("\n"));
       } catch {
         // Same rule as safeWrite: reporting an error must not throw one.
       }

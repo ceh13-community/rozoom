@@ -2,6 +2,7 @@
   import type { Snippet } from "svelte";
   import { page } from "$app/state";
   import { reportJsError, describeError } from "$shared/lib/js-error-log";
+  import { redactSecrets } from "$shared/lib/log-redaction";
   import {
     buildSupportReport,
     copyToClipboard,
@@ -16,8 +17,9 @@
   const appVersion: string = __APP_VERSION__;
   let copyState = $state<"idle" | "copying" | "copied" | "failed">("idle");
 
+  // Redacted like the log: the panel ends up in screenshots and bug reports.
   function messageOf(error: unknown) {
-    return describeError(error).split("\n")[0] ?? "";
+    return redactSecrets(describeError(error).split("\n")[0] ?? "");
   }
 
   function handleError(error: unknown) {

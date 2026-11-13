@@ -6,20 +6,29 @@ import {
   JS_ERROR_LIMIT_PER_MINUTE,
 } from "./js-error-log";
 
+// Fake clock and timers: advance() moves the clock and runs the timers that came due.
 function makeLogger(start = 1_000_000) {
   const lines: string[] = [];
   let clock = start;
+  let timers: Array<{ due: number; callback: () => void }> = [];
   const logger = createJsErrorLogger({
     write: (line) => {
       lines.push(line);
     },
     now: () => clock,
+    schedule: (callback, delayMs) => {
+      timers.push({ due: clock + delayMs, callback });
+    },
   });
   return {
     lines,
     logger,
+    pendingTimers: () => timers.length,
     advance(ms: number) {
       clock += ms;
+      const due = timers.filter((timer) => timer.due <= clock);
+      timers = timers.filter((timer) => timer.due > clock);
+      for (const timer of due) timer.callback();
     },
   };
 }
@@ -77,16 +86,66 @@ describe("createJsErrorLogger", () => {
     const { lines, logger, advance } = makeLogger();
     const error = new Error("same");
     error.stack = "";
-    logger.report("window.error", error);
+    logger.report("window.error", error, "/dashboard");
     advance(1_000);
     logger.report("window.error", error);
     logger.report("window.error", error);
-    expect(lines).toHaveLength(1);
+    expect(lines).toEqual(["[js:window.error] /dashboard Error: same"]);
+  });
 
+  it("writes the repeat count when the minute ends, even if the error never comes back", () => {
+    const { lines, logger, advance, pendingTimers } = makeLogger();
+    const error = new Error("render loop");
+    error.stack = "";
+    logger.report("render", error, "/dashboard/clusters/minikube");
+    advance(1_000);
+    logger.report("render", error);
+    logger.report("render", error);
+    expect(pendingTimers()).toBe(1);
+
+    advance(58_999);
+    expect(lines).toHaveLength(1);
+    advance(1);
+    expect(lines).toEqual([
+      "[js:render] /dashboard/clusters/minikube Error: render loop",
+      "[js:render] /dashboard/clusters/minikube Error: render loop (repeated 2 more times within a minute, not logged)",
+    ]);
+    expect(pendingTimers()).toBe(0);
+  });
+
+  it("does not schedule a timer for errors that did not repeat", () => {
+    const { logger, pendingTimers } = makeLogger();
+    logger.report("window.error", new Error("once"));
+    logger.report("window.error", new Error("also once"));
+    expect(pendingTimers()).toBe(0);
+  });
+
+  it("logs the same error again after its minute, as a new line", () => {
+    const { lines, logger, advance } = makeLogger();
+    const error = new Error("again");
+    error.stack = "";
+    logger.report("window.error", error);
     advance(60_000);
     logger.report("window.error", error);
-    expect(lines).toHaveLength(2);
-    expect(lines[1]).toContain("(2 repeats not logged)");
+    expect(lines).toEqual(["[js:window.error] Error: again", "[js:window.error] Error: again"]);
+  });
+
+  it("keys repeats on the first 200 characters, so long variants of one message count once", () => {
+    const { lines, logger } = makeLogger();
+    const prefix = "Failed to load row ".repeat(11).slice(0, 200);
+    logger.report("window.error", `${prefix} request 1`);
+    logger.report("window.error", `${prefix} request 2`);
+    expect(lines).toHaveLength(1);
+  });
+
+  it("redacts credentials in URLs", () => {
+    const { lines, logger } = makeLogger();
+    logger.report(
+      "unhandledrejection",
+      new Error("fetch https://admin:hunter2@10.0.0.1:6443/api failed"),
+    );
+    expect(lines[0]).not.toContain("hunter2");
+    expect(lines[0]).toContain("https://[REDACTED]@10.0.0.1:6443/api");
   });
 
   it("caps the number of lines per minute so a render loop cannot flood the file", () => {

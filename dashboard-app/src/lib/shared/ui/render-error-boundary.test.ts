@@ -15,11 +15,13 @@ vi.mock("$shared/lib/js-error-log", async (importOriginal) => {
 
 import RenderErrorBoundary from "./render-error-boundary.svelte";
 
+const DEFAULT_MESSAGE = "Cannot read properties of undefined (reading 'name')";
 let shouldThrow = true;
+let thrownMessage = DEFAULT_MESSAGE;
 
 const page = createRawSnippet(() => ({
   render: () => {
-    if (shouldThrow) throw new TypeError("Cannot read properties of undefined (reading 'name')");
+    if (shouldThrow) throw new TypeError(thrownMessage);
     return "<p>Pods list</p>";
   },
 }));
@@ -28,6 +30,7 @@ describe("render-error-boundary", () => {
   beforeEach(() => {
     reportJsError.mockClear();
     shouldThrow = true;
+    thrownMessage = DEFAULT_MESSAGE;
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -52,6 +55,16 @@ describe("render-error-boundary", () => {
       expect.any(TypeError),
       "/dashboard/clusters/minikube",
     );
+  });
+
+  it("does not show secrets carried in the error message", () => {
+    const token = "abcdefghijklmnopqrstuvwxyz0123456789";
+    thrownMessage = `request failed: Authorization: Bearer ${token} via http://u:pw@proxy:3128`;
+    const { getByRole } = render(RenderErrorBoundary, { props: { children: page } });
+    const panel = getByRole("alert");
+    expect(panel.textContent).not.toContain(token);
+    expect(panel.textContent).not.toContain("u:pw");
+    expect(panel.textContent).toContain("Authorization: [REDACTED]");
   });
 
   it("Try again re-renders the page once the cause is gone", async () => {

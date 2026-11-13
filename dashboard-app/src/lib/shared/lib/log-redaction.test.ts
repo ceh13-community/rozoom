@@ -46,6 +46,31 @@ describe("redactSecrets", () => {
     expect(redactSecrets(line)).toBe(line);
   });
 
+  it("masks credentials inside URLs (servers, proxies, tokens as user name)", () => {
+    expect(redactSecrets("GET https://admin:hunter2@10.0.0.1:6443/api failed")).toBe(
+      "GET https://[REDACTED]@10.0.0.1:6443/api failed",
+    );
+    expect(redactSecrets("HTTPS_PROXY=http://proxyuser:s3cr3t@proxy.corp:3128")).toBe(
+      "HTTPS_PROXY=http://[REDACTED]@proxy.corp:3128",
+    );
+    expect(redactSecrets("socks5://u:p@ss@127.0.0.1:1080")).toBe(
+      "socks5://[REDACTED]@127.0.0.1:1080",
+    );
+    expect(redactSecrets("clone https://ghp_abcdefgh12345678@github.com/org/repo")).toBe(
+      "clone https://[REDACTED]@github.com/org/repo",
+    );
+  });
+
+  it("leaves URLs without credentials alone, including an @ after the host", () => {
+    for (const line of [
+      "server: https://10.0.0.1:6443",
+      "open https://example.com/path?mail=a@b.c#x@y",
+      "contact admin@example.com",
+    ]) {
+      expect(redactSecrets(line)).toBe(line);
+    }
+  });
+
   it("masks a bare JWT and a bare long base64 blob", () => {
     expect(redactSecrets(`saw ${JWT} in response`)).toBe("saw [REDACTED] in response");
     expect(redactSecrets(`data=${CERT_DATA}`)).toBe("data=[REDACTED] base64");
