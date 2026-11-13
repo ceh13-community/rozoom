@@ -31,6 +31,9 @@ const KUBECONFIG_SECRET_KEYS = [
 const RULES: Array<[RegExp, string]> = [
   // PEM blocks (private keys, certificates) possibly folded onto one line.
   [/-----BEGIN [A-Z ]+-----[\s\S]*?-----END [A-Z ]+-----/g, `-----BEGIN ${REDACTED}-----`],
+  // Credentials in a URL: "https://user:pass@host", proxy URLs, a token as the user name.
+  // Greedy up to the last "@" before the host, so an unencoded "@" in a password is covered.
+  [/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/?#]+@/gi, `$1${REDACTED}@`],
   // Authorization headers and CLI flags: "Authorization: Bearer x", "--token=x".
   [/(\bauthorization\b\s*[:=]\s*)(?:bearer|basic)\s+\S+/gi, `$1${REDACTED}`],
   [/(\b(?:bearer|basic)\s+)[A-Za-z0-9._~+/=-]{8,}/gi, `$1${REDACTED}`],
