@@ -10,6 +10,7 @@ import {
 import { scrubErrorEvent, scrubBreadcrumb } from "$shared/config/sentry-scrub";
 import { HMR_ERROR_PATTERNS, HMR_URL_PATTERNS } from "$shared/config/sentry-filters";
 import { initRuntimeLogBridge } from "$shared/lib/runtime-log-bridge";
+import { installGlobalErrorLogging } from "$shared/lib/js-error-log";
 
 if (shouldInitSentry(dev)) {
   const dsn = getSentryDsn();
@@ -35,5 +36,7 @@ if (shouldInitSentry(dev)) {
 }
 
 initRuntimeLogBridge();
+// Uncaught errors and unhandled rejections go to logs.log (Sentry is off in release).
+installGlobalErrorLogging();
 // If you have a custom error handler, pass it to `handleErrorWithSentry`
 export const handleError = handleErrorWithSentry();
