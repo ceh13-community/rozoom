@@ -13,6 +13,7 @@
   import { LoadingSpinner } from "$shared/ui/loading-spinner";
   import { Sidebar } from "$widgets/sidebar";
   import ShellModal from "$widgets/shell/ui/shell-modal.svelte";
+  import RenderErrorBoundary from "$shared/ui/render-error-boundary.svelte";
   import { stopAllBackgroundPollers } from "$shared/lib/background-pollers";
   import { initNetworkRecoveryListener } from "$shared/lib/network-recovery";
   import { startFleetHeartbeat } from "$features/check-health/api/fleet-heartbeat";
@@ -296,7 +297,9 @@
       <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
         <main class="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:gap-6 lg:p-6">
           {#key routeRemountKey}
-            {@render children()}
+            <RenderErrorBoundary>
+              {@render children()}
+            </RenderErrorBoundary>
           {/key}
         </main>
       </div>
@@ -312,7 +315,9 @@
     {/if}
     <main class="ml-10 flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:gap-6 lg:p-6">
       {#key routeRemountKey}
-        {@render children()}
+        <RenderErrorBoundary>
+          {@render children()}
+        </RenderErrorBoundary>
       {/key}
     </main>
   </div>
