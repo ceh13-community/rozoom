@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, untrack } from "svelte";
   import { toast } from "svelte-sonner";
   import { writable } from "svelte/store";
   import { resolvePageClusterName, type PageData } from "$entities/cluster";
@@ -127,6 +127,10 @@
   let snapshotRefreshState = $state<"idle" | "loading" | "error">("idle");
   let snapshotRefreshError = $state<string | null>(null);
   let snapshotRefreshPromise: Promise<void> | null = null;
+  // Namespace scope of the request in snapshotRefreshPromise.
+  let snapshotRefreshScope: string | null = null;
+  // Cluster and namespace selection the list last loaded for.
+  let loadedNamespaceScope: { clusterId: string; selection: string } | null = null;
   let manualSnapshotBootstrapKey = $state<string | null>(null);
   let browserSnapshotDegradeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -463,12 +467,31 @@
     );
   }
 
-  async function loadPodsSnapshot() {
+  function currentPodsScope() {
+    return buildPodsSnapshotScopeKey(data.slug, getSelectedNamespaceList($selectedNamespace));
+  }
+
+  // Effects start loads. Untracked, so the effect that starts a load does not
+  // subscribe to state the load reads and then writes (cachedSnapshotPods, the
+  // namespace selection): otherwise the finished load re-runs the effect, which
+  // starts the next load, back to back for as long as the page is open.
+  function loadPodsSnapshot(): Promise<void> {
+    return untrack(() => runPodsSnapshotLoad());
+  }
+
+  async function runPodsSnapshotLoad() {
     if (!data.slug) return;
     if (snapshotRefreshPromise) {
+      const inFlightScope = snapshotRefreshScope;
       await snapshotRefreshPromise;
+      // The namespace selection changed while that request ran, so its pods
+      // belong to the old selection. Load the current one.
+      if (inFlightScope !== currentPodsScope()) await loadPodsSnapshot();
       return;
     }
+    const requestScope = currentPodsScope();
+    const requestNamespace = $selectedNamespace;
+    snapshotRefreshScope = requestScope;
     snapshotRefreshPromise = (async () => {
       markPodsSyncLoading(data.slug);
       watcherError = null;
@@ -494,11 +517,13 @@
         const items = await withSnapshotTimeout(
           fetchNamespacedSnapshotItems<Partial<PodItem>>({
             clusterId: data.slug,
-            selectedNamespace: $selectedNamespace,
+            selectedNamespace: requestNamespace,
             resource: "pods",
             errorMessage: "Failed to load pods snapshot.",
           }),
         );
+        // Stale: the waiting caller loads the new selection right after.
+        if (requestScope !== currentPodsScope()) return;
         if (items.length === 0 && hadCachedSnapshot && hasBrowserInvoke()) {
           throw new Error("Pod watcher sync failed.");
         }
@@ -508,6 +533,7 @@
         snapshotRefreshState = "idle";
         metricsRefreshToken += 1;
       } catch (error) {
+        if (requestScope !== currentPodsScope()) return;
         const message = error instanceof Error ? error.message : "Failed to load pods snapshot.";
         watcherError = message;
         snapshotRefreshState = "error";
@@ -515,6 +541,7 @@
         markPodsSyncError(data.slug, message);
       } finally {
         snapshotRefreshPromise = null;
+        snapshotRefreshScope = null;
       }
     })();
     await snapshotRefreshPromise;
@@ -870,12 +897,22 @@
     metricsRefreshToken += 1;
   });
 
+  // A namespace change shows the cached pods of the new selection at once and
+  // loads it fresh, even with the watcher paused: the pods of the old selection
+  // are not an answer for the new one. The first run on a cluster is left to
+  // the watcher effect below, which loads on mount.
   $effect(() => {
     if (!data.slug) return;
-    const currentNamespace = $selectedNamespace;
-    void currentNamespace;
+    const clusterId = data.slug;
+    const selection = $selectedNamespace;
     hydratePodsFromPersistedSnapshot();
     hydrateCachedPodsAt();
+    const previous = loadedNamespaceScope;
+    loadedNamespaceScope = { clusterId, selection };
+    if (!previous || previous.clusterId !== clusterId || previous.selection === selection) return;
+    void loadPodsSnapshot().then(() => {
+      if (watcherEnabled) scheduleRefresh();
+    });
   });
 
   $effect(() => {
