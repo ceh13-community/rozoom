@@ -78,19 +78,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Setup Playwright Chromium
+      # Both projects run in CI: mobile-chrome and mobile-safari (WebKit).
+      # The browser list is part of the cache key, so a Chromium-only cache
+      # never satisfies an exact hit and WebKit is saved on the next run.
+      - name: Setup Playwright browsers
         uses: ./.github/actions/setup-playwright
         with:
           working-directory: ./mobile-app
-          cache-key: playwright-mobile-${{ runner.os }}-${{ hashFiles('mobile-app/pnpm-lock.yaml') }}
+          browsers: chromium webkit
+          cache-key: playwright-mobile-chromium-webkit-${{ runner.os }}-${{ hashFiles('mobile-app/pnpm-lock.yaml') }}
           cache-restore-keys: |
+            playwright-mobile-chromium-webkit-${{ runner.os }}-
             playwright-mobile-${{ runner.os }}-
 
-      # Chromium only in CI. WebKit needs a long apt pass (GStreamer and
-      # friends) on every run, and that pass is what hung this job to its
-      # timeout. The mobile-safari project stays in the config for local runs.
       - name: Run E2E tests
-        run: pnpm test:e2e --project=mobile-chrome
+        run: pnpm test:e2e
 
       - name: Upload Playwright report
         if: failure()

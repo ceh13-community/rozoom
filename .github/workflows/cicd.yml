@@ -134,7 +134,7 @@ jobs:
 
       # A stale browser cache (older lockfile) is still a valid starting
       # point: the action verifies and tops it up.
-      - name: Setup Playwright Chromium
+      - name: Setup Playwright browsers
         uses: ./.github/actions/setup-playwright
         with:
           working-directory: ./dashboard-app
@@ -177,7 +177,7 @@ jobs:
         uses: ./.github/actions/setup-pnpm
 
       # Same action as e2e_smoke: verified install, save on a cache miss.
-      - name: Setup Playwright Chromium
+      - name: Setup Playwright browsers
         uses: ./.github/actions/setup-playwright
         with:
           working-directory: ./dashboard-app
