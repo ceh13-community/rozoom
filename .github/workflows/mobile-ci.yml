@@ -6,11 +6,13 @@ on:
     paths:
       - "mobile-app/**"
       - ".github/workflows/mobile-ci.yml"
+      - ".github/actions/setup-playwright/**"
   push:
     branches: [main, master]
     paths:
       - "mobile-app/**"
       - ".github/workflows/mobile-ci.yml"
+      - ".github/actions/setup-playwright/**"
 
 defaults:
   run:
@@ -76,11 +78,19 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright
-        run: pnpm exec playwright install --with-deps chromium webkit
+      - name: Setup Playwright Chromium
+        uses: ./.github/actions/setup-playwright
+        with:
+          working-directory: ./mobile-app
+          cache-key: playwright-mobile-${{ runner.os }}-${{ hashFiles('mobile-app/pnpm-lock.yaml') }}
+          cache-restore-keys: |
+            playwright-mobile-${{ runner.os }}-
 
+      # Chromium only in CI. WebKit needs a long apt pass (GStreamer and
+      # friends) on every run, and that pass is what hung this job to its
+      # timeout. The mobile-safari project stays in the config for local runs.
       - name: Run E2E tests
-        run: pnpm test:e2e
+        run: pnpm test:e2e --project=mobile-chrome
 
       - name: Upload Playwright report
         if: failure()
