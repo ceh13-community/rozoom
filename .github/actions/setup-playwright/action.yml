@@ -16,6 +16,10 @@ inputs:
     description: "Prefix fallbacks for a partial restore"
     required: false
     default: ""
+  node-version:
+    description: "Node version the job runs on, restored after the install"
+    required: false
+    default: "lts/*"
 runs:
   using: "composite"
   steps:
@@ -29,6 +33,16 @@ runs:
         path: ~/.cache/ms-playwright
         key: ${{ inputs.cache-key }}
         restore-keys: ${{ inputs.cache-restore-keys }}
+
+    # Playwright 1.58 hangs after the download on Node 26: the archive never
+    # finishes extracting (reproduced locally: Node 24 installs in 9 s,
+    # Node 26 stalls until killed; Playwright 1.65 is fine on 26). Install
+    # on Node 24, then switch back to the job's Node. Drop this once
+    # Playwright is 1.65 or newer.
+    - name: Use Node 24 for the browser install
+      uses: actions/setup-node@v5
+      with:
+        node-version: 24
 
     # `playwright install chromium` is idempotent: a no-op when the cached
     # binary is valid, a download when it is missing. A stalled CDN
@@ -90,6 +104,11 @@ runs:
           echo "$missing"
           exit 1
         fi
+
+    - name: Restore the job's Node
+      uses: actions/setup-node@v5
+      with:
+        node-version: ${{ inputs.node-version }}
 
     - name: Save Playwright browser cache
       if: steps.playwright-cache.outputs.cache-hit != 'true'
