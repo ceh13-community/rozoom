@@ -78,9 +78,35 @@ fn relax_webview_tls(
     Ok(())
 }
 
+/// Window properties restored on launch.
+///
+/// Linux leaves the size out. There the plugin saves the GTK allocation,
+/// which includes the client-side decorations (shadow margins and title bar),
+/// and restores it as the content size, so the window grows by the decoration
+/// size on every launch (+52 x +99 px per launch on GNOME 50) until its right
+/// and bottom edges sit off-screen. Position and the maximized state are
+/// still restored.
+fn window_state_flags() -> tauri_plugin_window_state::StateFlags {
+    use tauri_plugin_window_state::StateFlags;
+    if cfg!(target_os = "linux") {
+        StateFlags::all().difference(StateFlags::SIZE)
+    } else {
+        StateFlags::all()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{is_loopback_host, is_loopback_url};
+    use super::{is_loopback_host, is_loopback_url, window_state_flags};
+    use tauri_plugin_window_state::StateFlags;
+
+    #[test]
+    fn window_state_restores_size_everywhere_but_linux() {
+        let flags = window_state_flags();
+        assert_eq!(flags.contains(StateFlags::SIZE), !cfg!(target_os = "linux"));
+        assert!(flags.contains(StateFlags::POSITION));
+        assert!(flags.contains(StateFlags::MAXIMIZED));
+    }
 
     #[test]
     fn loopback_host_accepts_standard_loopbacks() {
@@ -167,7 +193,11 @@ fn main() {
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(window_state_flags())
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![
             relax_webview_tls,
             support_logs::read_recent_log_tail,
