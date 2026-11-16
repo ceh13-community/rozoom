@@ -1,0 +1,161 @@
+name: "Setup Playwright browsers"
+description: >
+  Restores the Playwright browser cache, installs the requested browsers
+  with bounded retries, installs system libraries only when a browser is
+  actually missing some, and saves the cache only after a verified install.
+  Any failure fails the step: a job that uses this action is green only
+  when every requested browser is really there.
+inputs:
+  browsers:
+    description: "Space-separated Playwright browsers to install: chromium, webkit"
+    required: false
+    default: "chromium"
+  working-directory:
+    description: "Package directory where @playwright/test is installed"
+    required: true
+  cache-key:
+    description: "Exact cache key for ~/.cache/ms-playwright"
+    required: true
+  cache-restore-keys:
+    description: "Prefix fallbacks for a partial restore"
+    required: false
+    default: ""
+  node-version:
+    description: "Node version the job runs on, restored after the install"
+    required: false
+    default: "lts/*"
+runs:
+  using: "composite"
+  steps:
+    # Restore-only: the install step below verifies the browser, and the
+    # save step at the end persists only a cache that passed that check.
+    # A blind save would let one stalled download poison every later run.
+    - name: Restore Playwright browser cache
+      id: playwright-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ inputs.cache-key }}
+        restore-keys: ${{ inputs.cache-restore-keys }}
+
+    # Playwright 1.58 hangs after the download on Node 26: the archive never
+    # finishes extracting (reproduced locally: Node 24 installs in 9 s,
+    # Node 26 stalls until killed; Playwright 1.65 is fine on 26). Install
+    # on Node 24, then switch back to the job's Node. Drop this once
+    # Playwright is 1.65 or newer.
+    - name: Use Node 24 for the browser install
+      uses: actions/setup-node@v5
+      with:
+        node-version: 24
+
+    # `playwright install <browser>` is idempotent: a no-op when the cached
+    # binary is valid, a download when it is missing. A stalled CDN
+    # connection never errors on its own, so bound each attempt.
+    - name: Install Playwright browsers
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+      run: |
+        for browser in $BROWSERS; do
+          installed=""
+          for attempt in 1 2 3; do
+            echo "$browser install attempt $attempt/3"
+            if timeout 180 pnpm exec playwright install "$browser"; then
+              installed=1
+              break
+            fi
+            echo "attempt $attempt stalled or failed; retrying"
+            sleep 5
+          done
+          if [ -z "$installed" ]; then
+            echo "::error::Playwright $browser download failed after 3 attempts"
+            exit 1
+          fi
+        done
+
+    # The runner image usually ships every library Chromium links against,
+    # so apt is skipped unless ldd reports a missing one. WebKit is checked
+    # the way Playwright checks it before launch: ldd over the MiniBrowser
+    # binaries and bundled libraries with the bundle on LD_LIBRARY_PATH,
+    # plus the two libraries WebKit dlopens at runtime. When apt is
+    # needed: `timeout` kills pnpm, but sudo runs apt-get in its own pty
+    # session, so a timed-out apt-get survives and holds the apt lock, and
+    # every retry then dies on "Could not get lock". Reap it between
+    # attempts.
+    - name: Install browser system libraries
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+      run: |
+        wants() { case " $BROWSERS " in *" $1 "*) return 0 ;; esac; return 1; }
+        webkit_missing() {
+          local webkit root
+          webkit="$(ls -d "$HOME"/.cache/ms-playwright/webkit-* 2>/dev/null | sort -V | tail -1)"
+          if [ -z "$webkit" ]; then
+            echo "webkit bundle => not found"
+            return
+          fi
+          for root in "$webkit/minibrowser-gtk" "$webkit/minibrowser-wpe"; do
+            [ -d "$root" ] || continue
+            LD_LIBRARY_PATH="$root:$root/bin:$root/lib:$root/sys/lib" \
+              find -L "$root" "$root/bin" "$root/lib" "$root/sys/lib" -maxdepth 1 -type f \
+              \( -perm -u+x -o -name '*.so' -o -name '*.so.*' \) \
+              -exec ldd {} + 2>/dev/null
+          done
+          for lib in libGLESv2.so.2 libx264.so; do
+            /sbin/ldconfig -p | grep -qiF "$lib" || echo "$lib => not found (dlopen)"
+          done
+        }
+        missing_libs() {
+          {
+            if wants chromium; then
+              find "$HOME/.cache/ms-playwright" -type f -perm -u+x \
+                \( -name chrome -o -name headless_shell -o -name chrome-headless-shell \) \
+                -exec ldd {} + 2>/dev/null
+            fi
+            if wants webkit; then webkit_missing; fi
+          } | grep 'not found' | sort -u || true
+        }
+        reap_apt() {
+          sudo pkill -TERM -x apt-get || true
+          for _ in $(seq 1 30); do
+            pgrep -x apt-get >/dev/null || pgrep -x dpkg >/dev/null || return 0
+            sleep 2
+          done
+          sudo pkill -KILL -x apt-get || true
+          sudo dpkg --configure -a || true
+        }
+        missing="$(missing_libs)"
+        if [ -z "$missing" ]; then
+          echo "All browser libraries present; skipping apt."
+          exit 0
+        fi
+        echo "Missing libraries:"
+        echo "$missing"
+        for attempt in 1 2 3; do
+          echo "System deps install attempt $attempt/3"
+          timeout 240 pnpm exec playwright install-deps $BROWSERS && break
+          echo "attempt $attempt stalled or failed; reaping apt and retrying"
+          reap_apt
+          sleep 5
+        done
+        missing="$(missing_libs)"
+        if [ -n "$missing" ]; then
+          echo "::error::Browser system libraries still missing after 3 attempts:"
+          echo "$missing"
+          exit 1
+        fi
+
+    - name: Restore the job's Node
+      uses: actions/setup-node@v5
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Save Playwright browser cache
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ inputs.cache-key }}
