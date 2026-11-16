@@ -107,7 +107,10 @@
         </Badge>
       {/snippet}
     </Popover.Trigger>
-    <Popover.Content class="w-[760px] max-h-[420px] overflow-y-auto" sideOffset={8}>
+    <Popover.Content
+      class="w-[760px] max-h-[min(420px,var(--bits-popover-content-available-height,calc(100dvh-2rem)))] overflow-y-auto"
+      sideOffset={8}
+    >
       <div class="flex items-center justify-between gap-2 mb-3">
         <span class="text-xs text-muted-foreground">Last updated: {updatedAtText}</span>
         <div class="flex items-center gap-2">

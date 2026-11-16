@@ -37,9 +37,7 @@
     return STATUS_CLASSES.unknown;
   });
 
-  const detailText = $derived(
-    summary?.message ?? "Storage data is unavailable for this cluster.",
-  );
+  const detailText = $derived(summary?.message ?? "Storage data is unavailable for this cluster.");
 
   async function refreshNow() {
     if (isRefreshing || !clusterId) return;
@@ -63,7 +61,10 @@
         </Badge>
       {/snippet}
     </Popover.Trigger>
-    <Popover.Content class="w-[400px] max-h-[420px] overflow-y-auto" sideOffset={8}>
+    <Popover.Content
+      class="w-[400px] max-h-[min(420px,var(--bits-popover-content-available-height,calc(100dvh-2rem)))] overflow-y-auto"
+      sideOffset={8}
+    >
       <p>{detailText}</p>
       <div class="flex items-center justify-between gap-2 mb-3">
         <span class="text-xs text-muted-foreground">Last updated: {updatedAtText}</span>

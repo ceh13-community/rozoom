@@ -161,7 +161,7 @@
           </button>
         </Popover.Trigger>
         <Popover.Content
-          class="w-[360px] max-h-[480px] overflow-hidden p-0 flex flex-col"
+          class="w-[360px] max-h-[min(480px,var(--bits-popover-content-available-height,calc(100dvh-2rem)))] overflow-hidden p-0 flex flex-col"
           side="right"
           sideOffset={8}
         >

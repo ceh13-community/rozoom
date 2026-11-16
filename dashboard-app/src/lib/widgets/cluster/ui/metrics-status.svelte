@@ -67,10 +67,13 @@
   const isActionable = $derived(isKubeStateMetrics || isMetricsServer || isNodeExporter);
   const description = $derived.by(() => {
     const map: Record<string, string> = {
-      "Kube State Metrics": "Cluster-state metrics from kube-state-metrics. Useful for dashboards and alerts, but not required for core Kubernetes health.",
-      Kubelet: "Kubelet summary/resource metrics per node. Core signal for node resource visibility.",
+      "Kube State Metrics":
+        "Cluster-state metrics from kube-state-metrics. Useful for dashboards and alerts, but not required for core Kubernetes health.",
+      Kubelet:
+        "Kubelet summary/resource metrics per node. Core signal for node resource visibility.",
       "Metrics Server": "Resource Metrics API used by kubectl top and autoscaling flows.",
-      "Node Exporter": "Host-level metrics from node-exporter, usually for Prometheus-based observability stacks.",
+      "Node Exporter":
+        "Host-level metrics from node-exporter, usually for Prometheus-based observability stacks.",
     };
     return map[metrics.title] ?? "Metrics endpoint availability and install status.";
   });
@@ -194,12 +197,15 @@
         </span>
       {/snippet}
     </Popover.Trigger>
-    <Popover.Content class="w-[460px] max-h-[420px] overflow-y-auto" sideOffset={8}>
+    <Popover.Content
+      class="w-[460px] max-h-[min(420px,var(--bits-popover-content-available-height,calc(100dvh-2rem)))] overflow-y-auto"
+      sideOffset={8}
+    >
       <div class="my-2 p-2">
         <div class="mb-2 text-[11px] text-muted-foreground/90">
-          This row shows metrics-source availability, not full observability coverage. `Metrics Server`
-          powers resource metrics APIs, while `kube-state-metrics` and `node-exporter` are usually
-          optional observability stack components.
+          This row shows metrics-source availability, not full observability coverage. `Metrics
+          Server` powers resource metrics APIs, while `kube-state-metrics` and `node-exporter` are
+          usually optional observability stack components.
         </div>
         Last sync: {metrics.lastSync}<br />
         {#if metrics.error}

@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 function read(path: string) {
@@ -31,5 +31,30 @@ describe("shared overlay layering contract", () => {
     expect(popoverContent).toContain("overflow-y-auto");
     expect(dropdownContent).toContain("max-h-[var(--bits-dropdown-menu-content-available-height");
     expect(dropdownContent).toContain("overflow-y-auto");
+  });
+
+  it("does not let a popover consumer replace the window bound with a fixed height", () => {
+    // cn() runs tailwind-merge, so a consumer's own max-h-* drops the bound
+    // from popover-content.svelte. Every consumer max-h must carry it.
+    const files = readdirSync(resolve("src"), { recursive: true, encoding: "utf8" }).filter(
+      (file) => file.endsWith(".svelte"),
+    );
+    const contentTag = /<(?:Popover\.Content|PopoverContent)\b[\s\S]*?>/g;
+    let consumers = 0;
+    const unbounded: string[] = [];
+    for (const file of files) {
+      const source = read(join("src", file));
+      for (const tag of source.match(contentTag) ?? []) {
+        consumers += 1;
+        for (const maxHeight of tag.match(/max-h-[^\s"'}]+/g) ?? []) {
+          if (!maxHeight.includes("--bits-popover-content-available-height")) {
+            unbounded.push(`${file}: ${maxHeight}`);
+          }
+        }
+      }
+    }
+
+    expect(consumers).toBeGreaterThan(50);
+    expect(unbounded).toEqual([]);
   });
 });

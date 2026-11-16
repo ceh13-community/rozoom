@@ -82,11 +82,15 @@
         </Badge>
       {/snippet}
     </Popover.Trigger>
-    <Popover.Content class="w-[980px] max-h-[520px] overflow-y-auto" sideOffset={8}>
+    <Popover.Content
+      class="w-[980px] max-h-[min(520px,var(--bits-popover-content-available-height,calc(100dvh-2rem)))] overflow-y-auto"
+      sideOffset={8}
+    >
       <p>{detailText}</p>
       <div class="mb-2 text-[11px] text-muted-foreground/90">
-        This summary reflects Kubernetes NetworkPolicy coverage and default-deny posture. It does not
-        validate CNI-specific enforcement beyond what policy objects and observable signals expose.
+        This summary reflects Kubernetes NetworkPolicy coverage and default-deny posture. It does
+        not validate CNI-specific enforcement beyond what policy objects and observable signals
+        expose.
       </div>
       <div class="flex items-center justify-between gap-2 mb-3">
         <span class="text-xs text-muted-foreground">Last updated: {updatedAtText}</span>

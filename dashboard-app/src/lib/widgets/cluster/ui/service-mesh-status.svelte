@@ -55,7 +55,10 @@
         </Badge>
       {/snippet}
     </Popover.Trigger>
-    <Popover.Content class="w-[340px] max-h-[300px] overflow-y-auto" sideOffset={8}>
+    <Popover.Content
+      class="w-[340px] max-h-[min(300px,var(--bits-popover-content-available-height,calc(100dvh-2rem)))] overflow-y-auto"
+      sideOffset={8}
+    >
       <p>Service Mesh: {badgeLabel}</p>
       <div class="flex items-center justify-between gap-2 mb-3">
         <span class="text-xs text-muted-foreground">Last updated: {updatedAtText}</span>
