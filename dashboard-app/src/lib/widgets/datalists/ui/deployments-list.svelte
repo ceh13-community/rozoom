@@ -1,6 +1,7 @@
 <script lang="ts">
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
   import DetailsSheetPortal from "$shared/ui/details-sheet-portal.svelte";
+  import { hasOpenOverlay } from "$shared/lib/keyboard-manager";
   import { createRawSnippet, onDestroy, onMount, tick } from "svelte";
   import { writable } from "svelte/store";
   import type { ColumnDef } from "@tanstack/table-core";
@@ -2714,18 +2715,18 @@
     });
   }
 
+  // The details panel and the command palette sit in the keyboard
+  // manager's overlay stack and close there. This handler only takes
+  // Escape when no overlay is open and nobody handled the key yet, so one
+  // press never closes the panel and a workbench tab together.
   function handleWindowKeydown(event: KeyboardEvent) {
-    if (event.key !== "Escape") return;
+    if (event.key !== "Escape" || event.defaultPrevented || hasOpenOverlay()) return;
     if ($logsOpen) {
       logsOpen.set(false);
       return;
     }
     if (activeWorkbenchTabId) {
       void closeWorkbenchTab(activeWorkbenchTabId);
-      return;
-    }
-    if (isOpen) {
-      closeDetails();
     }
   }
 

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   handleGlobalKeydown,
+  hasOpenOverlay,
   pushOverlay,
   registerShortcut,
   resetKeyboardManager,
@@ -140,6 +141,24 @@ describe("keyboard-manager", () => {
       dispose();
       handleGlobalKeydown(key("Escape"));
       expect(close1).not.toHaveBeenCalled();
+    });
+
+    it("leaves an Escape that something nearer the target already handled", () => {
+      const close1 = vi.fn();
+      pushOverlay("panel", close1);
+      const handled = key("Escape", { cancelable: true });
+      handled.preventDefault();
+      handleGlobalKeydown(handled);
+      expect(close1).not.toHaveBeenCalled();
+      expect(hasOpenOverlay()).toBe(true);
+    });
+
+    it("reports whether an overlay is open", () => {
+      expect(hasOpenOverlay()).toBe(false);
+      const dispose = pushOverlay("panel", vi.fn());
+      expect(hasOpenOverlay()).toBe(true);
+      dispose();
+      expect(hasOpenOverlay()).toBe(false);
     });
   });
 });
