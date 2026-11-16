@@ -99,9 +99,18 @@ export function pushOverlay(id: string, close: () => void): () => void {
   };
 }
 
+/** True while any registered overlay is open and owns Escape. */
+export function hasOpenOverlay(): boolean {
+  return overlayStack.length > 0;
+}
+
 export function handleGlobalKeydown(event: KeyboardEvent): void {
-  // Escape always works - closes topmost overlay
+  // Escape closes the topmost overlay, even from an input. An Escape that
+  // something nearer the target already handled (a bits-ui menu or dialog,
+  // a text field inside a panel) is left alone, so one key press closes
+  // one thing.
   if (event.key === "Escape" && overlayStack.length > 0) {
+    if (event.defaultPrevented) return;
     event.preventDefault();
     const topmost = overlayStack[overlayStack.length - 1];
     topmost.close();
