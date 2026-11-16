@@ -5,9 +5,11 @@ import { classifyKubectlFailure } from "$shared/lib/kubectl-connectivity";
  * Per-cluster connectivity, independent of the Linter.
  *
  * Fed passively by every kubectl call the app makes for a cluster (see
- * kubectl-proxy) and by the health check, so it never runs a credential plugin
- * on its own. The only active check is the one the cluster page runs when it
- * opens and the Retry button.
+ * kubectl-proxy) and by the health check. Errors that prove the state (refused,
+ * no route, unknown host, untrusted certificate, rejected credentials) are
+ * written at once. A timeout is not proof: it asks for the connectivity check
+ * (one small request), and only the check writes "unreachable" for it. The
+ * check also runs when a cluster page opens and on Retry.
  *
  * - unknown: nothing has talked to the cluster in this session yet.
  * - online: the API server answered (also with 403/404: that is the page's error).
@@ -111,6 +113,34 @@ function persist(state: Record<string, ClusterConnectivity>) {
 const PERSIST_EVERY_MS = 60_000;
 let lastPersistAt = 0;
 
+// A steady cluster answers on every call. Rewriting the store each time would
+// re-render every card and page that reads it, for times shown in minutes.
+const ONLINE_REWRITE_EVERY_MS = 15_000;
+
+// A timeout on an ordinary call asks for one check, at most this often.
+const CONFIRMATION_EVERY_MS = 30_000;
+
+// A cluster that answers again makes each view reload, at most this often.
+const RECONNECT_RELOAD_EVERY_MS = 60_000;
+
+/** `source` of the kubectl call made by the connectivity check itself. */
+export const CONNECTIVITY_CHECK_SOURCE = "cluster-connectivity:check";
+
+/** When the call behind a report started, and who made it. */
+export type ConnectivityReport = {
+  /** Defaults to the time of the report. */
+  startedAt?: number;
+  source?: string | null;
+};
+
+// Start time of the call behind the current verdict. Calls finish in any order:
+// a list that hung for 10 s must not overwrite what a Retry started 5 s later
+// has already found out, in either direction.
+const verdictStartedAt = new Map<string, number>();
+const lastConfirmationAt = new Map<string, number>();
+const lastReconnectReloadAt = new Map<string, number>();
+let confirmationRunner: ((clusterId: string) => void) | null = null;
+
 function currentEntry(clusterId: string): ClusterConnectivity | undefined {
   const entry: ClusterConnectivity | undefined = get(store)[clusterId];
   return entry;
@@ -123,8 +153,29 @@ function update(clusterId: string, patch: Partial<ClusterConnectivity>) {
   }));
 }
 
-function markOnline(clusterId: string, now: number) {
-  const wasOnline = currentEntry(clusterId)?.state === "online";
+function isStale(clusterId: string, startedAt: number): boolean {
+  const recorded = verdictStartedAt.get(clusterId);
+  return recorded !== undefined && startedAt < recorded;
+}
+
+/** Records the call as the source of the verdict, unless a newer one already is. */
+function claimVerdict(clusterId: string, startedAt: number): boolean {
+  if (isStale(clusterId, startedAt)) return false;
+  verdictStartedAt.set(clusterId, startedAt);
+  return true;
+}
+
+function markOnline(clusterId: string, startedAt: number, now: number) {
+  if (!claimVerdict(clusterId, startedAt)) return;
+  const entry = currentEntry(clusterId);
+  if (
+    entry?.state === "online" &&
+    entry.checkedAt !== null &&
+    now - entry.checkedAt < ONLINE_REWRITE_EVERY_MS
+  ) {
+    return;
+  }
+  const wasOnline = entry?.state === "online";
   update(clusterId, {
     state: "online",
     reason: null,
@@ -138,13 +189,36 @@ function markOnline(clusterId: string, now: number) {
   }
 }
 
-function markFailure(clusterId: string, stderr: string, now: number) {
+function requestConfirmation(clusterId: string, now: number) {
+  const last = lastConfirmationAt.get(clusterId);
+  if (last !== undefined && now - last < CONFIRMATION_EVERY_MS) return;
+  lastConfirmationAt.set(clusterId, now);
+  confirmationRunner?.(clusterId);
+}
+
+function markFailure(
+  clusterId: string,
+  stderr: string,
+  startedAt: number,
+  authoritative: boolean,
+  now: number,
+) {
   if (!NETWORK_OR_AUTH_FAILURE.test(stderr)) return;
   const verdict = classifyKubectlFailure(stderr);
   if (verdict.state === "online") {
-    markOnline(clusterId, now);
+    markOnline(clusterId, startedAt, now);
     return;
   }
+  if (!verdict.definite && !authoritative) {
+    // One slow request on a live cluster times out the same way a dead cluster
+    // does. It changes nothing by itself; the check decides.
+    if (isStale(clusterId, startedAt)) return;
+    if (!isClusterDisconnected(currentEntry(clusterId) ?? EMPTY)) {
+      requestConfirmation(clusterId, now);
+    }
+    return;
+  }
+  if (!claimVerdict(clusterId, startedAt)) return;
   update(clusterId, {
     state: verdict.state,
     reason: verdict.reason,
@@ -159,45 +233,83 @@ function normalizeId(clusterId: string | null | undefined): string | null {
 }
 
 /**
+ * The connectivity check registers itself here, so a timeout on an ordinary call
+ * can ask for it without this store importing the kubectl proxy.
+ */
+export function registerConnectivityConfirmation(runner: ((clusterId: string) => void) | null) {
+  confirmationRunner = runner;
+}
+
+/**
  * Called by the kubectl proxy after every finished exec for a cluster. A null
- * code means kubectl was killed (abort or timeout): that says nothing about the
- * cluster, so it records no verdict.
+ * code means kubectl was killed: that says nothing about the cluster, so it
+ * records no verdict.
  */
 export function reportKubectlOutcome(
   clusterId: string | null | undefined,
   result: { code?: number | null; stderr: string },
+  report: ConnectivityReport = {},
 ) {
   const id = normalizeId(clusterId);
   if (!id || result.code === null) return;
   const now = Date.now();
+  const startedAt = report.startedAt ?? now;
   if (result.code === 0 || result.code === undefined) {
-    markOnline(id, now);
+    markOnline(id, startedAt, now);
     return;
   }
-  markFailure(id, result.stderr, now);
+  markFailure(id, result.stderr, startedAt, report.source === CONNECTIVITY_CHECK_SOURCE, now);
 }
 
 /** Called by the health check after a fresh load that reached the cluster. */
-export function reportClusterAnswered(clusterId: string | null | undefined) {
-  const id = normalizeId(clusterId);
-  if (id) markOnline(id, Date.now());
-}
-
-/** Called by the health check with the error text of a failed load. */
-export function reportClusterLoadError(clusterId: string | null | undefined, errorText: string) {
+export function reportClusterAnswered(clusterId: string | null | undefined, startedAt?: number) {
   const id = normalizeId(clusterId);
   if (!id) return;
-  markFailure(id, errorText, Date.now());
+  const now = Date.now();
+  markOnline(id, startedAt ?? now, now);
 }
 
-/** A check gave up waiting: the server neither answered nor refused. */
-export function reportClusterNoAnswer(clusterId: string, detail: string) {
+/** Called with the error text of a failed load (health check) or check. */
+export function reportClusterLoadError(
+  clusterId: string | null | undefined,
+  errorText: string,
+  report: ConnectivityReport = {},
+) {
+  const id = normalizeId(clusterId);
+  if (!id) return;
+  const now = Date.now();
+  markFailure(
+    id,
+    errorText,
+    report.startedAt ?? now,
+    report.source === CONNECTIVITY_CHECK_SOURCE,
+    now,
+  );
+}
+
+/** The check gave up waiting: the server neither answered nor refused. */
+export function reportClusterNoAnswer(clusterId: string, detail: string, startedAt?: number) {
+  const now = Date.now();
+  if (!claimVerdict(clusterId, startedAt ?? now)) return;
   update(clusterId, {
     state: "unreachable",
     reason: "No answer from the server",
     detail,
-    checkedAt: Date.now(),
+    checkedAt: now,
   });
+}
+
+/**
+ * A view asks before reloading because the cluster answered again. True at most
+ * once a minute per cluster and view, so a cluster that keeps dropping cannot
+ * turn every return into a full reload of the card, the list and the pods.
+ */
+export function claimReconnectReload(clusterId: string, view: string, now = Date.now()): boolean {
+  const key = `${clusterId}::${view}`;
+  const last = lastReconnectReloadAt.get(key);
+  if (last !== undefined && now - last < RECONNECT_RELOAD_EVERY_MS) return false;
+  lastReconnectReloadAt.set(key, now);
+  return true;
 }
 
 export function recordServerVersion(clusterId: string, version: string) {
@@ -236,5 +348,8 @@ export function formatContactTime(at: number, now = Date.now()): string {
 /** Test seam. */
 export function resetClusterConnectivity() {
   lastPersistAt = 0;
+  verdictStartedAt.clear();
+  lastConfirmationAt.clear();
+  lastReconnectReloadAt.clear();
   store.set(initialState());
 }

@@ -15,6 +15,7 @@
   import { WorkloadDisplay } from "$widgets/workload";
   import ClusterUnreachableBanner from "$widgets/cluster/ui/connectivity/cluster-unreachable-banner.svelte";
   import {
+    claimReconnectReload,
     clusterConnectivity,
     getClusterConnectivity,
     isClusterDisconnected,
@@ -596,7 +597,12 @@
   let wasDisconnected = false;
   $effect(() => {
     const disconnected = clusterDisconnected;
-    if (wasDisconnected && !disconnected && connectivity.state === "online") {
+    if (
+      wasDisconnected &&
+      !disconnected &&
+      connectivity.state === "online" &&
+      claimReconnectReload(cluster, "workloads")
+    ) {
       untrack(() => workloads.refetch());
     }
     wasDisconnected = disconnected;

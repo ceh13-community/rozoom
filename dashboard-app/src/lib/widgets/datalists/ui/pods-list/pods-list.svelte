@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount, untrack } from "svelte";
   import {
+    claimReconnectReload,
     clusterConnectivity,
     getClusterConnectivity,
     isClusterDisconnected,
@@ -183,7 +184,9 @@
   let wasClusterUnreachable = false;
   $effect(() => {
     const unreachable = clusterUnreachable;
-    if (wasClusterUnreachable && !unreachable) void loadPodsSnapshot();
+    if (wasClusterUnreachable && !unreachable && claimReconnectReload(data.slug, "pods")) {
+      void loadPodsSnapshot();
+    }
     wasClusterUnreachable = unreachable;
   });
   const podsSummarySyncLabel = $derived.by(() => {

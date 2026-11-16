@@ -1,11 +1,15 @@
 import { get } from "svelte/store";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  claimReconnectReload,
   clusterConnectivity,
+  CONNECTIVITY_CHECK_SOURCE,
   formatContactTime,
+  registerConnectivityConfirmation,
   isClusterDisconnected,
   recordServerVersion,
   reportClusterAnswered,
+  reportClusterNoAnswer,
   reportClusterLoadError,
   reportKubectlOutcome,
   resetClusterConnectivity,
@@ -19,6 +23,7 @@ describe("cluster connectivity", () => {
   beforeEach(() => {
     window.localStorage.clear();
     resetClusterConnectivity();
+    registerConnectivityConfirmation(null);
     vi.useRealTimers();
   });
 
@@ -119,5 +124,114 @@ describe("cluster connectivity", () => {
     const now = new Date(2026, 10, 16, 18, 0).getTime();
     expect(formatContactTime(new Date(2026, 10, 16, 14, 2).getTime(), now)).toBe("14:02");
     expect(formatContactTime(new Date(2026, 10, 15, 9, 5).getTime(), now)).toBe("15 Nov 09:05");
+  });
+
+  describe("calls that finish out of order", () => {
+    const REFUSED =
+      "The connection to the server 127.0.0.1:6443 was refused - did you specify the right host or port?";
+
+    it("keeps a Retry's answer when an older call fails after it", () => {
+      // A list request starts at 1000 and hangs; Retry starts at 5000 and answers.
+      reportKubectlOutcome("a", { code: 0, stderr: "" }, { startedAt: 5_000 });
+      reportKubectlOutcome("a", { code: 1, stderr: REFUSED }, { startedAt: 1_000 });
+      expect(get(selectClusterConnectivity("a")).state).toBe("online");
+    });
+
+    it("keeps a newer failure when an older call answers after it", () => {
+      reportKubectlOutcome("a", { code: 1, stderr: REFUSED }, { startedAt: 5_000 });
+      reportKubectlOutcome("a", { code: 0, stderr: "" }, { startedAt: 1_000 });
+      expect(get(selectClusterConnectivity("a"))).toMatchObject({
+        state: "unreachable",
+        reason: "Connection refused",
+      });
+    });
+
+    it("drops a check that gave up when a newer call has answered", () => {
+      reportKubectlOutcome("a", { code: 0, stderr: "" }, { startedAt: 10_000 });
+      reportClusterNoAnswer("a", "Gave up after 35 s", 5_000);
+      expect(get(selectClusterConnectivity("a")).state).toBe("online");
+    });
+  });
+
+  describe("a timeout on an ordinary call", () => {
+    const TIMEOUT = "Unable to connect to the server: dial tcp 10.0.0.1:6443: i/o timeout";
+
+    it("leaves a live cluster online and asks for one check", () => {
+      const runner = vi.fn();
+      registerConnectivityConfirmation(runner);
+      reportKubectlOutcome("a", { code: 0, stderr: "" }, { startedAt: 1_000 });
+      reportKubectlOutcome("a", { code: 1, stderr: TIMEOUT }, { startedAt: 2_000 });
+      reportKubectlOutcome("a", { code: 1, stderr: TIMEOUT }, { startedAt: 3_000 });
+      expect(get(selectClusterConnectivity("a")).state).toBe("online");
+      expect(runner).toHaveBeenCalledTimes(1);
+      expect(runner).toHaveBeenCalledWith("a");
+    });
+
+    it("does not ask again within 30 s", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(100_000);
+      const runner = vi.fn();
+      registerConnectivityConfirmation(runner);
+      reportKubectlOutcome("a", { code: 1, stderr: TIMEOUT });
+      vi.setSystemTime(129_000);
+      reportKubectlOutcome("a", { code: 1, stderr: TIMEOUT });
+      expect(runner).toHaveBeenCalledTimes(1);
+      vi.setSystemTime(131_000);
+      reportKubectlOutcome("a", { code: 1, stderr: TIMEOUT });
+      expect(runner).toHaveBeenCalledTimes(2);
+    });
+
+    it("is written by the check itself", () => {
+      const runner = vi.fn();
+      registerConnectivityConfirmation(runner);
+      reportKubectlOutcome("a", { code: 0, stderr: "" }, { startedAt: 1_000 });
+      reportKubectlOutcome(
+        "a",
+        { code: 1, stderr: TIMEOUT },
+        { startedAt: 2_000, source: CONNECTIVITY_CHECK_SOURCE },
+      );
+      expect(get(selectClusterConnectivity("a"))).toMatchObject({
+        state: "unreachable",
+        reason: "No answer from the server",
+      });
+      expect(runner).not.toHaveBeenCalled();
+    });
+
+    it("from the health check also only asks for the check", () => {
+      const runner = vi.fn();
+      registerConnectivityConfirmation(runner);
+      reportKubectlOutcome("a", { code: 0, stderr: "" }, { startedAt: 1_000 });
+      reportClusterLoadError("a", `Failed to load pods: ${TIMEOUT}`, { startedAt: 2_000 });
+      expect(get(selectClusterConnectivity("a")).state).toBe("online");
+      expect(runner).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("does not rewrite the store for every answer of a steady cluster", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    reportKubectlOutcome("a", { code: 0, stderr: "" });
+    let writes = 0;
+    const unsubscribe = clusterConnectivity.subscribe(() => {
+      writes += 1;
+    });
+    writes = 0;
+    for (let step = 1; step <= 10; step += 1) {
+      vi.setSystemTime(1_000_000 + step * 1_000);
+      reportKubectlOutcome("a", { code: 0, stderr: "" });
+    }
+    expect(writes).toBe(0);
+    vi.setSystemTime(1_016_000);
+    reportKubectlOutcome("a", { code: 0, stderr: "" });
+    expect(writes).toBe(1);
+    unsubscribe();
+  });
+
+  it("lets each view reload after a reconnect at most once a minute per cluster", () => {
+    expect(claimReconnectReload("a", "card", 0)).toBe(true);
+    expect(claimReconnectReload("a", "card", 59_000)).toBe(false);
+    expect(claimReconnectReload("a", "pods", 59_000)).toBe(true);
+    expect(claimReconnectReload("b", "card", 59_000)).toBe(true);
+    expect(claimReconnectReload("a", "card", 60_000)).toBe(true);
   });
 });

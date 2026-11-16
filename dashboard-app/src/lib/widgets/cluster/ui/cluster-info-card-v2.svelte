@@ -52,6 +52,7 @@
   import ConnectivityBadge from "./connectivity/connectivity-badge.svelte";
   import { resetUnreachableEntries } from "$features/check-health/model/feature-capability-cache";
   import {
+    claimReconnectReload,
     formatContactTime,
     isClusterDisconnected,
     selectClusterConnectivity,
@@ -379,7 +380,12 @@
   let wasDisconnected = false;
   $effect(() => {
     const isDown = disconnected;
-    if (wasDisconnected && !isDown && connectivity.state === "online") {
+    if (
+      wasDisconnected &&
+      !isDown &&
+      connectivity.state === "online" &&
+      claimReconnectReload(cluster.uuid, "card")
+    ) {
       // Probes cached as "unreachable" while the cluster was down would keep
       // answering for 5 minutes; they are about the outage, not the cluster.
       resetUnreachableEntries(cluster.uuid);

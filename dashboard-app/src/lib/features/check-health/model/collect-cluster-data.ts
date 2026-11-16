@@ -706,14 +706,14 @@ export async function collectClusterData(
       ...states,
       [clusterId]: { loading: false, error: errorText },
     }));
-    reportClusterLoadError(clusterId, errorText);
+    reportClusterLoadError(clusterId, errorText, { startedAt });
 
     return {
       errors: errorText,
       timestamp: Date.now(),
     };
   }
-  if (!reusesDiagnosticsSnapshot) reportClusterAnswered(clusterId);
+  if (!reusesDiagnosticsSnapshot) reportClusterAnswered(clusterId, startedAt);
   const normalizedData = normalizeLoadedClusterData(loadedData);
   if (dashboardDiagnosticsMode && !dashboardLightMode) {
     rememberDiagnosticsEntities(clusterId, entitiesToFetch, normalizedData);

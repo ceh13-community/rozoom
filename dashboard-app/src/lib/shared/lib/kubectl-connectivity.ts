@@ -9,7 +9,18 @@ export type ConnectivityState = "online" | "unreachable" | "auth-expired";
 
 export type ConnectivityVerdict =
   | { state: "online" }
-  | { state: "unreachable" | "auth-expired"; reason: string; detail: string };
+  | {
+      state: "unreachable" | "auth-expired";
+      reason: string;
+      detail: string;
+      /**
+       * True when the error itself proves the state: refused, no route, unknown host,
+       * untrusted certificate, rejected credentials. False for a timeout or an
+       * unrecognised failure: a slow request on a live cluster ends the same way, so
+       * one such call is not enough to call the cluster unreachable.
+       */
+      definite: boolean;
+    };
 
 export const UNKNOWN_FAILURE_REASON = "No answer from the server";
 
@@ -59,7 +70,12 @@ export function classifyKubectlFailure(stderr: string | null | undefined): Conne
   for (const [pattern, verdict] of RULES) {
     if (!pattern.test(text)) continue;
     if (verdict.state === "online") return { state: "online" };
-    return { state: verdict.state, reason: verdict.reason ?? UNKNOWN_FAILURE_REASON, detail };
+    return {
+      state: verdict.state,
+      reason: verdict.reason ?? UNKNOWN_FAILURE_REASON,
+      detail,
+      definite: true,
+    };
   }
-  return { state: "unreachable", reason: UNKNOWN_FAILURE_REASON, detail };
+  return { state: "unreachable", reason: UNKNOWN_FAILURE_REASON, detail, definite: false };
 }

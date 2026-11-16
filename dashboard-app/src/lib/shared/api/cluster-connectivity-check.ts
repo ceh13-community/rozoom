@@ -1,6 +1,8 @@
 import {
+  CONNECTIVITY_CHECK_SOURCE,
   getClusterConnectivity,
   recordServerVersion,
+  registerConnectivityConfirmation,
   reportClusterLoadError,
   reportClusterNoAnswer,
   setClusterConnectivityChecking,
@@ -38,6 +40,7 @@ export function checkClusterConnectivity(clusterId: string): Promise<ClusterConn
   if (running) return running;
 
   const check = (async () => {
+    const startedAt = Date.now();
     setClusterConnectivityChecking(clusterId, true);
     const controller = new AbortController();
     // Object, not a boolean: the flag is set inside the timer closure, which
@@ -57,7 +60,7 @@ export function checkClusterConnectivity(clusterId: string): Promise<ClusterConn
         kubectlRawArgsFront(["get", "--raw", "/version", "--request-timeout=5s"], {
           clusterId,
           signal: controller.signal,
-          source: "cluster-connectivity:check",
+          source: CONNECTIVITY_CHECK_SOURCE,
         }),
         giveUp,
       ]);
@@ -69,13 +72,17 @@ export function checkClusterConnectivity(clusterId: string): Promise<ClusterConn
         reportClusterNoAnswer(
           clusterId,
           `Gave up after ${Math.round(CONNECTIVITY_CHECK_TIMEOUT_MS / 1000)} s: kubectl did not return. Its credential plugin may still be running.`,
+          startedAt,
         );
       } else {
         const message =
           typeof error === "object" && error !== null && "message" in error
             ? String((error as { message: unknown }).message)
             : String(error);
-        reportClusterLoadError(clusterId, message);
+        reportClusterLoadError(clusterId, message, {
+          startedAt,
+          source: CONNECTIVITY_CHECK_SOURCE,
+        });
       }
     } finally {
       clearTimeout(timer);
@@ -87,3 +94,8 @@ export function checkClusterConnectivity(clusterId: string): Promise<ClusterConn
   inFlight.set(clusterId, check);
   return check;
 }
+
+// A timeout on an ordinary call is confirmed by this check, never by the call.
+registerConnectivityConfirmation((clusterId) => {
+  void checkClusterConnectivity(clusterId);
+});
