@@ -481,38 +481,49 @@
 
   async function runPodsSnapshotLoad() {
     if (!data.slug) return;
-    if (snapshotRefreshPromise) {
-      const inFlightScope = snapshotRefreshScope;
-      await snapshotRefreshPromise;
-      // The namespace selection changed while that request ran, so its pods
-      // belong to the old selection. Load the current one.
-      if (inFlightScope !== currentPodsScope()) await loadPodsSnapshot();
+    if (!snapshotRefreshPromise) {
+      await startPodsSnapshotLoad();
       return;
     }
+    const inFlight = snapshotRefreshPromise;
+    const inFlightScope = snapshotRefreshScope;
+    await inFlight;
+    // The namespace selection changed while that request ran, so its pods
+    // belong to the old selection. Load the current one, once, and only if
+    // no other caller has started that load already.
+    if (inFlightScope === currentPodsScope()) return;
+    if (snapshotRefreshPromise && snapshotRefreshPromise !== inFlight) {
+      await snapshotRefreshPromise;
+      return;
+    }
+    await startPodsSnapshotLoad();
+  }
+
+  async function startPodsSnapshotLoad() {
+    if (!data.slug) return;
     const requestScope = currentPodsScope();
     const requestNamespace = $selectedNamespace;
-    snapshotRefreshScope = requestScope;
-    snapshotRefreshPromise = (async () => {
+    const request = (async () => {
       markPodsSyncLoading(data.slug);
       watcherError = null;
       snapshotRefreshState = "loading";
       snapshotRefreshError = null;
       hydratePodsFromPersistedSnapshot();
 
-      const isBrowserOnlyPreview =
-        typeof window !== "undefined" &&
-        window.location.protocol.startsWith("http") &&
-        !isTauriAvailable();
-      if (isBrowserOnlyPreview && cachedSnapshotPods.length > 0) {
-        const message = "Pod watcher sync failed.";
-        watcherError = message;
-        snapshotRefreshState = "error";
-        snapshotRefreshError = message;
-        markPodsSyncError(data.slug, message);
-        return;
-      }
-
       try {
+        const isBrowserOnlyPreview =
+          typeof window !== "undefined" &&
+          window.location.protocol.startsWith("http") &&
+          !isTauriAvailable();
+        if (isBrowserOnlyPreview && cachedSnapshotPods.length > 0) {
+          const message = "Pod watcher sync failed.";
+          watcherError = message;
+          snapshotRefreshState = "error";
+          snapshotRefreshError = message;
+          markPodsSyncError(data.slug, message);
+          return;
+        }
+
         const hadCachedSnapshot = cachedSnapshotPods.length > 0;
         const items = await withSnapshotTimeout(
           fetchNamespacedSnapshotItems<Partial<PodItem>>({
@@ -539,12 +550,21 @@
         snapshotRefreshState = "error";
         snapshotRefreshError = message;
         markPodsSyncError(data.slug, message);
-      } finally {
+      }
+    })();
+    // Cleared here, not inside the request: a request that answers before its
+    // first await (the browser preview answers from cache) would clear the slot
+    // before it is set, and every later load would wait on it forever.
+    snapshotRefreshPromise = request;
+    snapshotRefreshScope = requestScope;
+    try {
+      await request;
+    } finally {
+      if (snapshotRefreshPromise === request) {
         snapshotRefreshPromise = null;
         snapshotRefreshScope = null;
       }
-    })();
-    await snapshotRefreshPromise;
+    }
   }
 
   function scheduleRefresh() {

@@ -209,3 +209,82 @@ test("a namespace change during a running load shows the new selection", async (
     )
     .toEqual(["all", "all", "alpha"]);
 });
+
+test("a namespace change in a browser without the desktop shell answers once from cache", async ({
+  browser,
+}) => {
+  const toEntry = (scope: string, names: string[]) => {
+    const scopeKey = `${CLUSTER_ID}::${scope}`;
+    const pods = names.map((name) => ({
+      metadata: { uid: `${scope}-${name}`, name, namespace: name.split("-")[0] },
+      status: {
+        phase: "Running",
+        startTime: new Date().toISOString(),
+        containerStatuses: [{ ready: true, restartCount: 0 }],
+      },
+      spec: { nodeName: "node-a", containers: [{ name: "main" }] },
+    }));
+    return {
+      key: `dashboard.pods.snapshot.v1:${encodeURIComponent(scopeKey)}`,
+      value: JSON.stringify({ schemaVersion: 1, scopeKey, cachedAt: Date.now(), pods }),
+    };
+  };
+  const cached = [toEntry("all", ["alpha-1", "beta-1", "gamma-1"]), toEntry("alpha", ["alpha-1"])];
+
+  const context = await browser.newContext();
+  await context.addInitScript(
+    ([entries, namespaces]) => {
+      const harness = { podsRequests: 0 };
+      (window as typeof window & { __previewHarness?: typeof harness }).__previewHarness = harness;
+      // No __TAURI__ marker: the page runs as a plain browser preview, where
+      // the pods list answers from its cache and does not call the cluster.
+      (
+        window as typeof window & {
+          __TAURI_INTERNALS__?: { invoke: (cmd: string, payload?: unknown) => Promise<unknown> };
+        }
+      ).__TAURI_INTERNALS__ = {
+        invoke: async (cmd: string, payload?: unknown) => {
+          const body = (payload ?? {}) as { args?: string[] };
+          if (cmd === "rozoom:namespaced-snapshot") {
+            harness.podsRequests += 1;
+            return { items: [] };
+          }
+          if (cmd === "rozoom:kubectl-proxy" && body.args?.includes("namespaces")) {
+            return {
+              output: JSON.stringify({ items: namespaces.map((name) => ({ metadata: { name } })) }),
+              errors: "",
+              code: 0,
+            };
+          }
+          if (cmd.startsWith("plugin:cache|")) return cmd.endsWith("|get") ? null : true;
+          if (cmd.startsWith("plugin:log|")) return true;
+          return await new Promise<never>(() => {});
+        },
+      };
+      for (const entry of entries) window.localStorage.setItem(entry.key, entry.value);
+    },
+    [cached, NAMESPACES] as const,
+  );
+
+  const page = await context.newPage();
+  await page.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=pods`);
+  await expectTable(page, ["alpha-1", "beta-1", "gamma-1"]);
+
+  await chooseNamespaces(page, ["alpha"]);
+  await expectTable(page, ["alpha-1"]);
+
+  // A hung tab never runs the next frame; a live one does at once.
+  const frame = await Promise.race([
+    page.evaluate(
+      () => new Promise<string>((resolve) => requestAnimationFrame(() => resolve("frame"))),
+    ),
+    new Promise<string>((resolve) => setTimeout(() => resolve("hung"), 3_000)),
+  ]);
+  expect(frame).toBe("frame");
+  const podsRequests = await page.evaluate(
+    () =>
+      (window as typeof window & { __previewHarness?: { podsRequests: number } }).__previewHarness!
+        .podsRequests,
+  );
+  expect(podsRequests).toBe(0);
+});
