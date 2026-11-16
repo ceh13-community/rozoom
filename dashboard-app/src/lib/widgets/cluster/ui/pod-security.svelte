@@ -68,7 +68,10 @@
         </Badge>
       {/snippet}
     </Popover.Trigger>
-    <Popover.Content class="w-[980px] max-h-[520px] overflow-y-auto" sideOffset={8}>
+    <Popover.Content
+      class="w-[980px] max-h-[min(520px,var(--bits-popover-content-available-height,calc(100dvh-2rem)))] overflow-y-auto"
+      sideOffset={8}
+    >
       <p>{detailText}</p>
       <div class="mb-2 text-[11px] text-muted-foreground/90">
         This summary is based on Pod Security Admission labels plus observed workload posture. It is

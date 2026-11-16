@@ -41,12 +41,17 @@
   <Popover.Root bind:open={isOpen}>
     <Popover.Trigger>
       {#snippet child({ props })}
-        <Badge {...props} class={`min-w-28 justify-center text-white ${statusClass} cursor-pointer`}>
+        <Badge
+          {...props}
+          class={`min-w-28 justify-center text-white ${statusClass} cursor-pointer`}
+        >
           {statusLabel}
         </Badge>
       {/snippet}
     </Popover.Trigger>
-    <Popover.Content class="w-96 max-h-80 overflow-y-auto">
+    <Popover.Content
+      class="w-96 max-h-[min(20rem,var(--bits-popover-content-available-height,calc(100dvh-2rem)))] overflow-y-auto"
+    >
       <div class="mb-2 text-[11px] text-muted-foreground/90">
         This check reflects the documented kube-apiserver `/livez` and `/readyz` endpoints. It is a
         direct health-endpoint probe, unlike latency or alert summaries.

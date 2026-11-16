@@ -67,7 +67,8 @@
 <div class="pl-1 text-sm flex justify-between items-center gap-2 mb-1 mt-1">
   <span
     class="font-medium text-slate-700 dark:text-slate-300"
-    title="Synthetic/external checks for discovered ingress and LoadBalancer targets plus TLS expiry.">Blackbox probes:</span
+    title="Synthetic/external checks for discovered ingress and LoadBalancer targets plus TLS expiry."
+    >Blackbox probes:</span
   >
   <Popover.Root bind:open={isOpen}>
     <Popover.Trigger>
@@ -77,7 +78,10 @@
         </Badge>
       {/snippet}
     </Popover.Trigger>
-    <Popover.Content class="w-[760px] max-h-[420px] overflow-y-auto" sideOffset={8}>
+    <Popover.Content
+      class="w-[760px] max-h-[min(420px,var(--bits-popover-content-available-height,calc(100dvh-2rem)))] overflow-y-auto"
+      sideOffset={8}
+    >
       <div class="flex items-center justify-between gap-2 mb-3">
         <span class="text-xs text-muted-foreground">Last updated: {updatedAtText}</span>
         <Button

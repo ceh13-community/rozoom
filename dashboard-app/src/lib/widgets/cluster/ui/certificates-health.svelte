@@ -64,12 +64,18 @@
   <Popover.Root bind:open={isOpen}>
     <Popover.Trigger>
       {#snippet child({ props })}
-        <Badge {...props} class={`min-w-24 justify-center text-white ${statusClass} cursor-pointer`}>
+        <Badge
+          {...props}
+          class={`min-w-24 justify-center text-white ${statusClass} cursor-pointer`}
+        >
           {statusLabel}
         </Badge>
       {/snippet}
     </Popover.Trigger>
-    <Popover.Content class="w-[680px] max-h-[420px] overflow-y-auto" sideOffset={8}>
+    <Popover.Content
+      class="w-[680px] max-h-[min(420px,var(--bits-popover-content-available-height,calc(100dvh-2rem)))] overflow-y-auto"
+      sideOffset={8}
+    >
       <div class="flex items-center justify-between gap-2 mb-3">
         <span class="text-xs text-muted-foreground">Last updated: {updatedAtText}</span>
         <Button
