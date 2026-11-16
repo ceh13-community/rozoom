@@ -1,4 +1,5 @@
 import { timeAgo } from "$shared/lib/timeFormatters";
+import { CLUSTER_DID_NOT_ANSWER } from "$shared/lib/parsers";
 import { prepareNodesBadge } from "$entities/cluster";
 import type { NamespaceData, Pods, Nodes, PodItem } from "$shared/model/clusters";
 import type { ControlPlaneComponentPodReport, ControlPlaneComponentsReport } from "../model/types";
@@ -139,6 +140,9 @@ export function parseMetricsServiceStatus(
   results: MetricsResult[],
   mode: StatusMode = "simple",
 ): string {
+  if (results.some((r) => r.result === CLUSTER_DID_NOT_ANSWER)) {
+    return mode === "simple" ? "Unknown" : "-";
+  }
   if (results.length === 0 || results.some((r) => r.result === -1)) {
     return mode === "simple" ? "❌ Not found" : "0 🔴";
   }
