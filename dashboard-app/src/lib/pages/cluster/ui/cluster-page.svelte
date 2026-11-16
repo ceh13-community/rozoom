@@ -13,6 +13,14 @@
   import { handleGlobalKeydown, registerShortcut } from "$shared/lib/keyboard-manager";
   import { NamespaceSelect } from "$widgets/namespace";
   import { WorkloadDisplay } from "$widgets/workload";
+  import ClusterUnreachableBanner from "$widgets/cluster/ui/connectivity/cluster-unreachable-banner.svelte";
+  import {
+    claimReconnectReload,
+    clusterConnectivity,
+    getClusterConnectivity,
+    isClusterDisconnected,
+  } from "$shared/model/cluster-connectivity";
+  import { checkClusterConnectivity } from "$shared/api/cluster-connectivity-check";
   import * as Alert from "$shared/ui/alert";
   import { Badge } from "$shared/ui/badge";
   import { Skeleton } from "$shared/ui/skeleton";
@@ -539,6 +547,71 @@
         data,
     ),
   );
+  // ── Connectivity ───────────────────────────────────────────────
+  // Opening the cluster page asks the API server once (unless something answered
+  // moments ago), so an unreachable cluster shows a banner instead of a skeleton
+  // or an empty list. The check is a user action: the page is about to run
+  // kubectl for this cluster anyway.
+  const CONNECTIVITY_WAIT_LIMIT_MS = 8_000;
+  const CONNECTIVITY_FRESH_MS = 30_000;
+  const connectivity = $derived($clusterConnectivity[cluster] ?? getClusterConnectivity(cluster));
+  const clusterDisconnected = $derived(isClusterDisconnected(connectivity));
+  // Plain lists keep their rows from before the drop, dimmed, under the banner.
+  // Pods keeps its cached snapshot the same way and says itself that it is not
+  // updating. Overview and the health panels have nothing honest to show: the
+  // banner is their whole body.
+  const showsRowsFromBeforeDrop = $derived(
+    !isClusterHealthView &&
+      !isRouteManagedPodsView &&
+      routeWorkloadType !== "overview" &&
+      hasRenderableWorkloadData(routeWorkloadType, effectiveWorkloadData),
+  );
+  const keepsPageUnderBanner = $derived(showsRowsFromBeforeDrop || isRouteManagedPodsView);
+  let connectivityWaitElapsed = $state(false);
+  let connectivityCheckedFor: string | null = null;
+  const showConnectivityWaitBanner = $derived(
+    connectivityWaitElapsed && connectivity.checking && connectivity.state === "unknown",
+  );
+
+  $effect(() => {
+    const id = cluster;
+    if (!id || id === connectivityCheckedFor) return;
+    connectivityCheckedFor = id;
+    connectivityWaitElapsed = false;
+    const entry = untrack(() => getClusterConnectivity(id));
+    if (
+      entry.state === "online" &&
+      entry.checkedAt !== null &&
+      Date.now() - entry.checkedAt < CONNECTIVITY_FRESH_MS
+    ) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      connectivityWaitElapsed = true;
+    }, CONNECTIVITY_WAIT_LIMIT_MS);
+    void checkClusterConnectivity(id).finally(() => clearTimeout(timer));
+    return () => clearTimeout(timer);
+  });
+
+  // The cluster answered again (Retry or any background call): load the list.
+  let wasDisconnected = false;
+  $effect(() => {
+    const disconnected = clusterDisconnected;
+    if (
+      wasDisconnected &&
+      !disconnected &&
+      connectivity.state === "online" &&
+      claimReconnectReload(cluster, "workloads")
+    ) {
+      untrack(() => workloads.refetch());
+    }
+    wasDisconnected = disconnected;
+  });
+
+  function retryClusterConnectivity() {
+    void checkClusterConnectivity(cluster);
+  }
+
   const hasActiveDebugShell = $derived.by(() => {
     return $shellModalState.some((windowState) => {
       return windowState.clusterId === cluster && windowState.targetPod === null;
@@ -1658,7 +1731,10 @@
             <div
               class="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs tabular-nums text-gray-500 dark:text-gray-400"
             >
-              {#if headerSyncDisplayText === "error"}
+              {#if clusterDisconnected}
+                <!-- No spinner and no green time while the cluster does not answer. -->
+                <span class="text-red-500">● Unreachable</span>
+              {:else if headerSyncDisplayText === "error"}
                 <span class="text-red-500">● Error</span>
               {:else if headerSyncDisplayText === "partial" && headerSyncDisplayUpdatedAt}
                 <span class="text-amber-600 dark:text-amber-400">
@@ -2028,7 +2104,7 @@
           </div>
         {/if}
 
-        {#if workloadCacheBanner && hasEffectiveWorkloadData}
+        {#if workloadCacheBanner && hasEffectiveWorkloadData && !clusterDisconnected}
           <div
             class="mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300"
           >
@@ -2036,20 +2112,7 @@
           </div>
         {/if}
 
-        {#if isLoading && !hasEffectiveWorkloadData}
-          <div class="cluster-page__skeleton">
-            <Skeleton class="h-4 w-full my-2" />
-            <Skeleton class="h-4 w-full my-2" />
-            <Skeleton class="h-4 w-full my-2" />
-            <Skeleton class="h-4 w-full my-2" />
-            <Skeleton class="h-4 w-full my-2" />
-          </div>
-        {:else if $errorMessage && !hasEffectiveWorkloadData}
-          <Alert.Root variant="destructive" class="cluster-page__error">
-            <Alert.Title>Error</Alert.Title>
-            <Alert.Description>{$errorMessage}</Alert.Description>
-          </Alert.Root>
-        {:else if hasEffectiveWorkloadData}
+        {#snippet primaryWorkloadDisplay()}
           <WorkloadDisplay
             clusterId={cluster}
             pageData={{
@@ -2060,6 +2123,58 @@
             }}
             workloadData={effectiveWorkloadData}
           />
+        {/snippet}
+
+        {#if clusterDisconnected}
+          <!-- The banner is the page body: no skeleton, no "No X found", no counters
+               that read 0 because nothing could be loaded. -->
+          <ClusterUnreachableBanner
+            clusterName={clusterName || cluster}
+            {connectivity}
+            mode="disconnected"
+            showingDataFrom={showsRowsFromBeforeDrop
+              ? (workloads.cache?.cachedAt ?? connectivity.lastContactAt)
+              : null}
+            listFrozen={isRouteManagedPodsView}
+            onRetry={retryClusterConnectivity}
+          />
+          {#if keepsPageUnderBanner}
+            <div class="cluster-page__stale-rows pointer-events-none opacity-50" inert>
+              {@render primaryWorkloadDisplay()}
+            </div>
+          {/if}
+        {:else if isLoading && !hasEffectiveWorkloadData}
+          {#if showConnectivityWaitBanner}
+            <ClusterUnreachableBanner
+              clusterName={clusterName || cluster}
+              {connectivity}
+              mode="waiting"
+              onRetry={retryClusterConnectivity}
+            />
+          {:else}
+            <div class="cluster-page__skeleton">
+              <Skeleton class="h-4 w-full my-2" />
+              <Skeleton class="h-4 w-full my-2" />
+              <Skeleton class="h-4 w-full my-2" />
+              <Skeleton class="h-4 w-full my-2" />
+              <Skeleton class="h-4 w-full my-2" />
+            </div>
+          {/if}
+        {:else if $errorMessage && !hasEffectiveWorkloadData}
+          <Alert.Root variant="destructive" class="cluster-page__error">
+            <Alert.Title>Error</Alert.Title>
+            <Alert.Description>{$errorMessage}</Alert.Description>
+          </Alert.Root>
+        {:else if hasEffectiveWorkloadData}
+          {#if showConnectivityWaitBanner}
+            <ClusterUnreachableBanner
+              clusterName={clusterName || cluster}
+              {connectivity}
+              mode="waiting"
+              onRetry={retryClusterConnectivity}
+            />
+          {/if}
+          {@render primaryWorkloadDisplay()}
         {:else}
           <Alert.Root class="cluster-page__no-data">
             <Alert.Title>No data</Alert.Title>

@@ -11,7 +11,9 @@ describe("pods table PR3 contract", () => {
   it("renders a searchable table with watcher, selection, and opt-in metrics controls", () => {
     expect(source).toContain('placeholder="Filter pods..."');
     expect(source).toContain('Watcher: <span class="font-medium text-foreground"');
-    expect(source).toContain('{watcherEnabled ? "Active" : "Paused"}');
+    // The watcher label never claims Active for a cluster that does not answer.
+    expect(source).toContain('? "Paused: cluster unreachable"');
+    expect(source).toContain('? "Active"');
     expect(source).toContain('{enrichedTableEnabled ? "Hide live usage" : "Show live usage"}');
     expect(source).toContain('label="Select all pods"');
     expect(source).not.toContain("showRefreshButton={true}");

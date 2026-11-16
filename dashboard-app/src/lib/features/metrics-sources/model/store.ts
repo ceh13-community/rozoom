@@ -9,7 +9,7 @@ import { checkKubeStateMetrics } from "$features/check-health";
 import { checkNodeExporter } from "$features/check-health";
 // eslint-disable-next-line no-restricted-imports -- legacy FSD violation, tech-debt (2026-08-20)
 import { updateClusterCheckPartially } from "$features/check-health/model/cache-store";
-import { checkResponseStatus } from "$shared/lib/parsers";
+import { CLUSTER_DID_NOT_ANSWER, checkResponseStatus } from "$shared/lib/parsers";
 import {
   clusterRuntimeContext,
   isClusterRuntimePlaneActive,
@@ -92,7 +92,15 @@ function resolveStatus(endpoints: MetricsSourceEndpoint[]): MetricsSourceStatus 
   if (endpoints.length === 0 || endpoints.some((endpoint) => endpoint.result === -1)) {
     return "not_found";
   }
-  if (endpoints.some((endpoint) => endpoint.result === 0 || endpoint.result === 2)) {
+  // CLUSTER_DID_NOT_ANSWER lands here too: no claim of "available" without an answer.
+  if (
+    endpoints.some(
+      (endpoint) =>
+        endpoint.result === 0 ||
+        endpoint.result === 2 ||
+        endpoint.result === CLUSTER_DID_NOT_ANSWER,
+    )
+  ) {
     return "unreachable";
   }
   return "available";

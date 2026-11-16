@@ -1,3 +1,4 @@
+import { checkResponseStatus } from "$shared/lib/parsers";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   parseNamespaces,
@@ -232,6 +233,20 @@ describe("parsers", () => {
 
     it("should default to simple mode", () => {
       expect(parseMetricsServiceStatus([{ result: 1 }])).toBe("✅ Available");
+    });
+
+    // A probe that never reached the cluster says nothing about the component:
+    // "Installed but unreachable" for a cluster that is down was a false claim.
+    it("shows Unknown when the cluster did not answer", () => {
+      const probe = [
+        {
+          result: checkResponseStatus(
+            "Unable to connect to the server: dial tcp 192.168.49.2:8443: connect: no route to host",
+          ),
+        },
+      ];
+      expect(parseMetricsServiceStatus(probe, "simple")).toBe("Unknown");
+      expect(parseMetricsServiceStatus(probe, "detailed")).toBe("-");
     });
   });
 

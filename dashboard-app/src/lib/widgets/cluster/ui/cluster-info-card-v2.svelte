@@ -40,11 +40,7 @@
     shouldAutoRunDiagnostics,
   } from "$shared/lib/dashboard-data-profile.svelte";
   import { getClusterPlatformLabel } from "$shared/ui/cluster-platform";
-  import {
-    humanizeClusterError,
-    isConnectionError,
-  } from "$widgets/datalists/ui/model/overview-diagnostics";
-  import { onMount, onDestroy, type Component } from "svelte";
+  import { onMount, onDestroy, untrack, type Component } from "svelte";
   import { page } from "$app/stores";
   import { stopAllBackgroundPollers } from "$shared/lib/background-pollers";
   import { markClusterRefreshHintSeen } from "$features/cluster-manager";
@@ -53,6 +49,15 @@
   import { trackFirstDiagnosticRendered } from "$shared/analytics/wau-c";
   import { maybePromptTelemetryConsent } from "$shared/analytics/telemetry-consent";
   import DriftBadge from "./drift-badge.svelte";
+  import ConnectivityBadge from "./connectivity/connectivity-badge.svelte";
+  import { resetUnreachableEntries } from "$features/check-health/model/feature-capability-cache";
+  import {
+    claimReconnectReload,
+    formatContactTime,
+    isClusterDisconnected,
+    selectClusterConnectivity,
+  } from "$shared/model/cluster-connectivity";
+  import { checkClusterConnectivity } from "$shared/api/cluster-connectivity-check";
 
   interface Props {
     cluster: AppClusterConfig;
@@ -89,6 +94,11 @@
     maybePromptTelemetryConsent();
   });
   const checkState = $derived($clusterStates[cluster.uuid] || { loading: false, error: null });
+  // Connectivity is separate from the Linter: a cluster that does not answer is
+  // shown as such even when its diagnostics are paused.
+  const connectivity$ = selectClusterConnectivity(clusterUuid);
+  const connectivity = $derived($connectivity$);
+  const disconnected = $derived(isClusterDisconnected(connectivity));
   const isClustersListRoute = $derived($page.url.pathname === "/dashboard");
   const awaitingInitialRefresh = $derived(Boolean(cluster.needsInitialRefreshHint) && !lastCheck);
   const clusterCardColor = $derived(getColorForClusterCard(lastCheck));
@@ -105,12 +115,6 @@
         color: "bg-slate-500",
         text: "Pending",
         tooltip: "Waiting for initial health check. Click the refresh button to start.",
-      };
-    if (checkState.error && isConnectionError(checkState.error))
-      return {
-        color: "bg-slate-600",
-        text: "Offline",
-        tooltip: "Cannot connect to the cluster API server. Check if the cluster is running.",
       };
     const base = clusterCardColor;
     const tooltip =
@@ -366,7 +370,35 @@
     goto(`/dashboard/clusters/${encodeURIComponent(cluster.uuid)}?workload=${workload}`);
   }
 
+  async function retryConnection() {
+    // A cluster that answers again reloads through the effect below.
+    await checkClusterConnectivity(cluster.uuid);
+  }
+
+  // Statuses are recomputed as soon as the cluster answers again, not on the
+  // next watcher tick.
+  let wasDisconnected = false;
+  $effect(() => {
+    const isDown = disconnected;
+    if (
+      wasDisconnected &&
+      !isDown &&
+      connectivity.state === "online" &&
+      claimReconnectReload(cluster.uuid, "card")
+    ) {
+      // Probes cached as "unreachable" while the cluster was down would keep
+      // answering for 5 minutes; they are about the outage, not the cluster.
+      resetUnreachableEntries(cluster.uuid);
+      untrack(() => void refreshData());
+    }
+    wasDisconnected = isDown;
+  });
+
   async function refreshData() {
+    if (disconnected) {
+      await retryConnection();
+      return;
+    }
     if (isRefreshLoading) return;
     try {
       const init = cluster.needsInitialRefreshHint;
@@ -470,12 +502,16 @@
           class={`hover:bg-transparent transition ${showInitialRefreshHint ? "animate-pulse rounded-full ring-2 ring-white/80 ring-offset-2 ring-offset-transparent" : ""} ${isRefreshLoading ? "cursor-not-allowed opacity-70" : ""}`}
           variant="ghost"
           onclick={refreshData}
-          disabled={isRefreshLoading}
-          aria-label={isRefreshLoading ? "Refreshing cluster health" : "Refresh cluster health"}
-          title="Refresh cluster health"
+          disabled={isRefreshLoading || connectivity.checking}
+          aria-label={disconnected
+            ? "Retry connection"
+            : isRefreshLoading
+              ? "Refreshing cluster health"
+              : "Refresh cluster health"}
+          title={disconnected ? "Retry connection" : "Refresh cluster health"}
         >
           <Refresh
-            class={isRefreshLoading
+            class={isRefreshLoading || connectivity.checking
               ? "animate-spin"
               : showInitialRefreshHint
                 ? "animate-bounce"
@@ -512,19 +548,27 @@
     <!-- Status bar -->
     <div class="px-4 py-2.5 flex items-center justify-between gap-2">
       <div class="flex items-center gap-1.5 flex-wrap">
-        <Badge
-          class="text-white {displayClusterCardColor?.color ??
-            'bg-slate-500'} text-[11px] h-5 px-1.5 cursor-help"
-          title={displayClusterCardColor?.tooltip ?? ""}
-        >
-          {#if statusGlyph}<span class="mr-0.5" aria-hidden="true">{statusGlyph}</span>{/if}
-          {displayClusterCardColor?.text.toUpperCase() ?? "UNKNOWN"}
-        </Badge>
-        <DriftBadge clusterId={cluster.uuid} />
+        <ConnectivityBadge {connectivity} />
+        <!-- A health verdict about a cluster that does not answer would be stale;
+             PAUSED is about the user's setting and stays. -->
+        {#if !disconnected || !effectiveLinter}
+          <Badge
+            class="text-white {displayClusterCardColor?.color ??
+              'bg-slate-500'} text-[11px] h-5 px-1.5 cursor-help"
+            title={displayClusterCardColor?.tooltip ?? ""}
+          >
+            {#if statusGlyph}<span class="mr-0.5" aria-hidden="true">{statusGlyph}</span>{/if}
+            {displayClusterCardColor?.text.toUpperCase() ?? "UNKNOWN"}
+          </Badge>
+        {/if}
+        <!-- Drift is unknown, not aligned, while the cluster does not answer. -->
+        {#if !disconnected}
+          <DriftBadge clusterId={cluster.uuid} />
+        {/if}
         <span class="text-xs text-muted-foreground">{platformLabel}</span>
       </div>
       <div class="flex items-center gap-2">
-        {#if effectiveLinter}
+        {#if effectiveLinter && !disconnected}
           {#if healthScore.score != null}
             <span
               class="text-xs font-bold tabular-nums {healthScore.score >= 85
@@ -596,20 +640,41 @@
       </div>
     </div>
 
-    <!-- Connection error (from checkState, may appear before primaryAlert updates) -->
-    {#if checkState.error && isConnectionError(checkState.error) && primaryAlert.severity === "ok"}
-      {@const friendly = humanizeClusterError(checkState.error)}
-      <button
-        type="button"
-        class="mx-3 mb-2 block w-[calc(100%-1.5rem)] rounded-lg border px-3 py-1.5 text-left text-xs shadow-sm transition hover:opacity-80
-          border-rose-300/60 bg-rose-50 dark:bg-rose-950/30 dark:border-rose-800/40"
-        onclick={goToCluster}
+    {#if disconnected}
+      <!-- Replaces the Primary Alert, including "Turn on the linter": a cluster that
+           does not answer cannot be scanned anyway. -->
+      <div
+        class="mx-3 mb-2 rounded-lg border px-3 py-1.5 text-xs shadow-sm {connectivity.state ===
+        'auth-expired'
+          ? 'border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800/40'
+          : 'border-rose-300/60 bg-rose-50 dark:bg-rose-950/30 dark:border-rose-800/40'}"
+        data-testid="cluster-card-unreachable"
       >
         <div class="flex items-center justify-between gap-2">
-          <span class="font-medium truncate">{friendly.title}</span>
-          <Badge class="text-white text-[9px] h-4 px-1 shrink-0 bg-rose-600">Crit</Badge>
+          <span class="font-medium truncate">
+            {connectivity.state === "auth-expired" ? "Auth expired" : "Cluster unreachable"}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            class="h-6 px-2 text-[11px]"
+            onclick={retryConnection}
+            disabled={connectivity.checking}
+          >
+            {connectivity.checking ? "Checking" : "Retry"}
+          </Button>
         </div>
-      </button>
+        {#if connectivity.reason}
+          <div class="truncate" title={connectivity.reason}>
+            {connectivity.reason}
+          </div>
+        {/if}
+        {#if connectivity.lastContactAt !== null}
+          <div class="text-muted-foreground">
+            Last successful contact: {formatContactTime(connectivity.lastContactAt)}
+          </div>
+        {/if}
+      </div>
       <!-- Primary Alert -->
     {:else if primaryAlert.severity !== "ok"}
       <button
@@ -638,7 +703,7 @@
     {/if}
 
     <!-- 5 Goal Blocks -->
-    {#if effectiveLinter}
+    {#if effectiveLinter && !disconnected}
       <div class={isHorizontal ? "px-3 pb-2 grid grid-cols-5 gap-1" : "px-3 pb-3 space-y-0.5"}>
         {#each goalBlocks as block (block.id)}
           <button
@@ -704,7 +769,7 @@
     {/if}
 
     <!-- Workload counts bar (clickable) -->
-    {#if lastCheck && !("errors" in lastCheck)}
+    {#if lastCheck && !("errors" in lastCheck) && !disconnected}
       <div
         class="px-4 py-2 border-t border-slate-200/50 dark:border-slate-600/40 flex items-center {isHorizontal
           ? 'gap-4'

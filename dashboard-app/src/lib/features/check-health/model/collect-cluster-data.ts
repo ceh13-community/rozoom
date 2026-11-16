@@ -47,6 +47,7 @@ import type {
   MetricsChecks,
 } from "./types";
 import { clusterStates } from "./watchers";
+import { reportClusterAnswered, reportClusterLoadError } from "$shared/model/cluster-connectivity";
 import {
   buildRecommendations,
   getMetricsSourceCapabilities,
@@ -643,9 +644,12 @@ export async function collectClusterData(
     ...states,
     [clusterId]: { loading: true, error: null },
   }));
-  const loadedData =
+  const reusesDiagnosticsSnapshot = Boolean(
     reusableDiagnosticsSnapshot &&
-    hasRequiredDiagnosticsEntities(reusableDiagnosticsSnapshot, entitiesToFetch)
+      hasRequiredDiagnosticsEntities(reusableDiagnosticsSnapshot, entitiesToFetch),
+  );
+  const loadedData =
+    reusesDiagnosticsSnapshot && reusableDiagnosticsSnapshot
       ? reusableDiagnosticsSnapshot.data
       : await loadClusterEntities(
           { uuid: clusterId },
@@ -702,12 +706,14 @@ export async function collectClusterData(
       ...states,
       [clusterId]: { loading: false, error: errorText },
     }));
+    reportClusterLoadError(clusterId, errorText, { startedAt });
 
     return {
       errors: errorText,
       timestamp: Date.now(),
     };
   }
+  if (!reusesDiagnosticsSnapshot) reportClusterAnswered(clusterId, startedAt);
   const normalizedData = normalizeLoadedClusterData(loadedData);
   if (dashboardDiagnosticsMode && !dashboardLightMode) {
     rememberDiagnosticsEntities(clusterId, entitiesToFetch, normalizedData);

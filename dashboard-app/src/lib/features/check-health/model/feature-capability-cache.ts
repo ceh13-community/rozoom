@@ -114,8 +114,11 @@ export function shouldSkipFeatureProbe(
   return statuses.includes(cached.status);
 }
 
-export function resetUnreachableEntries() {
+/** Drops cached "unreachable" probes, for one cluster when it answers again or for all. */
+export function resetUnreachableEntries(clusterId?: string) {
+  const prefix = clusterId ? buildKey(clusterId, "") : null;
   for (const [key, record] of featureCapabilityCache) {
+    if (prefix && !key.startsWith(prefix)) continue;
     if (record.status === "unreachable") {
       featureCapabilityCache.delete(key);
     }

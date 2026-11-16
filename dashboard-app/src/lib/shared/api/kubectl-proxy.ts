@@ -16,11 +16,16 @@ import { isMutatingKubectlCommand } from "$shared/analytics/kubectl-mutation";
 import { buildReadOnlyBlockedResult, checkKubectlReadOnly } from "$shared/lib/readonly-guard";
 import { withJsonOutput } from "./kubectl-json-output";
 import { trackCoreAction } from "$shared/analytics/wau-c";
+import { reportKubectlOutcome } from "$shared/model/cluster-connectivity";
 
 type KubectlExecResult = {
   code: number;
   stdout: string;
   stderr: string;
+  /** When kubectl was spawned, after any wait for an execution slot. */
+  startedAt?: number;
+  /** Ended by a signal (code null on close). `code` then reads 0 for older callers. */
+  killed?: boolean;
 };
 
 export type KubectlExecutionBudget = {
@@ -81,15 +86,19 @@ async function runBrowserKubectlFallback(
   if (!invoke) {
     throw new Error("Desktop kubectl is unavailable outside the Tauri runtime.");
   }
+  const startedAt = Date.now();
   const result = await invoke("rozoom:kubectl-proxy", {
     args,
     clusterId: options?.clusterId ?? null,
   });
+  const report = { startedAt, source: options?.source ?? null };
   if (typeof result === "string") {
+    reportKubectlOutcome(options?.clusterId, { code: 0, stderr: "" }, report);
     return { output: result, errors: "", code: 0 };
   }
   const code = typeof result.code === "number" ? result.code : 0;
   const errors = code !== 0 && typeof result.errors === "string" ? result.errors : "";
+  reportKubectlOutcome(options?.clusterId, { code, stderr: errors }, report);
   return {
     output: typeof result.output === "string" ? result.output : "",
     errors,
@@ -105,6 +114,25 @@ function abortIfNeeded(signal?: AbortSignal) {
   if (signal?.aborted) {
     throw toAbortError();
   }
+}
+
+// Tauri reports { code: null, signal: N } for a process ended by a signal.
+function wasKilledBySignal(event: unknown): boolean {
+  return (
+    typeof event === "object" &&
+    event !== null &&
+    "code" in event &&
+    (event as { code?: unknown }).code === null
+  );
+}
+
+/** Feeds the per-cluster connectivity state with one finished exec. */
+function reportExecOutcome(options: KubectlOptions | undefined, result: KubectlExecResult) {
+  reportKubectlOutcome(
+    options?.clusterId,
+    { code: result.killed ? null : result.code, stderr: result.stderr },
+    { startedAt: result.startedAt, source: options?.source ?? null },
+  );
 }
 
 function extractCloseCode(event: unknown): number {
@@ -284,6 +312,7 @@ async function executeCommandWithAbort(
   let stdout = "";
   let stderr = "";
   let closeCode = 0;
+  let killed = false;
   let resolveClose: (() => void) | null = null;
   const closePromise = new Promise<void>((resolve) => {
     resolveClose = resolve;
@@ -297,9 +326,11 @@ async function executeCommandWithAbort(
   });
   command.on("close", (event) => {
     closeCode = extractCloseCode(event);
+    killed = wasKilledBySignal(event);
     resolveClose?.();
   });
 
+  const startedAt = Date.now();
   const child = await command.spawn();
   const abort = async () => {
     try {
@@ -325,6 +356,8 @@ async function executeCommandWithAbort(
     code: closeCode,
     stdout,
     stderr,
+    startedAt,
+    killed,
   };
 }
 
@@ -370,6 +403,7 @@ export async function kubectlRawFront(
     () => executeCommandWithAbort(command, options?.signal),
     options?.signal,
   );
+  reportExecOutcome(options, result);
 
   // Kubectl sometimes prints warnings into stderr even with exit code 0.
   // Treat as "error" only when exit code is non-zero.
@@ -469,6 +503,7 @@ export async function kubectlRawArgsFront(
       () => executeCommandWithAbort(command, options?.signal),
       options?.signal,
     );
+    reportExecOutcome(options, result);
 
     if (result.code !== 0 && result.stderr.length > 0) {
       const shouldSuppressCommandUnavailable =

@@ -52,6 +52,8 @@
     isDeleting: (id: string) => boolean;
     isEvicting: (id: string) => boolean;
     watcherEnabled: boolean;
+    /** The cluster does not answer: the watcher cannot run and an empty list proves nothing. */
+    clusterUnreachable?: boolean;
     watcherRefreshSeconds: number;
     watcherError: string | null;
     onToggleWatcher: () => void;
@@ -112,6 +114,7 @@
     isDeleting,
     isEvicting,
     watcherEnabled,
+    clusterUnreachable = false,
     watcherRefreshSeconds,
     watcherError,
     onToggleWatcher,
@@ -230,7 +233,6 @@
   const selectableIds = $derived(
     (isGroupedView ? groupedViewRows : sortedRows).map((row) => row.uid).filter(Boolean),
   );
-
 
   const VIRTUAL_ROW_HEIGHT = 42;
   let tableScrollTop = $state(0);
@@ -565,7 +567,11 @@
     </div>
     <div>
       Watcher: <span class="font-medium text-foreground"
-        >{watcherEnabled ? "Active" : "Paused"}</span
+        >{clusterUnreachable
+          ? "Paused: cluster unreachable"
+          : watcherEnabled
+            ? "Active"
+            : "Paused"}</span
       >
     </div>
     <div class="min-w-[18rem] flex-1">{metricsSummary}</div>
@@ -573,8 +579,8 @@
 
   {#if isGroupedViewCapped}
     <InlineNotice class="border-amber-300/60 bg-amber-50 text-amber-950" title="Grouped view limit">
-      Grouped view shows the first {GROUPED_VIEW_MAX_ROWS} of {sortedRows.length} pods. Switch to the flat
-      list to page through all of them, or narrow the NS filter or search.
+      Grouped view shows the first {GROUPED_VIEW_MAX_ROWS} of {sortedRows.length} pods. Switch to the
+      flat list to page through all of them, or narrow the NS filter or search.
     </InlineNotice>
   {/if}
 
@@ -659,9 +665,12 @@
       </div>
 
       {#if sortedRows.length === 0}
-        <div class="px-4 py-6 text-sm text-muted-foreground">
-          No pods found for the current filter.
-        </div>
+        <!-- With the cluster down an empty list proves nothing; the page banner says why. -->
+        {#if !clusterUnreachable}
+          <div class="px-4 py-6 text-sm text-muted-foreground">
+            No pods found for the current filter.
+          </div>
+        {/if}
       {:else if isGroupedView}
         {#each getGroupedRows() as [groupKey, groupRows] (groupKey)}
           <div class="border-b border-border/60">
