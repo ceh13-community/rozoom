@@ -1,0 +1,99 @@
+name: "Setup Playwright Chromium"
+description: >
+  Restores the Playwright browser cache, installs Chromium with bounded
+  retries, installs system libraries only when the browser is actually
+  missing some, and saves the cache only after a verified install.
+  Any failure fails the step: a job that uses this action is green only
+  when the browser is really there.
+inputs:
+  working-directory:
+    description: "Package directory where @playwright/test is installed"
+    required: true
+  cache-key:
+    description: "Exact cache key for ~/.cache/ms-playwright"
+    required: true
+  cache-restore-keys:
+    description: "Prefix fallbacks for a partial restore"
+    required: false
+    default: ""
+runs:
+  using: "composite"
+  steps:
+    # Restore-only: the install step below verifies the browser, and the
+    # save step at the end persists only a cache that passed that check.
+    # A blind save would let one stalled download poison every later run.
+    - name: Restore Playwright browser cache
+      id: playwright-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ inputs.cache-key }}
+        restore-keys: ${{ inputs.cache-restore-keys }}
+
+    # `playwright install chromium` is idempotent: a no-op when the cached
+    # binary is valid, a download when it is missing. A stalled CDN
+    # connection never errors on its own, so bound each attempt.
+    - name: Install Playwright Chromium
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        for attempt in 1 2 3; do
+          echo "Chromium install attempt $attempt/3"
+          timeout 180 pnpm exec playwright install chromium && exit 0
+          echo "attempt $attempt stalled or failed; retrying"
+          sleep 5
+        done
+        echo "::error::Playwright Chromium download failed after 3 attempts"
+        exit 1
+
+    # The runner image usually ships every library Chromium links against,
+    # so apt is skipped unless ldd reports a missing one. When apt is
+    # needed: `timeout` kills pnpm, but sudo runs apt-get in its own pty
+    # session, so a timed-out apt-get survives and holds the apt lock, and
+    # every retry then dies on "Could not get lock". Reap it between
+    # attempts.
+    - name: Install Chromium system libraries
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        missing_libs() {
+          find "$HOME/.cache/ms-playwright" -type f -perm -u+x \
+            \( -name chrome -o -name headless_shell -o -name chrome-headless-shell \) \
+            -exec ldd {} + 2>/dev/null | grep 'not found' | sort -u || true
+        }
+        reap_apt() {
+          sudo pkill -TERM -x apt-get || true
+          for _ in $(seq 1 30); do
+            pgrep -x apt-get >/dev/null || pgrep -x dpkg >/dev/null || return 0
+            sleep 2
+          done
+          sudo pkill -KILL -x apt-get || true
+          sudo dpkg --configure -a || true
+        }
+        missing="$(missing_libs)"
+        if [ -z "$missing" ]; then
+          echo "All Chromium libraries present; skipping apt."
+          exit 0
+        fi
+        echo "Missing libraries:"
+        echo "$missing"
+        for attempt in 1 2 3; do
+          echo "System deps install attempt $attempt/3"
+          timeout 240 pnpm exec playwright install-deps chromium && break
+          echo "attempt $attempt stalled or failed; reaping apt and retrying"
+          reap_apt
+          sleep 5
+        done
+        missing="$(missing_libs)"
+        if [ -n "$missing" ]; then
+          echo "::error::Chromium system libraries still missing after 3 attempts:"
+          echo "$missing"
+          exit 1
+        fi
+
+    - name: Save Playwright browser cache
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ inputs.cache-key }}

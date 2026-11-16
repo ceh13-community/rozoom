@@ -113,8 +113,10 @@ jobs:
           git diff --stat -- ../THIRD-PARTY-LICENSES.md
 
   e2e_smoke:
+    # Blocking on purpose: green means the smoke really ran and passed. A
+    # browser or apt install that never completes is a red job, not a
+    # silent skip.
     if: github.event_name == 'pull_request'
-    continue-on-error: true
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -130,82 +132,17 @@ jobs:
       - name: Build web app
         run: pnpm run build
 
-      # Restore-only: we never trust the cache blindly. A previous CDN-stalled
-      # run could have *saved* an empty/partial ms-playwright dir (the install
-      # step exits 0 on the graceful-skip path), which then gets restored on
-      # every subsequent run, install gets skipped, and the browser binary is
-      # silently missing -> all e2e fail at launch. So restore here, but verify
-      # + (re)install below, and only save back a cache that actually works.
-      - name: Restore Playwright browser cache
-        id: playwright-cache
-        uses: actions/cache/restore@v4
+      # A stale browser cache (older lockfile) is still a valid starting
+      # point: the action verifies and tops it up.
+      - name: Setup Playwright Chromium
+        uses: ./.github/actions/setup-playwright
         with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('dashboard-app/pnpm-lock.yaml') }}
-          # A stale browser cache (older lockfile) is still a valid starting
-          # point: the install step below verifies and tops it up. Better a
-          # partial restore than a full download after every lockfile bump.
-          restore-keys: |
+          working-directory: ./dashboard-app
+          cache-key: playwright-${{ runner.os }}-${{ hashFiles('dashboard-app/pnpm-lock.yaml') }}
+          cache-restore-keys: |
             playwright-${{ runner.os }}-
 
-      - name: Install Playwright system deps
-        id: sys_deps
-        timeout-minutes: 9
-        # Same contract as the Chromium step below: apt mirrors stall or flake,
-        # and this job is already continue-on-error — a red ❌ from an apt
-        # hiccup protects nothing, it only reads like a test failure on a
-        # green-by-substance PR. Bound each attempt, retry on a fresh go,
-        # and after 3 attempts warn + skip the smoke instead of failing.
-        run: |
-          for attempt in 1 2 3; do
-            echo "System deps install attempt $attempt/3"
-            timeout 160 pnpm exec playwright install-deps chromium && {
-              echo "available=true" >> "$GITHUB_OUTPUT"; exit 0;
-            }
-            echo "attempt $attempt stalled or failed; retrying"
-            sleep 5
-          done
-          echo "::warning::playwright install-deps failed after 3 attempts (apt mirror/infra); skipping e2e smoke — non-blocking."
-          echo "available=false" >> "$GITHUB_OUTPUT"
-          exit 0
-
-      - name: Install Playwright browser (Chromium)
-        id: chromium_install
-        timeout-minutes: 12
-        # Always run (no cache-hit guard): `playwright install chromium` is
-        # idempotent — a near-instant no-op when the binary is already present
-        # and valid, a download when it is missing or the cache was poisoned.
-        # cdn.playwright.dev download can stall mid-transfer; a hung connection
-        # never errors on its own, so bound each attempt with `timeout` and
-        # retry on a fresh connection. The download failing is an infra/CDN
-        # problem, not a code regression — after 3 attempts emit a warning and
-        # skip the smoke (this job is already non-blocking) instead of a red ❌
-        # that reads like a test failure.
-        run: |
-          for attempt in 1 2 3; do
-            echo "Chromium install/verify attempt $attempt/3"
-            timeout 180 pnpm exec playwright install chromium && {
-              echo "available=true" >> "$GITHUB_OUTPUT"; exit 0;
-            }
-            echo "attempt $attempt stalled or failed; retrying"
-            sleep 5
-          done
-          echo "::warning::Playwright chromium download failed after 3 attempts (CDN/infra); skipping e2e smoke — non-blocking."
-          echo "available=false" >> "$GITHUB_OUTPUT"
-          exit 0
-
-      # Save only a working browser. Never persist the cache from a CDN-stalled
-      # run — that is exactly what poisons it for every later run until the
-      # lockfile hash changes. Skip the save on a cache-hit (nothing changed).
-      - name: Save Playwright browser cache
-        if: steps.chromium_install.outputs.available == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ steps.playwright-cache.outputs.cache-primary-key }}
-
       - name: Run e2e smoke
-        if: steps.sys_deps.outputs.available == 'true' && steps.chromium_install.outputs.available == 'true'
         run: pnpm run test:e2e
 
       - name: Upload Playwright report
