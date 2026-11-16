@@ -16,6 +16,7 @@ import { isMutatingKubectlCommand } from "$shared/analytics/kubectl-mutation";
 import { buildReadOnlyBlockedResult, checkKubectlReadOnly } from "$shared/lib/readonly-guard";
 import { withJsonOutput } from "./kubectl-json-output";
 import { trackCoreAction } from "$shared/analytics/wau-c";
+import { reportKubectlOutcome } from "$shared/model/cluster-connectivity";
 
 type KubectlExecResult = {
   code: number;
@@ -86,10 +87,12 @@ async function runBrowserKubectlFallback(
     clusterId: options?.clusterId ?? null,
   });
   if (typeof result === "string") {
+    reportKubectlOutcome(options?.clusterId, { code: 0, stderr: "" });
     return { output: result, errors: "", code: 0 };
   }
   const code = typeof result.code === "number" ? result.code : 0;
   const errors = code !== 0 && typeof result.errors === "string" ? result.errors : "";
+  reportKubectlOutcome(options?.clusterId, { code, stderr: errors });
   return {
     output: typeof result.output === "string" ? result.output : "",
     errors,
@@ -370,6 +373,7 @@ export async function kubectlRawFront(
     () => executeCommandWithAbort(command, options?.signal),
     options?.signal,
   );
+  reportKubectlOutcome(options?.clusterId, result);
 
   // Kubectl sometimes prints warnings into stderr even with exit code 0.
   // Treat as "error" only when exit code is non-zero.
@@ -469,6 +473,7 @@ export async function kubectlRawArgsFront(
       () => executeCommandWithAbort(command, options?.signal),
       options?.signal,
     );
+    reportKubectlOutcome(options?.clusterId, result);
 
     if (result.code !== 0 && result.stderr.length > 0) {
       const shouldSuppressCommandUnavailable =

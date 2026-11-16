@@ -12,8 +12,10 @@ describe("cluster info card primary alert contract", () => {
   it("renders a primary alert section driven by overview diagnostics", () => {
     expect(source).toContain("buildPrimaryAlert,");
     expect(source).toContain("humanizeClusterError,");
-    expect(source).toContain("isConnectionError,");
     expect(source).toContain('from "$widgets/datalists/ui/model/overview-diagnostics";');
+    // Connectivity, not the health check error text, decides "Cluster unreachable".
+    expect(source).toContain("isClusterDisconnected,");
+    expect(source).toContain('from "$shared/model/cluster-connectivity";');
     expect(source).toContain("const primaryAlert = $derived.by(");
     expect(source).toContain("Initial refresh required");
     expect(source).toContain("Scheduled updates start after that.");

@@ -63,6 +63,17 @@ export function createWorkloadsStore({
     fetcher.reset();
   }
 
+  /** Loads the current params again, past the cache: used when a cluster answers again. */
+  function refetch() {
+    const { clusterUuid, namespace, workloadType, sortField } = params;
+    if (!clusterUuid) return;
+    fetcher
+      .fetchWorkloads(workloadType, namespace, clusterUuid, sortField, true)
+      .catch(async (err: unknown) => {
+        await logError(`Failed to fetch workloads: ${(err as Error).message}`);
+      });
+  }
+
   return {
     get data() {
       return fetcher.data;
@@ -82,5 +93,6 @@ export function createWorkloadsStore({
 
     updateParams,
     reset,
+    refetch,
   };
 }

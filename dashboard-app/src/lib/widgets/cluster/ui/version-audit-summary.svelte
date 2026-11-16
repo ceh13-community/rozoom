@@ -15,6 +15,11 @@
   } from "$features/version-audit";
   import { scheduleSummaryBootstrap } from "./model/summary-bootstrap-queue";
   import LoadingDots from "$shared/ui/loading-dots.svelte";
+  import {
+    clusterConnectivity,
+    getClusterConnectivity,
+    isClusterDisconnected,
+  } from "$shared/model/cluster-connectivity";
 
   interface Props {
     clusterId: string;
@@ -27,6 +32,13 @@
 
   const auditState = $derived($versionAuditState[clusterId]);
   const summary = $derived(auditState?.summary ?? null);
+  const connectivity = $derived(
+    $clusterConnectivity[clusterId] ?? getClusterConnectivity(clusterId),
+  );
+  const disconnected = $derived(isClusterDisconnected(connectivity));
+  // While the cluster does not answer, "Unknown" reads like a fact about the
+  // cluster; the last version it reported is what the user can act on.
+  const lastKnownVersion = $derived(summary?.k8sVersion ?? connectivity.lastKnownVersion);
   let pageVisible = $state(true);
   const autoDiagnosticsEnabled = $derived(shouldAutoRunDiagnostics($dashboardDataProfile));
   const dashboardRootActive = $derived(page.url.pathname === "/dashboard" && !navigating.to);
@@ -187,7 +199,11 @@
 </script>
 
 <div>K8s version:</div>
-{#if summary}
+{#if disconnected}
+  <div class="truncate text-gray-500 text-xs" data-testid="k8s-version-offline">
+    {lastKnownVersion ? `Last known: ${lastKnownVersion}` : "Not available"}
+  </div>
+{:else if summary}
   <div class="truncate text-gray-500 text-xs">
     {summary.k8sVersion ?? "Unknown"}
   </div>

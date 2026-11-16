@@ -1,5 +1,10 @@
 <script lang="ts">
   import { onDestroy, onMount, untrack } from "svelte";
+  import {
+    clusterConnectivity,
+    getClusterConnectivity,
+    isClusterDisconnected,
+  } from "$shared/model/cluster-connectivity";
   import { toast } from "svelte-sonner";
   import { writable } from "svelte/store";
   import { resolvePageClusterName, type PageData } from "$entities/cluster";
@@ -168,7 +173,21 @@
     if (selected.length === 0) return "none";
     return selected.join(", ");
   });
+  // The page shell shows the "Cluster unreachable" banner; here nothing may
+  // claim a live watcher, a refresh in flight or an empty cluster.
+  const clusterUnreachable = $derived(
+    isClusterDisconnected($clusterConnectivity[data.slug] ?? getClusterConnectivity(data.slug)),
+  );
+  // The cluster answered again: load once now instead of waiting for the
+  // watcher interval (which may be paused or minutes long).
+  let wasClusterUnreachable = false;
+  $effect(() => {
+    const unreachable = clusterUnreachable;
+    if (wasClusterUnreachable && !unreachable) void loadPodsSnapshot();
+    wasClusterUnreachable = unreachable;
+  });
   const podsSummarySyncLabel = $derived.by(() => {
+    if (clusterUnreachable) return "cluster unreachable";
     if (podsSyncStatus.error) return "error";
     if (podsSyncStatus.isLoading) return "loading";
     if (podsSyncStatus.lastUpdatedAt) return "updated";
@@ -207,6 +226,7 @@
     `${getDashboardDataProfileDisplayName($dashboardDataProfile)} profile`,
   );
   const podsRuntimeSourceState = $derived.by(() => {
+    if (clusterUnreachable) return hasCachedPods ? "cached" : "paused";
     if (!watcherEnabled) return "paused";
     if ((snapshotRefreshState === "error" || podsSyncStatus.error) && hasCachedPods)
       return "cached";
@@ -1146,7 +1166,7 @@
     detail={podsRuntimeDetail}
     secondaryActionLabel="Update"
     secondaryActionAriaLabel="Refresh pods runtime section"
-    secondaryActionLoading={snapshotRefreshState === "loading"}
+    secondaryActionLoading={snapshotRefreshState === "loading" && !clusterUnreachable}
     onSecondaryAction={() => void loadPodsSnapshot()}
     reason={podsRuntimeReason}
     actionLabel={watcherEnabled ? "Pause section" : "Resume section"}
@@ -1257,8 +1277,9 @@
     isDeleting={(id) => deletingPodIds.has(id)}
     isEvicting={(id) => evictingPodIds.has(id)}
     {watcherEnabled}
+    {clusterUnreachable}
     {watcherRefreshSeconds}
-    {watcherError}
+    watcherError={clusterUnreachable ? null : watcherError}
     {onToggleWatcher}
     onWatcherRefreshSecondsChange={(value) => {
       watcherRefreshSeconds = clampWatcherRefreshSeconds(value);

@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 
 // F1 (trust): when the cluster is unreachable, the last stored health check is
 // still served from cache and reads "healthy". The live probes fail though, so
-// the Overview must warn that it is showing last-known state instead of
-// silently presenting the stale score as live.
+// the page must say the cluster is unreachable instead of silently presenting
+// the stale score as live.
 
 const CLUSTER_ID = "dev";
 const CONNECTION_ERROR =
@@ -97,17 +97,17 @@ test.describe("overview unreachable cluster", () => {
     const page = await context.newPage();
     await page.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=overview`);
 
-    // The trust signal: a prominent unreachable banner naming the last-known state.
-    const banner = page.getByTestId("overview-cluster-unreachable");
+    // The trust signal: the cluster page says the cluster did not answer, and
+    // the stale health is not shown as the page body at all.
+    const banner = page.getByTestId("cluster-unreachable-banner");
     await expect(banner).toBeVisible();
     await expect(banner).toContainText("Cluster unreachable");
-    await expect(banner).toContainText(/last known state/i);
+    await expect(banner).toContainText("Reason: Connection refused.");
 
     // The misleading green "Live · Updated" chip must NOT be shown.
     await expect(page.getByText(/^Live · Updated/)).toHaveCount(0);
-
-    // And the unreachable status chip replaces it.
-    await expect(page.getByTestId("overview-unreachable-chip")).toBeVisible();
+    // Nor an endless skeleton.
+    await expect(page.locator(".cluster-page__skeleton")).toHaveCount(0);
 
     await context.close();
   });

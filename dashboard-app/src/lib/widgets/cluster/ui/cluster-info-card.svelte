@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, untrack } from "svelte";
   import {
     getLastHealthCheck,
     startGlobalWatcher,
@@ -36,8 +36,16 @@
     buildPrimaryAlert,
     humanizeClusterError,
     isAuthError,
-    isConnectionError,
   } from "$widgets/datalists/ui/model/overview-diagnostics";
+  import {
+    formatContactTime,
+    clusterConnectivity,
+    getClusterConnectivity,
+    isClusterDisconnected,
+  } from "$shared/model/cluster-connectivity";
+  import { checkClusterConnectivity } from "$shared/api/cluster-connectivity-check";
+  import ConnectivityBadge from "./connectivity/connectivity-badge.svelte";
+  import { resetUnreachableEntries } from "$features/check-health/model/feature-capability-cache";
   import { trackFirstDiagnosticRendered } from "$shared/analytics/wau-c";
   import { maybePromptTelemetryConsent } from "$shared/analytics/telemetry-consent";
   import MetricsStatus from "./metrics-status.svelte";
@@ -322,6 +330,16 @@
   });
   const clusterCardColor = $derived(getColorForClusterCard(lastCheck));
   const awaitingInitialRefresh = $derived(Boolean(cluster.needsInitialRefreshHint) && !lastCheck);
+  // Connectivity is separate from the Linter: a cluster that does not answer is
+  // shown as such even when its diagnostics are paused. A 403 is not here: the
+  // cluster answered, so the page shows its own permission error.
+  const connectivity = $derived(
+    $clusterConnectivity[cluster.uuid] ?? getClusterConnectivity(cluster.uuid),
+  );
+  const disconnected = $derived(isClusterDisconnected(connectivity));
+  const connectivityTitle = $derived(
+    connectivity.state === "auth-expired" ? "Auth expired" : "Cluster unreachable",
+  );
   const displayClusterCardColor = $derived.by(() => {
     if (!effectiveLinter)
       return {
@@ -330,25 +348,17 @@
         tooltip:
           "Linter is off for this cluster - diagnostics won't run. Click the gauge icon to turn it on.",
       };
+    if (disconnected)
+      return {
+        color: "bg-slate-600",
+        text: connectivityTitle,
+        tooltip: connectivity.reason ?? "",
+      };
     if (awaitingInitialRefresh)
       return {
         color: "bg-slate-500",
         text: "Pending",
         tooltip: "Waiting for initial health check. Click the refresh button to start.",
-      };
-    if (checkState.error && isAuthError(checkState.error))
-      return {
-        color: "bg-amber-600",
-        text: "Auth expired",
-        tooltip:
-          "Kubeconfig credentials were rejected by the API server (Unauthorized/Forbidden). " +
-          "Refresh the token via the Cluster Manager or re-import the kubeconfig.",
-      };
-    if (checkState.error && isConnectionError(checkState.error))
-      return {
-        color: "bg-slate-600",
-        text: "Offline",
-        tooltip: "Cannot connect to the cluster API server. Check if the cluster is running.",
       };
     const base = clusterCardColor;
     const tooltip =
@@ -370,15 +380,19 @@
           "Use refresh once to load the first cluster state. Scheduled updates start after that.",
       };
     }
-    // Auth failures need the user's direct action - surface them in the
+    // Connectivity failures need the user's direct action - surface them in the
     // same slot as other alerts rather than as a floating banner above
-    // General status, so the card layout stays uniform across clusters.
-    if (checkState.error && isAuthError(checkState.error)) {
+    // General status, so the card layout stays uniform across clusters. This
+    // also hides "Turn on the linter": a cluster that does not answer cannot be
+    // scanned anyway.
+    if (disconnected) {
       return {
         severity: "critical" as const,
-        title: "Credentials expired",
+        title: connectivityTitle,
         detail:
-          "The kubeconfig token or credentials were rejected by the API server. Open Cluster Manager to refresh.",
+          connectivity.state === "auth-expired"
+            ? `${connectivity.reason ?? "Credentials expired or rejected"}. Sign in again in your terminal, then click Retry.`
+            : `${connectivity.reason ?? "No answer from the server"}. Check the server address in your kubeconfig, then your VPN or network.`,
       };
     }
     return buildPrimaryAlert(lastCheck, { loading: isRefreshLoading, paused: !effectiveLinter });
@@ -386,9 +400,7 @@
   // When the primary alert is an auth error, the card's main CTA should
   // take the user to the place that fixes it instead of opening the
   // cluster detail view (which will just fail to load).
-  const primaryAlertIsAuthError = $derived(
-    Boolean(checkState.error && isAuthError(checkState.error)),
-  );
+  const primaryAlertIsAuthError = $derived(connectivity.state === "auth-expired");
   const globalLinter = $derived($globalLinterEnabled);
   const deprecationSummary = $derived(
     globalLinter ? ($deprecationScanState[cluster.uuid]?.summary ?? null) : null,
@@ -735,7 +747,30 @@
     void saveClusterRefreshInterval(cluster.uuid, minutes);
   }
 
+  async function retryConnection() {
+    // A cluster that answers again reloads through the effect below.
+    await checkClusterConnectivity(cluster.uuid);
+  }
+
+  // Statuses are recomputed as soon as the cluster answers again, not on the
+  // next watcher tick.
+  let wasDisconnected = false;
+  $effect(() => {
+    const isDown = disconnected;
+    if (wasDisconnected && !isDown && connectivity.state === "online") {
+      // Probes cached as "unreachable" while the cluster was down would keep
+      // answering for 5 minutes; they are about the outage, not the cluster.
+      resetUnreachableEntries(cluster.uuid);
+      untrack(() => void refreshData());
+    }
+    wasDisconnected = isDown;
+  });
+
   async function refreshData() {
+    if (disconnected) {
+      await retryConnection();
+      return;
+    }
     if (isRefreshLoading) {
       manualRefreshPending = true;
       return;
@@ -948,11 +983,15 @@
           } ${isRefreshLoading ? "cursor-not-allowed opacity-70" : ""}`}
           variant="ghost"
           onclick={refreshData}
-          disabled={isRefreshLoading}
-          aria-label={isRefreshLoading ? "Refreshing cluster health" : "Refresh cluster health"}
-          title="Refresh cluster health"
+          disabled={isRefreshLoading || connectivity.checking}
+          aria-label={disconnected
+            ? "Retry connection"
+            : isRefreshLoading
+              ? "Refreshing cluster health"
+              : "Refresh cluster health"}
+          title={disconnected ? "Retry connection" : "Refresh cluster health"}
         >
-          <Refresh class={isRefreshLoading ? "animate-spin" : ""} />
+          <Refresh class={isRefreshLoading || connectivity.checking ? "animate-spin" : ""} />
         </Button>
         {#if cluster.needsInitialRefreshHint}
           {#if showInitialRefreshHint}
@@ -993,14 +1032,22 @@
     <div class="px-6 flex justify-between items-center gap-2 mb-2">
       General status:
       <div class="flex items-center gap-1.5">
-        <DriftBadge clusterId={cluster.uuid} />
-        <span title={displayClusterCardColor?.tooltip ?? ""} class="cursor-help">
-          <Badge
-            class="text-white {displayClusterCardColor?.color} h-7 whitespace-nowrap uppercase transition-colors duration-500"
-          >
-            {displayClusterCardColor?.text}
-          </Badge>
-        </span>
+        <ConnectivityBadge {connectivity} />
+        <!-- Drift is unknown, not aligned, while the cluster does not answer. -->
+        {#if !disconnected}
+          <DriftBadge clusterId={cluster.uuid} />
+        {/if}
+        <!-- A health verdict about a cluster that does not answer would be stale;
+             PAUSED is about the user's setting and stays. -->
+        {#if !disconnected || !effectiveLinter}
+          <span title={displayClusterCardColor?.tooltip ?? ""} class="cursor-help">
+            <Badge
+              class="text-white {displayClusterCardColor?.color} h-7 whitespace-nowrap uppercase transition-colors duration-500"
+            >
+              {displayClusterCardColor?.text}
+            </Badge>
+          </span>
+        {/if}
       </div>
     </div>
     <div class="px-6 flex justify-between items-center gap-2 mb-2">
@@ -1060,6 +1107,19 @@
         {primaryAlert.detail}
       </div>
     </button>
+    {#if disconnected}
+      <div class="mx-6 -mt-1 mb-3 flex items-center gap-2" data-testid="cluster-card-unreachable">
+        <Button
+          size="sm"
+          variant="outline"
+          class="h-7 px-2.5 text-xs"
+          onclick={retryConnection}
+          disabled={connectivity.checking}
+        >
+          {connectivity.checking ? "Checking" : "Retry"}
+        </Button>
+      </div>
+    {/if}
     <div class="px-6 flex flex-wrap justify-between items-center gap-y-1.5 gap-x-2 mb-3">
       <span class="shrink-0">Refresh:</span>
       <div class="flex flex-wrap items-center gap-2">
@@ -1109,7 +1169,7 @@
           <Gauge class="w-4 h-4" />
         </button>
       </div>
-      {#if effectiveLinter && (displayClusterCardColor?.text === "Unknown" || displayClusterCardColor?.text === "Offline" || (cluster.status === "error" && cluster.errors?.length) || (checkState.error && checkState.error.length))}
+      {#if effectiveLinter && !disconnected && (displayClusterCardColor?.text === "Unknown" || (cluster.status === "error" && cluster.errors?.length) || (checkState.error && checkState.error.length))}
         {@const rawError = cluster.errors ?? checkState.error ?? ""}
         {@const friendly = humanizeClusterError(rawError)}
         <Popover.Root>
@@ -1124,7 +1184,13 @@
       {/if}
     </div>
     <div class="px-6 mb-2 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
-      {#if isRefreshLoading}
+      {#if disconnected}
+        <!-- Hidden when nothing is recorded: a cluster that worked before this
+             version and has not answered since has no record, not "never". -->
+        {#if connectivity.lastContactAt !== null}
+          <span>Last successful contact: {formatContactTime(connectivity.lastContactAt)}</span>
+        {/if}
+      {:else if isRefreshLoading}
         <span class="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-sky-400"></span>
         <span>Refreshing now</span>
       {:else if cluster.needsInitialRefreshHint}
@@ -1378,9 +1444,14 @@
           tabindex="0"
         >
           <span>Cluster Alerts</span>
-          <Badge class="text-white {activeAlertsCount > 0 ? 'bg-amber-600' : 'bg-emerald-600'}">
-            {activeAlertsCount} active
-          </Badge>
+          {#if disconnected}
+            <!-- 0 would be a claim: the alerts could not be read. -->
+            <Badge class="text-white bg-slate-500">Not checked</Badge>
+          {:else}
+            <Badge class="text-white {activeAlertsCount > 0 ? 'bg-amber-600' : 'bg-emerald-600'}">
+              {activeAlertsCount} active
+            </Badge>
+          {/if}
         </div>
         <div
           class="pl-1 flex justify-between items-center gap-2 mb-1 cursor-pointer"

@@ -73,7 +73,7 @@ describe("cluster info card data profile contract", () => {
     expect(source).toContain("lastCheck.trivySummary");
     expect(source).toContain("{#if cluster.needsInitialRefreshHint}");
     expect(source).toContain("Summary widgets will activate after the first manual refresh.");
-    expect(source).toContain("disabled={isRefreshLoading}");
+    expect(source).toContain("disabled={isRefreshLoading || connectivity.checking}");
     expect(source).toContain("cursor-not-allowed opacity-70");
     expect(source).toContain("<Refresh");
     expect(source).toContain("animate-spin");
