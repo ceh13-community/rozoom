@@ -136,11 +136,12 @@ jobs:
       # point: the action verifies and tops it up.
       - name: Setup Playwright Chromium
         uses: ./.github/actions/setup-playwright
+        env:
+          PLAYWRIGHT_DOWNLOAD_HOST: http://127.0.0.1:9
         with:
           working-directory: ./dashboard-app
-          cache-key: playwright-${{ runner.os }}-${{ hashFiles('dashboard-app/pnpm-lock.yaml') }}
-          cache-restore-keys: |
-            playwright-${{ runner.os }}-
+          cache-key: red-demo-${{ github.run_id }}
+          cache-restore-keys: ""
 
       - name: Run e2e smoke
         run: pnpm run test:e2e

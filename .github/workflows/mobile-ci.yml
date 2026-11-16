@@ -80,11 +80,12 @@ jobs:
 
       - name: Setup Playwright Chromium
         uses: ./.github/actions/setup-playwright
+        env:
+          PLAYWRIGHT_DOWNLOAD_HOST: http://127.0.0.1:9
         with:
           working-directory: ./mobile-app
-          cache-key: playwright-mobile-${{ runner.os }}-${{ hashFiles('mobile-app/pnpm-lock.yaml') }}
-          cache-restore-keys: |
-            playwright-mobile-${{ runner.os }}-
+          cache-key: red-demo-${{ github.run_id }}
+          cache-restore-keys: ""
 
       # Chromium only in CI. WebKit needs a long apt pass (GStreamer and
       # friends) on every run, and that pass is what hung this job to its
