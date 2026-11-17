@@ -79,6 +79,16 @@ function enrichParsedConfig(raw: RawYamlKubeConfig): KubeConfigFileType {
   });
 }
 
+// js-yaml's `message` carries a snippet of the source lines around the error. In a
+// kubeconfig those lines can hold tokens and keys, so log only the reason and position.
+function describeYamlError(err: unknown): string {
+  if (err instanceof yaml.YAMLException) {
+    // yaml.load always attaches a mark to the exceptions it throws.
+    return `${err.reason} at line ${err.mark.line + 1}, column ${err.mark.column + 1}`;
+  }
+  return err instanceof Error ? err.name : "unknown error";
+}
+
 export async function parseKubeconfigText(configText: string): Promise<KubeConfig> {
   if (!configText.trim()) {
     await error("Kubeconfig text is empty");
@@ -89,7 +99,7 @@ export async function parseKubeconfigText(configText: string): Promise<KubeConfi
   try {
     parsedConfig = yaml.load(configText);
   } catch (err) {
-    await error(`Invalid YAML format: ${(err as Error).message}`);
+    await error(`Invalid YAML format: ${describeYamlError(err)}`);
   }
 
   if (!parsedConfig || typeof parsedConfig !== "object") {
