@@ -102,16 +102,13 @@ export function describeMainPane(main: HTMLElement, doc: Document = document): M
   };
 }
 
-/** A state worth a warn line: the pane would look blank to the user. */
+/**
+ * A state worth a warn line: the pane would look blank to the user. `center` is not part
+ * of it: a short page leaves the centre empty, and an open sheet covers it on purpose.
+ */
 export function looksBlank(state: MainPaneState): boolean {
   if (state.visibility !== "visible") return false;
-  return (
-    state.elements === 0 ||
-    state.textLength === 0 ||
-    state.invisible > 0 ||
-    state.center === "main" ||
-    state.center.startsWith("outside:")
-  );
+  return state.elements === 0 || state.textLength === 0 || state.invisible > 0;
 }
 
 export function formatMainPaneLine(

@@ -104,10 +104,15 @@ describe("looksBlank", () => {
     ["no elements", { elements: 0 }],
     ["no text", { textLength: 0 }],
     ["an invisible block", { invisible: 1 }],
-    ["nothing at the centre", { center: "main" }],
-    ["an overlay on top", { center: "outside:div[dialog-overlay]" }],
   ])("is true with %s", (_, change) => {
     expect(looksBlank({ ...healthy, ...change })).toBe(true);
+  });
+
+  it.each([
+    ["a short page with nothing at the centre", { center: "main" }],
+    ["a sheet open over the pane", { center: "outside:div[dialog-overlay]" }],
+  ])("is false for %s", (_, change) => {
+    expect(looksBlank({ ...healthy, ...change })).toBe(false);
   });
 
   it("is false while the window is hidden", () => {
