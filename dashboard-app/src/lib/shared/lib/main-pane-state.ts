@@ -35,6 +35,8 @@ const INVISIBLE_SCAN_LIMIT = 200;
 // Small hidden bits (hover-only buttons, tooltips) are normal. Only an invisible block
 // covering a large part of the pane can blank it.
 const INVISIBLE_MIN_SHARE = 0.25;
+// Below this the text is there but nobody can read it.
+const MIN_OPACITY = 0.05;
 const GRID = [1 / 6, 1 / 2, 5 / 6];
 const SHOW_TEXT = 0x4;
 const TEXT_NODE = 3;
@@ -67,12 +69,33 @@ function overlaps(rect: DOMRect, box: Box): boolean {
 }
 
 /**
- * Rendered text inside the pane's visible box. A node under display:none has no client
- * rects, and one moved out of the pane has none inside the box, so neither counts.
- * Clipping (overflow, clip-path) does not change the rects; `hits` covers that.
+ * Opacity does not inherit in computed style, so a text node is readable only if no
+ * element between it and the pane is (nearly) transparent. Memoised per element: text
+ * nodes share most of their ancestors.
+ */
+function createOpacityCheck(main: HTMLElement, view: Window): (element: Element) => boolean {
+  const known = new Map<Element, boolean>();
+  const isOpaque = (element: Element): boolean => {
+    const cached = known.get(element);
+    if (cached !== undefined) return cached;
+    const own = Number.parseFloat(view.getComputedStyle(element).opacity) >= MIN_OPACITY;
+    const parent = element.parentElement;
+    const result = own && (element === main || !parent || isOpaque(parent));
+    known.set(element, result);
+    return result;
+  };
+  return isOpaque;
+}
+
+/**
+ * Rendered, readable text inside the pane's visible box. A node under display:none has
+ * no client rects, one moved out of the pane has none inside the box, and one under a
+ * transparent or visibility:hidden ancestor is skipped, so none of them count. Clipping
+ * (overflow, clip-path) does not change the rects; `hits` covers that.
  */
 function countVisibleText(main: HTMLElement, doc: Document, view: Window, box: Box | null) {
   if (!box) return 0;
+  const isOpaque = createOpacityCheck(main, view);
   const walker = doc.createTreeWalker(main, SHOW_TEXT);
   const range = doc.createRange();
   let length = 0;
@@ -85,6 +108,7 @@ function countVisibleText(main: HTMLElement, doc: Document, view: Window, box: B
     seen += 1;
     const parent = node.parentElement;
     if (!parent || view.getComputedStyle(parent).visibility !== "visible") continue;
+    if (!isOpaque(parent)) continue;
     range.selectNodeContents(node);
     if (Array.from(range.getClientRects()).some((rect) => overlaps(rect, box))) {
       length += text.length;
@@ -150,7 +174,7 @@ function countInvisible(main: HTMLElement, view: Window): number {
     if (checked >= INVISIBLE_SCAN_LIMIT) return;
     checked += 1;
     const style = view.getComputedStyle(element);
-    if (Number.parseFloat(style.opacity) < 0.05 || style.visibility === "hidden") {
+    if (Number.parseFloat(style.opacity) < MIN_OPACITY || style.visibility === "hidden") {
       const rect = element.getBoundingClientRect();
       if (rect.width * rect.height >= minArea) invisible += 1;
       // Everything below an invisible element is invisible too; count it once.

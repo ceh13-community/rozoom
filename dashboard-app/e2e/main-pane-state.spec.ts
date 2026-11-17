@@ -123,6 +123,23 @@ test.describe("main pane log line", () => {
       await stylePage(page, "opacity:0");
       const state = await measure(page);
       expect(state.invisible).toBe(1);
+      expect(state.text).toBe(0);
+      expect(state.blank).toBe(true);
+    });
+
+    // Small blocks stay under the size limit of `invisible`; their text must still not
+    // count as readable. Seen live on the short empty-state page.
+    test("transparent in small blocks", async ({ page }) => {
+      await page.evaluate(() => {
+        const pane = document.getElementById("pane");
+        if (pane) {
+          pane.innerHTML =
+            '<h2 style="opacity:0">Clusters</h2><div style="opacity:0;width:300px">None yet</div>';
+        }
+      });
+      const state = await measure(page);
+      expect(state.invisible).toBe(0);
+      expect(state.text).toBe(0);
       expect(state.blank).toBe(true);
     });
   });
