@@ -7,7 +7,7 @@ import {
   removePastedKubeConfig,
 } from "../api/disk";
 import { formatResultMessages } from "../ui/formatters";
-import { parseKubeconfigText } from "$entities/config";
+import { parseKubeconfigText, formatYamlError } from "$entities/config";
 import { kubeconfigArgs, selectContextForCluster } from "./kubeconfig-context";
 import {
   loadConfig,
@@ -41,7 +41,14 @@ type FlattenedKubeconfig = {
 
 function extractFlattenedClusterName(rawYaml: string): string | null {
   if (!rawYaml.trim()) return null;
-  const parsed = yaml.load(rawYaml) as FlattenedKubeconfig | null;
+  let parsed: FlattenedKubeconfig | null;
+  try {
+    parsed = yaml.load(rawYaml) as FlattenedKubeconfig | null;
+  } catch (err) {
+    // The flattened config holds the credentials; js-yaml's message would quote them
+    // into the error the add dialog shows.
+    throw new Error(formatYamlError(err));
+  }
   if (!parsed || typeof parsed !== "object") return null;
 
   const currentContextName =

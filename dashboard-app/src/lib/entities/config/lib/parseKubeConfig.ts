@@ -79,6 +79,20 @@ function enrichParsedConfig(raw: RawYamlKubeConfig): KubeConfigFileType {
   });
 }
 
+/**
+ * A YAML parse error safe to log or show for kubeconfig text: fixed wording, position and
+ * error name only. js-yaml's `message` carries a snippet of the source lines, and its
+ * `reason` quotes the value for an unknown tag or alias (`password: *S3cret` gives
+ * `unidentified alias "S3cret"`), so neither may leave this function.
+ */
+export function formatYamlError(err: unknown): string {
+  const name = err instanceof Error ? err.name : "unknown error";
+  // Typed as always set, but js-yaml throws without one, e.g. for a multi-document stream.
+  const mark = err instanceof yaml.YAMLException ? (err.mark as yaml.Mark | undefined) : undefined;
+  const position = mark ? ` at line ${mark.line + 1}, column ${mark.column + 1}` : "";
+  return `Invalid YAML format${position} (${name})`;
+}
+
 export async function parseKubeconfigText(configText: string): Promise<KubeConfig> {
   if (!configText.trim()) {
     await error("Kubeconfig text is empty");
@@ -89,7 +103,7 @@ export async function parseKubeconfigText(configText: string): Promise<KubeConfi
   try {
     parsedConfig = yaml.load(configText);
   } catch (err) {
-    await error(`Invalid YAML format: ${(err as Error).message}`);
+    await error(formatYamlError(err));
   }
 
   if (!parsedConfig || typeof parsedConfig !== "object") {

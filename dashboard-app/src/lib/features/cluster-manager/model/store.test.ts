@@ -3,6 +3,7 @@ import { get } from "svelte/store";
 import type { KubeConfigFileType } from "$entities/config";
 import {
   addClustersFromKubeconfigSelection,
+  clustersConfigError,
   clustersList,
   removedClustersList,
   markClusterRefreshHintSeen,
@@ -133,6 +134,30 @@ current-context: minikube
 
     expect(mockSaveClusterOnDisk).not.toHaveBeenCalled();
     expect(get(clustersList)).toHaveLength(0);
+  });
+
+  it("keeps credentials out of the error when kubectl's flattened config does not parse", async () => {
+    mockKubectlRawFront.mockResolvedValue({
+      output: `
+apiVersion: v1
+clusters:
+  - name: alpha
+users:
+  - name: alpha-user
+    user:
+      token: dnlm42.0123456789abcdef
+      password: *S3cretPass
+`,
+      errors: "",
+    });
+
+    await addClustersFromKubeconfigSelection(baseConfig, baseConfig.path, [{ name: "alpha" }]);
+
+    const shown = get(clustersConfigError) ?? "";
+    expect(shown).toMatch(/alpha: Invalid YAML format at line \d+, column \d+ \(YAMLException\)/);
+    expect(shown).not.toContain("S3cretPass");
+    expect(shown).not.toContain("dnlm42");
+    expect(mockSaveClusterOnDisk).not.toHaveBeenCalled();
   });
 
   it("skips clusters that already exist", async () => {
