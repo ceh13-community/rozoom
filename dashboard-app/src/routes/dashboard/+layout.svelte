@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { beforeNavigate, goto } from "$app/navigation";
+  import { afterNavigate, beforeNavigate, goto } from "$app/navigation";
   import { page, navigating } from "$app/state";
   import { onDestroy } from "svelte";
   import PanelLeft from "@lucide/svelte/icons/panel-left";
@@ -14,6 +14,8 @@
   import { Sidebar } from "$widgets/sidebar";
   import ShellModal from "$widgets/shell/ui/shell-modal.svelte";
   import RenderErrorBoundary from "$shared/ui/render-error-boundary.svelte";
+  import { installMainPaneProbe } from "$shared/lib/main-pane-probe";
+  import { probeRoute } from "$shared/lib/main-pane-state";
   import { stopAllBackgroundPollers } from "$shared/lib/background-pollers";
   import { initNetworkRecoveryListener } from "$shared/lib/network-recovery";
   import { startFleetHeartbeat } from "$features/check-health/api/fleet-heartbeat";
@@ -94,6 +96,17 @@
 
   const cleanupNetworkRecovery = initNetworkRecoveryListener();
 
+  // One logs.log line on what the main pane holds after each navigation and after the
+  // window comes back, so a blank pane reported from the field can be told apart.
+  let mainPane: HTMLElement | undefined = $state();
+  const mainPaneProbe = installMainPaneProbe(
+    () => mainPane,
+    () => probeRoute(page.route.id, page.url.searchParams.get("workload")),
+  );
+  afterNavigate(() => {
+    mainPaneProbe.probe.navigated();
+  });
+
   $effect(() => {
     const clusters = $clustersList;
     if (clusters && clusters.length > 0) {
@@ -112,6 +125,7 @@
   onDestroy(() => {
     clearActiveDashboardRoute();
     cleanupNetworkRecovery();
+    mainPaneProbe.dispose();
   });
 
   function handleDataProfileChange(value: string) {
@@ -295,7 +309,10 @@
         </div>
       </aside>
       <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <main class="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:gap-6 lg:p-6">
+        <main
+          bind:this={mainPane}
+          class="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:gap-6 lg:p-6"
+        >
           {#key routeRemountKey}
             <RenderErrorBoundary>
               {@render children()}
@@ -313,7 +330,10 @@
         <LoadingSpinner />
       </div>
     {/if}
-    <main class="ml-10 flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:gap-6 lg:p-6">
+    <main
+      bind:this={mainPane}
+      class="ml-10 flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:gap-6 lg:p-6"
+    >
       {#key routeRemountKey}
         <RenderErrorBoundary>
           {@render children()}
