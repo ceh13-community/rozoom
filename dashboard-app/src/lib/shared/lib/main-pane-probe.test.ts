@@ -35,6 +35,7 @@ const healthy: MainPaneState = {
   text: 4200,
   invisible: 0,
   hits: 9,
+  covered: 0,
   animations: 0,
   center: "content",
 };
@@ -49,6 +50,7 @@ describe("looksBlank", () => {
     ["no visible text", { text: 0 }],
     ["an invisible block", { invisible: 1 }],
     ["no grid point on content", { hits: 0 }],
+    ["no grid point on content and a toast in one corner", { hits: 0, covered: 1 }],
   ])("is true with %s", (_, change) => {
     expect(looksBlank({ ...healthy, ...change })).toBe(true);
   });
@@ -56,6 +58,10 @@ describe("looksBlank", () => {
   it.each([
     ["a short page with nothing at the centre", { center: "main", hits: 3 }],
     ["a sheet open over the pane", { center: "outside:div[dialog-overlay]", hits: 6 }],
+    [
+      "a modal sheet covering every point",
+      { center: "outside:div[sheet-overlay]", hits: 0, covered: 9 },
+    ],
   ])("is false for %s", (_, change) => {
     expect(looksBlank({ ...healthy, ...change })).toBe(false);
   });
@@ -93,7 +99,8 @@ describe("formatMainPaneLine", () => {
   it("writes every field as a number or a fixed word", () => {
     expect(formatMainPaneLine(healthy, "/dashboard", "navigate")).toBe(
       "[main-pane] trigger=navigate route=/dashboard visibility=visible focus=1 size=1180x820 " +
-        "scroll=0/2400 elements=900 text=4200 invisible=0 hits=9/9 animations=0 center=content",
+        "scroll=0/2400 elements=900 text=4200 invisible=0 hits=9/9 covered=0/9 animations=0 " +
+        "center=content",
     );
   });
 

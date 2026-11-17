@@ -19,6 +19,8 @@ export interface MainPaneState {
   invisible: number;
   /** Grid points (of HIT_POINTS) where the topmost element is pane content that shows something. */
   hits: number;
+  /** Grid points where the topmost element is outside the pane: a sheet, dialog or toast. */
+  covered: number;
   animations: number;
   center: string;
 }
@@ -27,6 +29,9 @@ export const HIT_POINTS = 9;
 export const TEXT_CAP = 5_000;
 // Text nodes looked at before giving up; keeps a megabyte log view from costing seconds.
 const TEXT_NODE_LIMIT = 3_000;
+// Text nodes in a row that lie wholly below the visible box before the walk stops. Not 1:
+// absolutely positioned or reordered content can come later in the DOM but sit higher.
+const BELOW_BOX_STOP = 50;
 const MAX_ELEMENTS = 5_000;
 // Opacity and visibility carry down the tree, so the top levels decide whether anything
 // below can show. Deeper levels and long sibling lists are skipped to keep it cheap.
@@ -100,7 +105,8 @@ function countVisibleText(main: HTMLElement, doc: Document, view: Window, box: B
   const range = doc.createRange();
   let length = 0;
   let seen = 0;
-  while (length < TEXT_CAP && seen < TEXT_NODE_LIMIT) {
+  let belowInARow = 0;
+  while (length < TEXT_CAP && seen < TEXT_NODE_LIMIT && belowInARow < BELOW_BOX_STOP) {
     const node = walker.nextNode();
     if (!node) break;
     const text = (node.nodeValue ?? "").trim();
@@ -110,8 +116,18 @@ function countVisibleText(main: HTMLElement, doc: Document, view: Window, box: B
     if (!parent || view.getComputedStyle(parent).visibility !== "visible") continue;
     if (!isOpaque(parent)) continue;
     range.selectNodeContents(node);
-    if (Array.from(range.getClientRects()).some((rect) => overlaps(rect, box))) {
+    const rects = Array.from(range.getClientRects()).filter(
+      (rect) => rect.width > 0 && rect.height > 0,
+    );
+    // A node without rects (display:none) says nothing about where the walk is.
+    if (rects.length === 0) continue;
+    if (rects.some((rect) => overlaps(rect, box))) {
       length += text.length;
+      belowInARow = 0;
+    } else if (rects.every((rect) => rect.top >= box.bottom)) {
+      belowInARow += 1;
+    } else {
+      belowInARow = 0;
     }
   }
   return Math.min(length, TEXT_CAP);
@@ -146,23 +162,30 @@ function showsSomething(element: Element, view: Window, behind: string): boolean
  * engine would paint (display, visibility, overflow and clip-path clipping, stacking), so
  * a pane whose content is in the DOM but not shown scores 0. A pane that scores well and
  * still looks blank to the user points at WebKit losing the paint, not at the page.
+ * Points whose topmost element is outside the pane are counted apart as covered.
  */
-function countHits(main: HTMLElement, doc: Document, view: Window, box: Box | null): number {
-  if (!box) return 0;
+function countHits(
+  main: HTMLElement,
+  doc: Document,
+  view: Window,
+  box: Box | null,
+): { hits: number; covered: number } {
+  if (!box) return { hits: 0, covered: 0 };
   const behind = backgroundBehind(main, view);
   let hits = 0;
+  let covered = 0;
   for (const fy of GRID) {
     for (const fx of GRID) {
       const hit = doc.elementFromPoint(
         box.left + (box.right - box.left) * fx,
         box.top + (box.bottom - box.top) * fy,
       );
-      if (hit && hit !== main && main.contains(hit) && showsSomething(hit, view, behind)) {
-        hits += 1;
-      }
+      if (!hit) continue;
+      if (!main.contains(hit)) covered += 1;
+      else if (hit !== main && showsSomething(hit, view, behind)) hits += 1;
     }
   }
-  return hits;
+  return { hits, covered };
 }
 
 function countInvisible(main: HTMLElement, view: Window): number {
@@ -209,6 +232,7 @@ function countAnimations(main: HTMLElement, doc: Document): number {
 export function describeMainPane(main: HTMLElement, doc: Document = document): MainPaneState {
   const view = doc.defaultView ?? window;
   const box = visibleBox(main, view);
+  const { hits, covered } = countHits(main, doc, view, box);
   return {
     visibility: doc.visibilityState,
     focused: doc.hasFocus(),
@@ -219,7 +243,8 @@ export function describeMainPane(main: HTMLElement, doc: Document = document): M
     elements: Math.min(main.getElementsByTagName("*").length, MAX_ELEMENTS),
     text: countVisibleText(main, doc, view, box),
     invisible: countInvisible(main, view),
-    hits: countHits(main, doc, view, box),
+    hits,
+    covered,
     animations: countAnimations(main, doc),
     center: describeCenter(main, doc, box),
   };
@@ -227,11 +252,14 @@ export function describeMainPane(main: HTMLElement, doc: Document = document): M
 
 /**
  * A state worth a warn line: the pane would look blank to the user. `center` is not part
- * of it: a short page leaves the centre empty, and an open sheet covers it on purpose.
+ * of it: a short page leaves the centre empty. Zero hits counts only while some point is
+ * uncovered: a modal sheet or dialog over the whole pane takes every point on purpose,
+ * while a toast in one corner must not switch the check off.
  */
 export function looksBlank(state: MainPaneState): boolean {
   if (state.visibility !== "visible") return false;
-  return state.elements === 0 || state.text === 0 || state.invisible > 0 || state.hits === 0;
+  const shownNothing = state.hits === 0 && state.covered < HIT_POINTS;
+  return state.elements === 0 || state.text === 0 || state.invisible > 0 || shownNothing;
 }
 
 export type ProbeTrigger = "navigate" | "visible" | "focus";
@@ -261,6 +289,7 @@ export function formatMainPaneLine(
     `text=${state.text}${state.text >= TEXT_CAP ? "+" : ""}`,
     `invisible=${state.invisible}`,
     `hits=${state.hits}/${HIT_POINTS}`,
+    `covered=${state.covered}/${HIT_POINTS}`,
     `animations=${state.animations}`,
     `center=${state.center}`,
   ].join(" ");

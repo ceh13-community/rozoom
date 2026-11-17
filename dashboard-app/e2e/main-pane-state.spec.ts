@@ -35,6 +35,7 @@ type Measured = {
   text: number;
   invisible: number;
   hits: number;
+  covered: number;
   blank: boolean;
   line: string;
 };
@@ -63,6 +64,15 @@ async function measure(page: Page): Promise<Measured> {
       line: api.formatMainPaneLine(state, "/dashboard", "navigate"),
     };
   });
+}
+
+// A layer outside the pane, like the sheet overlay (fixed, z-index above the app) or a toast.
+async function addLayer(page: Page, css: string) {
+  await page.evaluate((value) => {
+    const layer = document.createElement("div");
+    layer.setAttribute("style", `position:fixed;z-index:190;background:rgba(0,0,0,0.5);${value}`);
+    document.body.appendChild(layer);
+  }, css);
 }
 
 async function stylePage(page: Page, css: string) {
@@ -153,5 +163,36 @@ test.describe("main pane log line", () => {
     expect(state.hits).toBe(0);
     expect(state.text).toBe(0);
     expect(state.blank).toBe(true);
+  });
+
+  test.describe("layers over the pane", () => {
+    test("a modal sheet over the whole pane is not a blank pane", async ({ page }) => {
+      await addLayer(page, "inset:0");
+      const state = await measure(page);
+      expect(state.covered).toBe(9);
+      expect(state.hits).toBe(0);
+      expect(state.blank).toBe(false);
+      expect(state.line).toMatch(/ covered=9\/9 /);
+    });
+
+    test("a toast in one corner does not hide clipped content", async ({ page }) => {
+      await stylePage(page, "height:0;overflow:hidden");
+      await addLayer(page, "right:0;bottom:0;width:320px;height:200px");
+      const state = await measure(page);
+      expect(state.covered).toBe(1);
+      expect(state.hits).toBe(0);
+      expect(state.blank).toBe(true);
+    });
+  });
+
+  test("a pane scrolled to the middle of a long list counts what is in view", async ({ page }) => {
+    await page.evaluate(() => {
+      const pane = document.getElementById("pane");
+      if (pane) pane.scrollTop = 1200;
+    });
+    const state = await measure(page);
+    expect(state.text).toBeGreaterThan(0);
+    expect(state.hits).toBe(9);
+    expect(state.blank).toBe(false);
   });
 });
