@@ -15,6 +15,7 @@
   import ShellModal from "$widgets/shell/ui/shell-modal.svelte";
   import RenderErrorBoundary from "$shared/ui/render-error-boundary.svelte";
   import { installMainPaneProbe } from "$shared/lib/main-pane-probe";
+  import { probeRoute } from "$shared/lib/main-pane-state";
   import { stopAllBackgroundPollers } from "$shared/lib/background-pollers";
   import { initNetworkRecoveryListener } from "$shared/lib/network-recovery";
   import { startFleetHeartbeat } from "$features/check-health/api/fleet-heartbeat";
@@ -100,10 +101,7 @@
   let mainPane: HTMLElement | undefined = $state();
   const mainPaneProbe = installMainPaneProbe(
     () => mainPane,
-    () => {
-      const workload = page.url.searchParams.get("workload");
-      return `${page.route.id ?? "unknown"}${workload ? `?workload=${workload}` : ""}`;
-    },
+    () => probeRoute(page.route.id, page.url.searchParams.get("workload")),
   );
   afterNavigate(() => {
     mainPaneProbe.probe.navigated();

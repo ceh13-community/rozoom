@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/plugin-log", () => ({
   info: vi.fn(),
@@ -9,21 +9,20 @@ vi.mock("@tauri-apps/plugin-log", () => ({
 
 import {
   createMainPaneProbe,
-  describeMainPane,
-  formatMainPaneLine,
-  looksBlank,
   MIN_AWAY_MS,
   NAVIGATE_DELAY_MS,
   RESTORE_DELAY_MS,
-  type MainPaneState,
 } from "./main-pane-probe";
+import {
+  formatMainPaneLine,
+  looksBlank,
+  probeRoute,
+  TEXT_CAP,
+  type MainPaneState,
+} from "./main-pane-state";
 
-function mountMain(html: string): HTMLElement {
-  const main = document.createElement("main");
-  main.innerHTML = html;
-  document.body.appendChild(main);
-  return main;
-}
+// What the pane measures needs layout, which jsdom does not have: those cases run in a
+// real browser in e2e/main-pane-state.spec.ts. This file covers the rest.
 
 const healthy: MainPaneState = {
   visibility: "visible",
@@ -33,90 +32,75 @@ const healthy: MainPaneState = {
   scrollHeight: 2400,
   scrollTop: 0,
   elements: 900,
-  textLength: 5000,
+  text: 4200,
   invisible: 0,
+  hits: 9,
   animations: 0,
   center: "content",
 };
 
-afterEach(() => {
-  document.body.innerHTML = "";
-  vi.restoreAllMocks();
-});
-
-describe("describeMainPane", () => {
-  it("reports an empty pane", () => {
-    const state = describeMainPane(mountMain(""));
-    expect(state.elements).toBe(0);
-    expect(state.textLength).toBe(0);
-    expect(state.invisible).toBe(0);
-  });
-
-  it("counts content without reading it into the line", () => {
-    const main = mountMain("<section><h1>prod-eu-payments</h1><p>pod-7f9c</p></section>");
-    const state = describeMainPane(main);
-    expect(state.elements).toBe(3);
-    expect(state.textLength).toBe("prod-eu-paymentspod-7f9c".length);
-
-    const line = formatMainPaneLine(state, "/dashboard/clusters/[slug]?workload=pods", "navigate");
-    expect(line).not.toContain("prod-eu-payments");
-    expect(line).not.toContain("pod-7f9c");
-    expect(line).toContain("elements=3");
-    expect(line).toContain("route=/dashboard/clusters/[slug]?workload=pods");
-  });
-
-  it("counts an invisible block once, not every element under it", () => {
-    const main = mountMain(
-      '<div style="opacity: 0"><table><tr><td>a</td></tr></table></div><div>shown</div>',
-    );
-    expect(describeMainPane(main).invisible).toBe(1);
-  });
-
-  it("counts visibility hidden as invisible", () => {
-    const main = mountMain('<div style="visibility: hidden">x</div>');
-    expect(describeMainPane(main).invisible).toBe(1);
-  });
-
-  it("names an overlay sitting on top of the pane", () => {
-    const main = mountMain("<p>rows</p>");
-    const overlay = document.createElement("div");
-    overlay.setAttribute("data-slot", "dialog-overlay");
-    document.body.appendChild(overlay);
-    vi.spyOn(main, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 800, 600));
-    Object.defineProperty(document, "elementFromPoint", {
-      configurable: true,
-      value: vi.fn(() => overlay),
-    });
-    try {
-      expect(describeMainPane(main).center).toBe("outside:div[dialog-overlay]");
-    } finally {
-      Reflect.deleteProperty(document, "elementFromPoint");
-    }
-  });
-});
-
 describe("looksBlank", () => {
-  it("is false for a pane with visible content", () => {
+  it("is false for a pane that shows content", () => {
     expect(looksBlank(healthy)).toBe(false);
   });
 
   it.each([
     ["no elements", { elements: 0 }],
-    ["no text", { textLength: 0 }],
+    ["no visible text", { text: 0 }],
     ["an invisible block", { invisible: 1 }],
+    ["no grid point on content", { hits: 0 }],
   ])("is true with %s", (_, change) => {
     expect(looksBlank({ ...healthy, ...change })).toBe(true);
   });
 
   it.each([
-    ["a short page with nothing at the centre", { center: "main" }],
-    ["a sheet open over the pane", { center: "outside:div[dialog-overlay]" }],
+    ["a short page with nothing at the centre", { center: "main", hits: 3 }],
+    ["a sheet open over the pane", { center: "outside:div[dialog-overlay]", hits: 6 }],
   ])("is false for %s", (_, change) => {
     expect(looksBlank({ ...healthy, ...change })).toBe(false);
   });
 
   it("is false while the window is hidden", () => {
     expect(looksBlank({ ...healthy, visibility: "hidden", elements: 0 })).toBe(false);
+  });
+});
+
+describe("probeRoute", () => {
+  it("keeps a plain workload slug", () => {
+    expect(probeRoute("/dashboard/clusters/[slug]", "daemonsets")).toBe(
+      "/dashboard/clusters/[slug]?workload=daemonsets",
+    );
+  });
+
+  it.each([
+    ["an uppercase value", "Pods"],
+    ["a path", "../secrets"],
+    ["a token-like value", "eyJhbGciOiJSUzI1NiJ9.payload"],
+    ["an overlong slug", "a".repeat(41)],
+  ])("replaces %s with other", (_, workload) => {
+    expect(probeRoute("/dashboard/clusters/[slug]", workload)).toBe(
+      "/dashboard/clusters/[slug]?workload=other",
+    );
+  });
+
+  it("leaves the workload out when there is none", () => {
+    expect(probeRoute("/dashboard", null)).toBe("/dashboard");
+    expect(probeRoute(null, null)).toBe("unknown");
+  });
+});
+
+describe("formatMainPaneLine", () => {
+  it("writes every field as a number or a fixed word", () => {
+    expect(formatMainPaneLine(healthy, "/dashboard", "navigate")).toBe(
+      "[main-pane] trigger=navigate route=/dashboard visibility=visible focus=1 size=1180x820 " +
+        "scroll=0/2400 elements=900 text=4200 invisible=0 hits=9/9 animations=0 center=content",
+    );
+  });
+
+  it("marks capped text", () => {
+    expect(formatMainPaneLine({ ...healthy, text: TEXT_CAP }, "/dashboard", "focus")).toContain(
+      `text=${TEXT_CAP}+`,
+    );
   });
 });
 
@@ -204,7 +188,7 @@ describe("createMainPaneProbe", () => {
   it("never throws into the page", () => {
     const failing = createMainPaneProbe({
       getMain: () => document.createElement("main"),
-      getRoute: () => null,
+      getRoute: () => "/dashboard",
       write: () => Promise.reject(new Error("log plugin gone")),
       schedule: (callback) => {
         callback();
@@ -214,7 +198,9 @@ describe("createMainPaneProbe", () => {
         throw new Error("layout read failed");
       },
     });
-    expect(() => failing.navigated()).not.toThrow();
+    expect(() => {
+      failing.navigated();
+    }).not.toThrow();
   });
 
   it("cancels a pending probe on dispose", () => {
