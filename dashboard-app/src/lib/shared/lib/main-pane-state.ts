@@ -25,7 +25,7 @@ export interface MainPaneState {
   center: string;
 }
 
-export const HIT_POINTS = 9;
+export const HIT_POINTS = 25;
 export const TEXT_CAP = 5_000;
 // Text nodes looked at before giving up; keeps a megabyte log view from costing seconds.
 const TEXT_NODE_LIMIT = 3_000;
@@ -42,7 +42,9 @@ const INVISIBLE_SCAN_LIMIT = 200;
 const INVISIBLE_MIN_SHARE = 0.25;
 // Below this the text is there but nobody can read it.
 const MIN_OPACITY = 0.05;
-const GRID = [1 / 6, 1 / 2, 5 / 6];
+// 5x5: on short pages (an empty list under a banner) a 3x3 grid hit content at 1 to 3
+// points, too thin a margin above zero; 5x5 hits 6 to 9 there.
+const GRID = [0.1, 0.3, 0.5, 0.7, 0.9];
 const SHOW_TEXT = 0x4;
 const TEXT_NODE = 3;
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -158,7 +160,7 @@ function showsSomething(element: Element, view: Window, behind: string): boolean
 }
 
 /**
- * Hit-tests a 3x3 grid over the visible part of the pane. Hit testing follows what the
+ * Hit-tests a 5x5 grid over the visible part of the pane. Hit testing follows what the
  * engine would paint (display, visibility, overflow and clip-path clipping, stacking), so
  * a pane whose content is in the DOM but not shown scores 0. A pane that scores well and
  * still looks blank to the user points at WebKit losing the paint, not at the page.

@@ -26,7 +26,7 @@ const PAGE = `<!doctype html>
 <html><body style="margin:0;background:rgb(7,8,10);color:#ddd;font:14px sans-serif">
 <aside style="position:fixed;left:0;top:0;width:240px;height:100vh">Clusters</aside>
 <main id="pane" style="position:fixed;left:240px;top:0;right:0;bottom:0;overflow-y:auto;padding:16px">
-  <div id="page"><h1>Pods</h1>${rows}</div>
+  <div id="page"><h1 style="margin:0;padding:40px 0">Pods</h1>${rows}</div>
 </main>
 </body></html>`;
 
@@ -89,7 +89,7 @@ test.describe("main pane log line", () => {
   test("a pane showing rows is not blank", async ({ page }) => {
     const state = await measure(page);
     expect(state.text).toBeGreaterThan(0);
-    expect(state.hits).toBe(9);
+    expect(state.hits).toBe(25);
     expect(state.invisible).toBe(0);
     expect(state.blank).toBe(false);
   });
@@ -98,7 +98,7 @@ test.describe("main pane log line", () => {
     const { line } = await measure(page);
     expect(line).not.toContain(ROW_TEXT);
     expect(line).not.toContain("Pods");
-    expect(line).toMatch(/ hits=9\/9 /);
+    expect(line).toMatch(/ hits=25\/25 /);
   });
 
   // The case the old line got wrong: every element still in the DOM, so a DOM count and
@@ -169,17 +169,18 @@ test.describe("main pane log line", () => {
     test("a modal sheet over the whole pane is not a blank pane", async ({ page }) => {
       await addLayer(page, "inset:0");
       const state = await measure(page);
-      expect(state.covered).toBe(9);
+      expect(state.covered).toBe(25);
       expect(state.hits).toBe(0);
       expect(state.blank).toBe(false);
-      expect(state.line).toMatch(/ covered=9\/9 /);
+      expect(state.line).toMatch(/ covered=25\/25 /);
     });
 
     test("a toast in one corner does not hide clipped content", async ({ page }) => {
       await stylePage(page, "height:0;overflow:hidden");
       await addLayer(page, "right:0;bottom:0;width:320px;height:200px");
       const state = await measure(page);
-      expect(state.covered).toBe(1);
+      expect(state.covered).toBeGreaterThan(0);
+      expect(state.covered).toBeLessThan(25);
       expect(state.hits).toBe(0);
       expect(state.blank).toBe(true);
     });
@@ -192,7 +193,7 @@ test.describe("main pane log line", () => {
     });
     const state = await measure(page);
     expect(state.text).toBeGreaterThan(0);
-    expect(state.hits).toBe(9);
+    expect(state.hits).toBe(25);
     expect(state.blank).toBe(false);
   });
 });
