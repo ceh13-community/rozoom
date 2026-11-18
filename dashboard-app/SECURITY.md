@@ -81,7 +81,7 @@ Tauri v2 capabilities (defined in `src-tauri/capabilities/default.json`) enforce
 
 ### DevTools
 
-DevTools (F12 inspector) are disabled in production builds (`"devtools": false` in `tauri.conf.json`). In development mode, DevTools are available only when running via `cargo tauri dev` or `pnpm tauri:dev:rozoom` - Tauri enables them automatically for debug builds. Running with `pnpm dev` (Vite-only, no Tauri shell) does not provide F12 DevTools.
+DevTools (the web inspector) are not compiled into release builds: `src-tauri/Cargo.toml` builds the `tauri` crate without its `devtools` feature, so a release build has no inspector and no "Inspect Element" menu item. A unit test (`scripts/release-devtools.test.ts`) fails if the feature comes back. In development mode, DevTools are available only when running via `cargo tauri dev` or `pnpm tauri:dev:rozoom` - Tauri enables them automatically for debug builds. Running with `pnpm dev` (Vite-only, no Tauri shell) does not provide F12 DevTools.
 
 ## Kubeconfig isolation
 
