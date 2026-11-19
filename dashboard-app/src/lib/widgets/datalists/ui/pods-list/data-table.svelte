@@ -362,17 +362,20 @@
     return columnConfigs.find((column) => column.id === columnId)?.visible ?? true;
   }
 
+  // Each track starts at the width of its header label plus the sort icon, so a header is
+  // never cut to "Na..." on a narrow window. Every row is its own grid with this template,
+  // so the minimums are fixed sizes, not content-based ones that would differ per row.
   function buildGridColumns() {
     const columns = ["auto", "auto"];
-    if (isColumnVisible("name")) columns.push("minmax(0,2fr)");
-    if (isColumnVisible("namespace")) columns.push("minmax(0,1fr)");
-    if (isColumnVisible("status")) columns.push("minmax(0,1fr)");
-    if (isColumnVisible("ready")) columns.push("minmax(0,0.8fr)");
-    if (enrichedTableEnabled && isColumnVisible("cpu")) columns.push("minmax(0,0.9fr)");
-    if (enrichedTableEnabled && isColumnVisible("memory")) columns.push("minmax(0,0.9fr)");
-    if (isColumnVisible("restarts")) columns.push("minmax(0,0.8fr)");
-    if (isColumnVisible("node")) columns.push("minmax(0,1.1fr)");
-    if (isColumnVisible("age")) columns.push("minmax(0,0.8fr)");
+    if (isColumnVisible("name")) columns.push("minmax(8rem,2fr)");
+    if (isColumnVisible("namespace")) columns.push("minmax(7rem,1fr)");
+    if (isColumnVisible("status")) columns.push("minmax(5rem,1fr)");
+    if (isColumnVisible("ready")) columns.push("minmax(5rem,0.8fr)");
+    if (enrichedTableEnabled && isColumnVisible("cpu")) columns.push("minmax(4.5rem,0.9fr)");
+    if (enrichedTableEnabled && isColumnVisible("memory")) columns.push("minmax(6rem,0.9fr)");
+    if (isColumnVisible("restarts")) columns.push("minmax(6.25rem,0.8fr)");
+    if (isColumnVisible("node")) columns.push("minmax(4.5rem,1.1fr)");
+    if (isColumnVisible("age")) columns.push("minmax(4rem,0.8fr)");
     return columns.join(" ");
   }
 
@@ -614,7 +617,7 @@
       onscroll={handleTableScroll}
     >
       <div
-        class="sticky-table-header pods-k9s-table__header grid gap-3 border-b border-border px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+        class="sticky-table-header pods-k9s-table__header grid items-center gap-3 border-b border-border px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
         style={`grid-template-columns: ${tableGridTemplate};`}
       >
         <div>
