@@ -52,10 +52,14 @@ type ClusterHealthLike =
   | null
   | undefined;
 
+/** The live probe result (shared/model/cluster-connectivity), the source of the fleet card badge. */
+type ClusterConnectivityLike = { state?: string } | null | undefined;
+
 export type FleetSummaryInputs = {
   clusters: AppClusterConfig[];
   states?: Record<string, ClusterStateLike>;
   health?: Record<string, ClusterHealthLike>;
+  connectivity?: Record<string, ClusterConnectivityLike>;
   envFor?: (cluster: AppClusterConfig) => string | undefined;
   providerFor?: (cluster: AppClusterConfig) => string | undefined;
 };
@@ -102,12 +106,17 @@ function isConnectionError(err: string | null | undefined): boolean {
 /**
  * Bucket a single cluster based on runtime signals.
  * Priority: auth-error > offline > critical > warning > online > unknown.
+ * The live probe goes first: the last health check can be green from before the cluster
+ * went down, and the fleet card already shows UNREACHABLE from the probe.
  */
 export function bucketCluster(
   cluster: AppClusterConfig,
   state: ClusterStateLike | undefined,
   health: ClusterHealthLike,
+  connectivity?: ClusterConnectivityLike,
 ): FleetStatusBucket {
+  if (connectivity?.state === "auth-expired") return "auth-error";
+  if (connectivity?.state === "unreachable") return "offline";
   if (state?.error) {
     if (isAuthError(state.error)) return "auth-error";
     if (isConnectionError(state.error)) return "offline";
@@ -138,7 +147,7 @@ export function bucketCluster(
 }
 
 export function buildFleetSummary(inputs: FleetSummaryInputs): FleetSummary {
-  const { clusters, states = {}, health = {}, envFor, providerFor } = inputs;
+  const { clusters, states = {}, health = {}, connectivity = {}, envFor, providerFor } = inputs;
 
   const summary: FleetSummary = {
     total: clusters.length,
@@ -153,7 +162,12 @@ export function buildFleetSummary(inputs: FleetSummaryInputs): FleetSummary {
   };
 
   for (const cluster of clusters) {
-    const bucket = bucketCluster(cluster, states[cluster.uuid], health[cluster.uuid]);
+    const bucket = bucketCluster(
+      cluster,
+      states[cluster.uuid],
+      health[cluster.uuid],
+      connectivity[cluster.uuid],
+    );
     switch (bucket) {
       case "online":
         summary.online += 1;
