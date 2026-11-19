@@ -62,6 +62,7 @@
     buildControlPlaneChecks,
     buildMetricsUnavailableMessage,
     buildOverviewResourceInsights,
+    pickWorkloadWarningEvents,
     buildUsageCards,
     calculateResourcePressure,
     detectManagedProviderInfo,
@@ -352,7 +353,13 @@
   const resourceInsights = $derived.by(() => {
     const overview = data.overview;
     if (!overview) return [];
-    return buildOverviewResourceInsights(overview, clusterHealth, warningItems);
+    const workloadEvents = pickWorkloadWarningEvents({
+      overviewItems: warningItems,
+      overviewEventsLoaded: eventsHydrated,
+      overviewEventsError: eventsError,
+      checks: clusterHealth,
+    });
+    return buildOverviewResourceInsights(overview, clusterHealth, workloadEvents);
   });
   const usageCards = $derived.by(() =>
     buildUsageCards({

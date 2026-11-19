@@ -4,6 +4,7 @@ import {
   buildControlPlaneChecks,
   buildMetricsUnavailableMessage,
   buildOverviewResourceInsights,
+  pickWorkloadWarningEvents,
   buildUsageCards,
   calculateResourcePressure,
   detectManagedProvider,
@@ -444,5 +445,100 @@ describe("overview-insights", () => {
     });
     expect(cards.find((c) => c.id === "cpu")?.title).toBe("CPU usage");
     expect(cards.find((c) => c.id === "memory")?.title).toBe("Memory usage");
+  });
+
+  // A user who may not list workloads, or an Overview with live diagnostics paused, has read
+  // no warning events at all. The tiles said "OK, no warning events" all the same.
+  describe("workload tiles without data", () => {
+    const workloadKeys = ["deployments", "daemonsets", "statefulsets", "replicasets", "jobs"];
+
+    it("shows the workload tiles as unknown when no warning events were read", () => {
+      const insights = buildOverviewResourceInsights(overview, makeChecks(), null);
+      for (const key of workloadKeys) {
+        const insight = insights.find((item) => item.key === key);
+        expect(insight?.severity).toBe("unknown");
+        expect(insight?.reason).toBe("Warning events not loaded.");
+      }
+    });
+
+    it("shows the cronjob tile as unknown before any health check result", () => {
+      const insights = buildOverviewResourceInsights(overview, null, null);
+      const cronjobs = insights.find((item) => item.key === "cronjobs");
+      expect(cronjobs?.severity).toBe("unknown");
+      expect(cronjobs?.reason).toBe("No cronjob check results yet.");
+    });
+
+    it("still shows OK when warning events were read and none matched", () => {
+      const insights = buildOverviewResourceInsights(overview, makeChecks(), []);
+      expect(insights.find((item) => item.key === "deployments")?.severity).toBe("ok");
+    });
+  });
+
+  describe("pickWorkloadWarningEvents", () => {
+    const item: WarningEventItem = {
+      timestamp: 1,
+      type: "Warning",
+      namespace: "default",
+      objectKind: "Deployment",
+      objectName: "api",
+      reason: "Failed",
+      message: "x",
+      count: 1,
+    };
+    const report = (status: "ok" | "unknown", errors?: string) => ({
+      status,
+      summary: { status, warnings: [], updatedAt: 1 },
+      items: [item],
+      errors,
+      updatedAt: 1,
+    });
+
+    it("prefers the events the Overview loaded itself", () => {
+      expect(
+        pickWorkloadWarningEvents({
+          overviewItems: [],
+          overviewEventsLoaded: true,
+          overviewEventsError: null,
+          checks: makeChecks({ warningEvents: report("ok") }),
+        }),
+      ).toEqual([]);
+    });
+
+    it("falls back to the events of the latest health check", () => {
+      expect(
+        pickWorkloadWarningEvents({
+          overviewItems: [],
+          overviewEventsLoaded: false,
+          overviewEventsError: null,
+          checks: makeChecks({ warningEvents: report("ok") }),
+        }),
+      ).toEqual([item]);
+    });
+
+    it("returns null when no events were read", () => {
+      const base = { overviewItems: [], overviewEventsLoaded: false, overviewEventsError: null };
+      expect(pickWorkloadWarningEvents({ ...base, checks: null })).toBeNull();
+      expect(pickWorkloadWarningEvents({ ...base, checks: makeChecks() })).toBeNull();
+      expect(
+        pickWorkloadWarningEvents({
+          ...base,
+          checks: makeChecks({ warningEvents: report("ok", "forbidden") }),
+        }),
+      ).toBeNull();
+      expect(
+        pickWorkloadWarningEvents({
+          ...base,
+          checks: makeChecks({ warningEvents: report("unknown") }),
+        }),
+      ).toBeNull();
+      expect(
+        pickWorkloadWarningEvents({
+          overviewItems: [item],
+          overviewEventsLoaded: true,
+          overviewEventsError: "Warning events timeout after 10000ms",
+          checks: null,
+        }),
+      ).toBeNull();
+    });
   });
 });

@@ -1,4 +1,8 @@
-import type { ClusterHealthChecks, WarningEventItem } from "$features/check-health/model/types";
+import type {
+  ClusterHealthChecks,
+  CronJobsHealthSummary,
+  WarningEventItem,
+} from "$features/check-health/model/types";
 import type { WorkloadOverview } from "$shared";
 import {
   hasCoreMetricsSourcesUnavailable,
@@ -318,10 +322,28 @@ function buildComponentCheck(params: {
   };
 }
 
+/**
+ * Warning events the workload tiles may judge by, or null when none were read. The Overview
+ * loads its own events only with live diagnostics on; otherwise the latest health check's
+ * events count. With neither, "no warning events" would only mean "not read" (no access,
+ * diagnostics paused), and the tiles said OK.
+ */
+export function pickWorkloadWarningEvents(params: {
+  overviewItems: WarningEventItem[];
+  overviewEventsLoaded: boolean;
+  overviewEventsError: string | null;
+  checks: ClusterHealthChecks | null;
+}): WarningEventItem[] | null {
+  if (params.overviewEventsLoaded && !params.overviewEventsError) return params.overviewItems;
+  const report = params.checks?.warningEvents;
+  if (report && !report.errors && report.status !== "unknown") return report.items;
+  return null;
+}
+
 export function buildOverviewResourceInsights(
   overview: WorkloadOverview,
   checks: ClusterHealthChecks | null,
-  warningItems: WarningEventItem[],
+  warningItems: WarningEventItem[] | null,
 ): OverviewResourceInsight[] {
   return OVERVIEW_RESOURCE_ORDER.map((key) => {
     const quantity = overview[key].quantity;
@@ -373,7 +395,12 @@ export function buildOverviewResourceInsights(
     }
 
     if (key === "cronjobs") {
-      const summary = checks?.cronJobsHealth.summary;
+      if (!checks) {
+        const reason = "No cronjob check results yet.";
+        return { key, title, route, quantity, severity: "unknown", reason, kubectlHint };
+      }
+      // Older cached check results have no summary yet.
+      const summary = checks.cronJobsHealth.summary as CronJobsHealthSummary | undefined;
       const critical = summary?.critical ?? 0;
       const warning = summary?.warning ?? 0;
       const severity = critical > 0 ? "critical" : warning > 0 ? "warning" : "ok";
@@ -393,6 +420,10 @@ export function buildOverviewResourceInsights(
       replicasets: ["ReplicaSet"],
       jobs: ["Job"],
     };
+    if (!warningItems) {
+      const reason = "Warning events not loaded.";
+      return { key, title, route, quantity, severity: "unknown", reason, kubectlHint };
+    }
     const warningCount = eventCountForKind(warningItems, kindMap[key] ?? []);
     const severity = eventSeverity(warningCount);
     const reason = buildWorkloadReason(title, warningCount);
