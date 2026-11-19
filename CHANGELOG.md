@@ -82,6 +82,10 @@ installed this one. We recommend this update.
   or "Auth expired", the last contact time, and counts the cluster as offline.
 - Opening Cron Jobs, most often right after Jobs, could replace the page with
   an error panel. The list now opens every time.
+- After a touchpad scroll on a long page, the next page (Global Triage, Service
+  Chains and other short pages) could open scrolled past its end and look
+  empty, and the collapsed cluster menu showed blank space below its icons.
+  Every page now opens at the top, and the menu stays within its items.
 
 Something confusing or broken? [Tell us what's wrong](https://github.com/ceh13-community/rozoom/discussions).
 
