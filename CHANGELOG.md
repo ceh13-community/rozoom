@@ -68,9 +68,9 @@ installed this one. We recommend this update.
 - Table column headers are no longer cut to a few letters ("Na...", "St...") on
   narrow windows, and every column in view shows its header. On the
   Deployments page names stay on one line and the table scrolls sideways.
-  Where a table fixes its column widths (ConfigMaps, Secrets, custom resource
-  definitions) a long header no longer runs into the next one: it ends with
-  "..." inside its column and the full name shows on hover.
+  In ConfigMaps, Secrets and the custom resource definitions list the headers
+  no longer run into each other or shrink to a letter: these tables also
+  scroll sideways when the window is too narrow for every column.
 - The page title stays readable in a narrow window; the header buttons move
   to a second line instead.
 - The usage strip and the Traffic Chain in the details panel were dark grey
