@@ -17,6 +17,7 @@
   import { loadPluginState } from "$shared/plugins";
   import { initAnalytics, trackAppOpened } from "$shared/analytics/wau-c";
   import SplashScreen from "$shared/ui/splash-screen.svelte";
+  import { installUiZoom } from "$shared/lib/ui-zoom";
 
   import "$lib/app/styles/index.css";
 
@@ -33,6 +34,9 @@
   function isExternalHttpUrl(raw: string) {
     return raw.startsWith("http://") || raw.startsWith("https://");
   }
+
+  // Interface scale: restore the saved Text size and listen for Ctrl/Cmd + = / - / 0.
+  onMount(() => installUiZoom());
 
   onMount(() => {
     // WAU-C telemetry, strictly opt-in. No-ops without a PUBLIC_POSTHOG_KEY or

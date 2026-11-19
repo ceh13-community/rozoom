@@ -1,4 +1,5 @@
 <script lang="ts">
+  import TextSizeControl from "$shared/ui/text-size-control.svelte";
   import { onDestroy, onMount } from "svelte";
   import { dispatchShortcut, SHORTCUTS } from "../lib/keyboard-shortcuts";
   import { toast } from "svelte-sonner";
@@ -1150,9 +1151,12 @@
           ?
         </button>
       </div>
-      <p class="text-sm text-slate-500 dark:text-slate-400 mb-4 text-center">
+      <p class="text-sm text-slate-500 dark:text-slate-400 mb-2 text-center">
         Add, verify, and open Kubernetes clusters from your kubeconfig files
       </p>
+      <div class="mb-4 flex justify-center">
+        <TextSizeControl />
+      </div>
 
       {#if showPageInfo}
         <div
