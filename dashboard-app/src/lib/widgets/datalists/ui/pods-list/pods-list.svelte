@@ -13,7 +13,10 @@
   import { openPodAttachModal, openPodShellModal } from "$features/shell";
   import { runDebugDescribe } from "$features/resource-debug-runtime";
   import { startPortForward } from "$shared/api/port-forward";
-  import { requestPortForwardStartMode } from "$shared/lib/port-forward-start-mode";
+  import {
+    defaultLocalPort,
+    requestPortForwardStartMode,
+  } from "$shared/lib/port-forward-start-mode";
   import { popOutPortForwardPreview } from "$shared/lib/port-forward-preview";
   import {
     destroyPodsSync,
@@ -707,17 +710,19 @@
     const name = pod.metadata?.name ?? "unknown";
     const namespace = pod.metadata?.namespace ?? "default";
     const uniqueKey = `pod/${namespace}/${name}:${firstPort}`;
+    const localPort = defaultLocalPort(firstPort);
     const result = await startPortForward({
       namespace,
       resource: `pod/${name}`,
       remotePort: firstPort,
+      localPort,
       clusterId: data.slug,
       uniqueKey,
     });
     if (result.success) {
-      toast.success(`Port-forward started: localhost:${firstPort} -> ${name}:${firstPort}`);
+      toast.success(`Port-forward started: localhost:${localPort} -> ${name}:${firstPort}`);
       if (mode === "start-and-open") {
-        void popOutPortForwardPreview(`http://localhost:${firstPort}`);
+        void popOutPortForwardPreview(`http://localhost:${localPort}`);
       }
     } else {
       toast.error(result.error ?? "Failed to start port-forward.");

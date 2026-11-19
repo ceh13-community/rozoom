@@ -1,5 +1,19 @@
 export type PortForwardStartMode = "start-only" | "start-and-open";
 
+/** Ports below this need root to listen on, on Linux. */
+const FIRST_UNPRIVILEGED_PORT = 1024;
+/** Same base as the random local ports of Service port-forwards (30000-60999). */
+const PRIVILEGED_PORT_OFFSET = 30000;
+
+/**
+ * Local port for a port-forward started without asking: the remote port itself, unless that
+ * needs root to listen on. A pod serving on 80 gets 30080, on 443 gets 30443; kubectl
+ * could not listen on 80 for a normal user and the start failed.
+ */
+export function defaultLocalPort(remotePort: number): number {
+  return remotePort < FIRST_UNPRIVILEGED_PORT ? remotePort + PRIVILEGED_PORT_OFFSET : remotePort;
+}
+
 export function requestPortForwardStartMode(remotePort: number): PortForwardStartMode | null {
   if (typeof window === "undefined") return "start-only";
   if (typeof window.prompt !== "function") return "start-only";
