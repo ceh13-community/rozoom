@@ -6,24 +6,25 @@
 
   let {
     label,
+    truncate = false,
     variant = "ghost",
     class: className,
     ...restProps
-  }: ComponentProps<typeof Button> & { label: string } = $props();
+  }: ComponentProps<typeof Button> & { label: string; truncate?: boolean } = $props();
 </script>
 
-<!-- A header label never runs into the next header. Where the column is at least as wide
-     as the label (the Pods grid minimums, the content-sized Deployments table) the label
-     shows in full; -ml-1 starts it where the cell values below it start. Where the table
-     fixes the column width (table-fixed with percentage widths, as in ConfigMaps, Secrets
-     and CRDs) the label is cut with an ellipsis inside its own column and the tooltip
-     shows the full name. -->
+<!-- By default a header label never shrinks: in content-sized tables (Deployments) and the
+     Pods grid the label's own width keeps the column at least that wide, and a table too
+     wide for the window scrolls. -ml-1 starts the label where the cell values start.
+     `truncate` is for tables that fix their column widths (table-fixed): there the label
+     cannot widen the column, so it is cut with an ellipsis inside its own column instead of
+     running into the next header, and the tooltip shows the full name. -->
 <Button
-  class={cn("-ml-1 h-8 min-w-0 max-w-full justify-start gap-1 px-1", className)}
-  title={label}
+  class={cn("-ml-1 h-8 justify-start gap-1 px-1", truncate && "min-w-0 max-w-full", className)}
+  title={truncate ? label : undefined}
   {variant}
   {...restProps}
 >
-  <span class="min-w-0 truncate">{label}</span>
+  <span class={truncate ? "min-w-0 truncate" : undefined}>{label}</span>
   <ArrowUpDownIcon class="shrink-0" />
 </Button>

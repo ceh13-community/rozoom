@@ -896,7 +896,10 @@
   {/if}
 
   <TableSurface>
-    <Table.Table class="table-fixed">
+    <!-- Percent widths are set so every header fits from about 56rem of table width (a 1280 px
+         window); below that the table keeps 56rem and scrolls sideways instead of cutting
+         Version, Scope or Resource to a few letters. -->
+    <Table.Table class="table-fixed min-w-[56rem]">
       <Table.TableCaption>Custom Resource Definitions</Table.TableCaption>
       <Table.TableHeader>
         <Table.TableRow>
@@ -911,38 +914,38 @@
             <span class="text-[11px] uppercase tracking-wide">Actions</span>
           </Table.TableHead>
           {#if isColumnVisible("name")}
-            <Table.TableHead class="w-[22%]">
-              <SortingButton label="Name" onclick={() => toggleSort("name")} />
+            <Table.TableHead class="w-[19%]">
+              <SortingButton truncate label="Name" onclick={() => toggleSort("name")} />
             </Table.TableHead>
           {/if}
           {#if isColumnVisible("group")}
-            <Table.TableHead class="w-[18%]">
-              <SortingButton label="Group" onclick={() => toggleSort("group")} />
+            <Table.TableHead class="w-[15%]">
+              <SortingButton truncate label="Group" onclick={() => toggleSort("group")} />
             </Table.TableHead>
           {/if}
           {#if isColumnVisible("version")}
-            <Table.TableHead class="w-[11%]">
-              <SortingButton label="Version" onclick={() => toggleSort("version")} />
+            <Table.TableHead class="w-[13%]">
+              <SortingButton truncate label="Version" onclick={() => toggleSort("version")} />
             </Table.TableHead>
           {/if}
           {#if isColumnVisible("scope")}
             <Table.TableHead class="w-[12%]">
-              <SortingButton label="Scope" onclick={() => toggleSort("scope")} />
+              <SortingButton truncate label="Scope" onclick={() => toggleSort("scope")} />
             </Table.TableHead>
           {/if}
           {#if isColumnVisible("resource")}
             <Table.TableHead class="w-[14%]">
-              <SortingButton label="Resource" onclick={() => toggleSort("resource")} />
+              <SortingButton truncate label="Resource" onclick={() => toggleSort("resource")} />
             </Table.TableHead>
           {/if}
           {#if isColumnVisible("summary")}
-            <Table.TableHead class="w-[23%]">
-              <SortingButton label="Summary" onclick={() => toggleSort("summary")} />
+            <Table.TableHead class="w-[17%]">
+              <SortingButton truncate label="Summary" onclick={() => toggleSort("summary")} />
             </Table.TableHead>
           {/if}
           {#if isColumnVisible("age")}
             <Table.TableHead class="w-[10%]">
-              <SortingButton label="Age" onclick={() => toggleSort("age")} />
+              <SortingButton truncate label="Age" onclick={() => toggleSort("age")} />
             </Table.TableHead>
           {/if}
         </Table.TableRow>
@@ -1103,10 +1106,10 @@
       <div
         class="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.7fr)_auto] gap-3 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
       >
-        <SortingButton label="Name" onclick={() => toggleInstanceSort("name")} />
-        <SortingButton label="Namespace" onclick={() => toggleInstanceSort("namespace")} />
-        <SortingButton label="Status" onclick={() => toggleInstanceSort("status")} />
-        <SortingButton label="Age" onclick={() => toggleInstanceSort("age")} />
+        <SortingButton truncate label="Name" onclick={() => toggleInstanceSort("name")} />
+        <SortingButton truncate label="Namespace" onclick={() => toggleInstanceSort("namespace")} />
+        <SortingButton truncate label="Status" onclick={() => toggleInstanceSort("status")} />
+        <SortingButton truncate label="Age" onclick={() => toggleInstanceSort("age")} />
         <div>Actions</div>
       </div>
 
