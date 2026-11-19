@@ -152,6 +152,7 @@
   import SectionRuntimeStatus from "./common/section-runtime-status.svelte";
   import WorkloadSelectionBar from "./common/workload-selection-bar.svelte";
   import ResourceSummaryStrip from "./common/resource-summary-strip.svelte";
+  import { configurationTableMinWidth } from "./configuration-table-width";
 
   type GenericItem = Record<string, unknown>;
   type SortBy =
@@ -899,6 +900,8 @@
   let configPageIndex = $state(0);
   let configPageSize = $state(100);
   let columnsVisible = $state<ColumnVisibilityState>(getDefaultColumnsForWorkload());
+  // Below this width a header would shrink to a letter or two; the table scrolls instead.
+  const configTableMinWidth = $derived(configurationTableMinWidth(columnsVisible));
   let namespaceCreateName = $state("");
   let namespaceLabelsText = $state("");
   let namespaceAnnotationsText = $state("");
@@ -5211,7 +5214,7 @@ spec:
     onScroll={handleTableScroll}
     bind:ref={tableScrollHost}
   >
-    <Table.Table class="table-fixed">
+    <Table.Table class="table-fixed" style="min-width: {configTableMinWidth}px">
       <Table.TableCaption>{tableTitle}</Table.TableCaption>
       <Table.TableHeader>
         <Table.TableRow>
@@ -5228,162 +5231,191 @@ spec:
           </Table.TableHead>
           {#if columnsVisible.name}
             <Table.TableHead class="w-[28%]">
-              <SortingButton label="Name" onclick={() => toggleSort("name")} />
+              <SortingButton truncate label="Name" onclick={() => toggleSort("name")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.namespace}
             <Table.TableHead class="w-[18%]">
-              <SortingButton label="Namespace" onclick={() => toggleSort("namespace")} />
+              <SortingButton truncate label="Namespace" onclick={() => toggleSort("namespace")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.createdAt}
             <Table.TableHead class="w-[18%]">
-              <SortingButton label="Age" onclick={() => toggleSort("createdAt")} />
+              <SortingButton truncate label="Age" onclick={() => toggleSort("createdAt")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.keys}
             <Table.TableHead class="w-[90px]">
-              <SortingButton label="Keys" onclick={() => toggleSort("keys")} />
+              <SortingButton truncate label="Keys" onclick={() => toggleSort("keys")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.labels}
             <Table.TableHead class="w-[220px]">
-              <SortingButton label="Labels" onclick={() => toggleSort("labels")} />
+              <SortingButton truncate label="Labels" onclick={() => toggleSort("labels")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.type}
             <Table.TableHead class="w-[180px]">
-              <SortingButton label="Type" onclick={() => toggleSort("type")} />
+              <SortingButton truncate label="Type" onclick={() => toggleSort("type")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.handler}
             <Table.TableHead class="w-[180px]">
-              <SortingButton label="Handler" onclick={() => toggleSort("handler")} />
+              <SortingButton truncate label="Handler" onclick={() => toggleSort("handler")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.holder}
             <Table.TableHead class="w-[180px]">
-              <SortingButton label="Holder" onclick={() => toggleSort("holder")} />
+              <SortingButton truncate label="Holder" onclick={() => toggleSort("holder")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.webhooks}
             <Table.TableHead class="w-[110px]">
-              <SortingButton label="WebHooks" onclick={() => toggleSort("webhooks")} />
+              <SortingButton truncate label="WebHooks" onclick={() => toggleSort("webhooks")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.status}
             <Table.TableHead class="w-[130px]">
-              <SortingButton label="Status" onclick={() => toggleSort("status")} />
+              <SortingButton truncate label="Status" onclick={() => toggleSort("status")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.minAvailable}
             <Table.TableHead class="w-[170px]">
-              <SortingButton label="Min available" onclick={() => toggleSort("minAvailable")} />
+              <SortingButton
+                truncate
+                label="Min available"
+                onclick={() => toggleSort("minAvailable")}
+              />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.maxUnavailable}
             <Table.TableHead class="w-[180px]">
-              <SortingButton label="Max unavailable" onclick={() => toggleSort("maxUnavailable")} />
+              <SortingButton
+                truncate
+                label="Max unavailable"
+                onclick={() => toggleSort("maxUnavailable")}
+              />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.currentHealthy}
             <Table.TableHead class="w-[180px]">
-              <SortingButton label="Current healthy" onclick={() => toggleSort("currentHealthy")} />
+              <SortingButton
+                truncate
+                label="Current healthy"
+                onclick={() => toggleSort("currentHealthy")}
+              />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.desiredHealthy}
             <Table.TableHead class="w-[180px]">
-              <SortingButton label="Desired healthy" onclick={() => toggleSort("desiredHealthy")} />
+              <SortingButton
+                truncate
+                label="Desired healthy"
+                onclick={() => toggleSort("desiredHealthy")}
+              />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.metrics}
             <Table.TableHead class="w-[100px]">
-              <SortingButton label="Metrics" onclick={() => toggleSort("metrics")} />
+              <SortingButton truncate label="Metrics" onclick={() => toggleSort("metrics")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.minPods}
             <Table.TableHead class="w-[100px]">
-              <SortingButton label="Min Pods" onclick={() => toggleSort("minPods")} />
+              <SortingButton truncate label="Min Pods" onclick={() => toggleSort("minPods")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.maxPods}
             <Table.TableHead class="w-[100px]">
-              <SortingButton label="Max Pods" onclick={() => toggleSort("maxPods")} />
+              <SortingButton truncate label="Max Pods" onclick={() => toggleSort("maxPods")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.replicas}
             <Table.TableHead class="w-[110px]">
-              <SortingButton label="Replicas" onclick={() => toggleSort("replicas")} />
+              <SortingButton truncate label="Replicas" onclick={() => toggleSort("replicas")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.bindings}
             <Table.TableHead class="w-[220px]">
-              <SortingButton label="Bindings" onclick={() => toggleSort("bindings")} />
+              <SortingButton truncate label="Bindings" onclick={() => toggleSort("bindings")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.resource}
             <Table.TableHead class="w-[180px]">
-              <SortingButton label="Resource" onclick={() => toggleSort("resource")} />
+              <SortingButton truncate label="Resource" onclick={() => toggleSort("resource")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.group}
             <Table.TableHead class="w-[220px]">
-              <SortingButton label="Group" onclick={() => toggleSort("group")} />
+              <SortingButton truncate label="Group" onclick={() => toggleSort("group")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.version}
             <Table.TableHead class="w-[120px]">
-              <SortingButton label="Version" onclick={() => toggleSort("version")} />
+              <SortingButton truncate label="Version" onclick={() => toggleSort("version")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.scope}
             <Table.TableHead class="w-[130px]">
-              <SortingButton label="Scope" onclick={() => toggleSort("scope")} />
+              <SortingButton truncate label="Scope" onclick={() => toggleSort("scope")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.kind}
             <Table.TableHead class="w-[120px]">
-              <SortingButton label="Kind" onclick={() => toggleSort("kind")} />
+              <SortingButton truncate label="Kind" onclick={() => toggleSort("kind")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.controller}
             <Table.TableHead class="w-[220px]">
-              <SortingButton label="Controller" onclick={() => toggleSort("controller")} />
+              <SortingButton truncate label="Controller" onclick={() => toggleSort("controller")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.apiGroup}
             <Table.TableHead class="w-[220px]">
-              <SortingButton label="ApiGroup" onclick={() => toggleSort("apiGroup")} />
+              <SortingButton truncate label="ApiGroup" onclick={() => toggleSort("apiGroup")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.externalIP}
             <Table.TableHead class="w-[200px]">
-              <SortingButton label="External IP" onclick={() => toggleSort("externalIP")} />
+              <SortingButton
+                truncate
+                label="External IP"
+                onclick={() => toggleSort("externalIP")}
+              />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.selector}
             <Table.TableHead class="w-[240px]">
-              <SortingButton label="Selector" onclick={() => toggleSort("selector")} />
+              <SortingButton truncate label="Selector" onclick={() => toggleSort("selector")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.endpoints}
             <Table.TableHead class="w-[180px]">
-              <SortingButton label="Endpoints" onclick={() => toggleSort("endpoints")} />
+              <SortingButton truncate label="Endpoints" onclick={() => toggleSort("endpoints")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.loadBalancers}
             <Table.TableHead class="w-[220px]">
-              <SortingButton label="LoadBalancers" onclick={() => toggleSort("loadBalancers")} />
+              <SortingButton
+                truncate
+                label="LoadBalancers"
+                onclick={() => toggleSort("loadBalancers")}
+              />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.policyTypes}
             <Table.TableHead class="w-[180px]">
-              <SortingButton label="Policy Types" onclick={() => toggleSort("policyTypes")} />
+              <SortingButton
+                truncate
+                label="Policy Types"
+                onclick={() => toggleSort("policyTypes")}
+              />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.storageClass}
             <Table.TableHead class="w-[170px]">
               <SortingButton
+                truncate
                 label={workloadKey === "volumesnapshots" ? "Snapshot Class" : "Storage Class"}
                 onclick={() => toggleSort("storageClass")}
               />
@@ -5392,6 +5424,7 @@ spec:
           {#if columnsVisible.size}
             <Table.TableHead class="w-[110px]">
               <SortingButton
+                truncate
                 label={workloadKey === "volumesnapshots" || workloadKey === "volumesnapshotcontents"
                   ? "Restore Size"
                   : "Size"}
@@ -5401,27 +5434,28 @@ spec:
           {/if}
           {#if columnsVisible.pods}
             <Table.TableHead class="w-[100px]">
-              <SortingButton label="Pods" onclick={() => toggleSort("pods")} />
+              <SortingButton truncate label="Pods" onclick={() => toggleSort("pods")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.capacity}
             <Table.TableHead class="w-[130px]">
-              <SortingButton label="Capacity" onclick={() => toggleSort("capacity")} />
+              <SortingButton truncate label="Capacity" onclick={() => toggleSort("capacity")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.serviceType}
             <Table.TableHead class="w-[140px]">
-              <SortingButton label="Type" onclick={() => toggleSort("serviceType")} />
+              <SortingButton truncate label="Type" onclick={() => toggleSort("serviceType")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.clusterIP}
             <Table.TableHead class="w-[150px]">
-              <SortingButton label="ClusterIP" onclick={() => toggleSort("clusterIP")} />
+              <SortingButton truncate label="ClusterIP" onclick={() => toggleSort("clusterIP")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.ports}
             <Table.TableHead class="w-[100px]">
               <SortingButton
+                truncate
                 label={workloadKey === "ingresses" ? "Rules" : "Ports"}
                 onclick={() => toggleSort("ports")}
               />
@@ -5429,17 +5463,18 @@ spec:
           {/if}
           {#if columnsVisible.phase}
             <Table.TableHead class="w-[120px]">
-              <SortingButton label="Status" onclick={() => toggleSort("phase")} />
+              <SortingButton truncate label="Status" onclick={() => toggleSort("phase")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.storage}
             <Table.TableHead class="w-[110px]">
-              <SortingButton label="Storage" onclick={() => toggleSort("storage")} />
+              <SortingButton truncate label="Storage" onclick={() => toggleSort("storage")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.claim}
             <Table.TableHead class="w-[190px]">
               <SortingButton
+                truncate
                 label={workloadKey === "volumesnapshotcontents" ? "Snapshot Ref" : "Claim"}
                 onclick={() => toggleSort("claim")}
               />
@@ -5448,6 +5483,7 @@ spec:
           {#if columnsVisible.provisioner}
             <Table.TableHead class="w-[220px]">
               <SortingButton
+                truncate
                 label={workloadKey === "volumeattributesclasses" ||
                 workloadKey === "volumesnapshotcontents" ||
                 workloadKey === "volumesnapshotclasses"
@@ -5460,6 +5496,7 @@ spec:
           {#if columnsVisible.reclaimPolicy}
             <Table.TableHead class="w-[120px]">
               <SortingButton
+                truncate
                 label={workloadKey === "volumesnapshotcontents" ||
                 workloadKey === "volumesnapshotclasses"
                   ? "Deletion Policy"
@@ -5470,22 +5507,30 @@ spec:
           {/if}
           {#if columnsVisible.isDefaultStorageClass}
             <Table.TableHead class="w-[100px]">
-              <SortingButton label="Default" onclick={() => toggleSort("isDefaultStorageClass")} />
+              <SortingButton
+                truncate
+                label="Default"
+                onclick={() => toggleSort("isDefaultStorageClass")}
+              />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.resourceVersion}
             <Table.TableHead class="w-[110px]">
-              <SortingButton label="RV" onclick={() => toggleSort("resourceVersion")} />
+              <SortingButton truncate label="RV" onclick={() => toggleSort("resourceVersion")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.value}
             <Table.TableHead class="w-[120px]">
-              <SortingButton label="Value" onclick={() => toggleSort("value")} />
+              <SortingButton truncate label="Value" onclick={() => toggleSort("value")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.globalDefault}
             <Table.TableHead class="w-[150px]">
-              <SortingButton label="Global default" onclick={() => toggleSort("globalDefault")} />
+              <SortingButton
+                truncate
+                label="Global default"
+                onclick={() => toggleSort("globalDefault")}
+              />
             </Table.TableHead>
           {/if}
         </Table.TableRow>

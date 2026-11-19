@@ -68,6 +68,11 @@ installed this one. We recommend this update.
 - Table column headers are no longer cut to a few letters ("Na...", "St...") on
   narrow windows, and every column in view shows its header. On the
   Deployments page names stay on one line and the table scrolls sideways.
+  In ConfigMaps, Secrets and the custom resource definitions list the headers
+  no longer run into each other or shrink to a letter: these tables also
+  scroll sideways when the window is too narrow for every column.
+- The page title stays readable in a narrow window; the header buttons move
+  to a second line instead.
 - The usage strip and the Traffic Chain in the details panel were dark grey
   and hard to read in the light theme. They now follow the theme.
 - On the cluster card in Detailed view, the status and credentials badges wrap
