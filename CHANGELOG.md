@@ -65,6 +65,16 @@ installed this one. We recommend this update.
 - Quick actions buttons stay inside the Detected kubeconfig files card on
   narrow windows.
 - The installer no longer contains internal project notes.
+- Table column headers are no longer cut to a few letters ("Na...", "St...") on
+  narrow windows, and every column in view shows its header. On the
+  Deployments page names stay on one line and the table scrolls sideways.
+- The usage strip and the Traffic Chain in the details panel were dark grey
+  and hard to read in the light theme. They now follow the theme.
+- On the cluster card in Detailed view, the status and credentials badges wrap
+  inside the card instead of running past its edge.
+- Manage Kubernetes Clusters showed "Online" and counted a cluster as online
+  when the cluster card already said unreachable. It now shows "Unreachable"
+  or "Auth expired", the last contact time, and counts the cluster as offline.
 
 Something confusing or broken? [Tell us what's wrong](https://github.com/ceh13-community/rozoom/discussions).
 
