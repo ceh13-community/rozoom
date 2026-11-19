@@ -87,6 +87,11 @@
   import type { FleetStatusBucket } from "$features/cluster-manager/model/fleet-summary";
   import { bucketCluster } from "$features/cluster-manager/model/fleet-summary";
   import {
+    clusterConnectivity,
+    formatContactTime,
+    isClusterDisconnected,
+  } from "$shared/model/cluster-connectivity";
+  import {
     getCachedAuthInfo,
     loadClusterAuthInfo,
   } from "$features/cluster-manager/model/cluster-auth-cache";
@@ -188,6 +193,23 @@
   let pendingRemovalUuid = $state<string | null>(null);
   let pendingRemovalInput = $state("");
   let clusterAuthInfo = $state<Record<string, AuthMethodInfo | null>>({});
+
+  /** "Unreachable" or "Auth expired" from the live probe (the fleet card badge), else null. */
+  function liveProblemLabel(clusterId: string): string | null {
+    const entry = $clusterConnectivity[clusterId];
+    if (!entry || !isClusterDisconnected(entry)) return null;
+    return entry.state === "auth-expired" ? "Auth expired" : "Unreachable";
+  }
+
+  /** The live-probe label for a row the user has not switched offline. */
+  function rowLiveProblem(cluster: { uuid: string; offline?: boolean }): string | null {
+    return cluster.offline ? null : liveProblemLabel(cluster.uuid);
+  }
+
+  function liveProblemSince(clusterId: string): string {
+    const at = $clusterConnectivity[clusterId]?.lastContactAt;
+    return at ? `, last contact ${formatContactTime(at)}` : "";
+  }
 
   function formatRelativeLastSeen(value: string | Date | undefined): string {
     if (!value) return "unknown";
@@ -893,6 +915,7 @@
             cluster,
             $clusterStates[cluster.uuid],
             $clusterHealthChecks[cluster.uuid],
+            $clusterConnectivity[cluster.uuid],
           );
           if (fleetFilter === "online") {
             if (bucket !== "online" && bucket !== "warning" && bucket !== "critical") {
@@ -2050,7 +2073,9 @@
                 <div
                   class="rounded-lg p-4 {cluster?.offline
                     ? 'bg-gray-50 dark:bg-slate-700 dark:border-slate-600 border border-gray-200'
-                    : 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700'}"
+                    : rowLiveProblem(cluster)
+                      ? 'bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-700'
+                      : 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700'}"
                 >
                   <div class="flex items-start gap-2.5">
                     <Checkbox
@@ -2108,14 +2133,23 @@
                           >
                             {cluster.pinned ? "Unpin" : "📌"}
                           </Button>
+                          <!-- Offline is the user's switch; otherwise the label follows the live
+                               probe, so a cluster that does not answer never reads "Online". -->
                           <Button
                             onclick={() => handleToggleConnection(cluster.uuid)}
-                            variant={cluster?.offline ? "outline" : "default"}
+                            variant={cluster?.offline || rowLiveProblem(cluster) ? "outline" : "default"}
                             size="sm"
-                            class="text-[11px] h-7 px-2 dark:text-white"
+                            class="text-[11px] h-7 px-2 dark:text-white {rowLiveProblem(cluster)
+                              ? 'border-rose-500 text-rose-700 dark:border-rose-400'
+                              : ''}"
+                            title={rowLiveProblem(cluster) === "Unreachable"
+                              ? "The cluster does not answer. Click to mark it offline."
+                              : rowLiveProblem(cluster)
+                                ? "The cluster rejects the saved credentials. Click to mark it offline."
+                                : undefined}
                             disabled={isLoading}
                           >
-                            {cluster?.offline ? "Offline" : "Online"}
+                            {cluster?.offline ? "Offline" : (rowLiveProblem(cluster) ?? "Online")}
                           </Button>
                           <span
                             class="mx-1 h-5 w-px bg-slate-300 dark:bg-slate-600"
@@ -2219,6 +2253,7 @@
                               cluster,
                               $clusterStates[cluster.uuid],
                               $clusterHealthChecks[cluster.uuid],
+                              $clusterConnectivity[cluster.uuid],
                             ),
                           )}"
                           title="Runtime health bucket from last diagnostic pass"
@@ -2227,6 +2262,7 @@
                             cluster,
                             $clusterStates[cluster.uuid],
                             $clusterHealthChecks[cluster.uuid],
+                            $clusterConnectivity[cluster.uuid],
                           )}
                         </span>
                         {#if clusterAuthInfo[cluster.uuid] !== undefined}
@@ -2255,7 +2291,9 @@
                         >
                           {cluster.offline
                             ? `seen ${formatRelativeLastSeen(cluster.lastSeen)}`
-                            : "online now"}
+                            : liveProblemLabel(cluster.uuid)
+                              ? `${liveProblemLabel(cluster.uuid)?.toLowerCase()}${liveProblemSince(cluster.uuid)}`
+                              : "online now"}
                         </span>
                       </div>
                       {#if cluster.source || cluster.tags.length > 0}

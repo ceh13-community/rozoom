@@ -211,54 +211,54 @@
 
 <div class="mt-3">
 {#if loading}
-  <div class="flex items-center gap-2 rounded border border-slate-700 bg-slate-900/60 px-2.5 py-1.5 text-xs text-slate-500">
+  <div class="flex items-center gap-2 rounded border border-border bg-muted/50 px-2.5 py-1.5 text-xs text-muted-foreground">
     <Cpu class="h-3 w-3" />
     <span>Loading metrics...</span>
   </div>
 {:else if metrics}
-  <div class="flex items-center gap-3 rounded border border-slate-700 bg-slate-900/60 px-2.5 py-1.5 text-xs">
+  <div class="flex items-center gap-3 rounded border border-border bg-muted/50 px-2.5 py-1.5 text-xs">
     <div class="flex items-center gap-1.5" title="CPU: {metrics.cpu}{metrics.cpuPercent ? ` (${metrics.cpuPercent})` : ''}">
-      <Cpu class="h-3 w-3 text-slate-400" />
-      <span class="text-slate-300">{metrics.cpu}</span>
+      <Cpu class="h-3 w-3 text-muted-foreground" />
+      <span class="text-foreground">{metrics.cpu}</span>
       {#if metrics.cpuPercent}
-        <div class="h-1.5 w-12 rounded-full bg-slate-700">
+        <div class="h-1.5 w-12 rounded-full bg-muted-foreground/20">
           <div
             class="h-1.5 rounded-full transition-all {barColor(cpuPercentNum(metrics.cpuPercent))}"
             style="width: {Math.min(100, cpuPercentNum(metrics.cpuPercent))}%"
           ></div>
         </div>
-        <span class="text-slate-500">{metrics.cpuPercent}</span>
+        <span class="text-muted-foreground">{metrics.cpuPercent}</span>
       {/if}
     </div>
     <div class="flex items-center gap-1.5" title="Memory: {metrics.memory}{metrics.memoryPercent ? ` (${metrics.memoryPercent})` : ''}">
-      <MemoryStick class="h-3 w-3 text-slate-400" />
-      <span class="text-slate-300">{metrics.memory}</span>
+      <MemoryStick class="h-3 w-3 text-muted-foreground" />
+      <span class="text-foreground">{metrics.memory}</span>
       {#if metrics.memoryPercent}
-        <div class="h-1.5 w-12 rounded-full bg-slate-700">
+        <div class="h-1.5 w-12 rounded-full bg-muted-foreground/20">
           <div
             class="h-1.5 rounded-full transition-all {barColor(memPercentNum(metrics.memoryPercent))}"
             style="width: {Math.min(100, memPercentNum(metrics.memoryPercent))}%"
           ></div>
         </div>
-        <span class="text-slate-500">{metrics.memoryPercent}</span>
+        <span class="text-muted-foreground">{metrics.memoryPercent}</span>
       {/if}
     </div>
     {#if metrics.disk && metrics.diskPercent}
       <div class="flex items-center gap-1.5" title="Disk: {metrics.disk} ({metrics.diskPercent} used)">
-        <HardDrive class="h-3 w-3 text-slate-400" />
-        <span class="text-slate-300">{metrics.disk}</span>
-        <div class="h-1.5 w-12 rounded-full bg-slate-700">
+        <HardDrive class="h-3 w-3 text-muted-foreground" />
+        <span class="text-foreground">{metrics.disk}</span>
+        <div class="h-1.5 w-12 rounded-full bg-muted-foreground/20">
           <div
             class="h-1.5 rounded-full transition-all {barColor(memPercentNum(metrics.diskPercent))}"
             style="width: {Math.min(100, memPercentNum(metrics.diskPercent))}%"
           ></div>
         </div>
-        <span class="text-slate-500">{metrics.diskPercent}</span>
+        <span class="text-muted-foreground">{metrics.diskPercent}</span>
       </div>
     {/if}
   </div>
 {:else}
-  <div class="flex items-center gap-2 rounded border border-dashed border-slate-700 px-2.5 py-1.5 text-xs text-slate-500">
+  <div class="flex items-center gap-2 rounded border border-dashed border-border px-2.5 py-1.5 text-xs text-muted-foreground">
     <Cpu class="h-3 w-3" />
     <span>{errorMsg ?? "No metrics available"}</span>
   </div>

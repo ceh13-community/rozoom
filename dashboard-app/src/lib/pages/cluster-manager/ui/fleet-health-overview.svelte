@@ -1,6 +1,7 @@
 <script lang="ts">
   import { clusterStates, clusterHealthChecks } from "$features/check-health/";
   import { clustersList } from "$features/cluster-manager";
+  import { clusterConnectivity } from "$shared/model/cluster-connectivity";
   import {
     buildFleetSummary,
     fleetSummaryHeadline,
@@ -21,6 +22,7 @@
       clusters: $clustersList,
       states: $clusterStates,
       health: $clusterHealthChecks,
+      connectivity: $clusterConnectivity,
       envFor: (c) => c.env || inferEnv(c.name) || undefined,
       providerFor: (c) => c.provider || detectClusterProvider({ clusterName: c.name }).provider,
     }),

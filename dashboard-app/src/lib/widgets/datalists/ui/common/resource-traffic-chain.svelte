@@ -44,25 +44,25 @@
   let resolved = $state(false);
 
   const kindColors: Record<string, string> = {
-    Gateway: "bg-violet-500/20 text-violet-400 border-violet-500/30",
-    Ingress: "bg-violet-500/20 text-violet-400 border-violet-500/30",
-    Service: "bg-sky-500/20 text-sky-400 border-sky-500/30",
-    Endpoint: "bg-sky-500/20 text-sky-400 border-sky-500/30",
-    Deployment: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-    StatefulSet: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-    DaemonSet: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-    ReplicaSet: "bg-teal-500/20 text-teal-400 border-teal-500/30",
-    Pod: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-    PersistentVolumeClaim: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-    PersistentVolume: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-    StorageClass: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-    ConfigMap: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-    Secret: "bg-rose-500/20 text-rose-400 border-rose-500/30",
-    Job: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
-    CronJob: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
-    Node: "bg-slate-500/20 text-slate-300 border-slate-500/30",
-    Namespace: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    ServiceAccount: "bg-pink-500/20 text-pink-400 border-pink-500/30",
+    Gateway: "bg-violet-500/15 text-violet-800 dark:text-violet-300 border-violet-500/40",
+    Ingress: "bg-violet-500/15 text-violet-800 dark:text-violet-300 border-violet-500/40",
+    Service: "bg-sky-500/15 text-sky-800 dark:text-sky-300 border-sky-500/40",
+    Endpoint: "bg-sky-500/15 text-sky-800 dark:text-sky-300 border-sky-500/40",
+    Deployment: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/40",
+    StatefulSet: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/40",
+    DaemonSet: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/40",
+    ReplicaSet: "bg-teal-500/15 text-teal-800 dark:text-teal-300 border-teal-500/40",
+    Pod: "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/40",
+    PersistentVolumeClaim: "bg-cyan-500/15 text-cyan-800 dark:text-cyan-300 border-cyan-500/40",
+    PersistentVolume: "bg-cyan-500/15 text-cyan-800 dark:text-cyan-300 border-cyan-500/40",
+    StorageClass: "bg-cyan-500/15 text-cyan-800 dark:text-cyan-300 border-cyan-500/40",
+    ConfigMap: "bg-orange-500/15 text-orange-800 dark:text-orange-300 border-orange-500/40",
+    Secret: "bg-rose-500/15 text-rose-800 dark:text-rose-300 border-rose-500/40",
+    Job: "bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 border-indigo-500/40",
+    CronJob: "bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 border-indigo-500/40",
+    Node: "bg-muted text-foreground border-border",
+    Namespace: "bg-blue-500/15 text-blue-800 dark:text-blue-300 border-blue-500/40",
+    ServiceAccount: "bg-pink-500/15 text-pink-800 dark:text-pink-300 border-pink-500/40",
   };
 
   const kindAbbr: Record<string, string> = {
@@ -474,7 +474,7 @@
   });
 </script>
 
-<div class="rounded border border-slate-700/50 bg-slate-900/30 p-3">
+<div class="rounded border border-border bg-muted/30 p-3">
   <div class="mb-2 flex items-center justify-between">
     <h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Traffic Chain</h4>
     {#if resolved && !loading}
@@ -496,9 +496,9 @@
     <div class="flex flex-wrap items-center gap-1.5">
       {#each buildDisplayNodes() as node, i}
         {#if i > 0}
-          <ArrowRight class="h-3 w-3 shrink-0 text-slate-600" />
+          <ArrowRight class="h-3 w-3 shrink-0 text-muted-foreground" />
         {/if}
-        <div class={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] ${kindColors[node.kind] ?? "bg-slate-500/20 text-slate-400 border-slate-500/30"}`}>
+        <div class={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] ${kindColors[node.kind] ?? "bg-muted text-foreground border-border"}`}>
           <span class="font-bold">{kindAbbr[node.kind] ?? node.kind}</span>
           <span class="truncate max-w-[140px]" title={node.name}>{node.name}</span>
           {#if node.status === "healthy"}

@@ -421,7 +421,9 @@
 {/if}
 
 <TableSurface onScroll={handleTableScroll}>
-  <Table.Root>
+  <!-- Columns take the width of their content (names and node selectors do not break at
+       every hyphen) and the surface scrolls sideways when the window is narrower. -->
+  <Table.Root class="w-max min-w-full">
     <Table.Caption>A list of deployments.</Table.Caption>
     <Table.Header>
       {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}

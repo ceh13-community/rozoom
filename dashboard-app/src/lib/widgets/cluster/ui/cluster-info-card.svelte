@@ -1035,9 +1035,11 @@
         </Button>
       {/if}
     </Card.Title>
-    <div class="px-6 flex justify-between items-center gap-2 mb-2">
-      General status:
-      <div class="flex items-center gap-1.5">
+    <!-- The rows wrap instead of pushing badges past the card edge: a narrow card puts the
+         badges on the next line, right-aligned. -->
+    <div class="px-6 flex flex-wrap justify-between items-center gap-x-2 gap-y-1 mb-2">
+      <span class="whitespace-nowrap">General status:</span>
+      <div class="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1.5">
         <ConnectivityBadge {connectivity} />
         <!-- Drift is unknown, not aligned, while the cluster does not answer. -->
         {#if !disconnected}
@@ -1061,20 +1063,20 @@
       <Badge class="text-white bg-slate-500 max-w-24 h-7">{platformLabel}</Badge>
     </div>
     {#if credRiskLabel}
-      <div class="px-6 flex justify-between items-center gap-2 mb-2">
-        Credentials:
+      <div class="px-6 flex flex-wrap justify-between items-center gap-x-2 gap-y-1 mb-2">
+        <span class="whitespace-nowrap">Credentials:</span>
         <button
           type="button"
           onclick={() =>
             goto(`/dashboard/clusters/${encodeURIComponent(cluster.uuid)}?workload=compliancehub`)}
-          class="inline-flex items-center gap-1 rounded h-7 px-2 text-[11px] font-semibold border cursor-help transition {credRiskLabel.risk ===
+          class="ml-auto inline-flex min-w-0 max-w-full items-center gap-1 rounded h-7 px-2 text-[11px] font-semibold border cursor-help transition {credRiskLabel.risk ===
           'critical'
-            ? 'border-rose-500 text-rose-400 bg-rose-500/10 hover:bg-rose-500/20'
-            : 'border-orange-500 text-orange-400 bg-orange-500/10 hover:bg-orange-500/20'}"
+            ? 'border-rose-500 text-rose-700 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20'
+            : 'border-orange-500 text-orange-700 dark:text-orange-400 bg-orange-500/10 hover:bg-orange-500/20'}"
           title={credRiskLabel.tooltip}
         >
-          <Shield class="w-3 h-3" />
-          <span class="truncate max-w-[180px]">{credRiskLabel.title}</span>
+          <Shield class="w-3 h-3 shrink-0" />
+          <span class="truncate min-w-0">{credRiskLabel.title}</span>
         </button>
       </div>
     {/if}

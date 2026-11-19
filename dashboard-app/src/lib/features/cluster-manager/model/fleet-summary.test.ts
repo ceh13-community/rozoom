@@ -81,6 +81,27 @@ describe("bucketCluster", () => {
     const c = cluster({ offline: true });
     expect(bucketCluster(c, { error: "Unauthorized" }, null)).toBe("auth-error");
   });
+
+  // The last health check can be green from before the cluster went down; the live probe
+  // that marks the fleet card UNREACHABLE must win, or the manage page says "online".
+  it("marks offline when the live probe says unreachable, even with a green last check", () => {
+    const c = cluster({ name: "k" });
+    const health = { apiServerHealth: { status: "ok" } };
+    expect(bucketCluster(c, undefined, health, { state: "unreachable" })).toBe("offline");
+  });
+
+  it("marks auth error when the live probe says auth expired", () => {
+    const c = cluster({ name: "k" });
+    const health = { apiServerHealth: { status: "ok" } };
+    expect(bucketCluster(c, undefined, health, { state: "auth-expired" })).toBe("auth-error");
+  });
+
+  it("keeps the health verdict when the live probe says online or has not run", () => {
+    const c = cluster({ name: "k" });
+    const health = { apiServerHealth: { status: "critical" } };
+    expect(bucketCluster(c, undefined, health, { state: "online" })).toBe("critical");
+    expect(bucketCluster(c, undefined, health, { state: "unknown" })).toBe("critical");
+  });
 });
 
 describe("buildFleetSummary", () => {
@@ -113,6 +134,20 @@ describe("buildFleetSummary", () => {
     expect(summary.online).toBe(2);
     expect(summary.offline).toBe(1);
     expect(summary.authErrors).toBe(1);
+  });
+
+  it("counts a cluster the live probe cannot reach as offline, not online", () => {
+    const clusters = [cluster({ uuid: "1" }), cluster({ uuid: "2" })];
+    const summary = buildFleetSummary({
+      clusters,
+      health: {
+        "1": { apiServerHealth: { status: "ok" } },
+        "2": { apiServerHealth: { status: "ok" } },
+      },
+      connectivity: { "2": { state: "unreachable" } },
+    });
+    expect(summary.online).toBe(1);
+    expect(summary.offline).toBe(1);
   });
 
   it("groups critical and warning separately but counts them as online", () => {
