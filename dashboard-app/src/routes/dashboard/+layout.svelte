@@ -16,6 +16,7 @@
   import RenderErrorBoundary from "$shared/ui/render-error-boundary.svelte";
   import { installMainPaneProbe } from "$shared/lib/main-pane-probe";
   import { probeRoute } from "$shared/lib/main-pane-state";
+  import { keepScrollInRange } from "$shared/lib/scroll-position";
   import { stopAllBackgroundPollers } from "$shared/lib/background-pollers";
   import { initNetworkRecoveryListener } from "$shared/lib/network-recovery";
   import { startFleetHeartbeat } from "$features/check-health/api/fleet-heartbeat";
@@ -232,7 +233,7 @@
             </div>
           {/if}
           <div class="dashboard-workloads-nav relative min-h-0 overflow-hidden">
-            <div class="h-full min-h-0 overflow-y-auto pb-4">
+            <div class="h-full min-h-0 overflow-y-auto pb-4" use:keepScrollInRange>
               <Accordion.Root type="multiple" bind:value>
                 <Accordion.Item value="workloads">
                   <Accordion.Trigger class="!no-underline px-2">
@@ -309,16 +310,18 @@
         </div>
       </aside>
       <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <main
-          bind:this={mainPane}
-          class="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:gap-6 lg:p-6"
-        >
-          {#key routeRemountKey}
+        <!-- Each page gets its own scroll container: see $shared/lib/scroll-position.ts. -->
+        {#key routeRemountKey}
+          <main
+            bind:this={mainPane}
+            use:keepScrollInRange
+            class="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:gap-6 lg:p-6"
+          >
             <RenderErrorBoundary>
               {@render children()}
             </RenderErrorBoundary>
-          {/key}
-        </main>
+          </main>
+        {/key}
       </div>
     </div>
   </div>
@@ -330,16 +333,17 @@
         <LoadingSpinner />
       </div>
     {/if}
-    <main
-      bind:this={mainPane}
-      class="ml-10 flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:gap-6 lg:p-6"
-    >
-      {#key routeRemountKey}
+    {#key routeRemountKey}
+      <main
+        bind:this={mainPane}
+        use:keepScrollInRange
+        class="ml-10 flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:gap-6 lg:p-6"
+      >
         <RenderErrorBoundary>
           {@render children()}
         </RenderErrorBoundary>
-      {/key}
-    </main>
+      </main>
+    {/key}
   </div>
 {/if}
 
