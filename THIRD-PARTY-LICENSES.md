@@ -2628,7 +2628,7 @@ Production dependencies of the web app (dashboard-app), 338 packages, as reporte
 | [@sveltejs/vite-plugin-svelte](https://github.com/sveltejs/vite-plugin-svelte#readme) | 5.1.1 | MIT | Copyright (c) 2021 [these people](https://github.com/sveltejs/vite-plugin-svelte/graphs/contributors) |
 | [@sveltejs/vite-plugin-svelte-inspector](https://github.com/sveltejs/vite-plugin-svelte#readme) | 4.0.1 | MIT | Copyright (c) 2021 [these people](https://github.com/sveltejs/vite-plugin-svelte/graphs/contributors) |
 | [@tanstack/table-core](https://tanstack.com/table) | 8.21.3 | MIT | Copyright (c) 2016 Tanner Linsley |
-| [@tauri-apps/api](https://github.com/tauri-apps/tauri#readme) | 2.9.1 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
+| [@tauri-apps/api](https://github.com/tauri-apps/tauri#readme) | 2.12.5 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
 | [@tauri-apps/plugin-dialog](https://github.com/tauri-apps/plugins-workspace#readme) | 2.6.0 | MIT OR Apache-2.0 |  |
 | [@tauri-apps/plugin-fs](https://github.com/tauri-apps/plugins-workspace#readme) | 2.4.5 | MIT OR Apache-2.0 |  |
 | [@tauri-apps/plugin-http](https://github.com/tauri-apps/plugins-workspace#readme) | 2.5.6 | MIT OR Apache-2.0 |  |
@@ -2870,15 +2870,15 @@ Production dependencies of the web app (dashboard-app), 338 packages, as reporte
 <!-- cargo:start -->
 ## Rust crates
 
-Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as reported by `cargo metadata`. A crate listed with several licenses may be used under any one of them.
+Dependencies of the Tauri shell (dashboard-app/src-tauri), 640 crates, as reported by `cargo metadata`. A crate listed with several licenses may be used under any one of them.
 
 | Crate | Version | License | Copyright |
 | --- | --- | --- | --- |
 | [adler2](https://github.com/oyvindln/adler2) | 2.0.1 | 0BSD OR MIT OR Apache-2.0 | Copyright (C) Jonas Schievink <jonasschievink@gmail.com> |
 | [ahash](https://github.com/tkaitchuck/ahash) | 0.7.8 | MIT OR Apache-2.0 | Copyright (c) 2016 Amanieu d'Antras |
 | [aho-corasick](https://github.com/BurntSushi/aho-corasick) | 1.1.4 | Unlicense OR MIT | Copyright (c) 2015 Andrew Gallant |
-| [alloc-no-stdlib](https://github.com/dropbox/rust-alloc-no-stdlib) | 2.0.4 | BSD-3-Clause | Copyright (c) 2016 Dropbox, Inc. |
-| [alloc-stdlib](https://github.com/dropbox/rust-alloc-no-stdlib) | 0.2.2 | BSD-3-Clause | Authors: Daniel Reiter Horn |
+| [alloc-no-stdlib](https://github.com/dropbox/rust-alloc-no-stdlib) | 3.0.0 | BSD-3-Clause | Copyright (c) 2016 Dropbox, Inc. |
+| [alloc-stdlib](https://github.com/dropbox/rust-alloc-no-stdlib) | 0.3.0 | BSD-3-Clause | Authors: Daniel Reiter Horn |
 | [android_log-sys](https://github.com/rust-mobile/android_log-sys-rs) | 0.3.2 | MIT OR Apache-2.0 | Copyright 2016 The android_log_sys Developers |
 | [android_logger](https://github.com/rust-mobile/android_logger-rs) | 0.15.1 | MIT OR Apache-2.0 | Copyright 2016 The android_logger Developers |
 | [android_system_properties](https://github.com/nical/android_system_properties) | 0.1.5 | MIT/Apache-2.0 | Copyright 2016 Nicolas Silva |
@@ -2901,16 +2901,22 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [autocfg](https://github.com/cuviper/autocfg) | 1.5.0 | Apache-2.0 OR MIT | Copyright (c) 2018 Josh Stone |
 | [base64](https://github.com/marshallpierce/rust-base64) | 0.21.7 | MIT OR Apache-2.0 | Copyright (c) 2015 Alice Maz |
 | [base64](https://github.com/marshallpierce/rust-base64) | 0.22.1 | MIT OR Apache-2.0 | Copyright (c) 2015 Alice Maz |
+| [base64](https://github.com/marshallpierce/rust-base64) | 0.23.1 | MIT OR Apache-2.0 | Copyright (c) 2025 Alice Maz, Marshall Pierce |
+| [bit-set](https://github.com/contain-rs/bit-vec) | 0.11.1 | Apache-2.0 OR MIT | Copyright (c) 2023 The Rust Project Developers |
+| [bit-set](https://github.com/contain-rs/bit-set) | 0.8.0 | Apache-2.0 OR MIT | Copyright (c) 2023 The Rust Project Developers |
+| [bit-vec](https://github.com/contain-rs/bit-vec) | 0.10.2 | Apache-2.0 OR MIT | Copyright (c) 2023 The Rust Project Developers |
+| [bit-vec](https://github.com/contain-rs/bit-vec) | 0.8.0 | Apache-2.0 OR MIT | Copyright (c) 2023 The Rust Project Developers |
 | [bitflags](https://github.com/bitflags/bitflags) | 1.3.2 | MIT/Apache-2.0 | Copyright (c) 2014 The Rust Project Developers |
 | [bitflags](https://github.com/bitflags/bitflags) | 2.10.0 | MIT OR Apache-2.0 | Copyright (c) 2014 The Rust Project Developers |
 | [bitvec](https://github.com/bitvecto-rs/bitvec) | 1.0.1 | MIT | Copyright (c) 2018 myrrlyn (Alexander Payne) |
 | [block-buffer](https://github.com/RustCrypto/utils) | 0.10.4 | MIT OR Apache-2.0 | Copyright (c) 2018-2019 The RustCrypto Project Developers |
+| [block-buffer](https://github.com/RustCrypto/utils) | 0.12.1 | MIT OR Apache-2.0 | Copyright (c) 2018-2025 The RustCrypto Project Developers |
 | [block2](https://github.com/madsmtm/objc2) | 0.6.2 | MIT | Authors: Mads Marquart |
 | [blocking](https://github.com/smol-rs/blocking) | 1.6.2 | Apache-2.0 OR MIT | Authors: Stjepan Glavina |
 | [borsh](https://github.com/near/borsh-rs) | 1.6.0 | MIT OR Apache-2.0 | Copyright 2019 Near |
 | [borsh-derive](https://github.com/near/borsh-rs) | 1.6.0 | Apache-2.0 | Copyright 2019 Near |
-| [brotli](https://github.com/dropbox/rust-brotli) | 8.0.2 | BSD-3-Clause AND MIT | Copyright (c) 2009, 2010, 2013-2016 by the Brotli Authors. |
-| [brotli-decompressor](https://github.com/dropbox/rust-brotli-decompressor) | 5.0.0 | BSD-3-Clause/MIT | Copyright (c) 2016 Dropbox, Inc. |
+| [brotli](https://github.com/dropbox/rust-brotli) | 9.1.3 | BSD-3-Clause AND MIT | Copyright (c) 2016 Dropbox, Inc. |
+| [brotli-decompressor](https://github.com/dropbox/rust-brotli-decompressor) | 6.3.2 | BSD-3-Clause/MIT | Copyright (c) 2016 Dropbox, Inc. |
 | [bumpalo](https://github.com/fitzgen/bumpalo) | 3.19.1 | MIT OR Apache-2.0 | Copyright (c) 2019 Nick Fitzgerald |
 | [byte-unit](https://github.com/magiclen/byte-unit) | 5.2.0 | MIT | Copyright (c) 2023 magiclen.org (Ron Li) |
 | [bytecheck](https://github.com/djkoloski/bytecheck) | 0.6.12 | MIT | Copyright 2020 David Koloski |
@@ -2922,10 +2928,11 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [cairo-sys-rs](https://github.com/gtk-rs/gtk-rs-core) | 0.18.2 | MIT | Authors: The gtk-rs Project Developers |
 | [camino](https://github.com/camino-rs/camino) | 1.2.2 | MIT OR Apache-2.0 | Authors: Without Boats, Ashley Williams, Steve Klabnik, Rain |
 | [cargo_metadata](https://github.com/oli-obk/cargo_metadata) | 0.19.2 | MIT | Authors: Oliver Schneider |
-| [cargo_toml](https://gitlab.com/lib.rs/cargo_toml) | 0.22.3 | Apache-2.0 OR MIT | Authors: Kornel |
+| [cargo_toml](https://gitlab.com/lib.rs/cargo_toml) | 1.0.1 | Apache-2.0 OR MIT | Authors: Kornel |
 | [cargo-platform](https://github.com/rust-lang/cargo) | 0.1.9 | MIT OR Apache-2.0 |  |
 | [cc](https://github.com/rust-lang/cc-rs) | 1.2.53 | MIT OR Apache-2.0 | Copyright (c) 2014 Alex Crichton |
 | [cesu8](https://github.com/emk/cesu8-rs) | 1.1.0 | Apache-2.0/MIT | Authors: Eric Kidd |
+| [cfb](https://github.com/mdsteele/rust-cfb) | 0.14.0 | MIT | Copyright (c) 2017 Matthew D. Steele |
 | [cfb](https://github.com/mdsteele/rust-cfb) | 0.7.3 | MIT | Copyright (c) 2017 Matthew D. Steele |
 | [cfg_aliases](https://github.com/katharostech/cfg_aliases) | 0.2.1 | MIT | Copyright (c) 2020 Katharos Technology |
 | [cfg-expr](https://github.com/EmbarkStudios/cfg-expr) | 0.15.8 | MIT OR Apache-2.0 | Copyright (c) 2019 Embark Studios |
@@ -2933,6 +2940,7 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [chrono](https://github.com/chronotope/chrono) | 0.4.43 | MIT OR Apache-2.0 | Copyright (c) 2014, Kang Seonghoon. |
 | [combine](https://github.com/Marwes/combine) | 4.6.7 | MIT | Copyright (c) 2015 Markus Westerlind |
 | [concurrent-queue](https://github.com/smol-rs/concurrent-queue) | 2.5.0 | Apache-2.0 OR MIT | Authors: Stjepan Glavina, Taiki Endo, John Nunley |
+| [const-oid](https://github.com/RustCrypto/formats) | 0.10.3 | Apache-2.0 OR MIT | Copyright (c) 2020-2026 The RustCrypto Project Developers |
 | [convert_case](https://github.com/rutrum/convert-case) | 0.4.0 | MIT | Authors: David Purdum |
 | [cookie](https://github.com/SergioBenitez/cookie-rs) | 0.18.1 | MIT OR Apache-2.0 | Copyright 2017 Sergio Benitez |
 | [cookie_store](https://github.com/pfernie/cookie_store) | 0.21.1 | MIT OR Apache-2.0 | Copyright (c) 2017 |
@@ -2940,32 +2948,43 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [core-foundation](https://github.com/servo/core-foundation-rs) | 0.10.1 | MIT OR Apache-2.0 | Copyright (c) 2012-2013 Mozilla Foundation |
 | [core-foundation](https://github.com/servo/core-foundation-rs) | 0.9.4 | MIT OR Apache-2.0 | Copyright (c) 2012-2013 Mozilla Foundation |
 | [core-foundation-sys](https://github.com/servo/core-foundation-rs) | 0.8.7 | MIT OR Apache-2.0 | Copyright (c) 2012-2013 Mozilla Foundation |
-| [core-graphics](https://github.com/servo/core-foundation-rs) | 0.24.0 | MIT OR Apache-2.0 | Copyright (c) 2012-2013 Mozilla Foundation |
+| [core-graphics](https://github.com/servo/core-foundation-rs) | 0.25.0 | MIT OR Apache-2.0 | Copyright (c) 2012-2013 Mozilla Foundation |
 | [core-graphics-types](https://github.com/servo/core-foundation-rs) | 0.2.0 | MIT OR Apache-2.0 | Copyright (c) 2012-2013 Mozilla Foundation |
 | [cpufeatures](https://github.com/RustCrypto/utils) | 0.2.17 | MIT OR Apache-2.0 | Copyright (c) 2020-2025 The RustCrypto Project Developers |
+| [cpufeatures](https://github.com/RustCrypto/utils) | 0.3.1 | MIT OR Apache-2.0 | Copyright (c) 2020-2026 The RustCrypto Project Developers |
 | [crc32fast](https://github.com/srijs/rust-crc32fast) | 1.5.0 | MIT OR Apache-2.0 | Copyright (c) 2018 Sam Rijs, Alex Crichton and contributors |
 | [crossbeam-channel](https://github.com/crossbeam-rs/crossbeam) | 0.5.15 | MIT OR Apache-2.0 | Copyright (c) 2019 The Crossbeam Project Developers |
 | [crossbeam-utils](https://github.com/crossbeam-rs/crossbeam) | 0.8.21 | MIT OR Apache-2.0 | Copyright (c) 2019 The Crossbeam Project Developers |
 | [crypto-common](https://github.com/RustCrypto/traits) | 0.1.7 | MIT OR Apache-2.0 | Copyright (c) 2021 RustCrypto Developers |
+| [crypto-common](https://github.com/RustCrypto/traits) | 0.2.2 | MIT OR Apache-2.0 | Copyright (c) 2021-2026 RustCrypto Developers |
 | [cssparser](https://github.com/servo/rust-cssparser) | 0.29.6 | MPL-2.0 | Authors: Simon Sapin |
+| [cssparser](https://github.com/servo/rust-cssparser) | 0.37.0 | MPL-2.0 | Authors: Simon Sapin |
+| [cssparser](https://github.com/servo/rust-cssparser) | 0.38.0 | MPL-2.0 | Authors: Simon Sapin |
 | [cssparser-macros](https://github.com/servo/rust-cssparser) | 0.6.1 | MPL-2.0 | Authors: Simon Sapin |
-| [ctor](https://github.com/mmastrac/rust-ctor) | 0.2.9 | Apache-2.0 OR MIT | Authors: Matt Mastracci |
+| [cssparser-macros](https://github.com/servo/rust-cssparser) | 0.7.1 | MPL-2.0 | Authors: Simon Sapin |
+| [ctor](https://github.com/mmastrac/linktime) | 1.0.14 | Apache-2.0 OR MIT | Authors: Matt Mastracci |
 | [darling](https://github.com/TedDriggs/darling) | 0.21.3 | MIT | Copyright (c) 2017 Ted Driggs |
 | [darling_core](https://github.com/TedDriggs/darling) | 0.21.3 | MIT | Copyright (c) 2017 Ted Driggs |
 | [darling_macro](https://github.com/TedDriggs/darling) | 0.21.3 | MIT | Copyright (c) 2017 Ted Driggs |
 | [data-url](https://github.com/servo/rust-url) | 0.3.2 | MIT OR Apache-2.0 | Copyright (c) 2013-2025 The rust-url developers |
+| [dbus](https://github.com/diwic/dbus-rs) | 0.9.12 | Apache-2.0/MIT | Copyright 2014-2018 David Henningsson <diwic@ubuntu.com> and other contributors |
 | [deranged](https://github.com/jhpratt/deranged) | 0.5.5 | MIT OR Apache-2.0 | Copyright 2024 Jacob Pratt et al. |
 | [derive_arbitrary](https://github.com/rust-fuzz/arbitrary) | 1.4.2 | MIT OR Apache-2.0 | Copyright (c) 2019 Manish Goregaokar |
 | [derive_more](https://github.com/JelteF/derive_more) | 0.99.20 | MIT | Copyright (c) 2016 Jelte Fennema |
+| [derive_more](https://github.com/JelteF/derive_more) | 2.1.1 | MIT | Copyright (c) 2016 Jelte Fennema |
+| [derive_more-impl](https://github.com/JelteF/derive_more) | 2.1.1 | MIT | Copyright (c) 2016 Jelte Fennema |
 | [digest](https://github.com/RustCrypto/traits) | 0.10.7 | MIT OR Apache-2.0 | Copyright (c) 2017 Artyom Pavlov |
+| [digest](https://github.com/RustCrypto/traits) | 0.11.3 | MIT OR Apache-2.0 | Copyright (c) 2017-2025 RustCrypto Developers |
 | [dirs](https://github.com/soc/dirs-rs) | 6.0.0 | MIT OR Apache-2.0 | Copyright (c) 2018-2019 dirs-rs contributors |
+| [dirs](https://codeberg.org/dirs/dirs-rs) | 7.0.0 | MIT OR Apache-2.0 | Copyright (c) 2018-2019 dirs-rs contributors |
 | [dirs-sys](https://github.com/dirs-dev/dirs-sys-rs) | 0.5.0 | MIT OR Apache-2.0 | Copyright (c) 2018-2019 dirs-rs contributors |
-| [dispatch](http://github.com/SSheldon/rust-dispatch) | 0.2.0 | MIT | Authors: Steven Sheldon |
 | [dispatch2](https://github.com/madsmtm/objc2) | 0.3.0 | Zlib OR Apache-2.0 OR MIT | Authors: Mads Marquart, Mary |
 | [displaydoc](https://github.com/yaahc/displaydoc) | 0.2.5 | MIT OR Apache-2.0 | Authors: Jane Lusby |
 | [dlopen2](https://github.com/OpenByteDev/dlopen2) | 0.8.2 | MIT | Authors: Szymon Wieloch, Ahmed Masud, OpenByte |
 | [dlopen2_derive](https://github.com/OpenByteDev/dlopen2) | 0.4.3 | MIT | Authors: Szymon Wieloch, OpenByte |
 | [document-features](https://github.com/slint-ui/document-features) | 0.2.12 | MIT OR Apache-2.0 | Copyright (c) 2020 Olivier Goffart <ogoffart@sixtyfps.io> |
+| [dom_query](https://github.com/niklak/dom_query) | 0.28.0 | MIT | Copyright (c) 2023 Mykola Humanov |
+| [dom_query](https://github.com/niklak/dom_query) | 0.29.0 | MIT | Copyright (c) 2023 Mykola Humanov |
 | [dpi](https://github.com/rust-windowing/winit) | 0.1.2 | Apache-2.0 AND MIT | Copyright (c) 2018 Jorge Aparicio |
 | [dtoa](https://github.com/dtolnay/dtoa) | 1.0.11 | MIT OR Apache-2.0 | Authors: David Tolnay |
 | [dtoa-short](https://github.com/upsuper/dtoa-short) | 0.3.5 | MPL-2.0 | Authors: Xidorn Quan |
@@ -2991,6 +3010,7 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [find-msvc-tools](https://github.com/rust-lang/cc-rs) | 0.1.8 | MIT OR Apache-2.0 | Copyright (c) 2014 Alex Crichton |
 | [flate2](https://github.com/rust-lang/flate2-rs) | 1.1.8 | MIT OR Apache-2.0 | Copyright (c) 2014-2025 Alex Crichton |
 | [fnv](https://github.com/servo/rust-fnv) | 1.0.7 | Apache-2.0 / MIT | Copyright (c) 2017 Contributors |
+| [foldhash](https://github.com/orlp/foldhash) | 0.2.0 | Zlib | Copyright (c) 2024 Orson Peters |
 | [foreign-types](https://github.com/sfackler/foreign-types) | 0.5.0 | MIT/Apache-2.0 | Copyright (c) 2017 The foreign-types Developers |
 | [foreign-types-macros](https://github.com/sfackler/foreign-types) | 0.2.3 | MIT/Apache-2.0 | Copyright (c) 2017 The foreign-types Developers |
 | [foreign-types-shared](https://github.com/sfackler/foreign-types) | 0.3.1 | MIT/Apache-2.0 | Copyright (c) 2017 The foreign-types Developers |
@@ -3036,16 +3056,19 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [hermit-abi](https://github.com/hermit-os/hermit-rs) | 0.5.2 | MIT OR Apache-2.0 | Authors: Stefan Lankes |
 | [hex](https://github.com/KokaKiwi/rust-hex) | 0.4.3 | MIT OR Apache-2.0 | Copyright (c) 2013-2014 The Rust Project Developers. |
 | [html5ever](https://github.com/servo/html5ever) | 0.29.1 | MIT OR Apache-2.0 | Copyright (c) 2014 The html5ever Project Developers |
+| [html5ever](https://github.com/servo/html5ever) | 0.39.0 | MIT OR Apache-2.0 | Copyright (c) 2014 The html5ever Project Developers |
+| [html5ever](https://github.com/servo/html5ever) | 0.40.1 | MIT OR Apache-2.0 | Copyright (c) 2014 The html5ever Project Developers |
 | [http](https://github.com/hyperium/http) | 1.4.0 | MIT OR Apache-2.0 | Copyright 2017 http-rs authors |
 | [http-body](https://github.com/hyperium/http-body) | 1.0.1 | MIT | Copyright (c) 2019-2024 Sean McArthur & Hyper Contributors |
 | [http-body-util](https://github.com/hyperium/http-body) | 0.1.3 | MIT | Copyright (c) 2019-2025 Sean McArthur & Hyper Contributors |
 | [httparse](https://github.com/seanmonstar/httparse) | 1.10.1 | MIT OR Apache-2.0 | Copyright (c) 2015-2025 Sean McArthur |
+| [hybrid-array](https://github.com/RustCrypto/hybrid-array) | 0.4.15 | MIT OR Apache-2.0 | Copyright (c) 2022-2026 The RustCrypto Project Developers |
 | [hyper](https://github.com/hyperium/hyper) | 1.8.1 | MIT | Copyright (c) 2014-2025 Sean McArthur |
 | [hyper-rustls](https://github.com/rustls/hyper-rustls) | 0.27.7 | Apache-2.0 OR ISC OR MIT | Copyright (c) 2016, Joseph Birr-Pixton <jpixton@gmail.com> |
 | [hyper-util](https://github.com/hyperium/hyper-util) | 0.1.19 | MIT | Copyright (c) 2023-2025 Sean McArthur |
 | [iana-time-zone](https://github.com/strawlab/iana-time-zone) | 0.1.64 | MIT OR Apache-2.0 | Copyright 2020 Andrew Straw |
 | [iana-time-zone-haiku](https://github.com/strawlab/iana-time-zone) | 0.1.2 | MIT OR Apache-2.0 | Copyright 2020 Andrew Straw |
-| [ico](https://github.com/mdsteele/rust-ico) | 0.4.0 | MIT | Copyright (c) 2018 Matthew D. Steele |
+| [ico](https://github.com/mdsteele/rust-ico) | 0.6.0 | MIT | Copyright (c) 2018 Matthew D. Steele |
 | [icu_collections](https://github.com/unicode-org/icu4x) | 2.1.1 | Unicode-3.0 | Copyright © 2020-2024 Unicode, Inc. |
 | [icu_locale_core](https://github.com/unicode-org/icu4x) | 2.1.1 | Unicode-3.0 | Copyright © 2020-2024 Unicode, Inc. |
 | [icu_normalizer](https://github.com/unicode-org/icu4x) | 2.1.1 | Unicode-3.0 | Copyright © 2020-2024 Unicode, Inc. |
@@ -3059,6 +3082,7 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [indexmap](https://github.com/bluss/indexmap) | 1.9.3 | Apache-2.0 OR MIT | Copyright (c) 2016--2017 |
 | [indexmap](https://github.com/indexmap-rs/indexmap) | 2.13.0 | Apache-2.0 OR MIT | Copyright (c) 2016--2017 |
 | [infer](https://github.com/bojand/infer) | 0.19.0 | MIT | Copyright (c) 2019 Bojan |
+| [infer](https://github.com/bojand/infer) | 0.22.0 | MIT | Copyright (c) 2019 Bojan |
 | [ipnet](https://github.com/krisprice/ipnet) | 2.11.0 | MIT OR Apache-2.0 | Copyright 2017 Juniper Networks, Inc. |
 | [iri-string](https://github.com/lo48576/iri-string) | 0.7.10 | MIT OR Apache-2.0 | Copyright 2019-2024 YOSHIOKA Takuma |
 | [is-docker](https://github.com/TheLarkInn/is-docker) | 0.2.0 | MIT | Copyright (c) 2023 Sean Larkin |
@@ -3069,18 +3093,20 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [jni](https://github.com/jni-rs/jni-rs) | 0.21.1 | MIT/Apache-2.0 | Copyright (c) 2016 Prevoty, Inc. and jni-rs contributors |
 | [jni-sys](https://github.com/sfackler/rust-jni-sys) | 0.3.0 | MIT/Apache-2.0 | Copyright (c) 2015 The rust-jni-sys Developers |
 | [js-sys](https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/js-sys) | 0.3.85 | MIT OR Apache-2.0 | Copyright (c) 2014 Alex Crichton |
-| [json-patch](https://github.com/idubrov/json-patch) | 3.0.1 | MIT/Apache-2.0 | Copyright (c) 2017 Ivan Dubrov |
-| [jsonptr](https://github.com/chanced/jsonptr) | 0.6.3 | MIT OR Apache-2.0 | Copyright 2024 Chance Dinkins |
+| [json-patch](https://github.com/idubrov/json-patch) | 4.2.0 | MIT/Apache-2.0 | Copyright (c) 2017 Ivan Dubrov |
+| [jsonptr](https://github.com/chanced/jsonptr) | 0.7.1 | MIT OR Apache-2.0 | Copyright 2024 Chance Dinkins |
 | [keyboard-types](https://github.com/pyfisch/keyboard-types) | 0.7.0 | MIT OR Apache-2.0 | Copyright (c) 2017 Pyfisch |
+| [keyboard-types](https://github.com/rust-windowing/keyboard-types) | 0.8.3 | MIT OR Apache-2.0 | Copyright (c) 2017 Pyfisch |
 | [kuchikiki](https://github.com/brave/kuchikiki) | 0.8.8-speedreader | MIT | Authors: Brave Authors, Ralph Giles, Simon Sapin |
-| [lazy_static](https://github.com/rust-lang-nursery/lazy-static.rs) | 1.5.0 | MIT OR Apache-2.0 | Copyright (c) 2010 The Rust Project Developers |
 | libappindicator | 0.9.0 | Apache-2.0 OR MIT | Copyright (c) 2017-2021 qDot |
 | libappindicator-sys | 0.9.0 | Apache-2.0 OR MIT |  |
 | [libc](https://github.com/rust-lang/libc) | 0.2.180 | MIT OR Apache-2.0 | Copyright (c) 2014-2020 The Rust Project Developers |
+| [libdbus-sys](https://github.com/diwic/dbus-rs) | 0.2.7 | Apache-2.0/MIT | Copyright 2014-2018 David Henningsson <diwic@ubuntu.com> and other contributors |
 | [libloading](https://github.com/nagisa/rust_libloading/) | 0.7.4 | ISC | Copyright © 2015, Simonas Kazlauskas |
 | [libredox](https://gitlab.redox-os.org/redox-os/libredox.git) | 0.1.12 | MIT | Copyright (c) 2023 4lDO2 |
 | [libxdo](https://github.com/crumblingstatue/rust-libxdo) | 0.6.0 | MIT | Copyright (c) 2015 Mika Attila |
 | [libxdo-sys](https://github.com/crumblingstatue/rust-libxdo-sys) | 0.11.0 | MIT | Copyright (c) 2015 Mika Attila |
+| [link-section](https://github.com/mmastrac/linktime) | 0.19.4 | Apache-2.0 OR MIT | Authors: Matt Mastracci |
 | [linux-raw-sys](https://github.com/sunfishcode/linux-raw-sys) | 0.11.0 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | Authors: Dan Gohman |
 | [litemap](https://github.com/unicode-org/icu4x) | 0.8.1 | Unicode-3.0 | Copyright © 2020-2024 Unicode, Inc. |
 | [litrs](https://github.com/LukasKalbertodt/litrs) | 1.0.0 | MIT OR Apache-2.0 | Copyright (c) 2020 Project Developers |
@@ -3090,16 +3116,18 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [lzma-sys](https://github.com/alexcrichton/xz2-rs) | 0.1.20 | MIT/Apache-2.0 | Copyright (c) 2016 Alex Crichton |
 | [mac](https://github.com/reem/rust-mac.git) | 0.1.1 | MIT/Apache-2.0 | Authors: Jonathan Reem |
 | [markup5ever](https://github.com/servo/html5ever) | 0.14.1 | MIT OR Apache-2.0 | Copyright (c) 2014 The html5ever Project Developers |
+| [markup5ever](https://github.com/servo/html5ever) | 0.39.0 | MIT OR Apache-2.0 | Copyright (c) 2014 The html5ever Project Developers |
+| [markup5ever](https://github.com/servo/html5ever) | 0.40.0 | MIT OR Apache-2.0 | Copyright (c) 2014 The html5ever Project Developers |
 | [match_token](https://github.com/servo/html5ever) | 0.1.0 | MIT OR Apache-2.0 |  |
 | [matches](https://github.com/SimonSapin/rust-std-candidates) | 0.1.10 | MIT | Copyright (c) 2014-2016 Simon Sapin |
-| [memchr](https://github.com/BurntSushi/memchr) | 2.7.6 | Unlicense OR MIT | Copyright (c) 2015 Andrew Gallant |
+| [memchr](https://github.com/BurntSushi/memchr) | 2.8.3 | Unlicense OR MIT | Copyright (c) 2015 Andrew Gallant |
 | [memoffset](https://github.com/Gilnaa/memoffset) | 0.9.1 | MIT | Copyright (c) 2017 Gilad Naaman |
 | [mime](https://github.com/hyperium/mime) | 0.3.17 | MIT OR Apache-2.0 | Copyright (c) 2014 Sean McArthur |
 | [minisign-verify](https://github.com/jedisct1/rust-minisign-verify) | 0.2.5 | MIT | Copyright (c) 2019-2025 Frank Denis |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide) | 0.8.9 | MIT OR Zlib OR Apache-2.0 | Copyright 2013-2014 RAD Game Tools and Valve Software |
 | [mio](https://github.com/tokio-rs/mio) | 1.1.1 | MIT | Copyright (c) 2014 Carl Lerche and other MIO contributors |
 | [muda](https://github.com/amrbashir/muda) | 0.16.1 | Apache-2.0 OR MIT | Copyright (c) 2022-2022 Tauri Programme within The Commons Conservancy |
-| [muda](https://github.com/amrbashir/muda) | 0.17.1 | Apache-2.0 OR MIT | Copyright (c) 2022-2022 Tauri Programme within The Commons Conservancy |
+| [muda](https://github.com/tauri-apps/muda) | 0.20.0 | Apache-2.0 OR MIT | Copyright (c) 2022-2022 Tauri Programme within The Commons Conservancy |
 | [ndk](https://github.com/rust-mobile/ndk) | 0.9.0 | MIT OR Apache-2.0 | Authors: The Rust Mobile contributors |
 | [ndk-context](https://github.com/rust-windowing/android-ndk-rs) | 0.1.1 | MIT OR Apache-2.0 | Authors: The Rust Windowing contributors |
 | [ndk-sys](https://github.com/rust-mobile/ndk) | 0.6.0+11769913 | MIT OR Apache-2.0 | Authors: The Rust Windowing contributors |
@@ -3110,24 +3138,23 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [num_threads](https://github.com/jhpratt/num_threads) | 0.1.7 | MIT OR Apache-2.0 | Copyright 2021 Jacob Pratt |
 | [num-conv](https://github.com/jhpratt/num-conv) | 0.1.0 | MIT OR Apache-2.0 | Copyright 2023 Jacob Pratt |
 | [num-traits](https://github.com/rust-num/num-traits) | 0.2.19 | MIT OR Apache-2.0 | Copyright (c) 2014 The Rust Project Developers |
-| [objc2](https://github.com/madsmtm/objc2) | 0.6.3 | MIT | Authors: Mads Marquart |
+| [objc2](https://github.com/madsmtm/objc2) | 0.6.5 | MIT | Authors: Mads Marquart |
 | [objc2-app-kit](https://github.com/madsmtm/objc2) | 0.3.2 | Zlib OR Apache-2.0 OR MIT |  |
 | [objc2-cloud-kit](https://github.com/madsmtm/objc2) | 0.3.2 | Zlib OR Apache-2.0 OR MIT |  |
 | [objc2-core-data](https://github.com/madsmtm/objc2) | 0.3.2 | Zlib OR Apache-2.0 OR MIT |  |
 | [objc2-core-foundation](https://github.com/madsmtm/objc2) | 0.3.2 | Zlib OR Apache-2.0 OR MIT |  |
 | [objc2-core-graphics](https://github.com/madsmtm/objc2) | 0.3.2 | Zlib OR Apache-2.0 OR MIT |  |
 | [objc2-core-image](https://github.com/madsmtm/objc2) | 0.3.2 | Zlib OR Apache-2.0 OR MIT |  |
+| [objc2-core-location](https://github.com/madsmtm/objc2) | 0.3.2 | Zlib OR Apache-2.0 OR MIT |  |
 | [objc2-core-text](https://github.com/madsmtm/objc2) | 0.3.2 | Zlib OR Apache-2.0 OR MIT |  |
-| [objc2-core-video](https://github.com/madsmtm/objc2) | 0.3.2 | Zlib OR Apache-2.0 OR MIT |  |
 | [objc2-encode](https://github.com/madsmtm/objc2) | 4.1.0 | MIT | Authors: Mads Marquart |
 | [objc2-exception-helper](https://github.com/madsmtm/objc2) | 0.1.1 | Zlib OR Apache-2.0 OR MIT | Authors: Mads Marquart |
 | [objc2-foundation](https://github.com/madsmtm/objc2) | 0.3.2 | MIT |  |
 | [objc2-io-surface](https://github.com/madsmtm/objc2) | 0.3.2 | Zlib OR Apache-2.0 OR MIT |  |
-| [objc2-javascript-core](https://github.com/madsmtm/objc2) | 0.3.2 | Zlib OR Apache-2.0 OR MIT |  |
 | [objc2-osa-kit](https://github.com/madsmtm/objc2) | 0.3.2 | Zlib OR Apache-2.0 OR MIT |  |
 | [objc2-quartz-core](https://github.com/madsmtm/objc2) | 0.3.2 | Zlib OR Apache-2.0 OR MIT |  |
-| [objc2-security](https://github.com/madsmtm/objc2) | 0.3.2 | Zlib OR Apache-2.0 OR MIT |  |
 | [objc2-ui-kit](https://github.com/madsmtm/objc2) | 0.3.2 | Zlib OR Apache-2.0 OR MIT |  |
+| [objc2-user-notifications](https://github.com/madsmtm/objc2) | 0.3.2 | Zlib OR Apache-2.0 OR MIT |  |
 | [objc2-web-kit](https://github.com/madsmtm/objc2) | 0.3.2 | Zlib OR Apache-2.0 OR MIT |  |
 | [once_cell](https://github.com/matklad/once_cell) | 1.21.3 | MIT OR Apache-2.0 | Authors: Aleksey Kladov |
 | [open](https://github.com/Byron/open-rs) | 5.3.3 | MIT | Copyright © `2015` `Sebastian Thiel` |
@@ -3144,16 +3171,25 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [percent-encoding](https://github.com/servo/rust-url/) | 2.3.2 | MIT OR Apache-2.0 | Copyright (c) 2013-2025 The rust-url developers |
 | [phf](https://github.com/sfackler/rust-phf) | 0.10.1 | MIT | Authors: Steven Fackler |
 | [phf](https://github.com/rust-phf/rust-phf) | 0.11.3 | MIT | Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi |
+| [phf](https://github.com/rust-phf/rust-phf) | 0.13.1 | MIT | Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi |
+| [phf](https://github.com/rust-phf/rust-phf) | 0.14.0 | MIT | Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi |
 | [phf](https://github.com/sfackler/rust-phf) | 0.8.0 | MIT | Authors: Steven Fackler |
 | [phf_codegen](https://github.com/rust-phf/rust-phf) | 0.11.3 | MIT | Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi |
+| [phf_codegen](https://github.com/rust-phf/rust-phf) | 0.13.1 | MIT | Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi |
+| [phf_codegen](https://github.com/rust-phf/rust-phf) | 0.14.0 | MIT | Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi |
 | [phf_codegen](https://github.com/sfackler/rust-phf) | 0.8.0 | MIT | Authors: Steven Fackler |
 | [phf_generator](https://github.com/sfackler/rust-phf) | 0.10.0 | MIT | Authors: Steven Fackler |
 | [phf_generator](https://github.com/rust-phf/rust-phf) | 0.11.3 | MIT | Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi |
+| [phf_generator](https://github.com/rust-phf/rust-phf) | 0.13.1 | MIT | Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi |
+| [phf_generator](https://github.com/rust-phf/rust-phf) | 0.14.0 | MIT | Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi |
 | [phf_generator](https://github.com/sfackler/rust-phf) | 0.8.0 | MIT | Authors: Steven Fackler |
 | [phf_macros](https://github.com/sfackler/rust-phf) | 0.10.0 | MIT | Authors: Steven Fackler |
-| [phf_macros](https://github.com/rust-phf/rust-phf) | 0.11.3 | MIT | Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi |
+| [phf_macros](https://github.com/rust-phf/rust-phf) | 0.13.1 | MIT | Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi |
+| [phf_macros](https://github.com/rust-phf/rust-phf) | 0.14.0 | MIT | Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi |
 | [phf_shared](https://github.com/sfackler/rust-phf) | 0.10.0 | MIT | Authors: Steven Fackler |
 | [phf_shared](https://github.com/rust-phf/rust-phf) | 0.11.3 | MIT | Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi |
+| [phf_shared](https://github.com/rust-phf/rust-phf) | 0.13.1 | MIT | Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi |
+| [phf_shared](https://github.com/rust-phf/rust-phf) | 0.14.0 | MIT | Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi |
 | [phf_shared](https://github.com/sfackler/rust-phf) | 0.8.0 | MIT | Authors: Steven Fackler |
 | [pin-project-lite](https://github.com/taiki-e/pin-project-lite) | 0.2.16 | Apache-2.0 OR MIT |  |
 | [pin-utils](https://github.com/rust-lang-nursery/pin-utils) | 0.1.0 | MIT OR Apache-2.0 | Copyright 2018 The pin-utils authors |
@@ -3161,6 +3197,7 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [pkg-config](https://github.com/rust-lang/pkg-config-rs) | 0.3.32 | MIT OR Apache-2.0 | Copyright (c) 2014 Alex Crichton |
 | [plist](https://github.com/ebarnard/rust-plist/) | 1.8.0 | MIT | Copyright (c) 2015 Edward Barnard |
 | [png](https://github.com/image-rs/image-png) | 0.17.16 | MIT OR Apache-2.0 | Copyright (c) 2015 nwin |
+| [png](https://github.com/image-rs/image-png) | 0.18.1 | MIT OR Apache-2.0 | Copyright (c) 2015 nwin |
 | [polling](https://github.com/smol-rs/polling) | 3.11.0 | Apache-2.0 OR MIT | Authors: Stjepan Glavina, John Nunley |
 | [potential_utf](https://github.com/unicode-org/icu4x) | 0.1.4 | Unicode-3.0 | Copyright © 2020-2024 Unicode, Inc. |
 | [powerfmt](https://github.com/jhpratt/powerfmt) | 0.2.0 | MIT OR Apache-2.0 | Copyright 2023 Jacob Pratt et al. |
@@ -3205,6 +3242,7 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [regex-syntax](https://github.com/rust-lang/regex) | 0.8.8 | MIT OR Apache-2.0 | Copyright (c) 2014 The Rust Project Developers |
 | [rend](https://github.com/djkoloski/rend) | 0.4.2 | MIT | Copyright 2021 David Koloski |
 | [reqwest](https://github.com/seanmonstar/reqwest) | 0.12.28 | MIT OR Apache-2.0 | Copyright 2016 Sean McArthur |
+| [reqwest](https://github.com/seanmonstar/reqwest) | 0.13.5 | MIT OR Apache-2.0 | Copyright 2016 Sean McArthur |
 | [rfd](https://github.com/PolyMeilex/rfd) | 0.16.0 | MIT | Copyright (c) 2022 Bartłomiej Maryńczak |
 | [ring](https://github.com/briansmith/ring) | 0.17.14 | Apache-2.0 AND ISC | Copyright (c) 2009 The Go Authors. All rights reserved. |
 | [rkyv](https://github.com/rkyv/rkyv) | 0.7.46 | MIT | Copyright 2021 David Koloski |
@@ -3226,7 +3264,9 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [scopeguard](https://github.com/bluss/scopeguard) | 1.2.0 | MIT OR Apache-2.0 | Copyright (c) 2016-2019 Ulrik Sverdrup "bluss" and scopeguard developers |
 | [seahash](https://gitlab.redox-os.org/redox-os/seahash) | 4.1.0 | MIT | Authors: ticki, Tom Almeida |
 | [selectors](https://github.com/servo/servo) | 0.24.0 | MPL-2.0 | Authors: The Servo Project Developers |
-| [semver](https://github.com/dtolnay/semver) | 1.0.27 | MIT OR Apache-2.0 | Authors: David Tolnay |
+| [selectors](https://github.com/servo/stylo) | 0.38.0 | MPL-2.0 | Authors: The Servo Project Developers |
+| [selectors](https://github.com/servo/stylo) | 0.41.0 | MPL-2.0 | Authors: The Servo Project Developers |
+| [semver](https://github.com/dtolnay/semver) | 1.0.28 | MIT OR Apache-2.0 | Authors: David Tolnay |
 | [serde](https://github.com/serde-rs/serde) | 1.0.228 | MIT OR Apache-2.0 | Authors: Erick Tryzelaar, David Tolnay |
 | [serde_core](https://github.com/serde-rs/serde) | 1.0.228 | MIT OR Apache-2.0 | Authors: Erick Tryzelaar, David Tolnay |
 | [serde_derive](https://github.com/serde-rs/serde) | 1.0.228 | MIT OR Apache-2.0 | Authors: Erick Tryzelaar, David Tolnay |
@@ -3234,7 +3274,7 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [serde_json](https://github.com/serde-rs/json) | 1.0.149 | MIT OR Apache-2.0 | Authors: Erick Tryzelaar, David Tolnay |
 | [serde_repr](https://github.com/dtolnay/serde-repr) | 0.1.20 | MIT OR Apache-2.0 | Authors: David Tolnay |
 | [serde_spanned](https://github.com/toml-rs/toml) | 0.6.9 | MIT OR Apache-2.0 | Copyright (c) Individual contributors |
-| [serde_spanned](https://github.com/toml-rs/toml) | 1.0.4 | MIT OR Apache-2.0 | Copyright (c) Individual contributors |
+| [serde_spanned](https://github.com/toml-rs/toml) | 1.1.3 | MIT OR Apache-2.0 | Copyright (c) Individual contributors |
 | [serde_urlencoded](https://github.com/nox/serde_urlencoded) | 0.7.1 | MIT/Apache-2.0 | Copyright (c) 2016 Anthony Ramine |
 | [serde_with](https://github.com/jonasbb/serde_with/) | 3.16.1 | MIT OR Apache-2.0 | Copyright (c) 2015 |
 | [serde_with_macros](https://github.com/jonasbb/serde_with/) | 3.16.1 | MIT OR Apache-2.0 | Copyright (c) 2015 |
@@ -3242,7 +3282,10 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [serialize-to-javascript](https://github.com/chippers/serialize-to-javascript) | 0.1.2 | MIT OR Apache-2.0 | Copyright (c) 2021 Chip Reed |
 | [serialize-to-javascript-impl](https://github.com/chippers/serialize-to-javascript) | 0.1.2 | MIT OR Apache-2.0 | Copyright (c) 2021 Chip Reed |
 | [servo_arc](https://github.com/servo/servo) | 0.2.0 | MIT OR Apache-2.0 | Authors: The Servo Project Developers |
+| [servo_arc](https://github.com/servo/stylo) | 0.4.3 | MIT OR Apache-2.0 | Authors: The Servo Project Developers |
+| [servo_arc](https://github.com/servo/stylo) | 0.5.0 | MIT OR Apache-2.0 | Authors: The Servo Project Developers |
 | [sha2](https://github.com/RustCrypto/hashes) | 0.10.9 | MIT OR Apache-2.0 | Copyright (c) 2006-2009 Graydon Hoare |
+| [sha2](https://github.com/RustCrypto/hashes) | 0.11.1 | MIT OR Apache-2.0 | Copyright (c) 2016-2026 The RustCrypto Project Developers |
 | [shared_child](https://github.com/oconnor663/shared_child.rs) | 1.1.1 | MIT | Authors: jacko |
 | [shlex](https://github.com/comex/rust-shlex) | 1.3.0 | MIT OR Apache-2.0 | Copyright 2015 Nicholas Allegra (comex). |
 | [sigchld](https://github.com/oconnor663/sigchld.rs) | 0.2.4 | MIT | Authors: Jack O'Connor |
@@ -3259,11 +3302,16 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [soup3](https://gitlab.gnome.org/World/Rust/soup3-rs) | 0.5.0 | MIT | Copyright (c) 2013-2017, The Gtk-rs Project Developers. |
 | [soup3-sys](https://gitlab.gnome.org/World/Rust/soup3-rs) | 0.5.0 | MIT | Copyright (c) 2013-2017, The Gtk-rs Project Developers. |
 | [stable_deref_trait](https://github.com/storyyeller/stable_deref_trait) | 1.2.1 | MIT OR Apache-2.0 | Copyright (c) 2017 Robert Grosse |
+| [static_vcruntime](https://github.com/ChrisDenton/static_vcruntime) | 3.0.0 | MIT OR Apache-2.0 OR Zlib | Copyright (c) 2021 Chris Denton. |
+| [string_cache](https://github.com/servo/string-cache) | 0.11.0 | MIT OR Apache-2.0 | Copyright (c) 2012-2013 Mozilla Foundation |
 | [string_cache](https://github.com/servo/string-cache) | 0.8.9 | MIT OR Apache-2.0 | Copyright (c) 2012-2013 Mozilla Foundation |
+| [string_cache](https://github.com/servo/string-cache) | 0.9.0 | MIT OR Apache-2.0 | Copyright (c) 2012-2013 Mozilla Foundation |
+| [string_cache_codegen](https://github.com/servo/string-cache) | 0.11.2 | MIT OR Apache-2.0 | Copyright (c) 2012-2013 Mozilla Foundation |
 | [string_cache_codegen](https://github.com/servo/string-cache) | 0.5.4 | MIT OR Apache-2.0 | Copyright (c) 2012-2013 Mozilla Foundation |
+| [string_cache_codegen](https://github.com/servo/string-cache) | 0.6.1 | MIT OR Apache-2.0 | Copyright (c) 2012-2013 Mozilla Foundation |
 | [strsim](https://github.com/rapidfuzz/strsim-rs) | 0.11.1 | MIT | Copyright (c) 2015 Danny Guo |
 | [subtle](https://github.com/dalek-cryptography/subtle) | 2.6.1 | BSD-3-Clause | Copyright (c) 2016-2017 Isis Agora Lovecruft, Henry de Valence. All rights reserved. |
-| [swift-rs](https://github.com/Brendonovich/swift-rs) | 1.0.7 | MIT OR Apache-2.0 | Copyright 2023 The swift-rs developers |
+| [swift-rs](https://github.com/Brendonovich/swift-rs) | 1.0.9 | MIT OR Apache-2.0 | Copyright 2023 The swift-rs developers |
 | [syn](https://github.com/dtolnay/syn) | 1.0.109 | MIT OR Apache-2.0 | Authors: David Tolnay |
 | [syn](https://github.com/dtolnay/syn) | 2.0.114 | MIT OR Apache-2.0 | Authors: David Tolnay |
 | [sync_wrapper](https://github.com/Actyx/sync_wrapper) | 1.0.2 | Apache-2.0 | Authors: Actyx AG |
@@ -3271,15 +3319,15 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [system-configuration](https://github.com/mullvad/system-configuration-rs) | 0.6.1 | MIT OR Apache-2.0 | Copyright (c) 2024 Mullvad VPN AB |
 | [system-configuration-sys](https://github.com/mullvad/system-configuration-rs) | 0.6.0 | MIT OR Apache-2.0 | Copyright (c) 2024 Mullvad VPN AB |
 | [system-deps](https://github.com/gdesmott/system-deps) | 6.2.2 | MIT OR Apache-2.0 | Authors: Guillaume Desmottes, Josh Triplett |
-| [tao](https://github.com/tauri-apps/tao) | 0.34.5 | Apache-2.0 | Authors: Tauri Programme within The Commons Conservancy, The winit contributors |
-| [tao-macros](https://github.com/tauri-apps/tao) | 0.1.3 | MIT OR Apache-2.0 | Authors: Tauri Programme within The Commons Conservancy |
+| [tao](https://github.com/tauri-apps/tao) | 0.37.3 | Apache-2.0 | Authors: Tauri Programme within The Commons Conservancy, The winit contributors |
+| [tao-macros](https://github.com/tauri-apps/tao) | 0.1.4 | MIT OR Apache-2.0 | Copyright (c) 2022 - Present Tauri Apps Contributors |
 | [tap](https://github.com/myrrlyn/tap) | 1.0.1 | MIT | Copyright (c) 2017 Elliot Linder <darfink@gmail.com> |
 | [tar](https://github.com/composefs/tar-rs) | 0.4.46 | MIT OR Apache-2.0 | Copyright (c) The tar-rs Project Contributors |
 | [target-lexicon](https://github.com/bytecodealliance/target-lexicon) | 0.12.16 | Apache-2.0 WITH LLVM-exception | Authors: Dan Gohman |
-| [tauri](https://github.com/tauri-apps/tauri) | 2.9.5 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
-| [tauri-build](https://github.com/tauri-apps/tauri) | 2.5.3 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
-| [tauri-codegen](https://github.com/tauri-apps/tauri) | 2.5.2 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
-| [tauri-macros](https://github.com/tauri-apps/tauri) | 2.5.2 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
+| [tauri](https://github.com/tauri-apps/tauri) | 2.12.7 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
+| [tauri-build](https://github.com/tauri-apps/tauri) | 2.7.6 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
+| [tauri-codegen](https://github.com/tauri-apps/tauri) | 2.7.6 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
+| [tauri-macros](https://github.com/tauri-apps/tauri) | 2.7.6 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
 | [tauri-plugin](https://github.com/tauri-apps/tauri) | 2.5.2 | Apache-2.0 OR MIT | Authors: Tauri Programme within The Commons Conservancy |
 | [tauri-plugin-cache](https://github.com/Taiizor/tauri-plugin-cache) | 0.1.6 | MIT | Copyright (c) 2025 Taiizor |
 | [tauri-plugin-dialog](https://github.com/tauri-apps/plugins-workspace) | 2.6.0 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
@@ -3292,12 +3340,13 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [tauri-plugin-store](https://github.com/tauri-apps/plugins-workspace) | 2.4.2 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
 | [tauri-plugin-updater](https://github.com/tauri-apps/plugins-workspace) | 2.9.0 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
 | [tauri-plugin-window-state](https://github.com/tauri-apps/plugins-workspace) | 2.4.1 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
-| [tauri-runtime](https://github.com/tauri-apps/tauri) | 2.9.2 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
-| [tauri-runtime-wry](https://github.com/tauri-apps/tauri) | 2.9.3 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
-| [tauri-utils](https://github.com/tauri-apps/tauri) | 2.8.1 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
+| [tauri-runtime](https://github.com/tauri-apps/tauri) | 2.12.4 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
+| [tauri-runtime-wry](https://github.com/tauri-apps/tauri) | 2.12.5 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
+| [tauri-utils](https://github.com/tauri-apps/tauri) | 2.10.4 | Apache-2.0 OR MIT | Copyright (c) 2017 - Present Tauri Apps Contributors |
 | [tauri-winres](https://github.com/tauri-apps/winres) | 0.3.5 | MIT | Copyright (c) 2023 - Present Tauri Apps Contributors |
 | [tempfile](https://github.com/Stebalien/tempfile) | 3.25.0 | MIT OR Apache-2.0 | Copyright (c) 2015 Steven Allen |
 | [tendril](https://github.com/servo/tendril) | 0.4.3 | MIT/Apache-2.0 | Copyright (c) 2015 Keegan McAllister |
+| [tendril](https://github.com/servo/html5ever) | 0.5.1 | MIT OR Apache-2.0 | Copyright (c) 2015 Keegan McAllister |
 | [thiserror](https://github.com/dtolnay/thiserror) | 1.0.69 | MIT OR Apache-2.0 | Authors: David Tolnay |
 | [thiserror](https://github.com/dtolnay/thiserror) | 2.0.18 | MIT OR Apache-2.0 | Authors: David Tolnay |
 | [thiserror-impl](https://github.com/dtolnay/thiserror) | 1.0.69 | MIT OR Apache-2.0 | Authors: David Tolnay |
@@ -3314,13 +3363,15 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [tokio-util](https://github.com/tokio-rs/tokio) | 0.7.18 | MIT | Copyright (c) Tokio Contributors |
 | [toml](https://github.com/toml-rs/toml) | 0.8.2 | MIT OR Apache-2.0 | Copyright (c) Individual contributors |
 | [toml](https://github.com/toml-rs/toml) | 0.9.11+spec-1.1.0 | MIT OR Apache-2.0 | Copyright (c) Individual contributors |
+| [toml](https://github.com/toml-rs/toml) | 1.2.1+spec-1.1.0 | MIT OR Apache-2.0 | Copyright (c) Individual contributors |
 | [toml_datetime](https://github.com/toml-rs/toml) | 0.6.3 | MIT OR Apache-2.0 | Copyright (c) 2014 Alex Crichton |
 | [toml_datetime](https://github.com/toml-rs/toml) | 0.7.5+spec-1.1.0 | MIT OR Apache-2.0 | Copyright (c) Individual contributors |
+| [toml_datetime](https://github.com/toml-rs/toml) | 1.1.3+spec-1.1.0 | MIT OR Apache-2.0 | Copyright (c) Individual contributors |
 | [toml_edit](https://github.com/toml-rs/toml) | 0.19.15 | MIT OR Apache-2.0 | Copyright (c) Individual contributors |
 | [toml_edit](https://github.com/toml-rs/toml) | 0.20.2 | MIT OR Apache-2.0 | Copyright (c) Individual contributors |
 | [toml_edit](https://github.com/toml-rs/toml) | 0.23.10+spec-1.0.0 | MIT OR Apache-2.0 | Copyright (c) Individual contributors |
-| [toml_parser](https://github.com/toml-rs/toml) | 1.0.6+spec-1.1.0 | MIT OR Apache-2.0 | Copyright (c) Individual contributors |
-| [toml_writer](https://github.com/toml-rs/toml) | 1.0.6+spec-1.1.0 | MIT OR Apache-2.0 | Copyright (c) Individual contributors |
+| [toml_parser](https://github.com/toml-rs/toml) | 1.1.5+spec-1.1.0 | MIT OR Apache-2.0 | Copyright (c) Individual contributors |
+| [toml_writer](https://github.com/toml-rs/toml) | 1.2.0+spec-1.1.0 | MIT OR Apache-2.0 | Copyright (c) Individual contributors |
 | [tower](https://github.com/tower-rs/tower) | 0.5.3 | MIT | Copyright (c) 2019 Tower Contributors |
 | [tower-http](https://github.com/tower-rs/tower-http) | 0.6.8 | MIT | Copyright (c) 2019-2021 Tower Contributors |
 | [tower-layer](https://github.com/tower-rs/tower) | 0.3.3 | MIT | Copyright (c) 2019 Tower Contributors |
@@ -3328,10 +3379,10 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [tracing](https://github.com/tokio-rs/tracing) | 0.1.44 | MIT | Copyright (c) 2019 Tokio Contributors |
 | [tracing-attributes](https://github.com/tokio-rs/tracing) | 0.1.31 | MIT | Copyright (c) 2019 Tokio Contributors |
 | [tracing-core](https://github.com/tokio-rs/tracing) | 0.1.36 | MIT | Copyright (c) 2019 Tokio Contributors |
-| [tray-icon](https://github.com/tauri-apps/tray-icon) | 0.21.3 | MIT OR Apache-2.0 | Copyright (c) 2022-2022 Tauri Programme within The Commons Conservancy |
+| [tray-icon](https://github.com/tauri-apps/tray-icon) | 0.25.1 | MIT OR Apache-2.0 | Copyright (c) 2022-2022 Tauri Programme within The Commons Conservancy |
 | [try-lock](https://github.com/seanmonstar/try-lock) | 0.2.5 | MIT | Copyright (c) 2018-2023 Sean McArthur |
 | [typeid](https://github.com/dtolnay/typeid) | 1.0.3 | MIT OR Apache-2.0 | Authors: David Tolnay |
-| [typenum](https://github.com/paholg/typenum) | 1.19.0 | MIT OR Apache-2.0 | Copyright 2014 Paho Lurie-Gregg |
+| [typenum](https://github.com/paholg/typenum) | 1.20.1 | MIT OR Apache-2.0 | Copyright 2014 Paho Lurie-Gregg |
 | [uds_windows](https://github.com/haraldh/rust_uds_windows) | 1.1.0 | MIT | Copyright (c) Microsoft Corporation. All rights reserved. |
 | [unic-char-property](https://github.com/open-i18n/rust-unic/) | 0.9.0 | MIT/Apache-2.0 | Authors: The UNIC Project Developers |
 | [unic-char-range](https://github.com/open-i18n/rust-unic/) | 0.9.0 | MIT/Apache-2.0 | Authors: The UNIC Project Developers |
@@ -3343,6 +3394,7 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [untrusted](https://github.com/briansmith/untrusted) | 0.9.0 | ISC | Authors: Brian Smith |
 | [url](https://github.com/servo/rust-url) | 2.5.8 | MIT OR Apache-2.0 | Copyright (c) 2013-2025 The rust-url developers |
 | [urlpattern](https://github.com/denoland/rust-urlpattern) | 0.3.0 | MIT | Copyright (c) 2021 the Deno authors |
+| [urlpattern](https://github.com/denoland/rust-urlpattern) | 0.6.0 | MIT | Copyright (c) 2021 the Deno authors |
 | [utf-8](https://github.com/SimonSapin/rust-utf8) | 0.7.6 | MIT OR Apache-2.0 | Authors: Simon Sapin |
 | [utf8_iter](https://github.com/hsivonen/utf8_iter) | 1.0.4 | Apache-2.0 OR MIT | Authors: Henri Sivonen |
 | [utf8-width](https://github.com/magiclen/utf8-width) | 0.1.8 | MIT | Copyright (c) 2020 magiclen.org (Ron Li) |
@@ -3363,20 +3415,24 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [wasm-bindgen-macro-support](https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/macro-support) | 0.2.108 | MIT OR Apache-2.0 | Copyright (c) 2014 Alex Crichton |
 | [wasm-bindgen-shared](https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/shared) | 0.2.108 | MIT OR Apache-2.0 | Copyright (c) 2014 Alex Crichton |
 | [wasm-streams](https://github.com/MattiasBuelens/wasm-streams/) | 0.4.2 | MIT OR Apache-2.0 | Authors: Mattias Buelens |
+| [wasm-streams](https://github.com/MattiasBuelens/wasm-streams/) | 0.5.0 | MIT OR Apache-2.0 | Authors: Mattias Buelens |
+| [web_atoms](https://github.com/servo/html5ever) | 0.2.6 | MIT OR Apache-2.0 | Copyright (c) 2014 The html5ever Project Developers |
+| [web_atoms](https://github.com/servo/html5ever) | 0.3.0 | MIT OR Apache-2.0 | Copyright (c) 2014 The html5ever Project Developers |
 | [web-sys](https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/web-sys) | 0.3.85 | MIT OR Apache-2.0 | Copyright (c) 2014 Alex Crichton |
 | [web-time](https://github.com/daxpedda/web-time) | 1.1.0 | MIT OR Apache-2.0 | Copyright 2023 dAxpeDDa |
-| [webkit2gtk](https://github.com/tauri-apps/webkit2gtk-rs) | 2.0.1 | MIT | Copyright (c) 2016 Boucher, Antoni <bouanto@zoho.com> |
-| [webkit2gtk-sys](https://github.com/tauri-apps/webkit2gtk-rs) | 2.0.1 | MIT | Copyright (c) 2016 Boucher, Antoni <bouanto@zoho.com> |
+| [webkit2gtk](https://github.com/tauri-apps/webkit2gtk-rs) | 2.0.2 | MIT | Copyright (c) 2016 Boucher, Antoni <bouanto@zoho.com> |
+| [webkit2gtk-sys](https://github.com/tauri-apps/webkit2gtk-rs) | 2.0.2 | MIT | Copyright (c) 2016 Boucher, Antoni <bouanto@zoho.com> |
 | [webpki-roots](https://github.com/rustls/webpki-roots) | 1.0.5 | CDLA-Permissive-2.0 |  |
-| [webview2-com](https://github.com/wravery/webview2-rs) | 0.38.2 | MIT |  |
+| [webview2-com](https://github.com/wravery/webview2-rs) | 0.39.1 | MIT |  |
 | [webview2-com-macros](https://github.com/wravery/webview2-rs) | 0.8.1 | MIT |  |
-| [webview2-com-sys](https://github.com/wravery/webview2-rs) | 0.38.2 | MIT |  |
+| [webview2-com-sys](https://github.com/wravery/webview2-rs) | 0.39.1 | MIT |  |
 | [winapi](https://github.com/retep998/winapi-rs) | 0.3.9 | MIT/Apache-2.0 | Copyright (c) 2015-2018 The winapi-rs Developers |
 | [winapi-i686-pc-windows-gnu](https://github.com/retep998/winapi-rs) | 0.4.0 | MIT/Apache-2.0 | Authors: Peter Atashian |
 | [winapi-util](https://github.com/BurntSushi/winapi-util) | 0.1.11 | Unlicense OR MIT | Copyright (c) 2017 Andrew Gallant |
 | [winapi-x86_64-pc-windows-gnu](https://github.com/retep998/winapi-rs) | 0.4.0 | MIT/Apache-2.0 | Authors: Peter Atashian |
-| [window-vibrancy](https://github.com/tauri-apps/tauri-plugin-vibrancy) | 0.6.0 | Apache-2.0 OR MIT | Copyright (c) 2020-2022 Tauri Programme within The Commons Conservancy |
+| [window-vibrancy](https://github.com/tauri-apps/tauri-plugin-vibrancy) | 0.8.1 | Apache-2.0 OR MIT | Copyright (c) 2020-2022 Tauri Programme within The Commons Conservancy |
 | [windows](https://github.com/microsoft/windows-rs) | 0.61.3 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
+| [windows](https://github.com/microsoft/windows-rs) | 0.62.2 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows_aarch64_gnullvm](https://github.com/microsoft/windows-rs) | 0.42.2 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows_aarch64_gnullvm](https://github.com/microsoft/windows-rs) | 0.52.6 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows_aarch64_gnullvm](https://github.com/microsoft/windows-rs) | 0.53.1 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
@@ -3401,14 +3457,17 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [windows_x86_64_msvc](https://github.com/microsoft/windows-rs) | 0.52.6 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows_x86_64_msvc](https://github.com/microsoft/windows-rs) | 0.53.1 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows-collections](https://github.com/microsoft/windows-rs) | 0.2.0 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
+| [windows-collections](https://github.com/microsoft/windows-rs) | 0.3.2 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows-core](https://github.com/microsoft/windows-rs) | 0.61.2 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows-core](https://github.com/microsoft/windows-rs) | 0.62.2 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows-future](https://github.com/microsoft/windows-rs) | 0.2.1 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
+| [windows-future](https://github.com/microsoft/windows-rs) | 0.3.2 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows-implement](https://github.com/microsoft/windows-rs) | 0.60.2 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows-interface](https://github.com/microsoft/windows-rs) | 0.59.3 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows-link](https://github.com/microsoft/windows-rs) | 0.1.3 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows-link](https://github.com/microsoft/windows-rs) | 0.2.1 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows-numerics](https://github.com/microsoft/windows-rs) | 0.2.0 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
+| [windows-numerics](https://github.com/microsoft/windows-rs) | 0.3.1 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows-registry](https://github.com/microsoft/windows-rs) | 0.6.1 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows-result](https://github.com/microsoft/windows-rs) | 0.3.4 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows-result](https://github.com/microsoft/windows-rs) | 0.4.1 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
@@ -3423,13 +3482,15 @@ Dependencies of the Tauri shell (dashboard-app/src-tauri), 579 crates, as report
 | [windows-targets](https://github.com/microsoft/windows-rs) | 0.52.6 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows-targets](https://github.com/microsoft/windows-rs) | 0.53.5 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows-threading](https://github.com/microsoft/windows-rs) | 0.1.0 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
+| [windows-threading](https://github.com/microsoft/windows-rs) | 0.2.1 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [windows-version](https://github.com/microsoft/windows-rs) | 0.1.7 | MIT OR Apache-2.0 | Copyright (c) Microsoft Corporation. |
 | [winnow](https://github.com/winnow-rs/winnow) | 0.5.40 | MIT |  |
 | [winnow](https://github.com/winnow-rs/winnow) | 0.7.14 | MIT |  |
+| [winnow](https://github.com/winnow-rs/winnow) | 1.0.5 | MIT |  |
 | [winreg](https://github.com/gentoo90/winreg-rs) | 0.55.0 | MIT | Copyright (c) 2015 Igor Shaula |
 | [wit-bindgen](https://github.com/bytecodealliance/wit-bindgen) | 0.51.0 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | Authors: Alex Crichton |
 | [writeable](https://github.com/unicode-org/icu4x) | 0.6.2 | Unicode-3.0 | Copyright © 2020-2024 Unicode, Inc. |
-| [wry](https://github.com/tauri-apps/wry) | 0.53.5 | Apache-2.0 OR MIT | Copyright (c) 2020-2023 Ngo Iok Ui & Tauri Programme within The Commons Conservancy |
+| [wry](https://github.com/tauri-apps/wry) | 0.57.3 | Apache-2.0 OR MIT | Copyright (c) 2020-2023 Ngo Iok Ui & Tauri Programme within The Commons Conservancy |
 | [wyz](https://github.com/myrrlyn/wyz) | 0.5.1 | MIT | Copyright (c) 2018 myrrlyn (Alexander Payne) |
 | [x11](https://github.com/AltF02/x11-rs.git) | 2.21.0 | MIT | Authors: daggerbot, Erle Pereira, AltF02 |
 | [x11-dl](https://github.com/AltF02/x11-rs.git) | 2.21.0 | MIT | Authors: daggerbot, Erle Pereira, AltF02 |
