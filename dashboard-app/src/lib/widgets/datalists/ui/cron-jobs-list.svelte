@@ -80,6 +80,7 @@
   import ResourceSummaryStrip from "./common/resource-summary-strip.svelte";
   import SectionRuntimeStatus from "./common/section-runtime-status.svelte";
   import WorkloadSelectionBar from "./common/workload-selection-bar.svelte";
+  import { subscribeUntracked } from "$shared/lib/subscribe-untracked";
   import {
     confirmWorkbenchLayoutShrink,
     confirmWorkbenchTabClose,
@@ -1503,7 +1504,10 @@
 
   function bindCronJobsSyncStore(clusterId: string) {
     cronJobsSyncStoreUnsubscribe?.();
-    cronJobsSyncStoreUnsubscribe = selectClusterCronJobs(clusterId).subscribe((items) => {
+    // The store also fires inside the effect that calls setInitialCronJobs, and
+    // mergeCronJobScheduleHints reads cronJobsSnapshot: untracked, so that effect does not
+    // rerun on this write until Svelte gives up (effect_update_depth_exceeded, blank page).
+    cronJobsSyncStoreUnsubscribe = subscribeUntracked(selectClusterCronJobs(clusterId), (items) => {
       cronJobsSnapshot = mergeCronJobScheduleHints(items as CronJobItem[]);
       lastWatcherSuccessAt = Date.now();
     });
