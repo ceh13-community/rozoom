@@ -80,6 +80,8 @@ installed this one. We recommend this update.
 - Manage Kubernetes Clusters showed "Online" and counted a cluster as online
   when the cluster card already said unreachable. It now shows "Unreachable"
   or "Auth expired", the last contact time, and counts the cluster as offline.
+- Opening Cron Jobs, most often right after Jobs, could replace the page with
+  an error panel. The list now opens every time.
 
 Something confusing or broken? [Tell us what's wrong](https://github.com/ceh13-community/rozoom/discussions).
 
