@@ -1548,15 +1548,13 @@
         class="flex flex-col gap-2 sm:gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4"
       >
         <h1
-          class="cluster-page__title min-w-0 truncate text-lg font-bold sm:text-xl lg:flex-1"
+          class="cluster-page__title min-w-0 truncate text-lg font-bold sm:text-xl lg:min-w-[14rem] lg:flex-1"
           data-cluster={clusterName}
           title={data?.title.replace(cluster, clusterName || cluster)}
         >
           {data?.title.replace(cluster, clusterName || cluster)}
         </h1>
-        <div
-          class="flex flex-wrap items-center gap-2 pt-0.5 sm:gap-3 lg:min-w-0 lg:flex-nowrap lg:justify-end"
-        >
+        <div class="flex flex-wrap items-center gap-2 pt-0.5 sm:gap-3 lg:min-w-0 lg:justify-end">
           {#if workspaceHydrated}
             <div class="flex items-center gap-1">
               <Button
