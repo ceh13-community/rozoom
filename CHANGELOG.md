@@ -8,6 +8,66 @@ the user-facing change in plain language. The in-app update notification
 deliberately shows fixed copy and never displays these notes.
 The release build fails if the section for the released version is missing.
 
+## [0.26.4] - 2026-11-19
+
+Security release. Inspect Element in the right-click menu and Ctrl+Shift+I
+opened the web inspector, whose console could run any script with the app's
+full access to your clusters. Release builds no longer contain it. A kubeconfig
+with a YAML error, pasted or generated in the connect wizard, wrote the lines
+around the error to the app log, including token and client-key-data values.
+The log line now holds only the position and the error name. If that happened
+to you, open Help > Open Logs Folder, delete the old log files and rotate
+the credentials from that kubeconfig. A cluster that does not answer now shows
+as unreachable on its card and on every page, with Retry, instead of empty
+lists and green statuses. On Linux (.deb, .rpm) the app does not update itself:
+download the new package from the release page and install it the way you
+installed this one. We recommend this update.
+
+### Security
+
+- Release builds are built without the web inspector, so Inspect Element and
+  Ctrl+Shift+I are gone.
+- A kubeconfig YAML error is logged as its position and error name only, for
+  example "Invalid YAML format at line 8, column 1 (YAMLException)". The same
+  text is shown in the add cluster dialog.
+
+### Changed
+
+- A cluster that does not answer shows "Cluster unreachable" or "Auth expired"
+  on its card with the reason, the last successful contact and Retry. Drift, scores and counters
+  are hidden until it answers again, and cluster pages show the same state
+  instead of a skeleton or "No pods found". This works with the Linter on or off.
+- Deleting from the configuration, RBAC, network and storage lists asks for
+  confirmation and lists the objects that will be deleted, like workloads and
+  Pods already did.
+- The Pods page lists every pod instead of the first 400: the NS filter,
+  search, Download CSV and counters cover the whole cluster. Grouped views keep
+  a 400-row limit and say so. When Select all reaches pods on other pages, the
+  delete and evict dialogs say how many are not on the current page.
+- Exec presets no longer show a "bundled" badge, because kubectl runs the
+  cloud CLI from your PATH. Cloud import says when the provider's CLI is not
+  bundled in this build instead of answering "No clusters found."
+- App icons show the wheel only, and the logo wordmark is spelled correctly.
+- A render error shows an error panel instead of an empty page, and uncaught
+  errors are written to logs.log.
+
+### Fixed
+
+- Linux: the window grew on every launch until it was larger than the screen.
+  It now opens at 1024x768 or maximized, and a size set by hand is not kept on
+  Linux for now.
+- The details panel closes with Escape.
+- Popovers (Runtime, Inspector, NS and Columns checklists, filters) stay inside
+  the window and scroll.
+- The Pods list reloads when the namespace selection changes, instead of
+  showing the pods of the old selection.
+- Sync sec accepts typed values such as 30 or 45.
+- Quick actions buttons stay inside the Detected kubeconfig files card on
+  narrow windows.
+- The installer no longer contains internal project notes.
+
+Something confusing or broken? [Tell us what's wrong](https://github.com/ceh13-community/rozoom/discussions).
+
 ## [0.26.3] - 2026-11-11
 
 Security release. When you connected a remote cluster through the Bearer Token,
