@@ -33,10 +33,10 @@ export type KubectlExecutionBudget = {
   maxConcurrentWatches: number;
 };
 
-const kubectlReadInFlight = new Map<
-  string,
-  Promise<{ output: string; errors: string; code?: number }>
->();
+/** stderr of a successful run lands in `warnings`; `errors` is set only when kubectl failed. */
+type KubectlRawResult = { output: string; errors: string; code?: number; warnings?: string };
+
+const kubectlReadInFlight = new Map<string, Promise<KubectlRawResult>>();
 const DEFAULT_READ_REQUEST_TIMEOUT = "--request-timeout=10s";
 const KUBECTL_ERROR_LOG_WINDOW_MS = 15_000;
 const DEFAULT_KUBECTL_EXECUTION_BUDGET: KubectlExecutionBudget = {
@@ -452,7 +452,7 @@ export async function kubectlRawFront(
 export async function kubectlRawArgsFront(
   args: string[],
   options?: KubectlOptions,
-): Promise<{ output: string; errors: string; code?: number }> {
+): Promise<KubectlRawResult> {
   const readOnlyCheck = checkKubectlReadOnly(options?.clusterId, args);
   if (readOnlyCheck.blocked) {
     return buildReadOnlyBlockedResult(readOnlyCheck.reason);
@@ -541,7 +541,11 @@ export async function kubectlRawArgsFront(
       });
     }
 
-    return { output, errors, code: result.code };
+    // kubectl prints warnings (deprecations, admission warnings) to stderr and still exits 0.
+    const warnings = result.code === 0 ? result.stderr.trim() : "";
+    return warnings
+      ? { output, errors, code: result.code, warnings }
+      : { output, errors, code: result.code };
   })();
 
   // WAU-C Core Action #3: a successful mutating kubectl command means the user

@@ -3,8 +3,17 @@ import { openPodNetworkDebugShellModal } from "$features/shell";
 import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
 import type { PodItem } from "$shared/model/clusters";
 
-/** Network tools (dig, curl, nc, tcpdump, mtr, iperf3). Pinned; about 210 MB, pulled on first use. */
-export const NETWORK_DEBUG_IMAGE = "nicolaka/netshoot:v0.16";
+/**
+ * Network tools (dig, curl, nc, tcpdump, mtr, iperf3). Pinned to the digest of the v0.16 index,
+ * so a moved tag cannot change what runs in the pod. About 210 MB, pulled on first use.
+ */
+export const NETWORK_DEBUG_IMAGE =
+  "nicolaka/netshoot:v0.16@sha256:b09d9b21381f47a79b3cbcb30da25266dc17186ea00ae65e99fdc51396f48e70";
+/**
+ * NET_ADMIN and NET_RAW only, for tcpdump and interface inspection. Explicit because the
+ * default profile of the bundled kubectl is "general", which adds SYS_PTRACE.
+ */
+const NETWORK_DEBUG_PROFILE = "netadmin";
 /** The debug container stops by itself after this, even if the app never stops it. */
 const NETWORK_DEBUG_TTL_SECONDS = 3600;
 const START_TIMEOUT_MS = 180_000;
@@ -41,6 +50,7 @@ export function buildNetworkDebugStartArgs(name: string, namespace: string, cont
     namespace,
     `--image=${NETWORK_DEBUG_IMAGE}`,
     `--container=${container}`,
+    `--profile=${NETWORK_DEBUG_PROFILE}`,
     "--",
     "sh",
     "-c",
@@ -149,6 +159,7 @@ export async function startPodNetworkDebugSession({ clusterId, pod }: PodNetwork
     container,
     stopArgs: buildNetworkDebugStopArgs(name, namespace, container),
     sessionLabel: `${name} (network debug)`,
+    notice: started.warnings ? `kubectl warning: ${started.warnings}` : undefined,
   });
-  return { container, namespace };
+  return { container, namespace, warnings: started.warnings };
 }

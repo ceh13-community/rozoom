@@ -26,6 +26,8 @@ export type ShellWindowState = {
   targetContainer?: string;
   /** kubectl arguments that stop the session's own container when the window closes. */
   stopArgs?: string[];
+  /** Shown once the session is ready, for example a warning kubectl printed while starting it. */
+  notice?: string;
   sessionKind?: "debug-shell" | "debug-describe" | "pod-debug" | "pod-network-debug";
 };
 
@@ -120,7 +122,7 @@ export function openPodDebugShellModal(
 export function openPodNetworkDebugShellModal(
   clusterId: string,
   pod: Partial<PodItem>,
-  options: { container: string; stopArgs: string[]; sessionLabel: string },
+  options: { container: string; stopArgs: string[]; sessionLabel: string; notice?: string },
 ) {
   if (!clusterId) return;
   shellModalState.update((items) => [
@@ -133,6 +135,7 @@ export function openPodNetworkDebugShellModal(
       podSessionMode: "exec",
       targetContainer: options.container,
       stopArgs: options.stopArgs,
+      notice: options.notice,
       sessionLabel: options.sessionLabel,
       sessionKind: "pod-network-debug",
     },

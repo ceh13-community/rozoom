@@ -522,6 +522,7 @@
         appendShellOutput(
           `\n✅ ${shellMode === "pod-attach" ? "Attached" : "Connected"} to ${shellTargetNamespace}/${shellTargetLabel}${containerInfo}`,
         );
+        if (state.notice) appendShellOutput(state.notice);
         if (shellSessionKind === "pod-network-debug") {
           appendShellOutput(
             "Each command runs on its own, without a terminal, and the next one waits for it. Give long-running tools a limit, for example tcpdump -c 20 or ping -c 3.",

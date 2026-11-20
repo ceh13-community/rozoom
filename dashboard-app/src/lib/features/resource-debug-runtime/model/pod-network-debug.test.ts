@@ -26,7 +26,7 @@ describe("pod network debug", () => {
   });
 
   it("adds a pinned netshoot container to the pod itself, without --target or --copy-to", () => {
-    expect(NETWORK_DEBUG_IMAGE).toMatch(/^nicolaka\/netshoot:v\d+\.\d+$/);
+    expect(NETWORK_DEBUG_IMAGE).toMatch(/^nicolaka\/netshoot:v\d+\.\d+@sha256:[0-9a-f]{64}$/);
     const args = buildNetworkDebugStartArgs("web-a", "shop", "rozoom-netshoot-abc123");
     expect(args.slice(0, 6)).toEqual([
       "debug",
@@ -39,6 +39,8 @@ describe("pod network debug", () => {
     expect(args.some((arg) => arg.startsWith("--target") || arg.startsWith("--copy-to"))).toBe(
       false,
     );
+    // The bundled kubectl defaults to --profile=general, which adds SYS_PTRACE.
+    expect(args.filter((arg) => arg.startsWith("--profile"))).toEqual(["--profile=netadmin"]);
     expect(args.at(-1)).toMatch(/^sleep 3600 & echo \$! > \/tmp\/\S+; wait$/);
     expect(buildNetworkDebugContainerName()).toMatch(/^rozoom-netshoot-[a-z0-9]{1,6}$/);
   });
@@ -130,5 +132,24 @@ describe("pod network debug", () => {
     );
     expect(kubectlRawArgsFront).toHaveBeenCalledTimes(1);
     expect(openPodNetworkDebugShellModal).not.toHaveBeenCalled();
+  });
+
+  it("shows what kubectl warned about while starting the container", async () => {
+    kubectlRawArgsFront.mockImplementation(async (args: string[]) => {
+      if (args[0] === "debug") {
+        return { output: "", errors: "", code: 0, warnings: "Warning: would violate PodSecurity" };
+      }
+      const container = (kubectlRawArgsFront.mock.calls[0][0] as string[])[5].split("=")[1];
+      return { output: podJson({ running: {} }, container), errors: "", code: 0 };
+    });
+
+    const result = await startPodNetworkDebugSession({ clusterId: "c1", pod });
+
+    expect(result.warnings).toBe("Warning: would violate PodSecurity");
+    expect(openPodNetworkDebugShellModal).toHaveBeenCalledWith(
+      "c1",
+      pod,
+      expect.objectContaining({ notice: "kubectl warning: Warning: would violate PodSecurity" }),
+    );
   });
 });
