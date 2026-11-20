@@ -10,10 +10,18 @@ import type { PodItem } from "$shared/model/clusters";
 export const NETWORK_DEBUG_IMAGE =
   "nicolaka/netshoot:v0.16@sha256:b09d9b21381f47a79b3cbcb30da25266dc17186ea00ae65e99fdc51396f48e70";
 /**
- * NET_ADMIN and NET_RAW only, for tcpdump and interface inspection. Explicit because the
- * default profile of the bundled kubectl is "general", which adds SYS_PTRACE.
+ * The baseline profile adds no capability of its own. Explicit because the default profile of
+ * the bundled kubectl is "general", which adds SYS_PTRACE.
  */
-const NETWORK_DEBUG_PROFILE = "netadmin";
+const NETWORK_DEBUG_PROFILE = "baseline";
+/**
+ * NET_RAW only: dig, curl, nc, ping, mtr and tcpdump need nothing more. NET_ADMIN would also
+ * let the session change the pod's routes and iptables. kubectl merges this into the debug
+ * container and it replaces any capability list a profile would add.
+ */
+export const NETWORK_DEBUG_CUSTOM_SPEC = {
+  securityContext: { capabilities: { add: ["NET_RAW"] } },
+};
 /** The debug container stops by itself after this, even if the app never stops it. */
 const NETWORK_DEBUG_TTL_SECONDS = 3600;
 const START_TIMEOUT_MS = 180_000;
@@ -42,7 +50,12 @@ export function buildNetworkDebugContainerName() {
  * dig, curl and tcpdump see what the pod sees. No --target, so it gets its own process
  * namespace and the stop command can never signal the app's processes.
  */
-export function buildNetworkDebugStartArgs(name: string, namespace: string, container: string) {
+export function buildNetworkDebugStartArgs(
+  name: string,
+  namespace: string,
+  container: string,
+  customSpecPath: string,
+) {
   return [
     "debug",
     `pod/${name}`,
@@ -51,6 +64,7 @@ export function buildNetworkDebugStartArgs(name: string, namespace: string, cont
     `--image=${NETWORK_DEBUG_IMAGE}`,
     `--container=${container}`,
     `--profile=${NETWORK_DEBUG_PROFILE}`,
+    `--custom=${customSpecPath}`,
     "--",
     "sh",
     "-c",
@@ -117,6 +131,25 @@ export function readEphemeralContainerState(
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * A Pod Security level that forbids NET_RAW turns into one plain sentence; any other refusal
+ * is passed on as kubectl wrote it.
+ */
+export function describeNetworkDebugRefusal(stderr: string, namespace: string): string {
+  const level = stderr.match(/violates PodSecurity "([a-z]+):/)?.[1];
+  if (!level) return stderr;
+  return `Namespace ${namespace} does not allow network debug: its Pod Security level "${level}" forbids NET_RAW, the capability that tcpdump, ping and mtr need. A cluster admin can relax the level for this namespace.`;
+}
+
+/** kubectl debug --custom reads a file, so the spec is written to the app data folder. */
+async function writeCustomSpecFile(): Promise<{ path: string; remove: () => Promise<void> }> {
+  const { writeTextFile, remove } = await import("@tauri-apps/plugin-fs");
+  const { appDataDir } = await import("@tauri-apps/api/path");
+  const path = `${await appDataDir()}/network-debug-${Math.random().toString(36).slice(2, 10)}.json`;
+  await writeTextFile(path, JSON.stringify(NETWORK_DEBUG_CUSTOM_SPEC));
+  return { path, remove: () => remove(path).catch(() => undefined) };
+}
+
 /** Adds the network debug container to the pod and opens a shell in it once it runs. */
 export async function startPodNetworkDebugSession({ clusterId, pod }: PodNetworkDebugTarget) {
   const name = pod.metadata?.name.trim();
@@ -126,12 +159,22 @@ export async function startPodNetworkDebugSession({ clusterId, pod }: PodNetwork
   }
 
   const container = buildNetworkDebugContainerName();
-  const started = await kubectlRawArgsFront(
-    buildNetworkDebugStartArgs(name, namespace, container),
-    { clusterId },
-  );
+  const customSpec = await writeCustomSpecFile();
+  let started: Awaited<ReturnType<typeof kubectlRawArgsFront>>;
+  try {
+    started = await kubectlRawArgsFront(
+      buildNetworkDebugStartArgs(name, namespace, container, customSpec.path),
+      { clusterId },
+    );
+  } finally {
+    await customSpec.remove();
+  }
   if (started.errors || started.code !== 0) {
-    throw new Error(started.errors || "Could not add the network debug container.");
+    throw new Error(
+      started.errors
+        ? describeNetworkDebugRefusal(started.errors, namespace)
+        : "Could not add the network debug container.",
+    );
   }
 
   const deadline = Date.now() + START_TIMEOUT_MS;
