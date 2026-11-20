@@ -39,7 +39,8 @@
   let needsScrollToBottom = false;
   let shellPanel: HTMLDivElement | null = null;
   let shellMode: "debug" | "pod-exec" | "pod-attach" = "debug";
-  let shellSessionKind: "debug-shell" | "debug-describe" | "pod-debug" = "debug-shell";
+  let shellSessionKind: "debug-shell" | "debug-describe" | "pod-debug" | "pod-network-debug" =
+    "debug-shell";
   let shellTargetNamespace = "default";
   let shellTargetLabel = "";
   let shellTargetPod: Partial<PodItem> | null = null;
@@ -47,6 +48,8 @@
   let shellOpenedAt: number | null = null;
   let shellLastRunAt: number | null = null;
   let shellCleanupPod: { name: string; namespace: string } | null = null;
+  let shellTargetContainer: string | undefined = undefined;
+  let shellStopArgs: string[] | null = null;
   let sessionClusterId = "";
   let collapsed = false;
   let commandHistory: string[] = loadShellHistory();
@@ -141,6 +144,9 @@
       sessionClusterId
     ) {
       void deletePodDebugCleanup(shellCleanupPod, sessionClusterId).catch(() => undefined);
+    }
+    if (!podDebugCleanupHandled && shellStopArgs && sessionClusterId) {
+      void stopSessionContainer(shellStopArgs, sessionClusterId).catch(() => undefined);
     }
     stopDragging();
     stopResizing();
@@ -281,6 +287,8 @@
     shellOpenedAt = null;
     shellLastRunAt = null;
     shellCleanupPod = null;
+    shellTargetContainer = undefined;
+    shellStopArgs = null;
     sessionClusterId = "";
     shellCommand = "kubectl get pods -A";
     shellMode = "debug";
@@ -467,6 +475,8 @@
     shellOpenedAt = state.openedAt ?? Date.now();
     shellLastRunAt = null;
     shellCleanupPod = state.cleanupPod ?? null;
+    shellTargetContainer = state.targetContainer;
+    shellStopArgs = state.stopArgs ?? null;
     sessionClusterId = clusterId;
     shellCommand = state.preset?.commandLine ?? getPodSessionInitialCommand(shellMode);
     resetHistoryNavigation();
@@ -506,11 +516,17 @@
           );
         }
         shellReady = true;
-        const mainContainer = shellTargetPod ? pickMainContainer(shellTargetPod) : undefined;
+        const mainContainer =
+          shellTargetContainer ?? (shellTargetPod ? pickMainContainer(shellTargetPod) : undefined);
         const containerInfo = mainContainer ? ` (container: ${mainContainer})` : "";
         appendShellOutput(
           `\n✅ ${shellMode === "pod-attach" ? "Attached" : "Connected"} to ${shellTargetNamespace}/${shellTargetLabel}${containerInfo}`,
         );
+        if (shellSessionKind === "pod-network-debug") {
+          appendShellOutput(
+            "Each command runs on its own, without a terminal, and the next one waits for it. Give long-running tools a limit, for example tcpdump -c 20 or ping -c 3.",
+          );
+        }
       }
     } catch (error) {
       if (!isSessionActive(sessionId)) return;
@@ -578,7 +594,7 @@
     }
 
     // pod-exec: run command inside a new shell in the container
-    const args = buildPodShellExecArgs(shellTargetPod!, command);
+    const args = buildPodShellExecArgs(shellTargetPod!, command, shellTargetContainer);
     const result = await kubectlRawArgsFront(args, {
       clusterId: sessionClusterId,
     });
@@ -652,9 +668,31 @@
     podDebugCleanupHandled = true;
   }
 
+  async function stopSessionContainer(args: string[], clusterId: string) {
+    podDebugCleanupHandled = true;
+    await kubectlRawArgsFront(args, { clusterId });
+  }
+
   async function handleClose() {
     if (shellBusy) return;
     if (shellMode === "debug") {
+      closeShellModal(windowState.id);
+      return;
+    }
+    if (shellSessionKind === "pod-network-debug" && shellStopArgs) {
+      const confirmed = await confirmAction(
+        `Close network debug for ${shellTargetNamespace}/${shellTargetPod?.metadata?.name ?? shellTargetLabel}?\n\nThe debug container ${shellTargetContainer ?? ""} stops now. Kubernetes keeps it listed in the pod as terminated until the pod is recreated.`,
+        "Confirm close",
+      );
+      if (!confirmed) return;
+      shellBusy = true;
+      try {
+        await stopSessionContainer(shellStopArgs, sessionClusterId);
+      } catch {
+        // It stops by itself after an hour; closing the window must not fail on this.
+      } finally {
+        shellBusy = false;
+      }
       closeShellModal(windowState.id);
       return;
     }

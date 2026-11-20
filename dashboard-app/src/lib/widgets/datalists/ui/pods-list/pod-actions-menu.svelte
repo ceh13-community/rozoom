@@ -14,6 +14,7 @@
   import Search from "@lucide/svelte/icons/search";
   import Terminal from "@lucide/svelte/icons/terminal";
   import Link2 from "@lucide/svelte/icons/link-2";
+  import Network from "@lucide/svelte/icons/network";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
   import ScrollText from "@lucide/svelte/icons/scroll-text";
   import Trash from "@lucide/svelte/icons/trash";
@@ -55,6 +56,8 @@
     onCopyDescribe: () => void;
     onRunDebugDescribe: () => void;
     onCopyDebug: () => void;
+    /** Shown only when given: needs a cluster that allows ephemeral containers. */
+    onNetworkDebug?: () => void;
     onPreviousLogs: () => void;
     onPortForward: () => void;
     onEvict: () => void;
@@ -97,6 +100,7 @@
     onCopyDescribe,
     onRunDebugDescribe,
     onCopyDebug,
+    onNetworkDebug,
     onPreviousLogs,
     onPortForward,
     onEvict,
@@ -206,6 +210,12 @@
         <DropdownMenu.Item onSelect={() => selectAction(onCopyDebug)}>
           <Copy class="mr-2 h-4 w-4" />
           Copy kubectl debug
+        </DropdownMenu.Item>
+      {/if}
+      {#if onNetworkDebug}
+        <DropdownMenu.Item onSelect={() => selectAction(onNetworkDebug)}>
+          <Network class="mr-2 h-4 w-4" />
+          Network debug (netshoot)
         </DropdownMenu.Item>
       {/if}
       {#if showInvestigate}

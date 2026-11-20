@@ -22,7 +22,11 @@ export type ShellWindowState = {
     name: string;
     namespace: string;
   };
-  sessionKind?: "debug-shell" | "debug-describe" | "pod-debug";
+  /** Container the pod shell runs commands in; the main container when absent. */
+  targetContainer?: string;
+  /** kubectl arguments that stop the session's own container when the window closes. */
+  stopArgs?: string[];
+  sessionKind?: "debug-shell" | "debug-describe" | "pod-debug" | "pod-network-debug";
 };
 
 export const shellModalState = writable<ShellWindowState[]>([]);
@@ -108,6 +112,29 @@ export function openPodDebugShellModal(
       cleanupPod: options.cleanupPod,
       sessionLabel: options.sessionLabel,
       sessionKind: "pod-debug",
+    },
+  ]);
+}
+
+/** Pod shell inside an ephemeral debug container that the session started and stops on close. */
+export function openPodNetworkDebugShellModal(
+  clusterId: string,
+  pod: Partial<PodItem>,
+  options: { container: string; stopArgs: string[]; sessionLabel: string },
+) {
+  if (!clusterId) return;
+  shellModalState.update((items) => [
+    ...items,
+    {
+      id: buildWindowId(clusterId, pod),
+      clusterId,
+      targetPod: pod,
+      openedAt: Date.now(),
+      podSessionMode: "exec",
+      targetContainer: options.container,
+      stopArgs: options.stopArgs,
+      sessionLabel: options.sessionLabel,
+      sessionKind: "pod-network-debug",
     },
   ]);
 }
