@@ -69,6 +69,24 @@ describe("workbench reveal after a row action", () => {
     expect(document.activeElement).toBe(region);
   });
 
+  it("leaves focus and scroll alone when the person types in a field outside the panel", async () => {
+    const view = render(MultiPaneWorkbench, { props: props({ revealToken: null }) });
+    await settle();
+    const filter = document.createElement("input");
+    filter.placeholder = "Filter pods...";
+    document.body.append(filter);
+    filter.focus();
+    scroll.mockClear();
+
+    // The cluster request finishes while the person is typing in the filter.
+    await view.rerender(props({ revealToken: 1 }));
+    await settle();
+
+    expect(document.activeElement).toBe(filter);
+    expect(scroll).not.toHaveBeenCalled();
+    filter.remove();
+  });
+
   it("closes the active tab on Esc and gives focus back to the row menu", async () => {
     const onCloseTab = vi.fn();
     const view = render(MultiPaneWorkbench, { props: props({ revealToken: 1, onCloseTab }) });

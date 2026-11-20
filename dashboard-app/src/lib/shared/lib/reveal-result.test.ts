@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { restoreFocus, revealBlock, revealResult } from "./reveal-result";
+import { isTypingOutside, restoreFocus, revealBlock, revealResult } from "./reveal-result";
 
 describe("revealResult", () => {
   afterEach(() => {
@@ -51,5 +51,41 @@ describe("revealResult", () => {
     button.remove();
     expect(restoreFocus(button)).toBe(false);
     expect(restoreFocus(null)).toBe(false);
+  });
+});
+
+describe("isTypingOutside", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  function make<K extends keyof HTMLElementTagNameMap>(tag: K, parent: Element = document.body) {
+    const el = document.createElement(tag);
+    parent.append(el);
+    return el;
+  }
+
+  it("is true for a text field, textarea, select or editable element outside the panel", () => {
+    const panel = make("section");
+    const text = make("input");
+    const search = make("input");
+    search.type = "search";
+    const editable = make("div");
+    editable.contentEditable = "true";
+    Object.defineProperty(editable, "isContentEditable", { value: true });
+    for (const el of [text, search, make("textarea"), make("select"), editable]) {
+      expect(isTypingOutside(el, panel)).toBe(true);
+    }
+  });
+
+  it("is false for buttons, checkboxes, the body and fields inside the panel", () => {
+    const panel = make("section");
+    const checkbox = make("input");
+    checkbox.type = "checkbox";
+    expect(isTypingOutside(make("button"), panel)).toBe(false);
+    expect(isTypingOutside(checkbox, panel)).toBe(false);
+    expect(isTypingOutside(document.body, panel)).toBe(false);
+    expect(isTypingOutside(null, panel)).toBe(false);
+    expect(isTypingOutside(make("input", panel), panel)).toBe(false);
   });
 });

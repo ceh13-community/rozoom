@@ -34,6 +34,29 @@ export function revealResult(target: HTMLElement, options: { focus?: boolean } =
   if (options.focus ?? true) target.focus({ preventScroll: true });
 }
 
+/**
+ * True when the person is typing in a field outside `root`. The result of a row action
+ * arrives after a cluster request; by then they may have moved on to a filter or a form,
+ * and a reveal would pull the caret and the page away from what they type.
+ */
+export function isTypingOutside(active: Element | null, root: Element): boolean {
+  if (!(active instanceof HTMLElement) || root.contains(active)) return false;
+  if (active.isContentEditable) return true;
+  if (active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement) return true;
+  if (!(active instanceof HTMLInputElement)) return false;
+  return ![
+    "button",
+    "checkbox",
+    "radio",
+    "submit",
+    "reset",
+    "image",
+    "file",
+    "range",
+    "color",
+  ].includes(active.type);
+}
+
 /** Focus the element that had it before, when it is still on the page. */
 export function restoreFocus(trigger: Element | null | undefined): boolean {
   if (!(trigger instanceof HTMLElement) || !trigger.isConnected) return false;

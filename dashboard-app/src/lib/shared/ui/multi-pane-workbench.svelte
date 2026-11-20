@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, tick } from "svelte";
-  import { restoreFocus, revealResult } from "$shared/lib/reveal-result";
+  import { isTypingOutside, restoreFocus, revealResult } from "$shared/lib/reveal-result";
   import type { Snippet } from "svelte";
   import Pin from "@lucide/svelte/icons/pin";
   import PinOff from "@lucide/svelte/icons/pin-off";
@@ -129,6 +129,9 @@
     const root = rootEl;
     if (!root) return;
     const active = document.activeElement;
+    // The request behind the reveal may take seconds: no scroll and no focus when the
+    // person has started typing somewhere else meanwhile.
+    if (isTypingOutside(active, root)) return;
     if (active && !root.contains(active)) revealTrigger = active;
     revealResult(root);
   }
