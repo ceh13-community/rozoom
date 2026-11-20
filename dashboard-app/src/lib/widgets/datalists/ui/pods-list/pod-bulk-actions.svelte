@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Button } from "$shared/ui/button";
+  import { ATTACH_HINT, SHELL_HINT } from "./pod-access-hints";
   import { Trash } from "$shared/ui/icons";
   import Archive from "@lucide/svelte/icons/archive";
   import Bug from "@lucide/svelte/icons/bug";
@@ -81,12 +82,12 @@
 
 <div class="flex items-center gap-1">
   {#if canOpenShell}
-    <Button variant="ghost" size="icon" aria-label="Shell" title="Shell" disabled={false} onclick={onShell}>
+    <Button variant="ghost" size="icon" aria-label="Shell" title={`Shell: ${SHELL_HINT}`} disabled={false} onclick={onShell}>
       <Terminal class="h-4 w-4" />
     </Button>
   {/if}
   {#if canAttach}
-    <Button variant="ghost" size="icon" aria-label="Attach pod" title="Attach pod" disabled={false} onclick={onAttach}>
+    <Button variant="ghost" size="icon" aria-label="Attach pod" title={`Attach pod: ${ATTACH_HINT}`} disabled={false} onclick={onAttach}>
       <Plug class="h-4 w-4" />
     </Button>
   {/if}

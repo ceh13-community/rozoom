@@ -1,6 +1,8 @@
 <script lang="ts">
   import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
   import LoadingDots from "$shared/ui/loading-dots.svelte";
+  import CircleAlert from "@lucide/svelte/icons/circle-alert";
+  import { DISK_USAGE_HINT, PVC_USAGE_NOTICES, type PvcUsageNotice } from "./pvc-usage-notice";
 
   interface Props {
     clusterId: string;
@@ -13,7 +15,7 @@
   let usedBytes = $state<number | null>(null);
   let capacityBytes = $state<number | null>(null);
   let loading = $state(true);
-  let error = $state<string | null>(null);
+  let notice = $state<PvcUsageNotice | null>(null);
 
   function formatGiB(bytes: number): string {
     if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(0)} Mi`;
@@ -22,7 +24,7 @@
 
   async function resolve() {
     loading = true;
-    error = null;
+    notice = null;
     try {
       // 1. Find pods that mount this PVC
       const podsResult = await kubectlRawArgsFront(
@@ -30,7 +32,7 @@
         { clusterId },
       );
       if (podsResult.errors || podsResult.code !== 0) {
-        error = "Cannot list pods";
+        notice = PVC_USAGE_NOTICES.cannotListPods;
         return;
       }
 
@@ -54,7 +56,7 @@
       }
 
       if (!targetNode) {
-        error = "No running pod mounts this PVC";
+        notice = PVC_USAGE_NOTICES.noPodUsesClaim;
         return;
       }
 
@@ -64,7 +66,7 @@
         { clusterId },
       );
       if (statsResult.errors || statsResult.code !== 0) {
-        error = "Cannot access kubelet stats";
+        notice = PVC_USAGE_NOTICES.cannotReadNodeStats;
         return;
       }
 
@@ -91,9 +93,9 @@
         }
       }
 
-      error = "Volume stats not available for this PVC";
+      notice = PVC_USAGE_NOTICES.noStatsForClaim;
     } catch {
-      error = "Failed to fetch volume stats";
+      notice = PVC_USAGE_NOTICES.failed;
     } finally {
       loading = false;
     }
@@ -124,12 +126,17 @@
 <div class="mt-4">
 {#if loading}
   <div class="text-xs text-muted-foreground">Checking disk usage<LoadingDots /></div>
-{:else if error}
-  <div class="text-xs text-muted-foreground">{error}</div>
+{:else if notice?.kind === "error"}
+  <div class="flex items-start gap-1.5 text-xs text-destructive" role="status">
+    <CircleAlert class="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+    <span>{notice.text}</span>
+  </div>
+{:else if notice}
+  <div class="text-xs text-muted-foreground">{notice.text}</div>
 {:else if usagePercent !== null && usedBytes !== null && capacityBytes !== null}
   <div class="rounded border bg-muted/10 p-3">
     <div class="mb-1 flex items-center justify-between text-xs">
-      <span class="font-medium">Disk Usage</span>
+      <span class="font-medium" title={DISK_USAGE_HINT}>Disk Usage</span>
       <span class={usagePercent >= 90 ? "text-rose-400 font-semibold" : usagePercent >= 75 ? "text-amber-400" : "text-emerald-400"}>
         {usagePercent}%
       </span>

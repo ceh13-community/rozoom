@@ -19,6 +19,7 @@
     getPodSessionInitialCommand,
     pickMainContainer,
   } from "$widgets/datalists/ui/pods-list/pod-shell";
+  import { podSessionLine } from "$widgets/datalists/ui/pods-list/pod-access-hints";
   import { parseCliCommand, SUPPORTED_CLI_TOOLS } from "$widgets/shell/lib/parse-cli-command";
   import { startPodOutputStream, type PodOutputStream } from "$widgets/shell/model/pod-output-stream";
   import {
@@ -949,6 +950,14 @@
           {shellStatus.label}
         </span>
       </div>
+      {#if shellMode !== "debug"}
+        <div class="mt-0.5 text-xs text-slate-400" data-testid="pod-session-line">
+          {podSessionLine(
+            shellMode,
+            shellTargetContainer ?? (shellTargetPod ? pickMainContainer(shellTargetPod) : undefined),
+          )}
+        </div>
+      {/if}
     </div>
     <div class="flex items-center gap-2">
       <Button
