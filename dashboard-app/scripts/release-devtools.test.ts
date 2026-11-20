@@ -19,27 +19,36 @@ function enablesDevtools(toml: string): boolean {
   return /devtools/i.test(withoutComments(toml));
 }
 
-const TAURI_LINE = 'tauri = { version = "2.9", features = [] }';
+// Read the tauri line with its current version, so a version bump does not break this test.
+const tauriLine = /^tauri = \{ version = "([^"]+)", features = \[\] \}$/m.exec(cargoToml);
+const TAURI_LINE = tauriLine?.[0] ?? "";
+const TAURI_VERSION = tauriLine?.[1] ?? "";
 
 describe("release builds ship without the web inspector", () => {
   it("src-tauri/Cargo.toml does not enable the devtools feature", () => {
-    expect(cargoToml).toContain(TAURI_LINE);
+    expect(tauriLine).not.toBeNull();
     expect(enablesDevtools(cargoToml)).toBe(false);
   });
 
   it.each([
     [
       "feature on the tauri line",
-      cargoToml.replace(TAURI_LINE, 'tauri = { version = "2.9", features = ["devtools"] }'),
+      cargoToml.replace(
+        TAURI_LINE,
+        `tauri = { version = "${TAURI_VERSION}", features = ["devtools"] }`,
+      ),
     ],
     [
       "feature on the next line",
-      cargoToml.replace(TAURI_LINE, 'tauri = { version = "2.9", features = [\n  "devtools",\n] }'),
+      cargoToml.replace(
+        TAURI_LINE,
+        `tauri = { version = "${TAURI_VERSION}", features = [\n  "devtools",\n] }`,
+      ),
     ],
     ["default feature of this crate", `${cargoToml}\n[features]\ndefault = ["tauri/devtools"]\n`],
     [
       "target-specific dependency",
-      `${cargoToml}\n[target.'cfg(windows)'.dependencies]\ntauri = { version = "2.9", features = ["devtools"] }\n`,
+      `${cargoToml}\n[target.'cfg(windows)'.dependencies]\ntauri = { version = "${TAURI_VERSION}", features = ["devtools"] }\n`,
     ],
     [
       "wry as a direct dependency",
@@ -50,7 +59,7 @@ describe("release builds ship without the web inspector", () => {
     ],
     [
       "table form of the tauri dependency",
-      `${cargoToml.replace(TAURI_LINE, "")}\n[dependencies.tauri]\nversion = "2.9"\nfeatures = ["devtools"]\n`,
+      `${cargoToml.replace(TAURI_LINE, "")}\n[dependencies.tauri]\nversion = "${TAURI_VERSION}"\nfeatures = ["devtools"]\n`,
     ],
   ])("catches the feature turned on as %s", (_, toml) => {
     expect(enablesDevtools(toml)).toBe(true);
