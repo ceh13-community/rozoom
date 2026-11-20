@@ -6,7 +6,9 @@ const CACHE_MS = 30 * 1000;
 const REQUEST_TIMEOUT = "10s";
 const KUBECTL_CALL_TIMEOUT_MS = 12_000;
 const RETENTION_MS = 24 * 60 * 60 * 1000;
-const MAX_EVENTS = 500;
+/** At most this many warning events are kept, newest first; a full list may be cut. */
+export const MAX_WARNING_EVENTS = 500;
+const MAX_EVENTS = MAX_WARNING_EVENTS;
 const WARNING_THRESHOLD = 5;
 const CRITICAL_THRESHOLD = 15;
 
@@ -88,7 +90,13 @@ function mapEvents(events: RawEvent[]): WarningEventItem[] {
     });
   }
 
-  return items.sort((a, b) => b.timestamp - a.timestamp).slice(0, MAX_EVENTS);
+  return items.sort((a, b) => b.timestamp - a.timestamp);
+}
+
+function countByKind(items: WarningEventItem[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const item of items) counts[item.objectKind] = (counts[item.objectKind] ?? 0) + 1;
+  return counts;
 }
 
 function summarize(
@@ -148,6 +156,7 @@ export async function checkWarningEvents(
 
   let errorMessage: string | undefined;
   let items: WarningEventItem[] = [];
+  let kindCounts: Record<string, number> | undefined;
 
   try {
     const result = await withTimeout(
@@ -163,7 +172,9 @@ export async function checkWarningEvents(
       await logError(`Warning events fetch failed: ${errorMessage}`);
     } else {
       const parsed = parseJson(result.output);
-      items = parsed?.items ? mapEvents(parsed.items) : [];
+      const all = parsed?.items ? mapEvents(parsed.items) : [];
+      kindCounts = countByKind(all);
+      items = all.slice(0, MAX_EVENTS);
     }
   } catch (error) {
     errorMessage = error instanceof Error ? error.message : "Failed to fetch warning events.";
@@ -175,6 +186,7 @@ export async function checkWarningEvents(
     status: summary.status,
     summary: { ...summary, updatedAt: Date.now() },
     items,
+    kindCounts,
     errors: errorMessage,
     updatedAt: Date.now(),
   };

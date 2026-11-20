@@ -462,7 +462,7 @@ describe("updateClusterCheckPartially", () => {
           namespaces: [],
           podRestarts: [],
           cronJobs: 0,
-          cronJobsHealth: emptyCronJobsHealth,
+          cronJobsHealth: { ...emptyCronJobsHealth, deferred: true },
           nodes: null,
           metricsChecks: { endpoints: {} },
           timestamp: mockTimestamp,

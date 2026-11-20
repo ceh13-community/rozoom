@@ -4,6 +4,7 @@ import type {
   WarningEventItem,
 } from "$features/check-health/model/types";
 import type { WorkloadOverview } from "$shared";
+import { MAX_WARNING_EVENTS } from "$features/check-health";
 import {
   hasCoreMetricsSourcesUnavailable,
   METRICS_BANNER_PIPELINE,
@@ -328,22 +329,33 @@ function buildComponentCheck(params: {
  * events count. With neither, "no warning events" would only mean "not read" (no access,
  * diagnostics paused), and the tiles said OK.
  */
+export type WorkloadWarningEvents = {
+  items: WarningEventItem[];
+  /** Exact counts per kind over the whole list, when the source kept them. */
+  kindCounts?: Record<string, number> | null;
+};
+
 export function pickWorkloadWarningEvents(params: {
   overviewItems: WarningEventItem[];
+  overviewKindCounts?: Record<string, number> | null;
   overviewEventsLoaded: boolean;
   overviewEventsError: string | null;
   checks: ClusterHealthChecks | null;
-}): WarningEventItem[] | null {
-  if (params.overviewEventsLoaded && !params.overviewEventsError) return params.overviewItems;
+}): WorkloadWarningEvents | null {
+  if (params.overviewEventsLoaded && !params.overviewEventsError) {
+    return { items: params.overviewItems, kindCounts: params.overviewKindCounts ?? null };
+  }
   const report = params.checks?.warningEvents;
-  if (report && !report.errors && report.status !== "unknown") return report.items;
+  if (report && !report.errors && report.status !== "unknown") {
+    return { items: report.items, kindCounts: report.kindCounts ?? null };
+  }
   return null;
 }
 
 export function buildOverviewResourceInsights(
   overview: WorkloadOverview,
   checks: ClusterHealthChecks | null,
-  warningItems: WarningEventItem[] | null,
+  warningEvents: WorkloadWarningEvents | null,
 ): OverviewResourceInsight[] {
   return OVERVIEW_RESOURCE_ORDER.map((key) => {
     const quantity = overview[key].quantity;
@@ -395,12 +407,19 @@ export function buildOverviewResourceInsights(
     }
 
     if (key === "cronjobs") {
-      if (!checks) {
+      // Zero counts mean "no problems" only from a check that ran: not before the first
+      // result, not from the placeholder of a deferred check, not from a failed one.
+      const cronJobsHealth = checks?.cronJobsHealth;
+      if (!cronJobsHealth || cronJobsHealth.deferred) {
         const reason = "No cronjob check results yet.";
         return { key, title, route, quantity, severity: "unknown", reason, kubectlHint };
       }
+      if (cronJobsHealth.error) {
+        const reason = "Cron job check failed.";
+        return { key, title, route, quantity, severity: "unknown", reason, kubectlHint };
+      }
       // Older cached check results have no summary yet.
-      const summary = checks.cronJobsHealth.summary as CronJobsHealthSummary | undefined;
+      const summary = cronJobsHealth.summary as CronJobsHealthSummary | undefined;
       const critical = summary?.critical ?? 0;
       const warning = summary?.warning ?? 0;
       const severity = critical > 0 ? "critical" : warning > 0 ? "warning" : "ok";
@@ -420,13 +439,29 @@ export function buildOverviewResourceInsights(
       replicasets: ["ReplicaSet"],
       jobs: ["Job"],
     };
-    if (!warningItems) {
+    if (!warningEvents) {
       const reason = "Warning events not loaded.";
       return { key, title, route, quantity, severity: "unknown", reason, kubectlHint };
     }
-    const warningCount = eventCountForKind(warningItems, kindMap[key] ?? []);
+    const kinds = kindMap[key] ?? [];
+    const { kindCounts } = warningEvents;
+    if (kindCounts) {
+      const exact = kinds.reduce((sum, kind) => sum + (kindCounts[kind] ?? 0), 0);
+      const reason = buildWorkloadReason(title, exact);
+      return { key, title, route, quantity, severity: eventSeverity(exact), reason, kubectlHint };
+    }
+    const warningCount = eventCountForKind(warningEvents.items, kinds);
+    // Without counts the list holds only the newest MAX_WARNING_EVENTS. When it is full, a
+    // kind with none in it may still have older warnings, and a count is a lower bound.
+    const listIsCut = warningEvents.items.length >= MAX_WARNING_EVENTS;
+    if (listIsCut && warningCount === 0) {
+      const reason = `None of the newest ${MAX_WARNING_EVENTS} warning events; older ones not loaded.`;
+      return { key, title, route, quantity, severity: "unknown", reason, kubectlHint };
+    }
     const severity = eventSeverity(warningCount);
-    const reason = buildWorkloadReason(title, warningCount);
+    const reason = listIsCut
+      ? `${warningCount}+ warning events.`
+      : buildWorkloadReason(title, warningCount);
     return { key, title, route, quantity, severity, reason, kubectlHint };
   });
 }

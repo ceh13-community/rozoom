@@ -266,6 +266,8 @@
   let clusterHealth = $state<ClusterHealthChecks | null>(null);
   let clusterHealthError = $state<string | null>(null);
   let warningItems = $state<WarningEventItem[]>([]);
+  // Per-kind counts over the whole event list; null when only the cut list is known.
+  let warningKindCounts = $state<Record<string, number> | null>(null);
   let cpuAveragePercent = $state<number | null>(null);
   let memoryAveragePercent = $state<number | null>(null);
   let cpuReservedCores = $state<number | null>(null);
@@ -355,6 +357,7 @@
     if (!overview) return [];
     const workloadEvents = pickWorkloadWarningEvents({
       overviewItems: warningItems,
+      overviewKindCounts: warningKindCounts,
       overviewEventsLoaded: eventsHydrated,
       overviewEventsError: eventsError,
       checks: clusterHealth,
@@ -556,6 +559,7 @@
     certificatesRows = snapshot.certificatesRows;
     rotationRows = snapshot.rotationRows;
     warningItems = snapshot.warningItems;
+    warningKindCounts = null;
     eventsError = snapshot.eventsError;
     certificatesError = snapshot.certificatesError;
     clusterHealth = snapshot.clusterHealth;
@@ -768,6 +772,7 @@
     lastCertificatesSuccessAt = 0;
     overviewWatchedEventsStore = readable([]);
     warningItems = [];
+    warningKindCounts = null;
     eventsError = null;
     certificatesError = null;
     clusterHealth = null;
@@ -1009,6 +1014,7 @@
 
       if (watcherActive && (watcherItems.length > 0 || eventsHydrated)) {
         warningItems = watcherItems;
+        warningKindCounts = null;
         const mappedRows = await mapWithMainThreadYield(
           watcherItems.slice(0, OVERVIEW_EVENTS_ROWS_MAX),
           formatEvent,
@@ -1035,6 +1041,7 @@
         );
         if (!isRefreshTokenActive(token, clusterId) || eventsInFlightTokenId !== token.id) return;
         warningItems = report.items;
+        warningKindCounts = report.kindCounts ?? null;
         setInitialOverviewWarningEvents(clusterId, report.items);
         const mappedRows = await mapWithMainThreadYield(
           report.items.slice(0, OVERVIEW_EVENTS_ROWS_MAX),
@@ -1052,6 +1059,7 @@
       if (!shouldKeepStaleSection(lastEventsSuccessAt, eventsRows.length)) {
         eventsRows = [];
         warningItems = [];
+    warningKindCounts = null;
       }
     } finally {
       if (eventsWatchdog) {

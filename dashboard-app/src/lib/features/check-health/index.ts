@@ -40,7 +40,7 @@ export { checkApiServerLatency } from "./api/check-api-server-latency";
 export { checkCertificatesHealth } from "./api/check-certificates-health";
 export { checkPodIssues } from "./api/check-pod-issues";
 export { checkAdmissionWebhooks } from "./api/check-admission-webhooks";
-export { checkWarningEvents } from "./api/check-warning-events";
+export { checkWarningEvents, MAX_WARNING_EVENTS } from "./api/check-warning-events";
 export { checkBlackboxProbes } from "./api/check-blackbox-probes";
 export { checkResourcesHygiene } from "./api/check-resources-hygiene";
 export { checkHpaStatus } from "./api/check-hpa";
