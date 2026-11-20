@@ -22,7 +22,13 @@ export function buildShortcutGroups(onMac: boolean): ShortcutGroup[] {
   return [
     {
       title: "Everywhere",
-      rows: [{ keys: "Esc", description: "Close the open panel or dialog" }],
+      rows: [
+        { keys: "Esc", description: "Close the open panel or dialog" },
+        // Handled by installUiZoom ($shared/lib/ui-zoom), the Text size control.
+        { keys: `${mod} + =`, description: "Larger text" },
+        { keys: `${mod} + -`, description: "Smaller text" },
+        { keys: `${mod} + 0`, description: "Reset text size" },
+      ],
     },
     {
       title: "Cluster pages",
