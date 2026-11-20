@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { startPortForward, stopPortForward } from "./port-forward";
+import { startPortForward, stopPortForward, usedLocalPorts } from "./port-forward";
 import * as tauriPath from "@tauri-apps/api/path";
 import * as cli from "$shared/api/cli";
 import {
@@ -256,6 +256,32 @@ describe("port-forward", () => {
         error: "Local port 19090 is already in use by another running port-forward.",
       });
       await stopPortForward("key-1");
+    });
+
+    it("reports the local ports of starting and running forwards as used", async () => {
+      let onStdoutLine: ((line: string) => void) | undefined;
+      vi.mocked(cli.spawnCli).mockImplementation(async (_tool, _args, handlers) => {
+        onStdoutLine = handlers?.onStdoutLine;
+        return { command: mockCommand, child: mockChild };
+      });
+
+      const start = startPortForward({
+        namespace: mockNamespace,
+        resource: "pod/web-a",
+        remotePort: 80,
+        localPort: 30080,
+        clusterId: mockClusterId,
+        uniqueKey: "used-key",
+      });
+      expect(usedLocalPorts().has(30080)).toBe(true);
+      await vi.advanceTimersByTimeAsync(100);
+      onStdoutLine?.("Forwarding from 127.0.0.1:30080 -> 80");
+      await vi.advanceTimersByTimeAsync(100);
+      await start;
+      expect(usedLocalPorts().has(30080)).toBe(true);
+
+      await stopPortForward("used-key");
+      expect(usedLocalPorts().has(30080)).toBe(false);
     });
 
     it("prevents concurrent start race on the same local port", async () => {
