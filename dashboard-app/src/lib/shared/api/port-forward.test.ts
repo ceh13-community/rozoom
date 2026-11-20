@@ -7,9 +7,11 @@ import {
   resetPortForwardTelemetry,
 } from "$shared/lib/port-forward-telemetry";
 import type { Child, Command, IOPayload } from "@tauri-apps/plugin-shell";
+import { error as logError } from "@tauri-apps/plugin-log";
 
 vi.mock("@tauri-apps/api/path");
 vi.mock("@/lib/shared/api/cli");
+vi.mock("@tauri-apps/plugin-log", () => ({ error: vi.fn().mockResolvedValue(undefined) }));
 
 describe("port-forward", () => {
   const mockAppDataDir = "/mock/app/data";
@@ -164,6 +166,35 @@ describe("port-forward", () => {
         success: false,
         error: "Port-forward already running for this key",
       });
+    });
+
+    // The reason was shown only in a toast before, so a failed start left nothing in logs.log.
+    it("writes a failed start to the app log with the ports and kubectl's reason", async () => {
+      let onStderrLine: ((line: string) => void) | undefined;
+      vi.mocked(cli.spawnCli).mockImplementation(async (_tool, _args, handlers) => {
+        onStderrLine = handlers?.onStderrLine;
+        return { command: mockCommand, child: mockChild };
+      });
+
+      const startPromise = startPortForward({
+        namespace: "payments",
+        resource: "pod/web-frontend-1",
+        remotePort: 80,
+        localPort: 30080,
+        clusterId: mockClusterId,
+        uniqueKey: mockUniqueKey,
+      });
+      await vi.advanceTimersByTimeAsync(100);
+      onStderrLine?.("error: unable to listen on any of the requested ports: [{30080 80}]");
+      await vi.advanceTimersByTimeAsync(5100);
+      const result = await startPromise;
+
+      expect(result.success).toBe(false);
+      expect(logError).toHaveBeenCalledWith(
+        `[port-forward] start failed cluster=${mockClusterId} namespace=payments ` +
+          "resource=pod/web-frontend-1 ports=30080:80 " +
+          "reason=error: unable to listen on any of the requested ports: [{30080 80}]",
+      );
     });
 
     it("should return error when timeout waiting for ready", async () => {

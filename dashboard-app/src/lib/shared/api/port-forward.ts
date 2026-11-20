@@ -1,5 +1,6 @@
 import { type IOPayload, type Child, type Command as TauriCommand } from "@tauri-apps/plugin-shell";
 import { appDataDir } from "@tauri-apps/api/path";
+import { error as logError } from "@tauri-apps/plugin-log";
 import { writable, get, readonly } from "svelte/store";
 import { spawnCli } from "$shared/api/cli";
 import {
@@ -220,6 +221,7 @@ export async function startPortForward(
         namespace: startArgs.namespace,
         resource: startArgs.resource,
       });
+      logStartFailure(startArgs, localPort, lastErr ?? "not ready after 5 s");
       return { success: false, error: lastErr ?? "Port-forward not ready (timeout)" };
     }
 
@@ -240,10 +242,23 @@ export async function startPortForward(
       namespace: startArgs.namespace,
       resource: startArgs.resource,
     });
-    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+    const message = err instanceof Error ? err.message : "Unknown error";
+    logStartFailure(startArgs, localPort, message);
+    return { success: false, error: message };
   } finally {
     pendingLocalPorts.delete(localPort);
   }
+}
+
+/**
+ * One logs.log line per failed start. The reason was shown only in a toast, so a report
+ * like "port-forward on pods does not work" left nothing in the log to look at.
+ */
+function logStartFailure(args: StartArgs, localPort: number, reason: string) {
+  const message =
+    `[port-forward] start failed cluster=${args.clusterId} namespace=${args.namespace} ` +
+    `resource=${args.resource} ports=${localPort}:${args.remotePort} reason=${reason}`;
+  void logError(message).catch(() => undefined);
 }
 
 function waitFor(cond: () => boolean, timeoutMs: number) {
