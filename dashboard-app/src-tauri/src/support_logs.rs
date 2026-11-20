@@ -153,6 +153,10 @@ fn about_metadata<R: Runtime>(app: &AppHandle<R>) -> tauri::menu::AboutMetadata<
         website: Some("https://rozoom.app".into()),
         website_label: Some("rozoom.app".into()),
         license: Some("Apache-2.0".into()),
+        // Without an icon GTK shows its "missing image" placeholder in the About dialog.
+        icon: app
+            .default_window_icon()
+            .map(|icon| icon.clone().to_owned()),
         ..Default::default()
     }
 }
