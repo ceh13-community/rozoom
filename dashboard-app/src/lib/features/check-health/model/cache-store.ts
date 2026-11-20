@@ -484,6 +484,7 @@ export const updateClusterCheckPartially = async (
             unknown: 0,
           },
           updatedAt: Date.now(),
+          deferred: true,
         },
         apiServerHealth: {
           live: { ok: false, output: "", error: "Unreachable" },

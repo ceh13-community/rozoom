@@ -4,6 +4,7 @@ import {
   buildControlPlaneChecks,
   buildMetricsUnavailableMessage,
   buildOverviewResourceInsights,
+  pickWorkloadWarningEvents,
   buildUsageCards,
   calculateResourcePressure,
   detectManagedProvider,
@@ -123,7 +124,7 @@ describe("overview-insights", () => {
         count: 1,
       },
     ];
-    const insights = buildOverviewResourceInsights(overview, makeChecks(), warningItems);
+    const insights = buildOverviewResourceInsights(overview, makeChecks(), { items: warningItems });
     const podsInsight = insights.find((item) => item.key === "pods");
     const deploymentsInsight = insights.find((item) => item.key === "deployments");
     expect(podsInsight?.severity).toBe("critical");
@@ -131,7 +132,7 @@ describe("overview-insights", () => {
   });
 
   it("returns resource insights in stable UI order", () => {
-    const insights = buildOverviewResourceInsights(overview, makeChecks(), []);
+    const insights = buildOverviewResourceInsights(overview, makeChecks(), { items: [] });
     expect(insights.map((item) => item.key)).toEqual([
       "pods",
       "deployments",
@@ -444,5 +445,168 @@ describe("overview-insights", () => {
     });
     expect(cards.find((c) => c.id === "cpu")?.title).toBe("CPU usage");
     expect(cards.find((c) => c.id === "memory")?.title).toBe("Memory usage");
+  });
+
+  // A user who may not list workloads, or an Overview with live diagnostics paused, has read
+  // no warning events at all. The tiles said "OK, no warning events" all the same.
+  describe("workload tiles without data", () => {
+    const workloadKeys = ["deployments", "daemonsets", "statefulsets", "replicasets", "jobs"];
+
+    it("shows the workload tiles as unknown when no warning events were read", () => {
+      const insights = buildOverviewResourceInsights(overview, makeChecks(), null);
+      for (const key of workloadKeys) {
+        const insight = insights.find((item) => item.key === key);
+        expect(insight?.severity).toBe("unknown");
+        expect(insight?.reason).toBe("Warning events not loaded.");
+      }
+    });
+
+    it("shows the cronjob tile as unknown before any health check result", () => {
+      const insights = buildOverviewResourceInsights(overview, null, null);
+      const cronjobs = insights.find((item) => item.key === "cronjobs");
+      expect(cronjobs?.severity).toBe("unknown");
+      expect(cronjobs?.reason).toBe("No cronjob check results yet.");
+    });
+
+    it("shows the cronjob tile as unknown for a deferred or failed check", () => {
+      const placeholder = {
+        items: [],
+        summary: { total: 0, ok: 0, warning: 0, critical: 0, unknown: 0 },
+        updatedAt: 1,
+      };
+      const deferred = buildOverviewResourceInsights(
+        overview,
+        makeChecks({ cronJobsHealth: { ...placeholder, deferred: true } }),
+        { items: [] },
+      ).find((item) => item.key === "cronjobs");
+      expect(deferred?.severity).toBe("unknown");
+      expect(deferred?.reason).toBe("No cronjob check results yet.");
+
+      const failed = buildOverviewResourceInsights(
+        overview,
+        makeChecks({ cronJobsHealth: { ...placeholder, error: "forbidden" } }),
+        { items: [] },
+      ).find((item) => item.key === "cronjobs");
+      expect(failed?.severity).toBe("unknown");
+      expect(failed?.reason).toBe("Cron job check failed.");
+
+      const checked = buildOverviewResourceInsights(
+        overview,
+        makeChecks({ cronJobsHealth: placeholder }),
+        { items: [] },
+      ).find((item) => item.key === "cronjobs");
+      expect(checked?.severity).toBe("ok");
+    });
+
+    // The warning event list is cut at the newest 500.
+    it("does not call a workload OK from a cut event list", () => {
+      const jobWarning = (i: number): WarningEventItem => ({
+        timestamp: i,
+        type: "Warning",
+        namespace: "kubearmor",
+        objectKind: "Job",
+        objectName: `snitch-${i}`,
+        reason: "BackoffLimitExceeded",
+        message: "x",
+        count: 1,
+      });
+      const full = Array.from({ length: 500 }, (_, i) => jobWarning(i));
+      const insights = buildOverviewResourceInsights(overview, makeChecks(), { items: full });
+      const deployments = insights.find((item) => item.key === "deployments");
+      expect(deployments?.severity).toBe("unknown");
+      expect(deployments?.reason).toBe(
+        "None of the newest 500 warning events; older ones not loaded.",
+      );
+      const jobs = insights.find((item) => item.key === "jobs");
+      expect(jobs?.severity).toBe("critical");
+      expect(jobs?.reason).toBe("500+ warning events.");
+
+      // With per-kind counts over the whole list the cut does not matter.
+      const counted = buildOverviewResourceInsights(overview, makeChecks(), {
+        items: full,
+        kindCounts: { Job: 812 },
+      });
+      expect(counted.find((item) => item.key === "deployments")?.severity).toBe("ok");
+      expect(counted.find((item) => item.key === "jobs")?.reason).toBe("812 warning events.");
+
+      const notCut = buildOverviewResourceInsights(overview, makeChecks(), {
+        items: full.slice(0, 499),
+      });
+      expect(notCut.find((item) => item.key === "deployments")?.severity).toBe("ok");
+    });
+
+    it("still shows OK when warning events were read and none matched", () => {
+      const insights = buildOverviewResourceInsights(overview, makeChecks(), { items: [] });
+      expect(insights.find((item) => item.key === "deployments")?.severity).toBe("ok");
+    });
+  });
+
+  describe("pickWorkloadWarningEvents", () => {
+    const item: WarningEventItem = {
+      timestamp: 1,
+      type: "Warning",
+      namespace: "default",
+      objectKind: "Deployment",
+      objectName: "api",
+      reason: "Failed",
+      message: "x",
+      count: 1,
+    };
+    const report = (status: "ok" | "unknown", errors?: string) => ({
+      status,
+      summary: { status, warnings: [], updatedAt: 1 },
+      items: [item],
+      kindCounts: { Deployment: 3 },
+      errors,
+      updatedAt: 1,
+    });
+
+    it("prefers the events the Overview loaded itself", () => {
+      expect(
+        pickWorkloadWarningEvents({
+          overviewItems: [],
+          overviewEventsLoaded: true,
+          overviewEventsError: null,
+          checks: makeChecks({ warningEvents: report("ok") }),
+        }),
+      ).toEqual({ items: [], kindCounts: null });
+    });
+
+    it("falls back to the events of the latest health check", () => {
+      expect(
+        pickWorkloadWarningEvents({
+          overviewItems: [],
+          overviewEventsLoaded: false,
+          overviewEventsError: null,
+          checks: makeChecks({ warningEvents: report("ok") }),
+        }),
+      ).toEqual({ items: [item], kindCounts: { Deployment: 3 } });
+    });
+
+    it("returns null when no events were read", () => {
+      const base = { overviewItems: [], overviewEventsLoaded: false, overviewEventsError: null };
+      expect(pickWorkloadWarningEvents({ ...base, checks: null })).toBeNull();
+      expect(pickWorkloadWarningEvents({ ...base, checks: makeChecks() })).toBeNull();
+      expect(
+        pickWorkloadWarningEvents({
+          ...base,
+          checks: makeChecks({ warningEvents: report("ok", "forbidden") }),
+        }),
+      ).toBeNull();
+      expect(
+        pickWorkloadWarningEvents({
+          ...base,
+          checks: makeChecks({ warningEvents: report("unknown") }),
+        }),
+      ).toBeNull();
+      expect(
+        pickWorkloadWarningEvents({
+          overviewItems: [item],
+          overviewEventsLoaded: true,
+          overviewEventsError: "Warning events timeout after 10000ms",
+          checks: null,
+        }),
+      ).toBeNull();
+    });
   });
 });

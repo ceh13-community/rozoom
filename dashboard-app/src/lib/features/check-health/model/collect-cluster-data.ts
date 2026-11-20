@@ -335,6 +335,7 @@ function buildDeferredCronJobsHealth(previous: ClusterHealthChecks | null) {
       unknown: 0,
     },
     updatedAt: Date.now(),
+    deferred: true,
   };
 }
 

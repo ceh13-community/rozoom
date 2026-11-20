@@ -88,6 +88,8 @@ export type CronJobsHealth = {
   summary: CronJobsHealthSummary;
   updatedAt: number;
   error?: string;
+  /** A placeholder with zero counts: the cron job check has not run (light mode, no data). */
+  deferred?: boolean;
 };
 
 export type ApiServerEndpointCheck = {
@@ -834,6 +836,8 @@ export type WarningEventsReport = {
   status: WarningEventsStatus;
   summary: WarningEventsSummary;
   items: WarningEventItem[];
+  /** Warning events per involved object kind, counted before `items` is cut to its limit. */
+  kindCounts?: Record<string, number>;
   errors?: string;
   updatedAt: number;
 };
