@@ -8,7 +8,7 @@ the user-facing change in plain language. The in-app update notification
 deliberately shows fixed copy and never displays these notes.
 The release build fails if the section for the released version is missing.
 
-## [0.26.4] - 2026-11-19
+## [0.26.4] - 2026-11-20
 
 Security release. Inspect Element in the right-click menu and Ctrl+Shift+I
 opened the web inspector, whose console could run any script with the app's
@@ -43,6 +43,9 @@ this update.
   session cannot change the pod's routes or firewall rules. When it is refused,
   the message shows only kubectl's last line, never the output of a credential
   plugin such as a sign-in link or device code.
+- Background kubectl proxy processes could pile up and outlive a crash; each
+  one gave read access to the cluster to any local process. The app now keeps
+  one per cluster.
 
 ### Changed
 
@@ -150,9 +153,6 @@ this update.
   show "Error: No data provided" instead of loading. The main pane had the
   same problem after Pods and back.
 - Closing an Attach window while it was still starting left kubectl running.
-- Background kubectl proxy processes piled up during a long session (one more
-  each time the app reconnected to a cluster) and stayed after a crash. The
-  app now keeps one per cluster and stops the old one.
 - Release notes on the release page and in the update feed no longer break
   sentences in the middle.
 
