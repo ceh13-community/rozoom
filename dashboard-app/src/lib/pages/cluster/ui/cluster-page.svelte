@@ -27,7 +27,6 @@
   import { Button } from "$shared/ui/button";
   import LoadingDots from "$shared/ui/loading-dots.svelte";
   import * as Popover from "$shared/ui/popover";
-  import { confirmAction } from "$shared/lib/confirm-action";
   import { trackCoreAction } from "$shared/analytics/wau-c";
   import { getTimeDifference, timeAgo } from "$shared/lib/timeFormatters";
   import {
@@ -176,6 +175,7 @@
   const WORKSPACE_PANES_KEY = "dashboard.cluster.workspace-panes.v1";
   const PINNED_WORKSPACE_SESSIONS_KEY = "dashboard.cluster.pinned-workspace-sessions.v1";
   const SINGLE_PAGE_HINT_SHOWN_KEY = "dashboard.cluster.single-page-hint-shown.v1";
+  const UNPIN_UNDO_TOAST_MS = 8000;
   const WORKSPACE_ROUTE_TRACE_LIMIT = 100;
   const cluster = $derived(data.slug);
 
@@ -876,51 +876,13 @@
     };
   }
 
-  async function shouldConfirmPinnedRemoval(tabId: string): Promise<boolean> {
-    const session = pinnedWorkspaceSessions[tabId];
-    if (!session || session.layout < 2) return false;
-    const confirmed = await confirmAction(
-      "This pinned tab has a saved split workspace (Pane 2/3). Remove pin and saved workspace session?",
-      "Remove pinned workspace",
-    );
-    return !confirmed;
-  }
-
-  async function togglePinCurrentTab() {
-    const existing = pinnedTabs.find(
-      (tab) => tab.id === currentPinnedTabId && tab.clusterId === cluster,
-    );
-    let next: PinnedClusterTab[];
-
-    if (existing) {
-      if (await shouldConfirmPinnedRemoval(currentPinnedTabId)) return;
-      next = pinnedTabs.filter(
-        (tab) => !(tab.id === currentPinnedTabId && tab.clusterId === cluster),
-      );
-      const remainingSessions = { ...pinnedWorkspaceSessions };
-      delete remainingSessions[currentPinnedTabId];
-      pinnedWorkspaceSessions = remainingSessions;
-      savePinnedWorkspaceSessions(PINNED_WORKSPACE_SESSIONS_KEY, remainingSessions);
-      toast.info("Page unpinned", { duration: 3000 });
-    } else {
-      const current = buildCurrentPinnedTab();
-      const withoutDuplicate = pinnedTabs.filter(
-        (tab) => !(tab.id === current.id && tab.clusterId === current.clusterId),
-      );
-      next = [current, ...withoutDuplicate].slice(0, MAX_PINNED_CLUSTER_TABS);
-      persistPinnedWorkspaceSession(current.id);
-      toast.success("Page pinned", {
-        description: "Workspace layout will be remembered.",
-        duration: 3000,
-      });
-    }
-
-    pinnedTabs = next;
-    savePinnedTabs(PINNED_CLUSTER_TABS_KEY, next);
-  }
-
-  async function removePinnedTab(tabId: string) {
-    if (await shouldConfirmPinnedRemoval(tabId)) return;
+  // Unpin never asks: it removes the chip and its saved layout at once and
+  // offers Undo, which puts both back.
+  function unpinWithUndo(tabId: string) {
+    const index = pinnedTabs.findIndex((tab) => tab.id === tabId);
+    if (index === -1) return;
+    const removedTab = pinnedTabs[index];
+    const removedSession = pinnedWorkspaceSessions[tabId];
     const next = pinnedTabs.filter((tab) => tab.id !== tabId);
     pinnedTabs = next;
     savePinnedTabs(PINNED_CLUSTER_TABS_KEY, next);
@@ -928,6 +890,56 @@
     delete remainingSessions[tabId];
     pinnedWorkspaceSessions = remainingSessions;
     savePinnedWorkspaceSessions(PINNED_WORKSPACE_SESSIONS_KEY, remainingSessions);
+    toast(`Unpinned ${removedTab.label}`, {
+      duration: UNPIN_UNDO_TOAST_MS,
+      action: {
+        label: "Undo",
+        onClick: () => restoreUnpinnedTab(removedTab, removedSession, index),
+      },
+    });
+  }
+
+  function restoreUnpinnedTab(
+    tab: PinnedClusterTab,
+    session: PinnedWorkspaceSession | undefined,
+    index: number,
+  ) {
+    if (pinnedTabs.some((item) => item.id === tab.id)) return;
+    const next = [...pinnedTabs];
+    next.splice(Math.min(index, next.length), 0, tab);
+    pinnedTabs = next.slice(0, MAX_PINNED_CLUSTER_TABS);
+    savePinnedTabs(PINNED_CLUSTER_TABS_KEY, pinnedTabs);
+    if (session) {
+      pinnedWorkspaceSessions = { ...pinnedWorkspaceSessions, [tab.id]: session };
+      savePinnedWorkspaceSessions(PINNED_WORKSPACE_SESSIONS_KEY, pinnedWorkspaceSessions);
+    }
+  }
+
+  async function togglePinCurrentTab() {
+    const existing = pinnedTabs.find(
+      (tab) => tab.id === currentPinnedTabId && tab.clusterId === cluster,
+    );
+    if (existing) {
+      unpinWithUndo(existing.id);
+      return;
+    }
+
+    const current = buildCurrentPinnedTab();
+    const withoutDuplicate = pinnedTabs.filter(
+      (tab) => !(tab.id === current.id && tab.clusterId === current.clusterId),
+    );
+    const next = [current, ...withoutDuplicate].slice(0, MAX_PINNED_CLUSTER_TABS);
+    persistPinnedWorkspaceSession(current.id);
+    toast.success("Page pinned", {
+      description: "Workspace layout will be remembered.",
+      duration: 3000,
+    });
+    pinnedTabs = next;
+    savePinnedTabs(PINNED_CLUSTER_TABS_KEY, next);
+  }
+
+  function removePinnedTab(tabId: string) {
+    unpinWithUndo(tabId);
   }
 
   function openPinnedTab(tab: PinnedClusterTab) {
@@ -1556,12 +1568,14 @@
         </h1>
         <div class="flex flex-wrap items-center gap-2 pt-0.5 sm:gap-3 lg:min-w-0 lg:justify-end">
           {#if workspaceHydrated}
-            <div class="flex items-center gap-1">
+            <div class="flex items-center gap-1" role="group" aria-label="Pane layout">
+              <span class="text-xs text-muted-foreground">Panes</span>
               <Button
                 variant={effectiveWorkspaceLayout === 1 ? "secondary" : "ghost"}
                 class="h-8 px-2 text-xs"
                 type="button"
                 onclick={() => setWorkspaceLayout(1)}
+                aria-pressed={effectiveWorkspaceLayout === 1}
                 title="Single pane - one workload view"
                 aria-label="Single pane layout"
               >
@@ -1572,6 +1586,7 @@
                 class="h-8 px-2 text-xs"
                 type="button"
                 onclick={() => setWorkspaceLayout(2)}
+                aria-pressed={effectiveWorkspaceLayout === 2}
                 title="Dual pane - view two workloads side by side. Each pane can show a different cluster."
                 aria-label="Dual pane layout"
               >
@@ -1582,6 +1597,7 @@
                 class="h-8 px-2 text-xs"
                 type="button"
                 onclick={() => setWorkspaceLayout(3)}
+                aria-pressed={effectiveWorkspaceLayout === 3}
                 title="Triple pane - view three workloads simultaneously. Each pane can show a different cluster."
                 aria-label="Triple pane layout"
               >
@@ -1793,45 +1809,42 @@
           >
             <button
               type="button"
-              class="px-3 py-1.5 text-xs hover:bg-muted/70"
+              class="min-h-6 px-3 py-1.5 text-xs hover:bg-muted/70"
               class:font-semibold={tab.id === currentPinnedTabId}
               onclick={() => openPinnedTab(tab)}
               title={tab.label}
             >
               {tab.label}
               <span
-                class="ml-1 rounded border border-border px-1 py-0.5 text-[10px] text-muted-foreground"
+                class="ml-1 rounded border border-border px-1 py-0.5 text-xs text-muted-foreground"
+                title={`Saved layout: ${workspaceLayoutBadge(tab.id)}`}
               >
                 {workspaceLayoutBadge(tab.id)}
               </span>
             </button>
             {#if workspaceHydrated && effectiveWorkspaceLayout >= 2}
-              <div class="mr-1 flex items-center gap-1 border-l border-border pl-1">
+              <div
+                class="mr-1 flex items-center gap-1 border-l border-border pl-2"
+                role="group"
+                aria-label="Open in pane"
+              >
+                <span class="text-xs text-muted-foreground">Open in:</span>
                 <button
                   type="button"
-                  class="rounded px-1.5 py-1 text-[10px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
-                  onclick={() => openPinnedTab(tab)}
-                  title="Open in Pane 1"
-                  aria-label={`Open ${tab.label} in Pane 1`}
-                >
-                  1
-                </button>
-                <button
-                  type="button"
-                  class="rounded px-1.5 py-1 text-[10px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+                  class="inline-flex h-6 min-w-6 items-center justify-center rounded text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onclick={() => openPinnedTabInPane("pane-2", tab)}
-                  title="Open in Pane 2"
-                  aria-label={`Open ${tab.label} in Pane 2`}
+                  title="Open in pane 2"
+                  aria-label={`Open ${tab.label} in pane 2`}
                 >
                   2
                 </button>
                 {#if effectiveWorkspaceLayout >= 3}
                   <button
                     type="button"
-                    class="rounded px-1.5 py-1 text-[10px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+                    class="inline-flex h-6 min-w-6 items-center justify-center rounded text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     onclick={() => openPinnedTabInPane("pane-3", tab)}
-                    title="Open in Pane 3"
-                    aria-label={`Open ${tab.label} in Pane 3`}
+                    title="Open in pane 3"
+                    aria-label={`Open ${tab.label} in pane 3`}
                   >
                     3
                   </button>
@@ -1840,12 +1853,10 @@
             {/if}
             <button
               type="button"
-              class="px-2 py-1.5 text-muted-foreground hover:text-foreground"
-              onclick={() => {
-                void removePinnedTab(tab.id);
-              }}
-              title="Remove pinned tab"
-              aria-label={`Remove pinned tab ${tab.label}`}
+              class="inline-flex h-6 min-w-6 items-center justify-center px-2 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onclick={() => removePinnedTab(tab.id)}
+              title="Unpin"
+              aria-label={`Unpin ${tab.label}`}
             >
               <X class="h-3.5 w-3.5" />
             </button>
