@@ -1,10 +1,10 @@
 import { derived, get, writable, type Readable } from "svelte/store";
 import type { WarningEventItem } from "../../types";
 import { eventBus } from "../event-bus";
+import { MAX_WARNING_EVENTS as MAX_EVENTS } from "../../../api/check-warning-events";
 import type { WarningEventWatchEvent } from "./warning-events-parser";
 
 const RETENTION_MS = 24 * 60 * 60 * 1000;
-const MAX_EVENTS = 500;
 
 type WarningEventStoreItem = WarningEventItem & { uid: string };
 

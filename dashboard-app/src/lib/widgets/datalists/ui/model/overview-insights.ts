@@ -420,6 +420,12 @@ export function buildOverviewResourceInsights(
       }
       // Older cached check results have no summary yet.
       const summary = cronJobsHealth.summary as CronJobsHealthSummary | undefined;
+      // A check that saw none of the cluster's cron jobs said nothing about them. The
+      // placeholder cached by 0.26.4 has zero counts and no deferred flag.
+      if ((summary?.total ?? 0) === 0 && quantity > 0) {
+        const reason = "No cronjob check results yet.";
+        return { key, title, route, quantity, severity: "unknown", reason, kubectlHint };
+      }
       const critical = summary?.critical ?? 0;
       const warning = summary?.warning ?? 0;
       const severity = critical > 0 ? "critical" : warning > 0 ? "warning" : "ok";

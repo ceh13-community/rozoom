@@ -1059,7 +1059,7 @@
       if (!shouldKeepStaleSection(lastEventsSuccessAt, eventsRows.length)) {
         eventsRows = [];
         warningItems = [];
-    warningKindCounts = null;
+        warningKindCounts = null;
       }
     } finally {
       if (eventsWatchdog) {
