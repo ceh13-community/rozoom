@@ -62,7 +62,10 @@ async function loadTauriUpdater(): Promise<UpdaterPort> {
   };
 }
 
-let inFlight: Promise<void> | null = null;
+/** How a check ended, for Help > Check for Updates. */
+export type UpdateCheckOutcome = "up-to-date" | "update-available" | "failed";
+
+let inFlight: Promise<UpdateCheckOutcome> | null = null;
 
 /**
  * Silent launch-time check. Never throws, never shows UI unless an update was
@@ -70,10 +73,26 @@ let inFlight: Promise<void> | null = null;
  * package install. A failed check (offline, GitHub down, no entry for this
  * platform) is logged and otherwise ignored - it is not the user's problem.
  */
-export function checkForUpdateSilently(port?: UpdaterPort): Promise<void> {
-  if (!port && !isTauriAvailable()) return Promise.resolve();
+export async function checkForUpdateSilently(port?: UpdaterPort): Promise<void> {
+  await runSharedCycle(port, false);
+}
+
+/**
+ * Help > Check for Updates: the same flow as the launch check, but a Linux release notice
+ * is shown again even if it was seen before, and the caller learns how the check ended so
+ * it can say "up to date" or "could not check".
+ */
+export function checkForUpdateManually(port?: UpdaterPort): Promise<UpdateCheckOutcome> {
+  return runSharedCycle(port, true);
+}
+
+function runSharedCycle(
+  port: UpdaterPort | undefined,
+  manual: boolean,
+): Promise<UpdateCheckOutcome> {
+  if (!port && !isTauriAvailable()) return Promise.resolve("failed");
   if (inFlight) return inFlight;
-  inFlight = runUpdateCycle(port).finally(() => {
+  inFlight = runUpdateCycle(port, manual).finally(() => {
     inFlight = null;
   });
   return inFlight;
@@ -83,7 +102,10 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function runUpdateCycle(port?: UpdaterPort): Promise<void> {
+async function runUpdateCycle(
+  port: UpdaterPort | undefined,
+  manual: boolean,
+): Promise<UpdateCheckOutcome> {
   let updater: UpdaterPort;
   try {
     updater = port ?? (await loadTauriUpdater());
@@ -93,13 +115,12 @@ async function runUpdateCycle(port?: UpdaterPort): Promise<void> {
       "warn",
       `[updater] check failed on v${__APP_VERSION__}: ${describeError(error)}`,
     );
-    return;
+    return "failed";
   }
 
   const packageKind = await detectLinuxPackageKind(updater);
   if (packageKind !== null) {
-    await announceLinuxRelease(updater, packageKind);
-    return;
+    return announceLinuxRelease(updater, packageKind, manual);
   }
 
   let update: UpdateHandle | null;
@@ -111,17 +132,18 @@ async function runUpdateCycle(port?: UpdaterPort): Promise<void> {
       "warn",
       `[updater] check failed on v${__APP_VERSION__}: ${describeError(error)}`,
     );
-    return;
+    return "failed";
   }
   if (!update) {
     await safeAppLog("info", `[updater] check ok: v${__APP_VERSION__} is up to date`);
-    return;
+    return "up-to-date";
   }
   await safeAppLog(
     "info",
     `[updater] check ok: v${update.version} available (running v${__APP_VERSION__}), downloading`,
   );
   await downloadAndNotify(updater, update);
+  return "update-available";
 }
 
 /**
@@ -159,7 +181,11 @@ export function releasePageUrl(version: string): string {
   return `${RELEASE_PAGE_PREFIX}${version}`;
 }
 
-async function announceLinuxRelease(updater: UpdaterPort, kind: LinuxPackageKind): Promise<void> {
+async function announceLinuxRelease(
+  updater: UpdaterPort,
+  kind: LinuxPackageKind,
+  manual: boolean,
+): Promise<UpdateCheckOutcome> {
   const target = linuxManifestTarget(kind);
   let update: UpdateHandle | null;
   try {
@@ -170,18 +196,18 @@ async function announceLinuxRelease(updater: UpdaterPort, kind: LinuxPackageKind
       "warn",
       `[updater] check failed on v${__APP_VERSION__} (${target}): ${describeError(error)}`,
     );
-    return;
+    return "failed";
   }
   if (!update) {
     await safeAppLog("info", `[updater] check ok: v${__APP_VERSION__} is up to date (${target})`);
-    return;
+    return "up-to-date";
   }
-  if (readSeenVersion() === update.version) {
+  if (!manual && readSeenVersion() === update.version) {
     await safeAppLog(
       "info",
       `[updater] v${update.version} available (${target}); notice already seen, not repeated`,
     );
-    return;
+    return "update-available";
   }
   await safeAppLog(
     "info",
@@ -203,6 +229,7 @@ async function announceLinuxRelease(updater: UpdaterPort, kind: LinuxPackageKind
     },
   });
   rememberWhenHandled(version);
+  return "update-available";
 }
 
 /**
