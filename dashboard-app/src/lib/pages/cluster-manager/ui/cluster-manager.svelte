@@ -1,6 +1,7 @@
 <script lang="ts">
   import TextSizeControl from "$shared/ui/text-size-control.svelte";
   import { onDestroy, onMount } from "svelte";
+  import { get } from "svelte/store";
   import { dispatchShortcut, SHORTCUTS } from "../lib/keyboard-shortcuts";
   import { toast } from "svelte-sonner";
   import { dev } from "$app/environment";
@@ -87,6 +88,12 @@
   import { inferEnv } from "$features/cluster-manager/model/infer-env";
   import type { FleetStatusBucket } from "$features/cluster-manager/model/fleet-summary";
   import { bucketCluster } from "$features/cluster-manager/model/fleet-summary";
+  import {
+    clustersToRecheck,
+    startConnectivityRefresh,
+  } from "$features/cluster-manager/model/live-connectivity-refresh";
+  import { matchesManagedStatusFilter } from "$features/cluster-manager/model/managed-status-filter";
+  import { checkClusterConnectivity } from "$shared/api/cluster-connectivity-check";
   import {
     clusterConnectivity,
     formatContactTime,
@@ -365,14 +372,24 @@
     if (handled) event.preventDefault();
   }
 
+  // Without this the page kept the last verdict until the user navigated away:
+  // a stopped cluster read Online here while its card already said Unreachable.
+  let stopConnectivityRefresh: (() => void) | null = null;
+
   onMount(async () => {
     window.addEventListener("keydown", handleGlobalKeydown);
+    stopConnectivityRefresh = startConnectivityRefresh({
+      pickClusterIds: () => clustersToRecheck(get(clustersList), get(clusterConnectivity)),
+      check: checkClusterConnectivity,
+      isPageVisible: () => document.visibilityState !== "hidden",
+    });
     await loadData();
     await safeDebugLog(`[Hooks on client]. Is dev? ${dev}`);
   });
 
   onDestroy(() => {
     window.removeEventListener("keydown", handleGlobalKeydown);
+    stopConnectivityRefresh?.();
   });
 
   // Preload auth method info for every managed cluster so the card can
@@ -903,8 +920,14 @@
         };
       })
       .filter((cluster) => {
-        if (managedStatusFilter === "online" && cluster.offline) return false;
-        if (managedStatusFilter === "offline" && !cluster.offline) return false;
+        if (
+          !matchesManagedStatusFilter(managedStatusFilter, {
+            offline: cluster.offline,
+            liveProblem: rowLiveProblem(cluster),
+          })
+        ) {
+          return false;
+        }
         if (managedProviderFilter !== "all" && cluster.provider !== managedProviderFilter) {
           return false;
         }
