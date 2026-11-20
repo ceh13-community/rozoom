@@ -6,6 +6,7 @@ import {
   buildNetworkDebugStartArgs,
   buildNetworkDebugStopArgs,
   describeNetworkDebugRefusal,
+  NetworkDebugRefusal,
   readEphemeralContainerState,
   startPodNetworkDebugSession,
 } from "./pod-network-debug";
@@ -13,14 +14,17 @@ import {
 const kubectlRawArgsFront = vi.hoisted(() => vi.fn());
 const openPodNetworkDebugShellModal = vi.hoisted(() => vi.fn());
 const fs = vi.hoisted(() => ({
-  writeTextFile: vi.fn(async () => undefined),
+  writeTextFile: vi.fn(async (_path: string, _content: string) => undefined),
   remove: vi.fn(async () => undefined),
 }));
 
 vi.mock("$shared/api/kubectl-proxy", () => ({ kubectlRawArgsFront }));
 vi.mock("$features/shell", () => ({ openPodNetworkDebugShellModal }));
 vi.mock("@tauri-apps/plugin-fs", () => fs);
-vi.mock("@tauri-apps/api/path", () => ({ appDataDir: async () => "/app-data" }));
+vi.mock("@tauri-apps/api/path", () => ({
+  appDataDir: async () => "/app-data",
+  join: async (...parts: string[]) => parts.join("/"),
+}));
 
 const podJson = (state: Record<string, unknown>, name = "rozoom-netshoot-abc123") =>
   JSON.stringify({ status: { ephemeralContainerStatuses: [{ name, state }] } });
@@ -85,24 +89,54 @@ describe("pod network debug", () => {
     expect(fs.remove).toHaveBeenCalledWith(path);
   });
 
-  it("explains a Pod Security refusal in plain words and still removes the spec file", async () => {
-    kubectlRawArgsFront.mockResolvedValue({
-      output: "",
-      errors:
-        'Error from server (Forbidden): pods "web-a" is forbidden: violates PodSecurity "baseline:latest": non-default capabilities (container "rozoom-netshoot-abc123" must not include "NET_RAW" in securityContext.capabilities.add)',
-      code: 1,
-    });
+  it("says a Pod Security refusal needs the privileged level and keeps kubectl's line", async () => {
+    const stderr =
+      'Error from server (Forbidden): pods "web-a" is forbidden: violates PodSecurity "baseline:latest": non-default capabilities (container "rozoom-netshoot-abc123" must not include "NET_RAW" in securityContext.capabilities.add)';
+    kubectlRawArgsFront.mockResolvedValue({ output: "", errors: stderr, code: 1 });
 
-    await expect(startPodNetworkDebugSession({ clusterId: "c1", pod })).rejects.toThrow(
-      'Namespace shop does not allow network debug: its Pod Security level "baseline" forbids NET_RAW, the capability that tcpdump, ping and mtr need. A cluster admin can relax the level for this namespace.',
+    const refusal = await startPodNetworkDebugSession({ clusterId: "c1", pod }).catch(
+      (error: unknown) => error,
     );
+
+    expect(refusal).toBeInstanceOf(NetworkDebugRefusal);
+    expect((refusal as NetworkDebugRefusal).message).toBe(
+      'Namespace shop does not allow network debug: its Pod Security level is "baseline", and network debug needs the "privileged" level for the NET_RAW capability that tcpdump, ping and mtr use.',
+    );
+    expect((refusal as NetworkDebugRefusal).detail).toBe(stderr);
     expect(fs.remove).toHaveBeenCalledTimes(1);
     expect(openPodNetworkDebugShellModal).not.toHaveBeenCalled();
   });
 
+  it("names the restricted level the same way", () => {
+    const refusal = describeNetworkDebugRefusal(
+      'pods "web-a" is forbidden: violates PodSecurity "restricted:latest": runAsNonRoot != true',
+      "shop",
+    );
+    expect(refusal.message).toContain('Pod Security level is "restricted"');
+    expect(refusal.message).toContain('needs the "privileged" level');
+  });
+
   it("passes on other refusals as kubectl wrote them", () => {
-    expect(describeNetworkDebugRefusal('error: pods "x" not found', "shop")).toBe(
-      'error: pods "x" not found',
+    const refusal = describeNetworkDebugRefusal('error: pods "x" not found', "shop");
+    expect(refusal.message).toBe('error: pods "x" not found');
+    expect(refusal.detail).toBeNull();
+  });
+
+  it("removes the spec file also when kubectl itself throws", async () => {
+    kubectlRawArgsFront.mockRejectedValue(new Error("spawn failed"));
+
+    await expect(startPodNetworkDebugSession({ clusterId: "c1", pod })).rejects.toThrow(
+      "spawn failed",
+    );
+    expect(fs.remove).toHaveBeenCalledTimes(1);
+    expect(fs.remove).toHaveBeenCalledWith(fs.writeTextFile.mock.calls[0]?.[0]);
+  });
+
+  it("builds the spec path with the platform separator", async () => {
+    kubectlRawArgsFront.mockResolvedValue({ output: "", errors: "boom", code: 1 });
+    await startPodNetworkDebugSession({ clusterId: "c1", pod }).catch(() => undefined);
+    expect(String(fs.writeTextFile.mock.calls[0]?.[0])).toMatch(
+      /^\/app-data\/network-debug-[a-z0-9]+\.json$/,
     );
   });
 

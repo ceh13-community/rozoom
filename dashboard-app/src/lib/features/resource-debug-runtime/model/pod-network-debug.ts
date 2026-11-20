@@ -131,21 +131,44 @@ export function readEphemeralContainerState(
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** A refused start: a plain sentence, with what kubectl wrote kept as the detail. */
+export class NetworkDebugRefusal extends Error {
+  readonly detail: string | null;
+
+  constructor(message: string, detail: string | null) {
+    super(message);
+    this.name = "NetworkDebugRefusal";
+    this.detail = detail;
+  }
+}
+
 /**
- * A Pod Security level that forbids NET_RAW turns into one plain sentence; any other refusal
- * is passed on as kubectl wrote it.
+ * A Pod Security level that forbids the container becomes one plain sentence. Both baseline
+ * and restricted forbid NET_RAW (restricted also asks for non-root, seccomp and no privilege
+ * escalation), so only the privileged level allows network debug. kubectl's own line stays
+ * as the detail. Any other refusal is passed on as kubectl wrote it.
  */
-export function describeNetworkDebugRefusal(stderr: string, namespace: string): string {
+export function describeNetworkDebugRefusal(
+  stderr: string,
+  namespace: string,
+): NetworkDebugRefusal {
   const level = stderr.match(/violates PodSecurity "([a-z]+):/)?.[1];
-  if (!level) return stderr;
-  return `Namespace ${namespace} does not allow network debug: its Pod Security level "${level}" forbids NET_RAW, the capability that tcpdump, ping and mtr need. A cluster admin can relax the level for this namespace.`;
+  if (!level) return new NetworkDebugRefusal(stderr, null);
+  return new NetworkDebugRefusal(
+    `Namespace ${namespace} does not allow network debug: its Pod Security level is "${level}", and network debug needs the "privileged" level for the NET_RAW capability that tcpdump, ping and mtr use.`,
+    stderr.trim(),
+  );
 }
 
 /** kubectl debug --custom reads a file, so the spec is written to the app data folder. */
 async function writeCustomSpecFile(): Promise<{ path: string; remove: () => Promise<void> }> {
   const { writeTextFile, remove } = await import("@tauri-apps/plugin-fs");
-  const { appDataDir } = await import("@tauri-apps/api/path");
-  const path = `${await appDataDir()}/network-debug-${Math.random().toString(36).slice(2, 10)}.json`;
+  const { appDataDir, join } = await import("@tauri-apps/api/path");
+  // join, not "/": the folder uses backslashes on Windows.
+  const path = await join(
+    await appDataDir(),
+    `network-debug-${Math.random().toString(36).slice(2, 10)}.json`,
+  );
   await writeTextFile(path, JSON.stringify(NETWORK_DEBUG_CUSTOM_SPEC));
   return { path, remove: () => remove(path).catch(() => undefined) };
 }
@@ -170,11 +193,9 @@ export async function startPodNetworkDebugSession({ clusterId, pod }: PodNetwork
     await customSpec.remove();
   }
   if (started.errors || started.code !== 0) {
-    throw new Error(
-      started.errors
-        ? describeNetworkDebugRefusal(started.errors, namespace)
-        : "Could not add the network debug container.",
-    );
+    throw started.errors
+      ? describeNetworkDebugRefusal(started.errors, namespace)
+      : new Error("Could not add the network debug container.");
   }
 
   const deadline = Date.now() + START_TIMEOUT_MS;
