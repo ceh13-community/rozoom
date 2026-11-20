@@ -490,9 +490,28 @@ describe("overview-insights", () => {
       expect(failed?.severity).toBe("unknown");
       expect(failed?.reason).toBe("Cron job check failed.");
 
-      const checked = buildOverviewResourceInsights(
+      // Zeros cached by 0.26.4 have no deferred flag; with cron jobs on the cluster they
+      // are not a result.
+      const cachedZeros = buildOverviewResourceInsights(
         overview,
         makeChecks({ cronJobsHealth: placeholder }),
+        { items: [] },
+      ).find((item) => item.key === "cronjobs");
+      expect(cachedZeros?.severity).toBe("unknown");
+      expect(cachedZeros?.reason).toBe("No cronjob check results yet.");
+
+      const noCronJobs = buildOverviewResourceInsights(
+        { ...overview, cronjobs: { quantity: 0 } },
+        makeChecks({ cronJobsHealth: placeholder }),
+        { items: [] },
+      ).find((item) => item.key === "cronjobs");
+      expect(noCronJobs?.severity).toBe("ok");
+
+      const checked = buildOverviewResourceInsights(
+        overview,
+        makeChecks({
+          cronJobsHealth: { ...placeholder, summary: { ...placeholder.summary, total: 1, ok: 1 } },
+        }),
         { items: [] },
       ).find((item) => item.key === "cronjobs");
       expect(checked?.severity).toBe("ok");
