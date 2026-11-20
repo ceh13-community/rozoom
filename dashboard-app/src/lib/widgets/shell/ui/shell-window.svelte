@@ -150,6 +150,8 @@
     ) {
       void deletePodDebugCleanup(shellCleanupPod, sessionClusterId).catch(() => undefined);
     }
+    // Ends the session first, so a stream that is still starting stops itself when it resolves.
+    activeSessionId += 1;
     stopAttachStream();
     if (!podDebugCleanupHandled && shellStopArgs && sessionClusterId) {
       void stopSessionContainer(shellStopArgs, sessionClusterId).catch(() => undefined);
@@ -295,6 +297,8 @@
     shellCleanupPod = null;
     shellTargetContainer = undefined;
     shellStopArgs = null;
+    // Ends the session first, so a stream that is still starting stops itself when it resolves.
+    activeSessionId += 1;
     stopAttachStream();
     attachEnded = false;
     sessionClusterId = "";

@@ -73,6 +73,27 @@ describe("shell window in attach mode", () => {
     expect(stream.stop).not.toHaveBeenCalled();
   });
 
+  it("stops kubectl once when the window closes while the stream is still starting", async () => {
+    let resolveStart: (value: { viaLog: boolean; stop: typeof stream.stop }) => void = () =>
+      undefined;
+    stream.startPodOutputStream.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveStart = resolve;
+        }),
+    );
+    const { unmount } = renderAttach();
+    await waitFor(() => expect(stream.startPodOutputStream).toHaveBeenCalled());
+
+    unmount();
+    expect(stream.stop).not.toHaveBeenCalled();
+
+    resolveStart({ viaLog: false, stop: stream.stop });
+    await waitFor(() => expect(stream.stop).toHaveBeenCalledTimes(1));
+    await Promise.resolve();
+    expect(stream.stop).toHaveBeenCalledTimes(1);
+  });
+
   it("stops the running stream on unmount", async () => {
     const { unmount } = renderAttach();
     await waitFor(() => expect(stream.startPodOutputStream).toHaveBeenCalled());
