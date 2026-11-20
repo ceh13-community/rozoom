@@ -5,7 +5,10 @@
   import { buildThemeBootstrapScript } from "$shared/theme";
   import { Toaster } from "$shared/ui/sonner";
   import { initCliNotifications } from "$shared/lib/cli-notification";
-  import { checkForUpdateSilently } from "$shared/lib/app-updater";
+  import { checkForUpdateManually, checkForUpdateSilently } from "$shared/lib/app-updater";
+  import { listenHelpMenu, updateCheckMessage } from "$shared/lib/help-menu";
+  import { KeyboardShortcutsDialog } from "$widgets/help";
+  import { toast } from "svelte-sonner";
   import {
     startCertNotificationWatcher,
     stopCertNotificationWatcher,
@@ -22,6 +25,23 @@
   import "$lib/app/styles/index.css";
 
   let { children } = $props();
+  let shortcutsOpen = $state(false);
+
+  // Native Help menu items the webview shows itself.
+  onMount(() =>
+    listenHelpMenu({
+      keyboardShortcuts: () => {
+        shortcutsOpen = true;
+      },
+      checkForUpdates: () => {
+        void checkForUpdateManually().then((outcome) => {
+          const message = updateCheckMessage(outcome, __APP_VERSION__);
+          if (message?.kind === "success") toast.success(message.text);
+          else if (message) toast.error(message.text);
+        });
+      },
+    }),
+  );
   const themeBootstrapScript = buildThemeBootstrapScript();
   const scriptOpenTag = "<scr" + "ipt>";
   const scriptCloseTag = "</scr" + "ipt>";
@@ -97,4 +117,10 @@
 <Toaster richColors />
 
 <SplashScreen />
+<KeyboardShortcutsDialog
+  open={shortcutsOpen}
+  onClose={() => {
+    shortcutsOpen = false;
+  }}
+/>
 {@render children()}

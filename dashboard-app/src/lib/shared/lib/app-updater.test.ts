@@ -7,7 +7,11 @@ import {
   dismissNotification,
   markAsRead,
 } from "./app-notifications";
-import { checkForUpdateSilently, type LinuxPackageKind } from "./app-updater";
+import {
+  checkForUpdateManually,
+  checkForUpdateSilently,
+  type LinuxPackageKind,
+} from "./app-updater";
 
 const askMock = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
 const appLogMock = vi.hoisted(() =>
@@ -273,6 +277,41 @@ describe("app-updater", () => {
         delete (navigator as { userAgent?: string }).userAgent;
       }
       expect(navigator.userAgent).toMatch(/linux/i);
+    });
+  });
+
+  // Help > Check for Updates says how the check ended; the launch check stays silent.
+  describe("manual check", () => {
+    beforeEach(() => {
+      window.localStorage.clear();
+    });
+
+    it("reports up to date, failed and update available", async () => {
+      expect(await checkForUpdateManually(makePort({ update: null }).port)).toBe("up-to-date");
+      expect(
+        await checkForUpdateManually(makePort({ checkError: new Error("offline") }).port),
+      ).toBe("failed");
+      const linux = makePort({ update: null, linuxPackageKind: "deb" });
+      expect(await checkForUpdateManually(linux.port)).toBe("up-to-date");
+      expect(await checkForUpdateManually(linuxPort("deb", "0.27.0").port)).toBe(
+        "update-available",
+      );
+    });
+
+    it("shows a Linux release notice again even when it was read before", async () => {
+      await checkForUpdateSilently(linuxPort("deb", "0.26.3").port);
+      markAsRead(get(appNotifications)[0].id);
+      dismissAllNotifications();
+      clearDismissedNotifications();
+
+      await checkForUpdateSilently(linuxPort("deb", "0.26.3").port);
+      expect(get(appNotifications)).toHaveLength(0);
+
+      expect(await checkForUpdateManually(linuxPort("deb", "0.26.3").port)).toBe(
+        "update-available",
+      );
+      expect(get(appNotifications)).toHaveLength(1);
+      expect(get(appNotifications)[0].title).toBe("Rozoom 0.26.3 is available");
     });
   });
 });

@@ -13,12 +13,23 @@ use std::fs;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 
+#[cfg(not(target_os = "macos"))]
+use tauri::menu::PredefinedMenuItem;
 use tauri::menu::{Menu, MenuEvent, MenuItemBuilder, SubmenuBuilder};
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_opener::OpenerExt;
 
 pub const LOG_FILE_NAME: &str = "logs.log";
 pub const MENU_OPEN_LOGS_FOLDER: &str = "help-open-logs-folder";
+pub const MENU_DOCUMENTATION: &str = "help-documentation";
+pub const MENU_KEYBOARD_SHORTCUTS: &str = "help-keyboard-shortcuts";
+pub const MENU_REPORT_ISSUE: &str = "help-report-issue";
+pub const MENU_CHECK_FOR_UPDATES: &str = "help-check-for-updates";
+
+/// Event the webview listens to for the Help items it shows itself.
+pub const HELP_MENU_EVENT: &str = "help-menu";
+const DOCUMENTATION_URL: &str = "https://rozoom.app/docs";
+const REPORT_ISSUE_URL: &str = "https://github.com/ceh13-community/rozoom/discussions";
 
 /// Upper bound on how much of the log we read back for the clipboard. The
 /// active file can be up to 5 MB (see `max_file_size` in main.rs); the last
@@ -93,13 +104,33 @@ pub fn logs_folder_path<R: Runtime>(app: AppHandle<R>) -> Result<String, String>
     log_dir(&app).map(|p| p.to_string_lossy().into_owned())
 }
 
-/// Native Help > "Open Logs Folder". On macOS this extends the default menu
-/// (Edit/Window shortcuts stay intact); elsewhere the app had no menu bar, so
-/// only a Help menu appears.
+/// Native Help menu on every OS. On macOS it extends the default menu (Edit/Window
+/// shortcuts stay intact, About is in the app menu); elsewhere the app has no other menu,
+/// so Help carries About too. Keyboard Shortcuts and Check for Updates are shown by the
+/// webview, which listens for HELP_MENU_EVENT.
 pub fn install_help_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
+    let documentation = MenuItemBuilder::with_id(MENU_DOCUMENTATION, "Documentation").build(app)?;
+    let shortcuts =
+        MenuItemBuilder::with_id(MENU_KEYBOARD_SHORTCUTS, "Keyboard Shortcuts").build(app)?;
+    let report = MenuItemBuilder::with_id(MENU_REPORT_ISSUE, "Report an Issue").build(app)?;
+    let updates =
+        MenuItemBuilder::with_id(MENU_CHECK_FOR_UPDATES, "Check for Updates").build(app)?;
     let open_logs =
         MenuItemBuilder::with_id(MENU_OPEN_LOGS_FOLDER, "Open Logs Folder").build(app)?;
-    let help = SubmenuBuilder::new(app, "Help").item(&open_logs).build()?;
+    let builder = SubmenuBuilder::new(app, "Help")
+        .item(&documentation)
+        .item(&shortcuts)
+        .item(&report)
+        .separator()
+        .item(&updates)
+        .item(&open_logs);
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.separator().item(&PredefinedMenuItem::about(
+        app,
+        Some("About ROZOOM"),
+        Some(about_metadata(app)),
+    )?);
+    let help = builder.build()?;
 
     #[cfg(target_os = "macos")]
     let menu = {
@@ -114,17 +145,88 @@ pub fn install_help_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     Ok(())
 }
 
+#[cfg(not(target_os = "macos"))]
+fn about_metadata<R: Runtime>(app: &AppHandle<R>) -> tauri::menu::AboutMetadata<'static> {
+    tauri::menu::AboutMetadata {
+        name: Some("ROZOOM - K8s Linter IDE".into()),
+        version: Some(app.package_info().version.to_string()),
+        website: Some("https://rozoom.app".into()),
+        website_label: Some("rozoom.app".into()),
+        license: Some("Apache-2.0".into()),
+        // Without an icon GTK shows its "missing image" placeholder in the About dialog.
+        icon: app
+            .default_window_icon()
+            .map(|icon| icon.clone().to_owned()),
+        ..Default::default()
+    }
+}
+
+/// What a Help item does: open a page, ask the webview to show something, or open logs.
+#[derive(Debug, PartialEq, Eq)]
+pub enum HelpAction {
+    OpenUrl(&'static str),
+    Webview(&'static str),
+    OpenLogsFolder,
+}
+
+pub fn help_action(id: &str) -> Option<HelpAction> {
+    match id {
+        MENU_DOCUMENTATION => Some(HelpAction::OpenUrl(DOCUMENTATION_URL)),
+        MENU_REPORT_ISSUE => Some(HelpAction::OpenUrl(REPORT_ISSUE_URL)),
+        MENU_KEYBOARD_SHORTCUTS => Some(HelpAction::Webview("keyboard-shortcuts")),
+        MENU_CHECK_FOR_UPDATES => Some(HelpAction::Webview("check-for-updates")),
+        MENU_OPEN_LOGS_FOLDER => Some(HelpAction::OpenLogsFolder),
+        _ => None,
+    }
+}
+
 pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
-    if event.id() == MENU_OPEN_LOGS_FOLDER {
-        if let Err(e) = open_logs_folder_inner(app) {
-            log::error!("Open Logs Folder failed: {e}");
-        }
+    let Some(action) = help_action(event.id().as_ref()) else {
+        return;
+    };
+    let result = match action {
+        HelpAction::OpenUrl(url) => app
+            .opener()
+            .open_url(url, None::<&str>)
+            .map_err(|e| e.to_string()),
+        HelpAction::Webview(what) => app.emit(HELP_MENU_EVENT, what).map_err(|e| e.to_string()),
+        HelpAction::OpenLogsFolder => open_logs_folder_inner(app),
+    };
+    if let Err(e) = result {
+        log::error!("Help menu {} failed: {e}", event.id().as_ref());
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::tail_lines;
+    use super::{help_action, tail_lines, HelpAction};
+
+    #[test]
+    fn every_help_item_has_an_action() {
+        assert_eq!(
+            help_action("help-documentation"),
+            Some(HelpAction::OpenUrl("https://rozoom.app/docs"))
+        );
+        assert_eq!(
+            help_action("help-report-issue"),
+            Some(HelpAction::OpenUrl(
+                "https://github.com/ceh13-community/rozoom/discussions"
+            ))
+        );
+        assert_eq!(
+            help_action("help-keyboard-shortcuts"),
+            Some(HelpAction::Webview("keyboard-shortcuts"))
+        );
+        assert_eq!(
+            help_action("help-check-for-updates"),
+            Some(HelpAction::Webview("check-for-updates"))
+        );
+        assert_eq!(
+            help_action("help-open-logs-folder"),
+            Some(HelpAction::OpenLogsFolder)
+        );
+        assert_eq!(help_action("something-else"), None);
+    }
 
     #[test]
     fn keeps_last_n_lines_oldest_first() {
