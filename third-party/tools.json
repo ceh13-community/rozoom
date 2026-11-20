@@ -73,6 +73,14 @@
       "license": "MIT",
       "variants": ["full"]
     },
+    "jq": {
+      "name": "jq",
+      "upstream": "https://github.com/jqlang/jq",
+      "sourceUrl": "https://github.com/jqlang/jq/tree/{version}",
+      "license": "MIT AND ICU AND BSD-2-Clause",
+      "variants": ["full"],
+      "note": "Release binary from https://github.com/jqlang/jq/releases. It includes decNumber (ICU license, see LICENSE) and statically links Oniguruma (BSD-2-Clause, see LICENSE.oniguruma)."
+    },
     "hcloud": {
       "name": "hcloud (Hetzner Cloud CLI)",
       "upstream": "https://github.com/hetznercloud/cli",

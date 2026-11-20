@@ -1582,6 +1582,24 @@ async function installYq() {
   });
 }
 
+// jq - JSON processor. Single-binary release assets (jq-linux-amd64, jq-macos-arm64,
+// jq-windows-amd64.exe) with a sha256sum.txt next to them; tags look like "jq-1.8.2".
+async function installJq() {
+  const platform = os.platform();
+  const osKey = platform === "win32" ? "windows" : platform === "darwin" ? "macos" : "linux";
+  const archKey = os.arch() === "x64" ? "amd64" : "arm64";
+  const assetName = `jq-${osKey}-${archKey}${platform === "win32" ? ".exe" : ""}`;
+
+  await installGhReleaseTool({
+    name: "jq",
+    repo: "jqlang/jq",
+    // No version pin: jq tags are "jq-1.8.2", and the pin helper adds a "v" prefix.
+    envVar: null,
+    pickAsset: (assets) => assets.find((a) => String(a?.name || "") === assetName),
+    extractBinary: false,
+  });
+}
+
 async function installHcloud() {
   await installGhReleaseTool({
     name: "hcloud",
@@ -2208,6 +2226,7 @@ const SIDECAR_TOOLS = [
   "kubeconform",
   "stern",
   "yq",
+  "jq",
   "hcloud",
   "oc",
   "curl",
@@ -2362,6 +2381,7 @@ process.on("beforeExit", (code) => {
   await run("kubeconform", installKubeconform);
   await run("stern", installStern);
   await run("yq", installYq);
+  await run("jq", installJq);
   await run("hcloud", installHcloud);
   await run("oc", installOc);
 

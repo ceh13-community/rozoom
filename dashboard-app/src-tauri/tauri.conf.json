@@ -34,6 +34,7 @@
       "binaries/rozoom-kubeconform",
       "binaries/rozoom-stern",
       "binaries/rozoom-yq",
+      "binaries/rozoom-jq",
       "binaries/rozoom-hcloud",
       "binaries/rozoom-oc",
       "binaries/rozoom-az-cli",

@@ -62,6 +62,11 @@
           "args": true
         },
         {
+          "name": "binaries/rozoom-jq",
+          "sidecar": true,
+          "args": true
+        },
+        {
           "name": "binaries/rozoom-gcloud-cli",
           "sidecar": true,
           "args": true
@@ -200,6 +205,11 @@
           "name": "yq",
           "cmd": "yq",
           "args": true
+        },
+        {
+          "name": "jq",
+          "cmd": "jq",
+          "args": true
         }
       ]
     },
@@ -248,6 +258,11 @@
         },
         {
           "name": "binaries/rozoom-yq",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-jq",
           "sidecar": true,
           "args": true
         },
@@ -368,6 +383,11 @@
         },
         {
           "name": "binaries/rozoom-yq",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/rozoom-jq",
           "sidecar": true,
           "args": true
         },

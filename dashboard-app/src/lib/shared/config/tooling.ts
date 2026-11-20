@@ -109,6 +109,7 @@ const FULL_TOOL_REGISTRY: readonly ToolEntry[] = [
   { tool: "stern", provider: null, status: "bundled", probeArgs: ["--version"] },
   { tool: "velero", provider: null, status: "bundled", probeArgs: ["version", "--client-only"] },
   { tool: "yq", provider: null, status: "bundled", probeArgs: ["--version"] },
+  { tool: "jq", provider: null, status: "bundled", probeArgs: ["--version"] },
   // Network & debug
   { tool: "curl", provider: null, status: "bundled", probeArgs: ["--version"] },
   { tool: "doggo", provider: null, status: "bundled", probeArgs: ["--version"] },
