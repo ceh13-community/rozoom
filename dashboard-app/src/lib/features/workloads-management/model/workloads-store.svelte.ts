@@ -59,8 +59,15 @@ export function createWorkloadsStore({
     return changed;
   }
 
+  /**
+   * Drops the data and forgets which data it was. Without forgetting, the next
+   * updateParams with the same params changes nothing, so nothing loads and the
+   * view gets no data: a split pane closed and opened again on the same workload
+   * showed "No data provided".
+   */
   function reset() {
     fetcher.reset();
+    params.clusterUuid = "";
   }
 
   /** Loads the current params again, past the cache: used when a cluster answers again. */

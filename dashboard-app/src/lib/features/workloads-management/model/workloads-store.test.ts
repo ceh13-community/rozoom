@@ -285,6 +285,29 @@ describe("createWorkloadsStore", () => {
       expect(mockFetcher.reset).toHaveBeenCalled();
     });
 
+    it("loads again when the same params come back after a reset", async () => {
+      const { component } = render(TestWrapper, {
+        props: { params: { clusterUuid: "cluster-123" } },
+      });
+      await vi.waitFor(() => expect(mockFetcher.fetchWorkloads).toHaveBeenCalledTimes(1));
+
+      component.store.reset();
+      const changed = component.store.updateParams({
+        clusterUuid: "cluster-123",
+        workloadType: "overview",
+        namespace: "all",
+      });
+
+      expect(changed).toBe(true);
+      await vi.waitFor(() => expect(mockFetcher.fetchWorkloads).toHaveBeenCalledTimes(2));
+      expect(mockFetcher.fetchWorkloads).toHaveBeenLastCalledWith(
+        "overview",
+        "all",
+        "cluster-123",
+        undefined,
+      );
+    });
+
     it("should call reset only once per call", () => {
       const { component } = render(TestWrapper, {
         props: { params: { clusterUuid: "cluster-123" } },
