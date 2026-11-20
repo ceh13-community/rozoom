@@ -136,4 +136,26 @@ describe("global-triage-panel", () => {
     expect(await findByText(/Supported/i)).toBeInTheDocument();
     expect(await findByText(/Unsupported/i)).toBeInTheDocument();
   });
+
+  // The panel started with loading false: the first frame said "No problems found."
+  // before the scan had begun.
+  it("shows the scan, not an empty result, before the first answer", () => {
+    mockKubectlRawArgsFront.mockReturnValue(new Promise(() => {}));
+    mockKubectlJson.mockReturnValue(new Promise(() => {}));
+
+    const { getByRole, queryByText } = render(GlobalTriagePanel, {
+      props: {
+        data: {
+          title: "Global Triage - Cluster: minikube",
+          slug: "cluster-a",
+          workload: "globaltriage",
+          sort_field: null,
+        },
+      },
+    });
+
+    expect(getByRole("status")).toHaveTextContent("Scanning cluster resources");
+    expect(queryByText("No problems found.")).toBeNull();
+    expect(queryByText("Findings:")?.textContent).toBe("Findings: -");
+  });
 });

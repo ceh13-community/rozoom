@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import {
     buildDependencyGraph,
     type DependencyGraph,
@@ -9,7 +10,7 @@
   import * as Card from "$shared/ui/card";
   import * as Popover from "$shared/ui/popover";
   import { Button } from "$shared/ui/button";
-  import LoadingDots from "$shared/ui/loading-dots.svelte";
+  import LoadingState from "$shared/ui/loading-state.svelte";
   import Info from "@lucide/svelte/icons/info";
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
@@ -25,7 +26,9 @@
   let selectedNode = $state<GraphNode | null>(null);
   let filterKind = $state<string>("all");
   let filterText = $state("");
-  let loading = $state(false);
+  // The scan starts as soon as the panel has a cluster: start in the loading state, so the
+  // first frame never shows "No data yet" before the scan.
+  let loading = $state(untrack(() => Boolean(clusterId)));
   let error = $state<string | null>(null);
   let namespace = $state("all");
   let scannedAt = $state<number | null>(null);
@@ -385,9 +388,9 @@
     {/if}
 
     {#if loading}
-      <div class="flex items-center gap-2 text-slate-400 py-4 justify-center">
-        <span class="animate-spin text-sm">&#9696;</span> Scanning cluster resources<LoadingDots />
-      </div>
+      <!-- Top of the panel, not the middle of a height that is not there yet. The card is
+           dark in every theme, so the text keeps the card's light colour. -->
+      <LoadingState label="Scanning cluster resources" class="py-3 !text-slate-300" />
     {:else if graph}
       <!-- Summary -->
       <div class="flex flex-wrap gap-3 text-[10px]">

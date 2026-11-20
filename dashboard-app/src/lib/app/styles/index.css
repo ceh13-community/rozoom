@@ -140,6 +140,13 @@ summary::-webkit-details-marker {
   animation: dot-pulse 1s ease-in-out infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .loading-dot {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
 @keyframes dot-pulse {
   0%,
   80%,
