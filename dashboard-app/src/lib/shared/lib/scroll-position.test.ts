@@ -83,13 +83,18 @@ describe("keepScrollInRange", () => {
     const first = document.createElement("section");
     pane.appendChild(first);
     const action = keepScrollInRange(pane);
-    expect(observers[0].targets).toEqual([pane, first]);
+    // toBe, not toEqual: two empty <section> elements are equal by structure.
+    expect(observers[0].targets).toHaveLength(2);
+    expect(observers[0].targets[0]).toBe(pane);
+    expect(observers[0].targets[1]).toBe(first);
 
     const next = document.createElement("section");
     pane.replaceChild(next, first);
     await Promise.resolve();
 
-    expect(observers[0].targets).toEqual([pane, next]);
+    expect(observers[0].targets).toHaveLength(2);
+    expect(observers[0].targets[1]).toBe(next);
+    expect(observers[0].targets).not.toContain(first);
     action.destroy();
     expect(observers[0].targets).toEqual([]);
   });
