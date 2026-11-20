@@ -28,6 +28,26 @@ notes="$(awk -v ver="$VERSION" '
 # Trim leading/trailing blank lines.
 notes="$(printf '%s' "$notes" | sed -e '/./,$!d' | sed -e ':a' -e '/^\n*$/{$d;N;ba' -e '}')"
 
+# CHANGELOG.md is wrapped at 80 columns, but a GitHub release body (and the latest.json
+# notes taken from it) renders every newline as a line break. Join the wrapped lines of
+# each paragraph and list item; headings, table rows, quotes and fenced code stay as they
+# are, line by line.
+notes="$(printf '%s\n' "$notes" | awk '
+  function flush() { if (buf != "") { print buf; buf = "" } }
+  /^```/ { flush(); print; code = !code; next }
+  code { print; next }
+  /^[[:space:]]*$/ { flush(); print ""; next }
+  /^#/ || /^[[:space:]]*\|/ || /^[[:space:]]*>/ { flush(); print; next }
+  /^[[:space:]]*([-*+]|[0-9]+\.)[[:space:]]/ { flush(); buf = $0; next }
+  {
+    line = $0
+    if (buf == "") { buf = line; next }
+    sub(/^[[:space:]]+/, "", line)
+    buf = buf " " line
+  }
+  END { flush() }
+')"
+
 if [[ -z "$notes" ]]; then
   echo "no changelog entry for version $VERSION in $CHANGELOG; add it to the bump PR" >&2
   exit 1
