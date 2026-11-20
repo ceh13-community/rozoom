@@ -88,10 +88,8 @@ describe("workload-simple-workbench", () => {
     const storageKey = "dashboard.test.workbench.2";
     const props = buildProps(storageKey);
     const first = render(WorkloadSimpleWorkbench, { props });
-    const selects = first.container.querySelectorAll("select");
-    expect(selects.length).toBeGreaterThan(0);
 
-    await fireEvent.change(selects[0], { target: { value: "triple" } });
+    await fireEvent.click(first.getByRole("button", { name: "3 panes" }));
     first.unmount();
 
     const raw = window.localStorage.getItem(
@@ -101,8 +99,7 @@ describe("workload-simple-workbench", () => {
     expect(raw).toContain('"layout":"triple"');
 
     const second = render(WorkloadSimpleWorkbench, { props: buildProps(storageKey) });
-    const secondSelects = second.container.querySelectorAll("select");
-    expect((secondSelects[0] as HTMLSelectElement).value).toBe("triple");
+    expect(second.getByRole("button", { name: "3 panes" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("persists active tab when switching from header tab strip", async () => {
@@ -160,19 +157,32 @@ describe("workload-simple-workbench", () => {
     expect(view.getByRole("button", { name: "Unpin Logs tab" })).toBeTruthy();
   });
 
-  it("does not close a tab when close confirmation is cancelled", async () => {
+  it("closes a YAML tab without a dialog when it has no edits", async () => {
     const props = buildProps("dashboard.test.workbench.5");
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     const view = render(WorkloadSimpleWorkbench, { props });
 
     await fireEvent.click(view.getByRole("button", { name: "Close YAML tab" }));
 
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(props.onCloseYaml).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks before closing a YAML tab with unsaved edits and keeps it on cancel", async () => {
+    const props = buildProps("dashboard.test.workbench.5b");
+    props.yaml = { ...props.yaml, yamlText: `${props.yaml.yamlText}\n  labels: {}` };
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const view = render(WorkloadSimpleWorkbench, { props });
+
+    await fireEvent.click(view.getByRole("button", { name: "Close YAML tab" }));
+
     expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(confirmSpy.mock.calls[0]?.[0]).toContain("Unsaved changes will be lost.");
     expect(props.onCloseYaml).not.toHaveBeenCalled();
     expect(view.getByRole("button", { name: "Close YAML tab" })).toBeInTheDocument();
   });
 
-  it("asks confirmation before shrinking pane layout when hidden panes contain tabs", async () => {
+  it("keeps both tabs open without a dialog when the pane layout shrinks", async () => {
     const storageKey = "dashboard.test.workbench.6";
     window.localStorage.setItem(
       buildDataModeWorkbenchStorageKey(storageKey, "balanced"),
@@ -188,18 +198,17 @@ describe("workload-simple-workbench", () => {
       }),
     );
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
-    const view = render(WorkloadSimpleWorkbench, { props: buildProps(storageKey) });
+    const props = buildProps(storageKey);
+    const view = render(WorkloadSimpleWorkbench, { props });
 
-    const layoutSelect = view.container.querySelector("select");
-    expect(layoutSelect).toBeTruthy();
-    if (!layoutSelect) return;
+    await fireEvent.click(view.getByRole("button", { name: "1 pane" }));
 
-    await fireEvent.change(layoutSelect, { target: { value: "single" } });
-
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    await waitFor(() => {
-      expect(view.getByText("Pane 2")).toBeInTheDocument();
-    });
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(view.getByRole("button", { name: "1 pane" })).toHaveAttribute("aria-pressed", "true");
+    expect(view.getByRole("button", { name: "Close Logs tab" })).toBeInTheDocument();
+    expect(view.getByRole("button", { name: "Close YAML tab" })).toBeInTheDocument();
+    expect(props.onCloseLogs).not.toHaveBeenCalled();
+    expect(props.onCloseYaml).not.toHaveBeenCalled();
   });
 
   it("keeps balanced collapse state separate from realtime state", async () => {

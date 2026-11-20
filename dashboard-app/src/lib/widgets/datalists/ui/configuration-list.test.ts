@@ -830,7 +830,7 @@ describe("configuration-list", () => {
     expect(getByText("Drift")).toBeInTheDocument();
   });
 
-  it("asks confirmation when closing YAML tab from close button", async () => {
+  it("closes a YAML tab without edits from the close button without a dialog", async () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     const { getByText, getByRole, queryByText } = render(ConfigurationList, {
       props: {
@@ -851,17 +851,19 @@ describe("configuration-list", () => {
     expect(getByText("YAML first")).toBeInTheDocument();
 
     await fireEvent.click(getByRole("button", { name: "Close YAML first tab" }));
-    expect(queryByText("YAML first")).toBeInTheDocument();
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(queryByText("YAML first")).not.toBeInTheDocument();
+    });
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 
-  it("asks confirmation before shrinking pane layout when hidden panes contain tabs", async () => {
+  it("keeps tabs from hidden panes open without a dialog when the layout shrinks", async () => {
     window.localStorage.setItem(
       "dashboard.configuration.watcher.settings.v2:cluster-a:configmaps",
       JSON.stringify({ enabled: false, refreshSeconds: 30, viewMode: "flat" }),
     );
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
-    const { getByLabelText, getByText, getByRole, getByTitle } = render(ConfigurationList, {
+    const { getByLabelText, getByText, getByRole } = render(ConfigurationList, {
       props: {
         data: {
           title: "ConfigMaps - Cluster: minikube",
@@ -885,16 +887,15 @@ describe("configuration-list", () => {
     expect(getByText("YAML first")).toBeInTheDocument();
     expect(getByText("YAML second")).toBeInTheDocument();
 
-    const paneLayout = getByTitle("Pane layout") as HTMLSelectElement;
-    paneLayout.value = "dual";
-    await fireEvent.change(paneLayout);
-    expect(paneLayout.value).toBe("dual");
+    await fireEvent.click(getByRole("button", { name: "2 panes" }));
+    expect(getByRole("button", { name: "2 panes" })).toHaveAttribute("aria-pressed", "true");
 
-    paneLayout.value = "single";
-    await fireEvent.change(paneLayout);
-    expect(confirmSpy).toHaveBeenCalled();
-    expect(getByText("Pane 2")).toBeInTheDocument();
-  });
+    await fireEvent.click(getByRole("button", { name: "1 pane" }));
+    expect(getByRole("button", { name: "1 pane" })).toHaveAttribute("aria-pressed", "true");
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(getByText("YAML first")).toBeInTheDocument();
+    expect(getByText("YAML second")).toBeInTheDocument();
+  }, 15000);
 
   it("renders rows when switching between configuration workloads", async () => {
     window.localStorage.setItem(

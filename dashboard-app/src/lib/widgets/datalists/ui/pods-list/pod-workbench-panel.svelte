@@ -13,7 +13,6 @@
   import { loadPodEvents } from "$features/pod-details";
   import {
     buildYamlFilename,
-    computeLayoutClosePlan,
     formatApplyErrorMessage,
     orderPinnedTabs,
     recoverWorkbenchTabs,
@@ -35,8 +34,9 @@
     type PersistedPodsWorkbenchState,
   } from "./workbench-session";
   import {
-    confirmWorkbenchLayoutShrink,
+    announceWorkbenchTabClosed,
     confirmWorkbenchTabClose,
+    hasUnsavedYaml,
   } from "../common/workbench-confirm";
   import { normalizeWorkbenchVisibilityForDataMode } from "../common/workbench-data-mode";
 
@@ -284,12 +284,7 @@
 
   async function requestWorkbenchLayout(nextLayout: PodsWorkbenchLayout) {
     if (nextLayout === workbenchLayout) return;
-    const nextPaneCount = nextLayout === "single" ? 1 : nextLayout === "dual" ? 2 : 3;
-    const { occupiedRemovedPaneCount } = computeLayoutClosePlan(paneTabIds, nextPaneCount);
-    if (occupiedRemovedPaneCount > 0) {
-      const confirmed = await confirmWorkbenchLayoutShrink();
-      if (!confirmed) return;
-    }
+    // Fewer panes only hides panes: their tabs stay in the tab strip.
     workbenchLayout = nextLayout;
     if (nextLayout === "single") {
       paneTabIds = [activeWorkbenchTabId, null, null];
@@ -565,8 +560,16 @@
   async function closeWorkbenchTab(tabId: string) {
     const closingTab = workbenchTabs.find((tab) => tab.id === tabId) ?? null;
     if (closingTab) {
-      const confirmed = await confirmWorkbenchTabClose(closingTab);
+      const yamlTab =
+        closingTab.kind === "yaml" ? (yamlTabs.find((tab) => tab.id === tabId) ?? null) : null;
+      const confirmed = await confirmWorkbenchTabClose({
+        ...closingTab,
+        hasUnsavedChanges: hasUnsavedYaml(
+          yamlTab ? { yamlText: yamlTab.yamlText, yamlOriginalText: yamlTab.originalYamlText } : null,
+        ),
+      });
       if (!confirmed) return;
+      announceWorkbenchTabClosed(closingTab, () => void reopenLastClosedTab());
     }
     const parsed = parseWorkbenchTabId(tabId);
     const wasPinned = pinnedTabIds.has(tabId);
@@ -1090,6 +1093,7 @@
 {#if hasWorkbenchTabs}
   <MultiPaneWorkbench
     tabs={availablePaneTabs}
+    {paneTabIds}
     activeTabId={activeWorkbenchTabId}
     {isTabPinned}
     onActivateTab={setActiveWorkbenchTab}

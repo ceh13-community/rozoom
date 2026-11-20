@@ -1,41 +1,64 @@
+import { toast } from "svelte-sonner";
 import { confirmAction } from "$shared/lib/confirm-action";
 
-type WorkbenchTabConfirmTarget = {
+// One close rule for every workbench: ask only when closing loses something
+// that Undo cannot bring back: unsaved YAML edits or a running port-forward.
+// Logs, events, rollout and clean YAML tabs close at once with an Undo toast.
+
+export type WorkbenchTabCloseTarget = {
   kind: string;
   title: string;
   subtitle?: string | null;
+  hasUnsavedChanges?: boolean;
+  /** Closing this tab stops a running port-forward. */
+  stopsPortForward?: boolean;
 };
+
+export const WORKBENCH_UNDO_TOAST_MS = 8000;
 
 function normalizeKindLabel(kind: string) {
   const normalized = kind.trim().toLowerCase();
   if (normalized === "yaml") return "YAML";
-  if (normalized === "logs") return "logs";
-  if (normalized === "events") return "events";
-  if (normalized === "port-forward") return "port-forward";
   if (normalized === "rollout-status") return "rollout status";
   if (normalized === "rollout-history") return "rollout history";
   return normalized.replace(/-/g, " ");
 }
 
-function buildTabSummary(target: WorkbenchTabConfirmTarget) {
+function buildTabSummary(target: { title: string; subtitle?: string | null }) {
   const title = target.title.trim() || "Untitled tab";
   const subtitle = target.subtitle?.trim();
-  return subtitle ? `${title} · ${subtitle}` : title;
+  return subtitle ? `${title} - ${subtitle}` : title;
 }
 
-export async function confirmWorkbenchTabClose(target: WorkbenchTabConfirmTarget) {
+export function workbenchTabCloseNeedsConfirm(target: WorkbenchTabCloseTarget) {
+  return target.hasUnsavedChanges === true || target.stopsPortForward === true;
+}
+
+export function hasUnsavedYaml(
+  tab: { yamlText?: string | null; yamlOriginalText?: string | null } | null | undefined,
+) {
+  if (!tab) return false;
+  return (tab.yamlText ?? "") !== (tab.yamlOriginalText ?? "");
+}
+
+export async function confirmWorkbenchTabClose(target: WorkbenchTabCloseTarget) {
+  if (!workbenchTabCloseNeedsConfirm(target)) return true;
   const kindLabel = normalizeKindLabel(target.kind);
-  const summary = buildTabSummary(target);
-  const details =
-    kindLabel === "YAML"
-      ? "Unsaved YAML changes in this tab will be lost."
-      : "This tab will be removed from the workbench.";
-  return confirmAction(`Close this ${kindLabel} tab?\n${summary}\n${details}`, "Close tab");
+  const loss = target.hasUnsavedChanges
+    ? "Unsaved changes will be lost."
+    : "The port-forward will stop.";
+  return confirmAction(
+    `Close this ${kindLabel} tab?\n${buildTabSummary(target)}\n${loss}`,
+    "Close tab",
+  );
 }
 
-export async function confirmWorkbenchLayoutShrink(details?: string) {
-  return confirmAction(
-    details ?? "Switch to fewer panes?\nTabs in hidden panes will be closed.",
-    "Change pane layout",
-  );
+export function announceWorkbenchTabClosed(
+  target: { title: string; subtitle?: string | null },
+  onUndo?: () => void,
+) {
+  toast(`Tab closed: ${buildTabSummary(target)}`, {
+    duration: WORKBENCH_UNDO_TOAST_MS,
+    action: onUndo ? { label: "Undo", onClick: onUndo } : undefined,
+  });
 }

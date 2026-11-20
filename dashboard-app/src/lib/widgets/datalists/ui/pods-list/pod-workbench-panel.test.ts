@@ -143,8 +143,8 @@ describe("PodWorkbenchPanel", () => {
     setDashboardDataProfile("balanced");
   });
 
-  it("keeps a pod workbench tab open when close confirmation is cancelled", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
+  it("closes a logs tab without a dialog and Reopen brings it back", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     const view = render(PodWorkbenchPanel, {
       props: {
         clusterId: "cluster-1",
@@ -173,11 +173,14 @@ describe("PodWorkbenchPanel", () => {
 
     await fireEvent.click(view.getByRole("button", { name: "Close api-0 tab" }));
 
-    expect(view.getByRole("button", { name: "Close api-0 tab" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(view.queryByRole("button", { name: "Close api-0 tab" })).not.toBeInTheDocument();
+    });
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 
-  it("asks confirmation before shrinking pod pane layout when hidden panes contain tabs", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
+  it("keeps every tab open when the pod pane layout shrinks", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     window.localStorage.setItem(
       getPodsWorkbenchStateKey("cluster-1", "balanced"),
       JSON.stringify({
@@ -214,19 +217,15 @@ describe("PodWorkbenchPanel", () => {
     });
 
     await waitFor(() => {
-      const selects = view.container.querySelectorAll("select");
-      expect(selects.length).toBeGreaterThan(0);
-      expect((selects[0] as HTMLSelectElement).value).toBe("dual");
+      expect(view.getByRole("button", { name: "2 panes" })).toHaveAttribute("aria-pressed", "true");
     });
 
-    const layoutSelect = view.container.querySelector("select");
-    expect(layoutSelect).toBeTruthy();
-    if (!layoutSelect) return;
-
-    await fireEvent.change(layoutSelect, { target: { value: "single" } });
+    await fireEvent.click(view.getByRole("button", { name: "1 pane" }));
 
     await waitFor(() => {
-      expect(view.getByText("Pane 2")).toBeInTheDocument();
+      expect(view.getByRole("button", { name: "1 pane" })).toHaveAttribute("aria-pressed", "true");
     });
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(view.getAllByRole("button", { name: "Close api-0 tab" })).toHaveLength(2);
   });
 });

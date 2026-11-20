@@ -1,12 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { writable } from "svelte/store";
-  import { computeLayoutClosePlan, orderPinnedTabs } from "$features/pods-workbench";
+  import { orderPinnedTabs } from "$features/pods-workbench";
   import MultiPaneWorkbench from "$shared/ui/multi-pane-workbench.svelte";
   import type { DashboardDataProfileId } from "$shared/lib/dashboard-data-profile.svelte";
   import {
-    confirmWorkbenchLayoutShrink,
+    announceWorkbenchTabClosed,
     confirmWorkbenchTabClose,
+    hasUnsavedYaml,
   } from "./common/workbench-confirm";
   import {
     buildDataModeWorkbenchStorageKey,
@@ -155,6 +156,7 @@
       subtitle: logs.ref,
     });
     if (!confirmed) return;
+    announceWorkbenchTabClosed({ title: "Logs", subtitle: logs.ref }, reopenLastClosedTab);
     markTabClosed("logs");
     pinnedTabIds = new Set([...pinnedTabIds].filter((id) => id !== "logs"));
     if (activeTabId === "logs") {
@@ -168,8 +170,13 @@
       kind: "yaml",
       title: "YAML",
       subtitle: yaml.ref,
+      hasUnsavedChanges: hasUnsavedYaml({
+        yamlText: yaml.yamlText,
+        yamlOriginalText: yaml.originalYaml,
+      }),
     });
     if (!confirmed) return;
+    announceWorkbenchTabClosed({ title: "YAML", subtitle: yaml.ref }, reopenLastClosedTab);
     markTabClosed("yaml");
     pinnedTabIds = new Set([...pinnedTabIds].filter((id) => id !== "yaml"));
     if (activeTabId === "yaml") {
@@ -256,12 +263,7 @@
 
   async function requestWorkbenchLayout(nextLayout: WorkbenchLayout) {
     if (nextLayout === workbenchLayout) return;
-    const nextPaneCount = nextLayout === "single" ? 1 : nextLayout === "dual" ? 2 : 3;
-    const { occupiedRemovedPaneCount } = computeLayoutClosePlan(paneTabIds, nextPaneCount);
-    if (occupiedRemovedPaneCount > 0) {
-      const confirmed = await confirmWorkbenchLayoutShrink();
-      if (!confirmed) return;
-    }
+    // Fewer panes only hides panes: their tabs stay in the tab strip.
     workbenchLayout = nextLayout;
   }
 
@@ -462,6 +464,7 @@
 
 {#if logs.open || yaml.open}
   <MultiPaneWorkbench
+    {paneTabIds}
     tabs={getAvailableTabs().map((tab) => ({
       id: tab.id,
       title: tab.label,

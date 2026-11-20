@@ -26,7 +26,6 @@
   import {
     buildIncidentTimeline,
     buildYamlFilename,
-    computeLayoutClosePlan,
     openStreamWithOptionalFallback,
     orderPinnedTabs,
     recoverWorkbenchTabs,
@@ -104,8 +103,9 @@
   import SectionRuntimeStatus from "./common/section-runtime-status.svelte";
   import WorkloadSelectionBar from "./common/workload-selection-bar.svelte";
   import {
-    confirmWorkbenchLayoutShrink,
+    announceWorkbenchTabClosed,
     confirmWorkbenchTabClose,
+    hasUnsavedYaml,
   } from "./common/workbench-confirm";
 
   interface DaemonSetsListProps {
@@ -1137,43 +1137,7 @@
 
   async function requestWorkbenchLayout(nextLayout: WorkbenchLayout) {
     if (nextLayout === workbenchLayout) return;
-    const currentPaneCount = getPaneCount();
-    const nextPaneCount = nextLayout === "single" ? 1 : nextLayout === "dual" ? 2 : 3;
-    if (nextPaneCount >= currentPaneCount) {
-      setWorkbenchLayout(nextLayout);
-      return;
-    }
-
-    const { occupiedRemovedPaneCount, tabsToClose } = computeLayoutClosePlan(
-      paneTabIds,
-      nextPaneCount,
-    );
-    if (occupiedRemovedPaneCount === 0) {
-      setWorkbenchLayout(nextLayout);
-      return;
-    }
-
-    const removedPaneItems = paneTabIds
-      .map((tabId, index) => ({ tabId, index }))
-      .filter((item) => item.index >= nextPaneCount && Boolean(item.tabId));
-    const removedPaneDetails = removedPaneItems
-      .map((item) => {
-        const tab = item.tabId ? getWorkbenchTab(item.tabId) : null;
-        const tabLabel = tab ? `${tab.title} (${tab.subtitle})` : item.tabId;
-        return `Pane ${item.index + 1}: ${tabLabel}`;
-      })
-      .join("\n");
-
-    const promptDetails =
-      tabsToClose.length > 0
-        ? `This will close ${tabsToClose.length} tab(s) from hidden panes:\n${removedPaneDetails}\n\nContinue?`
-        : "This will hide occupied panes. Continue?";
-    const confirmed = await confirmWorkbenchLayoutShrink(promptDetails);
-    if (!confirmed) return;
-
-    for (const tabId of tabsToClose) {
-      await closeWorkbenchTab(tabId, { skipConfirm: true });
-    }
+    // Fewer panes only hides panes: their tabs stay in the tab strip.
     setWorkbenchLayout(nextLayout);
   }
 
@@ -1259,11 +1223,17 @@
     const index = previousTabs.findIndex((item) => item.id === tabId);
     if (index === -1) return;
     const closingTab = previousTabs[index];
-    if (!options.skipConfirm && (closingTab.kind === "logs" || closingTab.kind === "yaml")) {
-      const confirmed = await confirmWorkbenchTabClose(closingTab);
+    if (!options.skipConfirm) {
+      const confirmed = await confirmWorkbenchTabClose({
+        ...closingTab,
+        hasUnsavedChanges: closingTab.kind === "yaml" && hasUnsavedYaml(getYamlTab(tabId)),
+      });
       if (!confirmed) return;
     }
     rememberClosedTab(tabId);
+    if (!options.skipConfirm) {
+      announceWorkbenchTabClosed(closingTab, () => void reopenLastClosedTab());
+    }
     workbenchTabs = previousTabs.filter((tab) => tab.id !== tabId);
     pinnedTabIds = new Set([...pinnedTabIds].filter((id) => id !== tabId));
     if (yamlCompareSourceTabId === tabId) yamlCompareSourceTabId = null;
@@ -2584,12 +2554,13 @@
   >
     <MultiPaneWorkbench
       tabs={orderedWorkbenchTabs}
+      {paneTabIds}
       activeTabId={activeWorkbenchTabId}
       {isTabPinned}
       onActivateTab={setActiveWorkbenchTab}
       onTogglePin={togglePinTab}
       onCloseTab={(tabId) => {
-        void closeWorkbenchTab(tabId, { skipConfirm: true });
+        void closeWorkbenchTab(tabId);
       }}
       onReopenLastClosedTab={reopenLastClosedTab}
       reopenDisabled={closedWorkbenchTabs.length === 0}

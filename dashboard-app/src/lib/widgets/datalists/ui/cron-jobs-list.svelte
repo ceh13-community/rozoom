@@ -24,7 +24,6 @@
   import {
     buildYamlFilename,
     buildIncidentTimeline,
-    computeLayoutClosePlan,
     orderPinnedTabs,
     type IncidentMarker,
   } from "$features/pods-workbench";
@@ -82,8 +81,9 @@
   import WorkloadSelectionBar from "./common/workload-selection-bar.svelte";
   import { subscribeUntracked } from "$shared/lib/subscribe-untracked";
   import {
-    confirmWorkbenchLayoutShrink,
+    announceWorkbenchTabClosed,
     confirmWorkbenchTabClose,
+    hasUnsavedYaml,
   } from "./common/workbench-confirm";
 
   interface CronJobsListProps {
@@ -651,20 +651,7 @@
 
   async function requestWorkbenchLayout(nextLayout: WorkbenchLayout) {
     if (nextLayout === workbenchLayout) return;
-    const currentPaneCount = getPaneCount();
-    const nextPaneCount = nextLayout === "single" ? 1 : nextLayout === "dual" ? 2 : 3;
-    if (nextPaneCount >= currentPaneCount) {
-      setWorkbenchLayout(nextLayout);
-      return;
-    }
-    const { occupiedRemovedPaneCount, tabsToClose } = computeLayoutClosePlan(paneTabIds, nextPaneCount);
-    if (occupiedRemovedPaneCount === 0) {
-      setWorkbenchLayout(nextLayout);
-      return;
-    }
-    const confirmed = await confirmWorkbenchLayoutShrink();
-    if (!confirmed) return;
-    for (const tabId of tabsToClose) await closeWorkbenchTab(tabId, { skipConfirm: true });
+    // Fewer panes only hides panes: their tabs stay in the tab strip.
     setWorkbenchLayout(nextLayout);
   }
 
@@ -750,11 +737,17 @@
     const index = previousTabs.findIndex((item) => item.id === tabId);
     if (index === -1) return;
     const closingTab = previousTabs[index];
-    if (!options.skipConfirm && (closingTab.kind === "logs" || closingTab.kind === "yaml")) {
-      const confirmed = await confirmWorkbenchTabClose(closingTab);
+    if (!options.skipConfirm) {
+      const confirmed = await confirmWorkbenchTabClose({
+        ...closingTab,
+        hasUnsavedChanges: closingTab.kind === "yaml" && hasUnsavedYaml(getYamlTab(tabId)),
+      });
       if (!confirmed) return;
     }
     rememberClosedTab(tabId);
+    if (!options.skipConfirm) {
+      announceWorkbenchTabClosed(closingTab, () => void reopenLastClosedTab());
+    }
     workbenchTabs = previousTabs.filter((tab) => tab.id !== tabId);
     pinnedTabIds = new Set([...pinnedTabIds].filter((id) => id !== tabId));
     if (tabId.startsWith("logs:")) {
@@ -1966,12 +1959,13 @@
     >
       <MultiPaneWorkbench
         tabs={orderedWorkbenchTabs}
+        {paneTabIds}
         activeTabId={activeWorkbenchTabId}
         {isTabPinned}
         onActivateTab={setActiveWorkbenchTab}
         onTogglePin={togglePinTab}
         onCloseTab={(tabId) => {
-          void closeWorkbenchTab(tabId, { skipConfirm: true });
+          void closeWorkbenchTab(tabId);
         }}
         onReopenLastClosedTab={() => {
           void reopenLastClosedTab();
