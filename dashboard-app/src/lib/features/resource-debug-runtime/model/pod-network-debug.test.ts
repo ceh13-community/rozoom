@@ -1,18 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  NETWORK_DEBUG_CUSTOM_SPEC,
   NETWORK_DEBUG_IMAGE,
   buildNetworkDebugContainerName,
   buildNetworkDebugStartArgs,
   buildNetworkDebugStopArgs,
+  describeNetworkDebugRefusal,
   readEphemeralContainerState,
   startPodNetworkDebugSession,
 } from "./pod-network-debug";
 
 const kubectlRawArgsFront = vi.hoisted(() => vi.fn());
 const openPodNetworkDebugShellModal = vi.hoisted(() => vi.fn());
+const fs = vi.hoisted(() => ({
+  writeTextFile: vi.fn(async () => undefined),
+  remove: vi.fn(async () => undefined),
+}));
 
 vi.mock("$shared/api/kubectl-proxy", () => ({ kubectlRawArgsFront }));
 vi.mock("$features/shell", () => ({ openPodNetworkDebugShellModal }));
+vi.mock("@tauri-apps/plugin-fs", () => fs);
+vi.mock("@tauri-apps/api/path", () => ({ appDataDir: async () => "/app-data" }));
 
 const podJson = (state: Record<string, unknown>, name = "rozoom-netshoot-abc123") =>
   JSON.stringify({ status: { ephemeralContainerStatuses: [{ name, state }] } });
@@ -23,11 +31,18 @@ describe("pod network debug", () => {
   beforeEach(() => {
     kubectlRawArgsFront.mockReset();
     openPodNetworkDebugShellModal.mockReset();
+    fs.writeTextFile.mockClear();
+    fs.remove.mockClear();
   });
 
   it("adds a pinned netshoot container to the pod itself, without --target or --copy-to", () => {
     expect(NETWORK_DEBUG_IMAGE).toMatch(/^nicolaka\/netshoot:v\d+\.\d+@sha256:[0-9a-f]{64}$/);
-    const args = buildNetworkDebugStartArgs("web-a", "shop", "rozoom-netshoot-abc123");
+    const args = buildNetworkDebugStartArgs(
+      "web-a",
+      "shop",
+      "rozoom-netshoot-abc123",
+      "/app-data/spec.json",
+    );
     expect(args.slice(0, 6)).toEqual([
       "debug",
       "pod/web-a",
@@ -40,9 +55,55 @@ describe("pod network debug", () => {
       false,
     );
     // The bundled kubectl defaults to --profile=general, which adds SYS_PTRACE.
-    expect(args.filter((arg) => arg.startsWith("--profile"))).toEqual(["--profile=netadmin"]);
+    expect(args.filter((arg) => arg.startsWith("--profile"))).toEqual(["--profile=baseline"]);
+    expect(args.filter((arg) => arg.startsWith("--custom"))).toEqual([
+      "--custom=/app-data/spec.json",
+    ]);
     expect(args.at(-1)).toMatch(/^sleep 3600 & echo \$! > \/tmp\/\S+; wait$/);
     expect(buildNetworkDebugContainerName()).toMatch(/^rozoom-netshoot-[a-z0-9]{1,6}$/);
+  });
+
+  it("asks for NET_RAW and nothing else", () => {
+    expect(NETWORK_DEBUG_CUSTOM_SPEC).toEqual({
+      securityContext: { capabilities: { add: ["NET_RAW"] } },
+    });
+  });
+
+  it("writes the NET_RAW spec for kubectl and removes it after the start", async () => {
+    kubectlRawArgsFront.mockImplementation(async (args: string[]) => {
+      if (args[0] === "debug") return { output: "", errors: "", code: 0 };
+      const container = (kubectlRawArgsFront.mock.calls[0][0] as string[])[5].split("=")[1];
+      return { output: podJson({ running: {} }, container), errors: "", code: 0 };
+    });
+
+    await startPodNetworkDebugSession({ clusterId: "c1", pod });
+
+    const [path, content] = fs.writeTextFile.mock.calls[0] as unknown as [string, string];
+    expect(path).toMatch(/^\/app-data\/network-debug-[a-z0-9]+\.json$/);
+    expect(JSON.parse(content)).toEqual(NETWORK_DEBUG_CUSTOM_SPEC);
+    expect(kubectlRawArgsFront.mock.calls[0][0]).toContain(`--custom=${path}`);
+    expect(fs.remove).toHaveBeenCalledWith(path);
+  });
+
+  it("explains a Pod Security refusal in plain words and still removes the spec file", async () => {
+    kubectlRawArgsFront.mockResolvedValue({
+      output: "",
+      errors:
+        'Error from server (Forbidden): pods "web-a" is forbidden: violates PodSecurity "baseline:latest": non-default capabilities (container "rozoom-netshoot-abc123" must not include "NET_RAW" in securityContext.capabilities.add)',
+      code: 1,
+    });
+
+    await expect(startPodNetworkDebugSession({ clusterId: "c1", pod })).rejects.toThrow(
+      'Namespace shop does not allow network debug: its Pod Security level "baseline" forbids NET_RAW, the capability that tcpdump, ping and mtr need. A cluster admin can relax the level for this namespace.',
+    );
+    expect(fs.remove).toHaveBeenCalledTimes(1);
+    expect(openPodNetworkDebugShellModal).not.toHaveBeenCalled();
+  });
+
+  it("passes on other refusals as kubectl wrote them", () => {
+    expect(describeNetworkDebugRefusal('error: pods "x" not found', "shop")).toBe(
+      'error: pods "x" not found',
+    );
   });
 
   it("stops only its own sleep, in its own container", () => {

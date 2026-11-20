@@ -759,7 +759,7 @@
   async function startNetworkDebug(pod: Partial<PodItem>) {
     if (!data.slug || !pod.metadata?.name) return;
     const confirmed = await confirmAction(
-      `Start network debug in ${getPodRef(pod)}?\n\nAdds an ephemeral container with ${NETWORK_DEBUG_IMAGE} (dig, curl, nc, tcpdump) to this pod. It shares the pod's network and stops when you close the session, or after an hour. Kubernetes keeps it listed in the pod until the pod is recreated. The first start downloads about 210 MB.`,
+      `Start network debug in ${getPodRef(pod)}?\n\nAdds an ephemeral container with ${NETWORK_DEBUG_IMAGE} (dig, curl, nc, tcpdump, mtr) to this pod, with the NET_RAW capability. It shares the pod's network and stops when you close the session, or after an hour. Kubernetes keeps the container, and NET_RAW with it, in the pod spec until the pod is recreated. The first start downloads about 210 MB.`,
       "Confirm network debug",
     );
     if (!confirmed) return;
