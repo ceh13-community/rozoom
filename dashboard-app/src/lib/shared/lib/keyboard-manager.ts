@@ -25,7 +25,7 @@ let chordBuffer: string | null = null;
 let chordTimer: ReturnType<typeof setTimeout> | null = null;
 let overlayStack: Array<{ id: string; close: () => void }> = [];
 
-function isMac(): boolean {
+export function isMac(): boolean {
   if (typeof navigator === "undefined") return false;
   // eslint-disable-next-line @typescript-eslint/no-deprecated
   return /mac|iphone|ipad|ipod/i.test(navigator.platform || navigator.userAgent);
