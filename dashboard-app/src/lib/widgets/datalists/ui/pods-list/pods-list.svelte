@@ -781,7 +781,13 @@
     try {
       await startPodNetworkDebugSession({ clusterId: data.slug, pod });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not start network debug.");
+      const detail =
+        error instanceof Error && "detail" in error && typeof error.detail === "string"
+          ? error.detail
+          : undefined;
+      toast.error(error instanceof Error ? error.message : "Could not start network debug.", {
+        description: detail ? `kubectl: ${detail}` : undefined,
+      });
     }
   }
 
