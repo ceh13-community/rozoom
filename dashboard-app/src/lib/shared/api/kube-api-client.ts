@@ -48,9 +48,9 @@ function splitJsonLines(buffer: string) {
 export async function listKubeResource<Item>(
   options: ListResourceOptions,
 ): Promise<{ items: Item[]; resourceVersion: string }> {
-  const baseUrl = await acquireKubeApiProxy(options.clusterId);
+  const proxy = await acquireKubeApiProxy(options.clusterId);
   try {
-    const response = await fetch(buildUrl(baseUrl, options.path), {
+    const response = await fetch(buildUrl(proxy.baseUrl, options.path), {
       method: "GET",
       cache: "no-store",
       headers: { Accept: "application/json" },
@@ -67,12 +67,12 @@ export async function listKubeResource<Item>(
       resourceVersion: payload.metadata?.resourceVersion ?? "",
     };
   } finally {
-    await releaseKubeApiProxy(options.clusterId);
+    await releaseKubeApiProxy(proxy);
   }
 }
 
 export async function watchKubeResource<T>(options: WatchResourceOptions<T>) {
-  const baseUrl = await acquireKubeApiProxy(options.clusterId);
+  const proxy = await acquireKubeApiProxy(options.clusterId);
   const query = new URLSearchParams({
     watch: "1",
     allowWatchBookmarks: "true",
@@ -88,7 +88,7 @@ export async function watchKubeResource<T>(options: WatchResourceOptions<T>) {
   }
 
   try {
-    const response = await fetch(buildUrl(baseUrl, options.path, query), {
+    const response = await fetch(buildUrl(proxy.baseUrl, options.path, query), {
       method: "GET",
       cache: "no-store",
       headers: { Accept: "application/json" },
@@ -150,6 +150,6 @@ export async function watchKubeResource<T>(options: WatchResourceOptions<T>) {
 
     return { expired: false as const, resourceVersion: latestResourceVersion };
   } finally {
-    await releaseKubeApiProxy(options.clusterId);
+    await releaseKubeApiProxy(proxy);
   }
 }

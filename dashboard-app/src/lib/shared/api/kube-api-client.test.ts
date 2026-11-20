@@ -21,7 +21,7 @@ describe("kube-api-client", () => {
     vi.resetModules();
     acquireMock.mockReset();
     releaseMock.mockReset();
-    acquireMock.mockResolvedValue("http://127.0.0.1:39123");
+    acquireMock.mockResolvedValue({ clusterId: "cluster-a", baseUrl: "http://127.0.0.1:39123" });
     releaseMock.mockResolvedValue(undefined);
     vi.stubGlobal("fetch", vi.fn());
   });
@@ -44,7 +44,10 @@ describe("kube-api-client", () => {
       items: [{ metadata: { name: "demo" } }],
       resourceVersion: "55",
     });
-    expect(releaseMock).toHaveBeenCalledWith("cluster-a");
+    expect(releaseMock).toHaveBeenCalledWith({
+      clusterId: "cluster-a",
+      baseUrl: "http://127.0.0.1:39123",
+    });
   });
 
   it("streams watch events and returns the latest resourceVersion", async () => {
@@ -85,7 +88,10 @@ describe("kube-api-client", () => {
 
     expect(events).toEqual([{ type: "ADDED" }, { type: "BOOKMARK" }]);
     expect(result).toEqual({ expired: false, resourceVersion: "57" });
-    expect(releaseMock).toHaveBeenCalledWith("cluster-a");
+    expect(releaseMock).toHaveBeenCalledWith({
+      clusterId: "cluster-a",
+      baseUrl: "http://127.0.0.1:39123",
+    });
   });
 
   it("treats 410 error watch events as expired relist signals", async () => {
