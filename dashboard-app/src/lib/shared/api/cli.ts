@@ -21,6 +21,7 @@ export type CliTool =
   | "kubeconform"
   | "stern"
   | "yq"
+  | "jq"
   | "hcloud"
   | "oc"
   | "az"

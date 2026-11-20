@@ -86,6 +86,14 @@
       "mode": "latest",
       "updatedAt": "2026-04-06T20:45:08.535Z"
     },
+    "jq": {
+      "version": "jq-1.8.2",
+      "file": "jq",
+      "sha256": "b1c22172dd303f3be49e935aa56aa48a8b7a46e0bc838b4997d3bb451495870f",
+      "archiveSha256": "b1c22172dd303f3be49e935aa56aa48a8b7a46e0bc838b4997d3bb451495870f",
+      "mode": "latest",
+      "updatedAt": "2026-11-20T00:40:00.000Z"
+    },
     "hcloud": {
       "version": "v1.62.0",
       "file": "hcloud",

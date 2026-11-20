@@ -10,6 +10,7 @@ export const SUPPORTED_CLI_TOOLS: Record<string, CliTool> = {
   kubeconform: "kubeconform",
   pluto: "pluto",
   yq: "yq",
+  jq: "jq",
   doctl: "doctl",
   aws: "aws",
   gcloud: "gcloud",
