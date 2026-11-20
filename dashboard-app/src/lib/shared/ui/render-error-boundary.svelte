@@ -80,7 +80,7 @@
           {/if}
         </button>
       </div>
-      <p class="mt-3 text-[11px] text-muted-foreground/70">
+      <p class="mt-3 text-[11px] text-muted-foreground">
         The error is saved in the app log. Copy details for support adds the recent log lines with
         secrets removed.
       </p>

@@ -1171,7 +1171,7 @@
               repoTestResult = null;
             }}
             placeholder="https://github.com/org/infra.git"
-            class="w-full h-7 text-xs px-2 rounded border border-border bg-background text-foreground placeholder:text-muted-foreground/50"
+            class="w-full h-7 text-xs px-2 rounded border border-border bg-background text-foreground placeholder:text-muted-foreground"
           />
         </div>
         <Button
@@ -1192,7 +1192,7 @@
             type="text"
             bind:value={branch}
             placeholder="main"
-            class="w-full h-7 text-xs px-2 rounded border border-border bg-background text-foreground placeholder:text-muted-foreground/50"
+            class="w-full h-7 text-xs px-2 rounded border border-border bg-background text-foreground placeholder:text-muted-foreground"
           />
         </div>
         <div>
@@ -1204,7 +1204,7 @@
             type="text"
             bind:value={path}
             placeholder="."
-            class="w-full h-7 text-xs px-2 rounded border border-border bg-background text-foreground placeholder:text-muted-foreground/50"
+            class="w-full h-7 text-xs px-2 rounded border border-border bg-background text-foreground placeholder:text-muted-foreground"
           />
         </div>
       </div>
@@ -1465,7 +1465,7 @@
                   }}
                   disabled={!installDone}
                   placeholder="https://github.com/org/infra.git"
-                  class="flex-1 h-7 text-xs px-2 rounded border border-border bg-background text-foreground placeholder:text-muted-foreground/50 disabled:opacity-50"
+                  class="flex-1 h-7 text-xs px-2 rounded border border-border bg-background text-foreground placeholder:text-muted-foreground disabled:opacity-50"
                 />
                 <Button
                   size="sm"

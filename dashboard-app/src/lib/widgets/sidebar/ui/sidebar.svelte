@@ -14,6 +14,7 @@
     ShieldOff,
     SquareChevronRight,
     MessageSquareCode,
+    MessageSquareOff,
     BookCopy,
   } from "$shared/ui/icons";
   import { openExternalUrl } from "$shared/api/in-app-browser";
@@ -143,7 +144,7 @@
       <Popover.Root>
         <Popover.Trigger class="w-full">
           <button
-            class="flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium text-muted-foreground hover:bg-muted relative"
+            class="rail-notifications flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium text-muted-foreground hover:bg-muted relative"
             title="Notifications"
             aria-label={$unreadCount > 0
               ? `Notifications, ${$unreadCount} unread`
@@ -194,9 +195,9 @@
           <div class="overflow-y-auto flex-1">
             {#if $appNotifications.length === 0}
               <div class="px-3 py-8 text-center">
-                <Bell class="h-8 w-8 mx-auto text-muted-foreground/30 mb-2" />
+                <Bell class="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                 <p class="text-xs text-muted-foreground">No notifications</p>
-                <p class="text-[10px] text-muted-foreground/60 mt-1">
+                <p class="text-[10px] text-muted-foreground mt-1">
                   Certificate and update alerts will appear here
                 </p>
               </div>
@@ -243,7 +244,7 @@
                       <div class="text-[11px] text-muted-foreground mt-0.5">{notif.detail}</div>
                     {/if}
                     <div class="flex items-center gap-2 mt-1">
-                      <span class="text-[10px] text-muted-foreground/60">
+                      <span class="text-[10px] text-muted-foreground">
                         {formatTimeAgo(notif.createdAt)}
                       </span>
                       {#if notif.category === "certificate"}
@@ -276,7 +277,7 @@
                     </div>
                   </div>
                   <button
-                    class="flex-shrink-0 mt-1 text-muted-foreground/40 hover:text-foreground text-sm leading-none"
+                    class="flex-shrink-0 mt-1 text-muted-foreground hover:text-foreground text-sm leading-none"
                     onclick={(e) => {
                       e.stopPropagation();
                       dismissNotification(notif.id);
@@ -291,7 +292,7 @@
       </Popover.Root>
       <button
         class={cn(
-          "flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium",
+          "rail-toggle flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium",
           linterEnabled
             ? cn(NAV_ACTIVE_CLASS, NAV_ACTIVE_HOVER_CLASS)
             : "bg-slate-600/20 text-slate-400 hover:bg-slate-600/30",
@@ -312,7 +313,7 @@
       </button>
       <button
         class={cn(
-          "flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium",
+          "rail-toggle flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium",
           diagnosticsEnabled
             ? cn(NAV_ACTIVE_CLASS, NAV_ACTIVE_HOVER_CLASS)
             : "bg-slate-600/20 text-slate-400 hover:bg-slate-600/30",
@@ -335,7 +336,7 @@
       </button>
       <button
         class={cn(
-          "flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium",
+          "rail-toggle flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium",
           cliNotificationsEnabled
             ? cn(NAV_ACTIVE_CLASS, NAV_ACTIVE_HOVER_CLASS)
             : "bg-slate-600/20 text-slate-400 hover:bg-slate-600/30",
@@ -347,7 +348,11 @@
           ? "CLI toasts shown - click to hide"
           : "CLI toasts hidden - click to show"}
       >
-        <MessageSquareCode class={cn("h-4 w-4", !cliNotificationsEnabled && "opacity-50")} />
+        {#if cliNotificationsEnabled}
+          <MessageSquareCode class="h-4 w-4" />
+        {:else}
+          <MessageSquareOff class="h-4 w-4" />
+        {/if}
         <span class={cn(sidebarOpen ? "block" : "hidden")}>
           Toasts {cliNotificationsEnabled ? "on" : "off"}
         </span>

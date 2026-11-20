@@ -194,9 +194,10 @@
     border-color: hsl(191 88% 44% / 0.35);
   }
 
+  /* Field and control borders need 3:1 against the background (WCAG 1.4.11): the token. */
   .k9s button[variant="outline"],
   .k9s .border-input {
-    border-color: hsl(191 88% 44% / 0.4);
+    border-color: hsl(var(--input));
   }
 
   .k9s .bg-emerald-500 {
@@ -439,7 +440,7 @@
   .k9s input[type="number"],
   .k9s input[type="search"] {
     background: hsl(0 0% 5% / 0.9) !important;
-    border-color: hsl(191 88% 44% / 0.35) !important;
+    border-color: hsl(var(--input)) !important;
     color: hsl(203 100% 74%) !important;
   }
 
