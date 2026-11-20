@@ -15,11 +15,11 @@
   import type { PodItem } from "$shared/model/clusters";
   import {
     buildPodShellExecArgs,
-    buildPodAttachArgs,
     getPodSessionInitialCommand,
     pickMainContainer,
   } from "$widgets/datalists/ui/pods-list/pod-shell";
   import { parseCliCommand, SUPPORTED_CLI_TOOLS } from "$widgets/shell/lib/parse-cli-command";
+  import { startPodOutputStream, type PodOutputStream } from "$widgets/shell/model/pod-output-stream";
   import {
     canCopyCommandLine,
     COPY_BLOCKED_MESSAGE,
@@ -50,6 +50,11 @@
   let shellCleanupPod: { name: string; namespace: string } | null = null;
   let shellTargetContainer: string | undefined = undefined;
   let shellStopArgs: string[] | null = null;
+  /** Read-only output of the main process in attach mode. */
+  let attachStream: PodOutputStream | null = null;
+  let attachEnded = false;
+  /** Attach can run for hours; keep the newest lines only. */
+  const ATTACH_MAX_LINES = 2000;
   let sessionClusterId = "";
   let collapsed = false;
   let commandHistory: string[] = loadShellHistory();
@@ -145,6 +150,9 @@
     ) {
       void deletePodDebugCleanup(shellCleanupPod, sessionClusterId).catch(() => undefined);
     }
+    // Ends the session first, so a stream that is still starting stops itself when it resolves.
+    activeSessionId += 1;
+    stopAttachStream();
     if (!podDebugCleanupHandled && shellStopArgs && sessionClusterId) {
       void stopSessionContainer(shellStopArgs, sessionClusterId).catch(() => undefined);
     }
@@ -289,6 +297,10 @@
     shellCleanupPod = null;
     shellTargetContainer = undefined;
     shellStopArgs = null;
+    // Ends the session first, so a stream that is still starting stops itself when it resolves.
+    activeSessionId += 1;
+    stopAttachStream();
+    attachEnded = false;
     sessionClusterId = "";
     shellCommand = "kubectl get pods -A";
     shellMode = "debug";
@@ -405,7 +417,50 @@
   function appendShellOutput(text: string) {
     const lines = text.replace(/\r\n/g, "\n").split("\n");
     shellOutput = [...shellOutput, ...lines];
+    if (shellMode === "pod-attach" && shellOutput.length > ATTACH_MAX_LINES) {
+      shellOutput = shellOutput.slice(-ATTACH_MAX_LINES);
+    }
     needsScrollToBottom = true;
+  }
+
+  function stopAttachStream() {
+    const stream = attachStream;
+    attachStream = null;
+    if (stream) void stream.stop();
+  }
+
+  async function openAttachStream(sessionId: number, container: string | undefined) {
+    const pod = shellTargetPod;
+    if (!pod) return;
+    attachEnded = false;
+    const stream = await startPodOutputStream({
+      clusterId: sessionClusterId,
+      pod,
+      container,
+      onLine: (line) => {
+        if (isSessionActive(sessionId)) appendShellOutput(line);
+      },
+      onEnd: (code) => {
+        if (!isSessionActive(sessionId)) return;
+        attachEnded = true;
+        attachStream = null;
+        appendShellOutput(
+          code === null || code === 0
+            ? "\nThe output stream ended."
+            : `\nThe output stream ended (kubectl exit code ${code}).`,
+        );
+      },
+    });
+    if (!isSessionActive(sessionId)) {
+      void stream.stop();
+      return;
+    }
+    attachStream = stream;
+    appendShellOutput(
+      stream.viaLog
+        ? "This container runs with a terminal, so its output is read from the container log. New lines appear below."
+        : "New output of the main process appears below. Processes that print only on activity, such as a web server, stay quiet until something happens.",
+    );
   }
 
   function isDebugDescribeSession() {
@@ -523,6 +578,9 @@
           `\n✅ ${shellMode === "pod-attach" ? "Attached" : "Connected"} to ${shellTargetNamespace}/${shellTargetLabel}${containerInfo}`,
         );
         if (state.notice) appendShellOutput(state.notice);
+        if (shellMode === "pod-attach") {
+          await openAttachStream(sessionId, mainContainer);
+        }
         if (shellSessionKind === "pod-network-debug") {
           appendShellOutput(
             "Each command runs on its own, without a terminal, and the next one waits for it. Give long-running tools a limit, for example tcpdump -c 20 or ping -c 3.",
@@ -574,24 +632,6 @@
   async function runDebugCommand(command: string) {
     if (shellMode === "debug") {
       return runLocalCommand(command);
-    }
-
-    if (shellMode === "pod-attach") {
-      // kubectl attach connects to the main process stdin/stdout/stderr
-      const args = buildPodAttachArgs(shellTargetPod!);
-      const result = await kubectlRawArgsFront(args, {
-        clusterId: sessionClusterId,
-      });
-
-      if (!result.errors && result.code === 0) {
-        const output = result.output?.trim();
-        if (output?.length) {
-          appendShellOutput(output);
-        }
-        return;
-      }
-
-      throw new Error(normalizeShellError(result.errors || `Attach failed`));
     }
 
     // pod-exec: run command inside a new shell in the container
@@ -1007,12 +1047,18 @@
             Export output
           </Button>
         </div>
+      {:else if shellMode === "pod-attach"}
+        <p class="text-xs text-slate-400" data-testid="attach-read-only-note">
+          {attachEnded
+            ? "The output stream ended. Close this window and open Attach again to follow the process."
+            : "Read-only: this shows what the main process prints. Typing to it is not supported; use Shell to run commands."}
+        </p>
       {:else}
         <div class="flex flex-wrap items-start gap-2">
           <div class="flex-1 min-w-0">
             <textarea
               class="w-full resize-none rounded border border-slate-700 bg-slate-900/80 px-3 py-2 text-[13px] font-mono text-slate-100 outline-none transition focus:border-slate-500"
-              placeholder={shellMode === "pod-exec" || shellMode === "pod-attach"
+              placeholder={shellMode === "pod-exec"
                 ? "Run command inside the selected pod  (Enter = run, Shift+Enter = newline, Ctrl+Enter = run multi-line)"
                 : "Type command (for example: kubectl get ns)\nMulti-line paste OK. Enter = run, Shift+Enter = newline, Ctrl+Enter = run multi-line."}
               bind:value={shellCommand}

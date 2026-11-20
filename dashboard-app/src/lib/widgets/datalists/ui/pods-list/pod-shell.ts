@@ -237,6 +237,10 @@ export function buildPodShellExecArgs(pod: Partial<PodItem>, command: string, co
   return args;
 }
 
+/**
+ * Read-only attach: the output of the main process from now on. No -i or -t: the app has no
+ * terminal to give the process, and with -i -t kubectl failed ("Unable to use a TTY") or hung.
+ */
 export function buildPodAttachArgs(pod: Partial<PodItem>, container?: string) {
   const podName = pod.metadata?.name;
   if (!podName) {
@@ -244,10 +248,43 @@ export function buildPodAttachArgs(pod: Partial<PodItem>, container?: string) {
   }
   const namespace = pod.metadata?.namespace || DEBUG_POD_NAMESPACE;
   const containerArg = container || pickMainContainer(pod);
-  const args = ["attach", "-i", "-t", "--namespace", namespace];
+  const args = ["attach", "--namespace", namespace];
   if (containerArg) args.push("-c", containerArg);
   args.push(podName);
   return args;
+}
+
+/**
+ * A container started with tty: true cannot be attached without a terminal ("error stream
+ * protocol error"). Its output also goes to the container log, so it is followed there.
+ */
+export function buildPodOutputFollowArgs(pod: Partial<PodItem>, container?: string) {
+  const podName = pod.metadata?.name;
+  if (!podName) {
+    throw new Error("Pod attach requires a pod with a name.");
+  }
+  const namespace = pod.metadata?.namespace || DEBUG_POD_NAMESPACE;
+  const containerArg = container || pickMainContainer(pod);
+  const args = ["logs", "--follow", "--tail=0", "--namespace", namespace];
+  if (containerArg) args.push("-c", containerArg);
+  args.push(podName);
+  return args;
+}
+
+export function containerUsesTty(pod: Partial<PodItem>, container?: string) {
+  const name = container || pickMainContainer(pod);
+  const containers = pod.spec?.containers as Array<{ name?: string; tty?: boolean }> | undefined;
+  return containers?.find((c) => c.name === name)?.tty === true;
+}
+
+/** kubectl attach prints these for interactive sessions; they are wrong for a read-only stream. */
+const ATTACH_BANNER_LINES = [
+  "All commands and output from this session will be recorded in container logs",
+  "If you don't see a command prompt, try pressing enter.",
+];
+
+export function isAttachBannerLine(line: string) {
+  return ATTACH_BANNER_LINES.some((banner) => line.includes(banner));
 }
 
 export function getPodSessionInitialCommand(mode: "debug" | "pod-exec" | "pod-attach") {
