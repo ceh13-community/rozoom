@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { resolvePageClusterName, type PageData } from "$entities/cluster";
   import { toClusterWorkloadHref } from "$pages/cluster/model/cluster-page-workspace";
   import { kubectlJson } from "$shared/api/kubectl-proxy";
@@ -8,7 +9,7 @@
   import * as Table from "$shared/ui/table";
   import * as Alert from "$shared/ui/alert";
   import TableSurface from "$shared/ui/table-surface.svelte";
-  import LoadingDots from "$shared/ui/loading-dots.svelte";
+  import LoadingState from "$shared/ui/loading-state.svelte";
   import TableSummaryBar from "$shared/ui/table-summary-bar.svelte";
   import TableEmptyState from "$shared/ui/table-empty-state.svelte";
   import {
@@ -26,7 +27,9 @@
   const { data }: Props = $props();
   const clusterId = $derived(data.uuid ?? data.slug ?? "");
 
-  let loading = $state(false);
+  // The first scan starts once the cluster is known: start in the loading state so the
+  // first frame never says "No problems found."
+  let loading = $state(untrack(() => Boolean(data.uuid ?? data.slug)));
   let errorMessage = $state<string | null>(null);
   let search = $state("");
   let resources = $state<ProblemResource[]>([]);
@@ -241,8 +244,9 @@
 
   const summaryItems = $derived.by(() => [
     { label: "Cluster", value: resolvePageClusterName(data) },
-    { label: "Findings", value: matchedResources.length },
-    { label: "Supported", value: supportedResourceTypes },
+    // "-" while scanning: a 0 there reads as a result.
+    { label: "Findings", value: loading ? "-" : matchedResources.length },
+    { label: "Supported", value: loading ? "-" : supportedResourceTypes },
     ...(unsupportedResourceTypes > 0 ? [{ label: "Unsupported", value: unsupportedResourceTypes }] : []),
     ...(failedResourceTypes > 0 ? [{ label: "Failed", value: failedResourceTypes }] : []),
   ]);
@@ -377,7 +381,7 @@
             <Table.Row>
               <Table.Cell colspan={6} class="text-center py-6">
                 {#if loading}
-                  <div class="px-4 py-6 text-sm text-muted-foreground">Scanning cluster resources<LoadingDots /></div>
+                  <LoadingState label="Scanning cluster resources" class="px-4 py-6" />
                 {:else}
                   <TableEmptyState message="No problems found." />
                 {/if}
