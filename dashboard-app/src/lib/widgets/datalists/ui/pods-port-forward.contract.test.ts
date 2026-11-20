@@ -11,15 +11,14 @@ describe("pod port-forward local port", () => {
 
   it("starts the forward on an unprivileged local port", () => {
     expect(start).toBeGreaterThan(0);
-    expect(body).toContain("const localPort = defaultLocalPort(firstPort);");
+    expect(body).toContain("const localPort = defaultLocalPort(firstPort, usedLocalPorts());");
     expect(body).toMatch(/remotePort: firstPort,\s*localPort,/);
   });
 
-  it("shows and opens the local port, not the container port", () => {
-    expect(body).toContain(
-      "`Port-forward started: localhost:${localPort} -> ${name}:${firstPort}`",
-    );
-    expect(body).toContain("popOutPortForwardPreview(`http://localhost:${localPort}`)");
-    expect(body).not.toContain("http://localhost:${firstPort}");
+  it("shows and opens 127.0.0.1 on the local port, not the container port", () => {
+    expect(body).toContain("const url = portForwardLocalUrl(localPort, firstPort);");
+    expect(body).toContain("`Port-forward started: ${url} -> ${name}:${firstPort}`");
+    expect(body).toContain("popOutPortForwardPreview(url)");
+    expect(body).not.toContain("localhost");
   });
 });

@@ -33,6 +33,15 @@ export const activePortForwards = readonly(activeForwards);
 const CONFIG_DIR = "configs";
 const pendingLocalPorts = new Set<number>();
 
+/** Local ports held by the app's own forwards, running or starting. */
+export function usedLocalPorts(): Set<number> {
+  const used = new Set(pendingLocalPorts);
+  for (const proc of Object.values(get(activeForwards))) {
+    if (proc?.isRunning) used.add(proc.localPort);
+  }
+  return used;
+}
+
 function updateForward(
   uniqueKey: string,
   updater: (current: PortForwardProcess) => PortForwardProcess,
