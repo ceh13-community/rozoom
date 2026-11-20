@@ -21,7 +21,11 @@ the credentials from that kubeconfig. A cluster that does not answer now shows
 as unreachable on its card and on every page, with Retry, instead of empty
 lists and green statuses. On Linux (.deb, .rpm) the app does not update itself:
 download the new package from the release page and install it the way you
-installed this one. We recommend this update.
+installed this one. This release also adds Text size (Ctrl/Cmd + = / - / 0),
+a Help menu on every OS and network debug from the pod menu, makes Attach a
+read-only view of the process output, keeps workbench tabs when you change the
+pane layout, and fixes pod port-forwards to ports below 1024. We recommend
+this update.
 
 ### Security
 
@@ -30,6 +34,15 @@ installed this one. We recommend this update.
 - A kubeconfig YAML error is logged as its position and error name only, for
   example "Invalid YAML format at line 8, column 1 (YAMLException)". The same
   text is shown in the add cluster dialog.
+- Tauri is updated to 2.12.7 for the IPC origin advisory GHSA-7gmj-67g7-phm9.
+- Manage Kubernetes Clusters no longer checks again in the background a cluster
+  whose last check got no answer. A sign-in that waits for you, such as a
+  kubelogin browser login or device code, is started only by Retry or by
+  opening the cluster, not every 30 seconds.
+- Network debug runs with the NET_RAW capability only, not NET_ADMIN, so the
+  session cannot change the pod's routes or firewall rules. When it is refused,
+  the message shows only kubectl's last line, never the output of a credential
+  plugin such as a sign-in link or device code.
 
 ### Changed
 
@@ -50,6 +63,41 @@ installed this one. We recommend this update.
 - App icons show the wheel only, and the logo wordmark is spelled correctly.
 - A render error shows an error panel instead of an empty page, and uncaught
   errors are written to logs.log.
+- Text size: Ctrl/Cmd + = and Ctrl/Cmd + - change the size of the whole
+  interface from 80% to 150%, Ctrl/Cmd + 0 resets it. The same control is on
+  the Manage Kubernetes Clusters page, and the size is kept between launches.
+- The Help menu is on every OS: Documentation, Keyboard Shortcuts, Report an
+  Issue, Check for Updates, Open Logs Folder and About. Keyboard Shortcuts
+  lists every shortcut the app handles.
+- The full build bundles jq.
+- Network debug (netshoot) in the pod menu: after a confirmation it adds an
+  ephemeral container with nicolaka/netshoot v0.16, pinned by its digest, to
+  the pod and opens a shell in it with dig, curl, nc, tcpdump and mtr. It
+  stops when you close the window or after an hour. Kubernetes keeps the
+  container, and NET_RAW with it, in the pod spec until the pod is recreated.
+  A namespace whose Pod Security level is baseline or restricted refuses it;
+  the message says that network debug needs the privileged level.
+- Attach pod shows what the main process of the container prints, read-only.
+  It no longer sends your keys to the process, so it cannot stop it by
+  accident. To run commands, use Shell.
+- Shell, Attach pod and PVC disk usage explain in plain words what they do and
+  why a value is missing.
+- After Logs, Previous logs, Edit YAML, Events or Investigate on a pod, the
+  panel with the result comes into view and takes focus. Esc closes it and
+  focus goes back to the row menu. It does not take focus while you are
+  typing in another field.
+- Panels that wait for the cluster show one loading indicator that says what
+  is loading, and Workload Map no longer says "No data yet" before its first
+  scan.
+- Workbench tabs (Logs, YAML, Events and others under a list): closing a tab
+  asks first only when it would lose unsaved YAML edits or stop a running
+  port-forward. Other tabs close at once with an Undo. Choosing fewer panes
+  keeps every tab open. The layout switch reads "Panes 1 2 3", each tab shows
+  the number of the pane it is in, and panes are named Pane 1, 2 and 3.
+- Pinned page chips say "2 panes" instead of "2P", group the pane buttons
+  under "Open in", and Unpin shows an Undo instead of a dialog.
+- Colors meet WCAG AA contrast in the light, dark and K9s themes, including
+  buttons, field borders and the text on the light theme's blue sidebar rail.
 
 ### Fixed
 
@@ -86,6 +134,24 @@ installed this one. We recommend this update.
   Chains and other short pages) could open scrolled past its end and look
   empty, and the collapsed cluster menu showed blank space below its icons.
   Every page now opens at the top, and the menu stays within its items.
+- Pod port-forward to a port below 1024 failed without root. It now uses
+  local port 30000 plus the port (80 becomes 30080), opens on 127.0.0.1, and
+  a second pod on the same port gets the next free local port.
+- Overview workload tiles said OK when the warning events could not be read.
+  They now show Unknown with the reason, and the Cron Jobs tile shows Unknown
+  until its check has a result.
+- The close button on a workbench tab closed a YAML tab with unsaved edits
+  without asking.
+- Manage Kubernetes Clusters showed a stopped cluster as Online until you left
+  the page, and Online only kept listing it. The page now checks again every
+  30 seconds while it is open, and the status filter follows the same live
+  status as each row.
+- After switching the page between one and two panes, the second pane could
+  show "Error: No data provided" instead of loading. The main pane had the
+  same problem after Pods and back.
+- Closing an Attach window while it was still starting left kubectl running.
+- Release notes on the release page and in the update feed no longer break
+  sentences in the middle.
 
 Something confusing or broken? [Tell us what's wrong](https://github.com/ceh13-community/rozoom/discussions).
 
