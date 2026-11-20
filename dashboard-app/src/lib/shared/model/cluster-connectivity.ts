@@ -31,6 +31,12 @@ export type ClusterConnectivity = {
   lastKnownVersion: string | null;
   /** Last time any verdict was recorded in this session. */
   checkedAt: number | null;
+  /**
+   * The last check gave up waiting: kubectl neither answered nor failed. A credential
+   * plugin that waits for a person (browser login, device code) looks exactly like this,
+   * so nothing re-checks such a cluster on its own; only Retry or opening it does.
+   */
+  noAnswer: boolean;
 };
 
 const STORAGE_KEY = "rozoom:cluster-connectivity:v1";
@@ -49,6 +55,7 @@ const EMPTY: ClusterConnectivity = {
   lastContactAt: null,
   lastKnownVersion: null,
   checkedAt: null,
+  noAnswer: false,
 };
 
 type PersistedEntry = { lastContactAt: number | null; lastKnownVersion: string | null };
@@ -182,6 +189,7 @@ function markOnline(clusterId: string, startedAt: number, now: number) {
     detail: null,
     lastContactAt: now,
     checkedAt: now,
+    noAnswer: false,
   });
   if (!wasOnline || now - lastPersistAt >= PERSIST_EVERY_MS) {
     lastPersistAt = now;
@@ -224,6 +232,7 @@ function markFailure(
     reason: verdict.reason,
     detail: verdict.detail,
     checkedAt: now,
+    noAnswer: false,
   });
 }
 
@@ -296,6 +305,7 @@ export function reportClusterNoAnswer(clusterId: string, detail: string, started
     reason: "No answer from the server",
     detail,
     checkedAt: now,
+    noAnswer: true,
   });
 }
 

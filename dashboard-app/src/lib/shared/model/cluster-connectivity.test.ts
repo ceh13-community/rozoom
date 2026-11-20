@@ -146,6 +146,24 @@ describe("cluster connectivity", () => {
       });
     });
 
+    it("marks a check that got no answer, and clears the mark on the next verdict", () => {
+      reportClusterNoAnswer("a", "Gave up after 35 s", 5_000);
+      expect(get(selectClusterConnectivity("a"))).toMatchObject({
+        state: "unreachable",
+        noAnswer: true,
+      });
+
+      reportKubectlOutcome("a", { code: 1, stderr: REFUSED }, { startedAt: 6_000 });
+      expect(get(selectClusterConnectivity("a")).noAnswer).toBe(false);
+
+      reportClusterNoAnswer("a", "Gave up after 35 s", 7_000);
+      reportKubectlOutcome("a", { code: 0, stderr: "" }, { startedAt: 8_000 });
+      expect(get(selectClusterConnectivity("a"))).toMatchObject({
+        state: "online",
+        noAnswer: false,
+      });
+    });
+
     it("drops a check that gave up when a newer call has answered", () => {
       reportKubectlOutcome("a", { code: 0, stderr: "" }, { startedAt: 10_000 });
       reportClusterNoAnswer("a", "Gave up after 35 s", 5_000);

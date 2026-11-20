@@ -16,6 +16,7 @@ function entry(patch: Partial<ClusterConnectivity>): ClusterConnectivity {
     lastContactAt: null,
     lastKnownVersion: null,
     checkedAt: null,
+    noAnswer: false,
     ...patch,
   };
 }
