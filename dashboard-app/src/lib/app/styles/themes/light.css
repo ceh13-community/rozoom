@@ -28,7 +28,9 @@
   }
 
   /* Bundled tools list and version under the rail: grey slate text fails on the blue. */
-  html:not(.dark):not(.k9s) .app-sidebar-rail :is(.text-slate-300, .text-slate-400, .text-slate-500) {
+  html:not(.dark):not(.k9s)
+    .app-sidebar-rail
+    :is(.text-slate-300, .text-slate-400, .text-slate-500) {
     color: hsl(0 0% 100% / 0.92);
   }
 
