@@ -11,7 +11,11 @@
   import { resolvePageClusterName, type PageData } from "$entities/cluster";
   import type { PodItem } from "$shared/model/clusters";
   import { openPodAttachModal, openPodShellModal } from "$features/shell";
-  import { runDebugDescribe } from "$features/resource-debug-runtime";
+  import {
+    NETWORK_DEBUG_IMAGE,
+    runDebugDescribe,
+    startPodNetworkDebugSession,
+  } from "$features/resource-debug-runtime";
   import { startPortForward, usedLocalPorts } from "$shared/api/port-forward";
   import {
     defaultLocalPort,
@@ -752,6 +756,21 @@
     showActionSuccess(`Copied kubectl debug for ${getPodRef(pod)}.`);
   }
 
+  async function startNetworkDebug(pod: Partial<PodItem>) {
+    if (!data.slug || !pod.metadata?.name) return;
+    const confirmed = await confirmAction(
+      `Start network debug in ${getPodRef(pod)}?\n\nAdds an ephemeral container with ${NETWORK_DEBUG_IMAGE} (dig, curl, nc, tcpdump) to this pod. It shares the pod's network and stops when you close the session, or after an hour. Kubernetes keeps it listed in the pod until the pod is recreated. The first start downloads about 210 MB.`,
+      "Confirm network debug",
+    );
+    if (!confirmed) return;
+    toast.info(`Starting network debug in ${getPodRef(pod)}...`);
+    try {
+      await startPodNetworkDebugSession({ clusterId: data.slug, pod });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not start network debug.");
+    }
+  }
+
   function runPodDebugDescribe(pod: Partial<PodItem>) {
     const name = pod.metadata?.name?.trim();
     if (!name || !data.slug) return;
@@ -1268,6 +1287,11 @@
       const pod = getPodByUid(row.uid);
       if (!pod) return;
       void copyDebugCommand(pod);
+    }}
+    onNetworkDebug={(row) => {
+      const pod = getPodByUid(row.uid);
+      if (!pod) return;
+      void startNetworkDebug(pod);
     }}
     onPortForward={(row) => {
       const pod = getPodByUid(row.uid);

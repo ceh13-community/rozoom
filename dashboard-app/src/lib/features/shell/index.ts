@@ -4,6 +4,7 @@ export {
   openDebugDescribeModal,
   openPodShellModal,
   openPodDebugShellModal,
+  openPodNetworkDebugShellModal,
   openPodAttachModal,
   closeShellModal,
   closeAllShellModals,

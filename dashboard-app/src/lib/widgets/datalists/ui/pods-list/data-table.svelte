@@ -45,6 +45,7 @@
     onCopyDescribe: (row: PodListRow) => void;
     onRunDebugDescribe: (row: PodListRow) => void;
     onCopyDebug: (row: PodListRow) => void;
+    onNetworkDebug?: (row: PodListRow) => void;
     onPreviousLogs: (row: PodListRow) => void;
     onPortForward: (row: PodListRow) => void;
     onEvict: (row: PodListRow) => void;
@@ -107,6 +108,7 @@
     onCopyDescribe,
     onRunDebugDescribe,
     onCopyDebug,
+    onNetworkDebug,
     onPreviousLogs,
     onPortForward,
     onEvict,
@@ -746,6 +748,7 @@
                       onCopyDescribe={() => onCopyDescribe(row)}
                       onRunDebugDescribe={() => onRunDebugDescribe(row)}
                       onCopyDebug={() => onCopyDebug(row)}
+                      onNetworkDebug={onNetworkDebug ? () => onNetworkDebug(row) : undefined}
                       onPreviousLogs={() => onPreviousLogs(row)}
                       onPortForward={() => onPortForward(row)}
                       onEvict={() => onEvict(row)}
@@ -861,6 +864,7 @@
                 onCopyDescribe={() => onCopyDescribe(row)}
                 onRunDebugDescribe={() => onRunDebugDescribe(row)}
                 onCopyDebug={() => onCopyDebug(row)}
+                onNetworkDebug={onNetworkDebug ? () => onNetworkDebug(row) : undefined}
                 onPreviousLogs={() => onPreviousLogs(row)}
                 onPortForward={() => onPortForward(row)}
                 onEvict={() => onEvict(row)}
