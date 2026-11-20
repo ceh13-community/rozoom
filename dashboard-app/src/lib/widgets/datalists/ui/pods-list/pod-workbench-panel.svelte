@@ -13,7 +13,6 @@
   import { loadPodEvents } from "$features/pod-details";
   import {
     buildYamlFilename,
-    computeLayoutClosePlan,
     formatApplyErrorMessage,
     orderPinnedTabs,
     recoverWorkbenchTabs,
@@ -35,8 +34,11 @@
     type PersistedPodsWorkbenchState,
   } from "./workbench-session";
   import {
-    confirmWorkbenchLayoutShrink,
+    announceWorkbenchTabClosed,
     confirmWorkbenchTabClose,
+    hasUnsavedYaml,
+    isSameClosedTab,
+    undoForClosedTab,
   } from "../common/workbench-confirm";
   import { normalizeWorkbenchVisibilityForDataMode } from "../common/workbench-data-mode";
 
@@ -285,12 +287,7 @@
 
   async function requestWorkbenchLayout(nextLayout: PodsWorkbenchLayout) {
     if (nextLayout === workbenchLayout) return;
-    const nextPaneCount = nextLayout === "single" ? 1 : nextLayout === "dual" ? 2 : 3;
-    const { occupiedRemovedPaneCount } = computeLayoutClosePlan(paneTabIds, nextPaneCount);
-    if (occupiedRemovedPaneCount > 0) {
-      const confirmed = await confirmWorkbenchLayoutShrink();
-      if (!confirmed) return;
-    }
+    // Fewer panes only hides panes: their tabs stay in the tab strip.
     workbenchLayout = nextLayout;
     if (nextLayout === "single") {
       paneTabIds = [activeWorkbenchTabId, null, null];
@@ -302,9 +299,16 @@
   }
 
   function reopenLastClosedTab() {
-    const next = closedWorkbenchTabs[0];
-    if (!next?.target) return;
-    closedWorkbenchTabs = closedWorkbenchTabs.slice(1);
+    reopenClosedTab(closedWorkbenchTabs[0]);
+  }
+
+  function reopenClosedTab(wanted: (typeof closedWorkbenchTabs)[number] | undefined) {
+    if (!wanted) return;
+    const index = closedWorkbenchTabs.findIndex((item) => isSameClosedTab(item, wanted));
+    if (index === -1) return;
+    const next = closedWorkbenchTabs[index];
+    closedWorkbenchTabs = closedWorkbenchTabs.filter((_, position) => position !== index);
+    if (!next.target) return;
     const pod = Array.from(podsByUid.values()).find(
       (entry) =>
         entry.metadata?.name === next.target?.name &&
@@ -565,8 +569,17 @@
 
   async function closeWorkbenchTab(tabId: string) {
     const closingTab = workbenchTabs.find((tab) => tab.id === tabId) ?? null;
+    let closeTarget: (WorkbenchTab & { hasUnsavedChanges: boolean }) | null = null;
     if (closingTab) {
-      const confirmed = await confirmWorkbenchTabClose(closingTab);
+      const yamlTab =
+        closingTab.kind === "yaml" ? (yamlTabs.find((tab) => tab.id === tabId) ?? null) : null;
+      closeTarget = {
+        ...closingTab,
+        hasUnsavedChanges: hasUnsavedYaml(
+          yamlTab ? { yamlText: yamlTab.yamlText, yamlOriginalText: yamlTab.originalYamlText } : null,
+        ),
+      };
+      const confirmed = await confirmWorkbenchTabClose(closeTarget);
       if (!confirmed) return;
     }
     const parsed = parseWorkbenchTabId(tabId);
@@ -585,6 +598,13 @@
             entry.target?.namespace !== parsed.namespace,
         ),
       ].slice(0, 20);
+    }
+    if (closeTarget) {
+      // Undo reopens the entry this close remembered, not whatever closed last.
+      announceWorkbenchTabClosed(
+        closeTarget,
+        undoForClosedTab(closeTarget, parsed ? closedWorkbenchTabs[0] : undefined, reopenClosedTab),
+      );
     }
     workbenchTabs = workbenchTabs.filter((tab) => tab.id !== tabId);
     logsTabs = logsTabs.filter((tab) => tab.id !== tabId);
@@ -1091,6 +1111,7 @@
 {#if hasWorkbenchTabs}
   <MultiPaneWorkbench
     tabs={availablePaneTabs}
+    {paneTabIds}
     activeTabId={activeWorkbenchTabId}
     {isTabPinned}
     onActivateTab={setActiveWorkbenchTab}

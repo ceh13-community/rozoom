@@ -63,8 +63,11 @@
   import SectionRuntimeStatus from "../common/section-runtime-status.svelte";
   import WorkloadSelectionBar from "../common/workload-selection-bar.svelte";
   import {
-    confirmWorkbenchLayoutShrink,
+    announceWorkbenchTabClosed,
     confirmWorkbenchTabClose,
+    hasUnsavedYaml,
+    isSameClosedTab,
+    undoForClosedTab,
   } from "../common/workbench-confirm";
 
   interface NodesStatusListProps {
@@ -711,30 +714,7 @@
 
   async function requestWorkbenchLayout(nextLayout: WorkbenchLayout) {
     if (nextLayout === workbenchLayout) return;
-    const currentPaneCount = getPaneCount();
-    const nextPaneCount = nextLayout === "single" ? 1 : nextLayout === "dual" ? 2 : 3;
-    if (nextPaneCount >= currentPaneCount) {
-      setWorkbenchLayout(nextLayout);
-      return;
-    }
-
-    const { occupiedRemovedPaneCount, tabsToClose } = computeLayoutClosePlan(
-      paneTabIds,
-      nextPaneCount,
-    );
-
-    if (occupiedRemovedPaneCount === 0) {
-      setWorkbenchLayout(nextLayout);
-      return;
-    }
-
-    const confirmed = await confirmWorkbenchLayoutShrink();
-    if (!confirmed) return;
-
-    for (const tabId of tabsToClose) {
-      await closeWorkbenchTab(tabId, { skipConfirm: true });
-    }
-
+    // Fewer panes only hides panes: their tabs stay in the tab strip.
     setWorkbenchLayout(nextLayout);
   }
 
@@ -823,12 +803,25 @@
     if (index === -1) return;
 
     const closingTab = previousTabs[index];
+    const closeTarget = {
+      ...closingTab,
+      hasUnsavedChanges: closingTab.kind === "yaml" && hasUnsavedYaml(getYamlTab(tabId)),
+    };
     if (!options.skipConfirm) {
-      const confirmed = await confirmWorkbenchTabClose(closingTab);
+      const confirmed = await confirmWorkbenchTabClose(closeTarget);
       if (!confirmed) return;
     }
-
+    const closedStackBefore = closedWorkbenchTabs;
     rememberClosedTab(tabId);
+    if (!options.skipConfirm) {
+      // Undo reopens the entry this close remembered; none when nothing was remembered.
+      const closedEntry =
+        closedWorkbenchTabs !== closedStackBefore ? closedWorkbenchTabs[0] : undefined;
+      announceWorkbenchTabClosed(
+        closeTarget,
+        undoForClosedTab(closeTarget, closedEntry, reopenClosedTab),
+      );
+    }
 
     workbenchTabs = previousTabs.filter((tab) => tab.id !== tabId);
     pinnedTabIds = new Set([...pinnedTabIds].filter((id) => id !== tabId));
@@ -862,10 +855,15 @@
   }
 
   async function reopenLastClosedTab() {
-    const entry = closedWorkbenchTabs[0];
-    if (!entry) return;
-    closedWorkbenchTabs = closedWorkbenchTabs.slice(1);
+    return reopenClosedTab(closedWorkbenchTabs[0]);
+  }
 
+  async function reopenClosedTab(wanted: ClosedWorkbenchTab | undefined) {
+    if (!wanted) return;
+    const index = closedWorkbenchTabs.findIndex((item) => isSameClosedTab(item, wanted));
+    if (index === -1) return;
+    const entry = closedWorkbenchTabs[index];
+    closedWorkbenchTabs = closedWorkbenchTabs.filter((_, position) => position !== index);
     if (!entry.target) return;
     const row = allNodeData.find((item) => item.name === entry.target?.name);
     if (!row) return;
@@ -1370,12 +1368,13 @@
   {#if hasWorkbenchTabs}
     <MultiPaneWorkbench
       tabs={orderedWorkbenchTabs}
+      {paneTabIds}
       activeTabId={activeWorkbenchTabId}
       {isTabPinned}
       onActivateTab={setActiveWorkbenchTab}
       onTogglePin={togglePinTab}
       onCloseTab={(tabId) => {
-        void closeWorkbenchTab(tabId, { skipConfirm: true });
+        void closeWorkbenchTab(tabId);
       }}
       onReopenLastClosedTab={() => {
         void reopenLastClosedTab();

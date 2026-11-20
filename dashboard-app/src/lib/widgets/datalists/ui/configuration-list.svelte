@@ -82,7 +82,6 @@
   } from "$features/workloads-management";
   import { checkYamlDrift, buildDriftMessage } from "$features/pod-yaml-editor";
   import {
-    computeLayoutClosePlan,
     formatApplyErrorMessage,
     orderPinnedTabs,
   } from "$features/pods-workbench";
@@ -146,8 +145,11 @@
   import TableToolbarShell from "./table-toolbar-shell.svelte";
   import WatcherToolbarControls from "./watcher-toolbar-controls.svelte";
   import {
-    confirmWorkbenchLayoutShrink,
+    announceWorkbenchTabClosed,
     confirmWorkbenchTabClose,
+    hasUnsavedYaml,
+    isSameClosedTab,
+    undoForClosedTab,
   } from "./common/workbench-confirm";
   import SectionRuntimeStatus from "./common/section-runtime-status.svelte";
   import WorkloadSelectionBar from "./common/workload-selection-bar.svelte";
@@ -1884,23 +1886,7 @@
 
   async function requestWorkbenchLayout(nextLayout: WorkbenchLayout) {
     if (nextLayout === workbenchLayout) return;
-    const currentPaneCount = getPaneCount();
-    const nextPaneCount = nextLayout === "single" ? 1 : nextLayout === "dual" ? 2 : 3;
-    if (nextPaneCount >= currentPaneCount) {
-      setWorkbenchLayout(nextLayout);
-      return;
-    }
-    const { occupiedRemovedPaneCount, tabsToClose } = computeLayoutClosePlan(
-      paneTabIds,
-      nextPaneCount,
-    );
-    if (occupiedRemovedPaneCount === 0) {
-      setWorkbenchLayout(nextLayout);
-      return;
-    }
-    const confirmed = await confirmWorkbenchLayoutShrink();
-    if (!confirmed) return;
-    for (const tabId of tabsToClose) await closeWorkbenchTab(tabId, { skipConfirm: true });
+    // Fewer panes only hides panes: their tabs stay in the tab strip.
     setWorkbenchLayout(nextLayout);
   }
 
@@ -2219,14 +2205,26 @@
     const index = previousTabs.findIndex((tab) => tab.id === tabId);
     if (index === -1) return;
     const closingTab = previousTabs[index];
-    if (
-      !options.skipConfirm &&
-      (closingTab.kind === "yaml" || closingTab.kind === "port-forward")
-    ) {
-      const confirmed = await confirmWorkbenchTabClose(closingTab);
+    const closeTarget = {
+      ...closingTab,
+      hasUnsavedChanges: closingTab.kind === "yaml" && hasUnsavedYaml(getYamlTab(tabId)),
+      stopsPortForward: closingTab.kind === "port-forward" && Boolean(getPortForwardTab(tabId)),
+    };
+    if (!options.skipConfirm) {
+      const confirmed = await confirmWorkbenchTabClose(closeTarget);
       if (!confirmed) return;
     }
+    const closedStackBefore = closedWorkbenchTabs;
     rememberClosedTab(tabId);
+    if (!options.skipConfirm) {
+      // Undo reopens the entry this close remembered; none when nothing was remembered.
+      const closedEntry =
+        closedWorkbenchTabs !== closedStackBefore ? closedWorkbenchTabs[0] : undefined;
+      announceWorkbenchTabClosed(
+        closeTarget,
+        undoForClosedTab(closeTarget, closedEntry, reopenClosedTab),
+      );
+    }
     workbenchTabs = previousTabs.filter((tab) => tab.id !== tabId);
     pinnedTabIds = new Set([...pinnedTabIds].filter((id) => id !== tabId));
     yamlTabs = yamlTabs.filter((tab) => tab.id !== tabId);
@@ -2265,9 +2263,15 @@
   }
 
   function reopenLastClosedTab() {
-    const entry = closedWorkbenchTabs[0];
-    if (!entry) return;
-    closedWorkbenchTabs = closedWorkbenchTabs.slice(1);
+    return reopenClosedTab(closedWorkbenchTabs[0]);
+  }
+
+  function reopenClosedTab(wanted: ClosedWorkbenchTab | undefined) {
+    if (!wanted) return;
+    const index = closedWorkbenchTabs.findIndex((item) => isSameClosedTab(item, wanted));
+    if (index === -1) return;
+    const entry = closedWorkbenchTabs[index];
+    closedWorkbenchTabs = closedWorkbenchTabs.filter((_, position) => position !== index);
     void openYamlTarget(entry.target, { scrollIntoView: false }).then(() => {
       if (entry.pinned) {
         const tabId = toYamlTabId(entry.target);
@@ -4692,6 +4696,7 @@ spec:
     <div bind:this={workbenchRootEl}>
       <MultiPaneWorkbench
         tabs={orderedWorkbenchTabs}
+        {paneTabIds}
         activeTabId={activeWorkbenchTabId}
         {isTabPinned}
         onActivateTab={setActiveWorkbenchTab}

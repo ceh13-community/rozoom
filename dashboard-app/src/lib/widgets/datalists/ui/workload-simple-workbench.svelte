@@ -1,12 +1,14 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { writable } from "svelte/store";
-  import { computeLayoutClosePlan, orderPinnedTabs } from "$features/pods-workbench";
+  import { orderPinnedTabs } from "$features/pods-workbench";
   import MultiPaneWorkbench from "$shared/ui/multi-pane-workbench.svelte";
   import type { DashboardDataProfileId } from "$shared/lib/dashboard-data-profile.svelte";
   import {
-    confirmWorkbenchLayoutShrink,
+    announceWorkbenchTabClosed,
     confirmWorkbenchTabClose,
+    hasUnsavedYaml,
+    undoForClosedTab,
   } from "./common/workbench-confirm";
   import {
     buildDataModeWorkbenchStorageKey,
@@ -156,6 +158,10 @@
     });
     if (!confirmed) return;
     markTabClosed("logs");
+    announceWorkbenchTabClosed(
+      { title: "Logs", subtitle: logs.ref },
+      undoForClosedTab({ kind: "logs" }, "logs" as const, reopenClosedTab),
+    );
     pinnedTabIds = new Set([...pinnedTabIds].filter((id) => id !== "logs"));
     if (activeTabId === "logs") {
       activeTabId = yaml.open ? "yaml" : null;
@@ -164,13 +170,22 @@
   }
 
   async function closeYamlTab() {
-    const confirmed = await confirmWorkbenchTabClose({
+    const closeTarget = {
       kind: "yaml",
       title: "YAML",
       subtitle: yaml.ref,
-    });
+      hasUnsavedChanges: hasUnsavedYaml({
+        yamlText: yaml.yamlText,
+        yamlOriginalText: yaml.originalYaml,
+      }),
+    };
+    const confirmed = await confirmWorkbenchTabClose(closeTarget);
     if (!confirmed) return;
     markTabClosed("yaml");
+    announceWorkbenchTabClosed(
+      closeTarget,
+      undoForClosedTab(closeTarget, "yaml" as const, reopenClosedTab),
+    );
     pinnedTabIds = new Set([...pinnedTabIds].filter((id) => id !== "yaml"));
     if (activeTabId === "yaml") {
       activeTabId = logs.open ? "logs" : null;
@@ -179,9 +194,14 @@
   }
 
   function reopenLastClosedTab() {
-    const next = closedTabs[0] ?? null;
+    const last = closedTabs[0];
+    if (last) reopenClosedTab(last.id);
+  }
+
+  function reopenClosedTab(id: "logs" | "yaml") {
+    const next = closedTabs.find((entry) => entry.id === id) ?? null;
     if (!next) return;
-    closedTabs = closedTabs.slice(1);
+    closedTabs = closedTabs.filter((entry) => entry.id !== id);
     if (next.id === "logs") {
       activeTabId = "logs";
       onOpenLogs?.();
@@ -256,12 +276,7 @@
 
   async function requestWorkbenchLayout(nextLayout: WorkbenchLayout) {
     if (nextLayout === workbenchLayout) return;
-    const nextPaneCount = nextLayout === "single" ? 1 : nextLayout === "dual" ? 2 : 3;
-    const { occupiedRemovedPaneCount } = computeLayoutClosePlan(paneTabIds, nextPaneCount);
-    if (occupiedRemovedPaneCount > 0) {
-      const confirmed = await confirmWorkbenchLayoutShrink();
-      if (!confirmed) return;
-    }
+    // Fewer panes only hides panes: their tabs stay in the tab strip.
     workbenchLayout = nextLayout;
   }
 
@@ -462,6 +477,7 @@
 
 {#if logs.open || yaml.open}
   <MultiPaneWorkbench
+    {paneTabIds}
     tabs={getAvailableTabs().map((tab) => ({
       id: tab.id,
       title: tab.label,

@@ -123,24 +123,24 @@ test.describe("critical user journeys", () => {
     await dualBtn.click();
     await page.waitForTimeout(300);
 
-    // Pane B should appear
-    await expect(page.getByText("Pane B")).toBeVisible();
+    // Pane 2 should appear
+    await expect(page.getByText("Pane 2", { exact: true })).toBeVisible();
 
     // Switch to triple pane
     const tripleBtn = page.getByRole("button", { name: "Triple pane layout" });
     await tripleBtn.click();
     await page.waitForTimeout(300);
 
-    // Pane C should appear
-    await expect(page.getByText("Pane C")).toBeVisible();
+    // Pane 3 should appear
+    await expect(page.getByText("Pane 3", { exact: true })).toBeVisible();
 
     // Switch back to single
     await singleBtn.click();
     await page.waitForTimeout(300);
 
-    // Pane B/C should be hidden
-    await expect(page.getByText("Pane B")).not.toBeVisible();
-    await expect(page.getByText("Pane C")).not.toBeVisible();
+    // Pane 2/3 should be hidden
+    await expect(page.getByText("Pane 2", { exact: true })).not.toBeVisible();
+    await expect(page.getByText("Pane 3", { exact: true })).not.toBeVisible();
   });
 
   test("5. pin and unpin a page", async ({ page }) => {

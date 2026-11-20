@@ -7,6 +7,7 @@
   import X from "@lucide/svelte/icons/x";
   import { WorkbenchHeader } from "$features/pods-workbench";
   import { NAV_ACTIVE_CLASS } from "./nav-active";
+  import { workbenchPaneBadges } from "$shared/lib/workbench-pane-badges";
 
   export type MultiPaneWorkbenchLayout = "single" | "dual" | "triple";
 
@@ -48,6 +49,8 @@
     onTimelineMarkerClick?: (marker: TimelineMarker) => void;
     timelineEmptyLabel?: string;
     tabActions?: Snippet<[any]>;
+    /** Tab id shown in each pane, so the tab strip can badge the pane number. */
+    paneTabIds?: ReadonlyArray<string | null>;
     body: Snippet;
     /**
      * Changes on every row action that opened or re-opened a tab (Logs, YAML, ...): the
@@ -79,9 +82,20 @@
     onTimelineMarkerClick,
     timelineEmptyLabel = "No warning markers",
     tabActions,
+    paneTabIds = [],
     body,
     revealToken = null,
   }: Props = $props();
+
+  const LAYOUT_OPTIONS: Array<{ value: MultiPaneWorkbenchLayout; label: string; panes: number }> = [
+    { value: "single", label: "1", panes: 1 },
+    { value: "dual", label: "2", panes: 2 },
+    { value: "triple", label: "3", panes: 3 },
+  ];
+  const visiblePaneCount = $derived(
+    LAYOUT_OPTIONS.find((option) => option.value === layout)?.panes ?? 1,
+  );
+  const paneBadges = $derived(workbenchPaneBadges(paneTabIds, visiblePaneCount));
 
   let rootEl = $state<HTMLDivElement | null>(null);
   let prevActiveTabId: string | null = null;
@@ -210,7 +224,17 @@
             : "text-muted-foreground hover:bg-muted"
         }`}
         onclick={() => onActivateTab(tab.id)}
+        aria-label={paneBadges.has(tab.id)
+          ? `${tab.title}: ${tab.subtitle ?? ""}, pane ${paneBadges.get(tab.id)}`
+          : undefined}
       >
+        {#if paneBadges.has(tab.id)}
+          <span
+            class="inline-flex h-5 min-w-5 items-center justify-center rounded border border-current px-1 text-xs font-semibold"
+            title={`Shown in pane ${paneBadges.get(tab.id)}`}
+            aria-hidden="true">{paneBadges.get(tab.id)}</span
+          >
+        {/if}
         <span class="inline-block max-w-[10rem] truncate">{tab.title}</span>
         <span class="inline-block max-w-[12rem] truncate text-xs opacity-70">{tab.subtitle}</span>
       </button>
@@ -253,16 +277,29 @@
       >
         Reopen
       </button>
-      <select
-        class="h-8 rounded border border-input bg-background px-2 text-xs text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        value={layout}
-        onchange={(event) => onLayoutChange(event.currentTarget.value as MultiPaneWorkbenchLayout)}
-        title="Pane layout"
-      >
-        <option value="single">1 pane</option>
-        <option value="dual">2 panes</option>
-        <option value="triple">3 panes</option>
-      </select>
+      <div class="inline-flex items-center gap-1" role="group" aria-label="Pane layout">
+        <span class="text-xs text-muted-foreground">Panes</span>
+        <div class="inline-flex items-center rounded border border-input bg-background p-0.5">
+          {#each LAYOUT_OPTIONS as option (option.value)}
+            <button
+              type="button"
+              class={`h-7 min-w-7 rounded px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                layout === option.value
+                  ? `${NAV_ACTIVE_CLASS} font-semibold underline underline-offset-2`
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+              aria-pressed={layout === option.value}
+              aria-label={option.panes === 1 ? "1 pane" : `${option.panes} panes`}
+              title={option.panes === 1 ? "1 pane" : `${option.panes} panes`}
+              onclick={() => {
+                if (layout !== option.value) onLayoutChange(option.value);
+              }}
+            >
+              {option.label}
+            </button>
+          {/each}
+        </div>
+      </div>
       <button
         type="button"
         class={`rounded px-2 py-1 text-xs ${

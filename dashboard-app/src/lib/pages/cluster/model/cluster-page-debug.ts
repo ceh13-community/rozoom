@@ -32,7 +32,8 @@ export function appendDebugLog(
 }
 
 export function workspaceLayoutBadge(layout: WorkspaceLayout | null | undefined): string {
-  return `${layout ?? 1}P`;
+  const panes = layout ?? 1;
+  return panes === 1 ? "1 pane" : `${panes} panes`;
 }
 
 export function buildRouteTraceEntry(params: {

@@ -39,7 +39,7 @@ describe("workloads/configuration smoke contract", () => {
     expect(podsSource).toContain("onEditYaml");
   });
 
-  it("keeps confirm dialogs for tab close and pane layout changes", () => {
+  it("uses the shared close rule and never closes tabs on a pane layout change", () => {
     const files = [
       "deployments-list.svelte",
       "daemon-sets-list.svelte",
@@ -52,7 +52,10 @@ describe("workloads/configuration smoke contract", () => {
     for (const file of files) {
       const source = read(file);
       expect(source).toContain("confirmWorkbenchTabClose");
-      expect(source).toContain("computeLayoutClosePlan");
+      expect(source).toContain("hasUnsavedYaml(getYamlTab(tabId))");
+      expect(source).toContain("undoForClosedTab(closeTarget, closedEntry, reopenClosedTab)");
+      expect(source).not.toContain("confirmWorkbenchLayoutShrink");
+      expect(source).not.toContain("tabsToClose");
     }
     expect(read("pods-list/pods-list.svelte")).toContain("confirmAction");
   });

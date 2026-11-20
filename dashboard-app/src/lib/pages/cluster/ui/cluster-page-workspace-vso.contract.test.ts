@@ -37,7 +37,7 @@ describe("cluster page workspace VSO contract", () => {
     );
   });
 
-  it("keeps three-pane workspace model with Pane A/B/C sections", () => {
+  it("keeps three-pane workspace model with Pane 1/2/3 sections", () => {
     expect(workspaceSource).toContain(
       'export type WorkspacePaneId = "pane-1" | "pane-2" | "pane-3";',
     );
@@ -111,15 +111,17 @@ describe("cluster page workspace VSO contract", () => {
     expect(source).toContain("function copyWorkspaceRouteTrace()");
   });
 
-  it("guards pin removal for split sessions and shows single-page hint once", () => {
+  it("unpins without a dialog, offers Undo, and shows single-page hint once", () => {
     expect(source).toContain(
       'const SINGLE_PAGE_HINT_SHOWN_KEY = "dashboard.cluster.single-page-hint-shown.v1"',
     );
+    expect(source).toContain("function unpinWithUndo(tabId: string)");
     expect(source).toContain(
-      "async function shouldConfirmPinnedRemoval(tabId: string): Promise<boolean>",
+      "onClick: () => restoreUnpinnedTab(removedTab, removedSession, index),",
     );
-    expect(source).toContain('import { confirmAction } from "$shared/lib/confirm-action";');
-    expect(source).toContain("await confirmAction(");
+    expect(source).not.toContain("shouldConfirmPinnedRemoval");
+    expect(source).not.toContain('title="Open in Pane 1"');
+    expect(source).toContain('aria-label="Open in pane"');
     expect(source).toContain("function showSinglePageHintOnce()");
     expect(source).toContain('window.localStorage.setItem(SINGLE_PAGE_HINT_SHOWN_KEY, "1");');
     expect(source).toContain('toast("You are viewing a standalone page.');

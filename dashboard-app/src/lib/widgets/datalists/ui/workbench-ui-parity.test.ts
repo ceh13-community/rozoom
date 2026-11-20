@@ -30,12 +30,10 @@ const successAlertClass =
   "mb-4 border-emerald-400/40 bg-emerald-100/20 text-emerald-900 dark:text-emerald-200";
 const workbenchCloseTabClass =
   "rounded bg-rose-100/70 p-1.5 text-xs text-rose-700 transition hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:hover:bg-rose-500/30";
-const paneSelectClass =
-  "h-8 rounded border border-input bg-background px-2 text-xs text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-const paneLabels = [
-  '<option value="single">1 pane</option>',
-  '<option value="dual">2 panes</option>',
-  '<option value="triple">3 panes</option>',
+const paneLayoutSwitch = [
+  'role="group" aria-label="Pane layout"',
+  "aria-pressed={layout === option.value}",
+  'aria-label={option.panes === 1 ? "1 pane" : `${option.panes} panes`}',
 ];
 
 describe("workbench UI parity contract", () => {
@@ -65,6 +63,7 @@ describe("workbench UI parity contract", () => {
       configurationListSource,
     ]) {
       expect(source).toContain("<MultiPaneWorkbench");
+      expect(source).toContain("{paneTabIds}");
       expect(source).toContain(workbenchCloseTabClass);
     }
 
@@ -85,9 +84,9 @@ describe("workbench UI parity contract", () => {
     }
     expect(sharedWorkbenchSource).toContain("Incident timeline");
     expect(sharedWorkbenchSource).toContain("Warnings only");
-    expect(sharedWorkbenchSource).toContain(paneSelectClass);
-    for (const label of paneLabels) {
-      expect(sharedWorkbenchSource).toContain(label);
+    expect(sharedWorkbenchSource).not.toContain("<select");
+    for (const marker of paneLayoutSwitch) {
+      expect(sharedWorkbenchSource).toContain(marker);
     }
     expect(podsSource).toContain("Select tab for pane");
     expect(podsSource).toContain("Select for compare");

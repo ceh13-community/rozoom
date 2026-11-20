@@ -23,17 +23,24 @@ const filesWithAutoRecovery = [
 ];
 
 describe("workbench close confirm parity", () => {
-  it("requires close confirmation for logs/yaml tabs and skips duplicate prompts on layout changes", () => {
+  it("asks only for unsaved YAML, offers Undo, and never closes tabs on a layout change", () => {
     for (const file of files) {
       const source = read(file);
       expect(source).toContain("async function closeWorkbenchTab(");
       expect(source).toContain("options: { skipConfirm?: boolean } = {}");
+      expect(source).toContain("if (!options.skipConfirm) {");
       expect(source).toContain(
-        'if (!options.skipConfirm && (closingTab.kind === "logs" || closingTab.kind === "yaml"))',
+        'hasUnsavedChanges: closingTab.kind === "yaml" && hasUnsavedYaml(getYamlTab(tabId)),',
       );
-      expect(source).toContain("confirmWorkbenchTabClose(closingTab)");
-      expect(source).toContain("confirmWorkbenchLayoutShrink");
-      expect(source).toContain("await closeWorkbenchTab(tabId, { skipConfirm: true })");
+      // Undo reopens the entry this close remembered, never the top of the stack.
+      expect(source).toContain("undoForClosedTab(closeTarget, closedEntry, reopenClosedTab)");
+      expect(source).toContain("function reopenClosedTab(wanted: ClosedWorkbenchTab | undefined)");
+      expect(source).not.toContain("() => void reopenLastClosedTab()");
+      expect(source).not.toContain("void closeWorkbenchTab(tabId, { skipConfirm: true });");
+      expect(source).not.toContain("confirmWorkbenchLayoutShrink");
+      expect(source).toContain(
+        "// Fewer panes only hides panes: their tabs stay in the tab strip.",
+      );
     }
     expect(read("workload-simple-workbench.svelte")).toContain("confirmWorkbenchTabClose");
     expect(read("pods-list/pod-workbench-panel.svelte")).toContain("confirmWorkbenchTabClose");

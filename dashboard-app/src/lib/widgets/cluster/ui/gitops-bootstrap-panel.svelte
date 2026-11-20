@@ -27,7 +27,7 @@
   import ResourceYamlSheet from "$widgets/datalists/ui/common/resource-yaml-sheet.svelte";
   import {
     confirmWorkbenchTabClose,
-    confirmWorkbenchLayoutShrink,
+    hasUnsavedYaml,
   } from "$widgets/datalists/ui/common/workbench-confirm";
   import { toast } from "svelte-sonner";
 
@@ -696,6 +696,10 @@
           kind: "yaml",
           title: wbTab.title,
           subtitle: wbTab.subtitle,
+          hasUnsavedChanges: hasUnsavedYaml({
+            yamlText: tab.yamlText,
+            yamlOriginalText: tab.originalYaml,
+          }),
         });
         if (!confirmed) return;
       } catch {
@@ -727,12 +731,7 @@
   }
 
   async function setWorkbenchLayout(layout: "single" | "dual" | "triple") {
-    const currentPaneCount = workbenchLayout === "single" ? 1 : workbenchLayout === "dual" ? 2 : 3;
-    const nextPaneCount = layout === "single" ? 1 : layout === "dual" ? 2 : 3;
-    if (nextPaneCount < currentPaneCount && currentPaneCount > 1) {
-      const confirmed = await confirmWorkbenchLayoutShrink();
-      if (!confirmed) return;
-    }
+    // Fewer panes only hides panes: their tabs stay in the tab strip.
     workbenchLayout = layout;
     if (layout === "single") {
       paneTabIds = [null, null, null];
@@ -1227,6 +1226,7 @@
   {#if hasWorkbenchTabs}
     <MultiPaneWorkbench
       tabs={workbenchTabs}
+      {paneTabIds}
       {activeTabId}
       isTabPinned={(id) => pinnedTabs.has(id)}
       onActivateTab={(id) => (activeTabId = id)}

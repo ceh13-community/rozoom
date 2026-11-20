@@ -30,8 +30,8 @@ export function buildPanePageData(
 }
 
 export function paneIndexLabel(paneId: WorkspacePaneId): string {
-  if (paneId === "pane-1") return "Pane A";
-  return paneId === "pane-2" ? "Pane B" : "Pane C";
+  if (paneId === "pane-1") return "Pane 1";
+  return paneId === "pane-2" ? "Pane 2" : "Pane 3";
 }
 
 export function paneHasEffectiveData(params: {
