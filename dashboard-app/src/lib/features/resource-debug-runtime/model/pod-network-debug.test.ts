@@ -21,10 +21,11 @@ const fs = vi.hoisted(() => ({
 vi.mock("$shared/api/kubectl-proxy", () => ({ kubectlRawArgsFront }));
 vi.mock("$features/shell", () => ({ openPodNetworkDebugShellModal }));
 vi.mock("@tauri-apps/plugin-fs", () => fs);
-vi.mock("@tauri-apps/api/path", () => ({
-  appDataDir: async () => "/app-data",
-  join: async (...parts: string[]) => parts.join("/"),
+const tauriPath = vi.hoisted(() => ({
+  appDataDir: vi.fn(async () => "/app-data"),
+  join: vi.fn(async (...parts: string[]) => parts.join("/")),
 }));
+vi.mock("@tauri-apps/api/path", () => tauriPath);
 
 const podJson = (state: Record<string, unknown>, name = "rozoom-netshoot-abc123") =>
   JSON.stringify({ status: { ephemeralContainerStatuses: [{ name, state }] } });
@@ -132,12 +133,42 @@ describe("pod network debug", () => {
     expect(fs.remove).toHaveBeenCalledWith(fs.writeTextFile.mock.calls[0]?.[0]);
   });
 
-  it("builds the spec path with the platform separator", async () => {
+  it("builds the spec path with the platform join, not a hard-coded slash", async () => {
+    // A join that is not "/" shows whether the path really comes from join.
+    tauriPath.join.mockImplementationOnce(async (...parts: string[]) => parts.join("\\"));
     kubectlRawArgsFront.mockResolvedValue({ output: "", errors: "boom", code: 1 });
     await startPodNetworkDebugSession({ clusterId: "c1", pod }).catch(() => undefined);
-    expect(String(fs.writeTextFile.mock.calls[0]?.[0])).toMatch(
-      /^\/app-data\/network-debug-[a-z0-9]+\.json$/,
+
+    expect(tauriPath.join).toHaveBeenCalledWith(
+      "/app-data",
+      expect.stringMatching(/^network-debug-[a-z0-9]+\.json$/),
     );
+    expect(String(fs.writeTextFile.mock.calls[0]?.[0])).toMatch(
+      /^\/app-data\\network-debug-[a-z0-9]+\.json$/,
+    );
+  });
+
+  it("shows only kubectl's last line, never a credential plugin's output before it", async () => {
+    const stderr = [
+      "[ERROR] [2026-11-20T11:23:28.292Z]: Please visit https://login.example.com/device and enter code ABCD-EFGH",
+      'Error from server (Forbidden): pods "web-a" is forbidden: violates PodSecurity "baseline:latest": non-default capabilities',
+    ].join("\n");
+    kubectlRawArgsFront.mockResolvedValue({ output: "", errors: stderr, code: 1 });
+
+    const refusal = (await startPodNetworkDebugSession({ clusterId: "c1", pod }).catch(
+      (error: unknown) => error,
+    )) as NetworkDebugRefusal;
+
+    expect(refusal.detail).toBe(
+      'Error from server (Forbidden): pods "web-a" is forbidden: violates PodSecurity "baseline:latest": non-default capabilities',
+    );
+    expect(`${refusal.message} ${refusal.detail}`).not.toMatch(/ABCD-EFGH|login\.example/);
+
+    const other = describeNetworkDebugRefusal(
+      'Enter code WXYZ-1234 at https://login.example.com\nerror: pods "x" not found',
+      "shop",
+    );
+    expect(other.message).toBe('error: pods "x" not found');
   });
 
   it("stops only its own sleep, in its own container", () => {

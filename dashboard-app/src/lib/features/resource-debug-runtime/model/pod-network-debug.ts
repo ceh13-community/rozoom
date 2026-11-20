@@ -1,6 +1,7 @@
 // eslint-disable-next-line no-restricted-imports -- same legacy FSD import as pod-debug-session
 import { openPodNetworkDebugShellModal } from "$features/shell";
 import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
+import { lastStderrLine } from "$shared/lib/kubectl-connectivity";
 import type { PodItem } from "$shared/model/clusters";
 
 /**
@@ -146,17 +147,21 @@ export class NetworkDebugRefusal extends Error {
  * A Pod Security level that forbids the container becomes one plain sentence. Both baseline
  * and restricted forbid NET_RAW (restricted also asks for non-root, seccomp and no privilege
  * escalation), so only the privileged level allows network debug. kubectl's own line stays
- * as the detail. Any other refusal is passed on as kubectl wrote it.
+ * as the detail. Any other refusal is passed on as kubectl's last line.
+ *
+ * Only the last stderr line is shown: earlier lines can be a credential plugin's own output,
+ * such as a kubelogin sign-in URL or device code, which must not end up in a toast.
  */
 export function describeNetworkDebugRefusal(
   stderr: string,
   namespace: string,
 ): NetworkDebugRefusal {
-  const level = stderr.match(/violates PodSecurity "([a-z]+):/)?.[1];
-  if (!level) return new NetworkDebugRefusal(stderr, null);
+  const kubectlLine = lastStderrLine(stderr) || stderr.trim();
+  const level = kubectlLine.match(/violates PodSecurity "([a-z]+):/)?.[1];
+  if (!level) return new NetworkDebugRefusal(kubectlLine, null);
   return new NetworkDebugRefusal(
     `Namespace ${namespace} does not allow network debug: its Pod Security level is "${level}", and network debug needs the "privileged" level for the NET_RAW capability that tcpdump, ping and mtr use.`,
-    stderr.trim(),
+    kubectlLine,
   );
 }
 
