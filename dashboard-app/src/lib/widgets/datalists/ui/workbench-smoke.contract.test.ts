@@ -53,7 +53,7 @@ describe("workloads/configuration smoke contract", () => {
       const source = read(file);
       expect(source).toContain("confirmWorkbenchTabClose");
       expect(source).toContain("hasUnsavedYaml(getYamlTab(tabId))");
-      expect(source).toContain("announceWorkbenchTabClosed(closingTab");
+      expect(source).toContain("undoForClosedTab(closeTarget, closedEntry, reopenClosedTab)");
       expect(source).not.toContain("confirmWorkbenchLayoutShrink");
       expect(source).not.toContain("tabsToClose");
     }

@@ -12,6 +12,8 @@ import {
   announceWorkbenchTabClosed,
   confirmWorkbenchTabClose,
   hasUnsavedYaml,
+  isSameClosedTab,
+  undoForClosedTab,
 } from "./workbench-confirm";
 
 afterEach(() => {
@@ -79,5 +81,36 @@ describe("workbench close rule", () => {
       action: { label: "Undo", onClick: onUndo },
     });
     expect(WORKBENCH_UNDO_TOAST_MS).toBe(8000);
+  });
+});
+
+describe("Undo of a closed tab", () => {
+  const logs = { kind: "logs", target: { name: "web", namespace: "shop" } };
+
+  it("reopens exactly the entry it was made for", () => {
+    const reopen = vi.fn();
+    undoForClosedTab({ kind: "logs" }, logs, reopen)?.();
+    expect(reopen).toHaveBeenCalledWith(logs);
+  });
+
+  it("offers no Undo for unsaved YAML edits, a port-forward, or nothing remembered", () => {
+    const reopen = vi.fn();
+    expect(
+      undoForClosedTab({ kind: "yaml", hasUnsavedChanges: true }, logs, reopen),
+    ).toBeUndefined();
+    expect(undoForClosedTab({ kind: "port-forward" }, logs, reopen)).toBeUndefined();
+    expect(undoForClosedTab({ kind: "logs" }, undefined, reopen)).toBeUndefined();
+  });
+
+  it("tells closed tabs apart by kind and object", () => {
+    expect(
+      isSameClosedTab(logs, { kind: "logs", target: { name: "web", namespace: "shop" } }),
+    ).toBe(true);
+    expect(
+      isSameClosedTab(logs, { kind: "yaml", target: { name: "web", namespace: "shop" } }),
+    ).toBe(false);
+    expect(
+      isSameClosedTab(logs, { kind: "logs", target: { name: "api", namespace: "shop" } }),
+    ).toBe(false);
   });
 });

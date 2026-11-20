@@ -32,9 +32,10 @@ describe("workbench close confirm parity", () => {
       expect(source).toContain(
         'hasUnsavedChanges: closingTab.kind === "yaml" && hasUnsavedYaml(getYamlTab(tabId)),',
       );
-      expect(source).toContain(
-        "announceWorkbenchTabClosed(closingTab, () => void reopenLastClosedTab());",
-      );
+      // Undo reopens the entry this close remembered, never the top of the stack.
+      expect(source).toContain("undoForClosedTab(closeTarget, closedEntry, reopenClosedTab)");
+      expect(source).toContain("function reopenClosedTab(wanted: ClosedWorkbenchTab | undefined)");
+      expect(source).not.toContain("() => void reopenLastClosedTab()");
       expect(source).not.toContain("void closeWorkbenchTab(tabId, { skipConfirm: true });");
       expect(source).not.toContain("confirmWorkbenchLayoutShrink");
       expect(source).toContain(

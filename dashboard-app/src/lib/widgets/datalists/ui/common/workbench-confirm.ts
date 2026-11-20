@@ -62,3 +62,35 @@ export function announceWorkbenchTabClosed(
     action: onUndo ? { label: "Undo", onClick: onUndo } : undefined,
   });
 }
+
+type ClosedTabKey = {
+  kind?: string;
+  id?: string;
+  target?: { name?: string; namespace?: string } | null;
+};
+
+/** Same closed tab: same kind (or id) and the same object. */
+export function isSameClosedTab(a: ClosedTabKey, b: ClosedTabKey): boolean {
+  return (
+    a.kind === b.kind &&
+    a.id === b.id &&
+    a.target?.name === b.target?.name &&
+    a.target?.namespace === b.target?.namespace
+  );
+}
+
+/**
+ * The Undo of the "Tab closed" toast: reopens exactly the tab it names, not whatever closed
+ * last. None when Undo could not give back what the close took: unsaved YAML edits are gone,
+ * and a stopped port-forward does not come back by reopening a tab.
+ */
+export function undoForClosedTab<T>(
+  closed: { kind: string; hasUnsavedChanges?: boolean },
+  entry: T | null | undefined,
+  reopen: (entry: T) => unknown,
+): (() => void) | undefined {
+  if (!entry || closed.hasUnsavedChanges || closed.kind === "port-forward") return undefined;
+  return () => {
+    void reopen(entry);
+  };
+}

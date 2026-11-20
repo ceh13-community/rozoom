@@ -148,6 +148,8 @@
     announceWorkbenchTabClosed,
     confirmWorkbenchTabClose,
     hasUnsavedYaml,
+    isSameClosedTab,
+    undoForClosedTab,
   } from "./common/workbench-confirm";
   import SectionRuntimeStatus from "./common/section-runtime-status.svelte";
   import WorkloadSelectionBar from "./common/workload-selection-bar.svelte";
@@ -2203,17 +2205,25 @@
     const index = previousTabs.findIndex((tab) => tab.id === tabId);
     if (index === -1) return;
     const closingTab = previousTabs[index];
-    if (!options.skipConfirm) {
-    const confirmed = await confirmWorkbenchTabClose({
+    const closeTarget = {
       ...closingTab,
       hasUnsavedChanges: closingTab.kind === "yaml" && hasUnsavedYaml(getYamlTab(tabId)),
       stopsPortForward: closingTab.kind === "port-forward" && Boolean(getPortForwardTab(tabId)),
-    });
+    };
+    if (!options.skipConfirm) {
+      const confirmed = await confirmWorkbenchTabClose(closeTarget);
       if (!confirmed) return;
     }
+    const closedStackBefore = closedWorkbenchTabs;
     rememberClosedTab(tabId);
     if (!options.skipConfirm) {
-      announceWorkbenchTabClosed(closingTab, () => void reopenLastClosedTab());
+      // Undo reopens the entry this close remembered; none when nothing was remembered.
+      const closedEntry =
+        closedWorkbenchTabs !== closedStackBefore ? closedWorkbenchTabs[0] : undefined;
+      announceWorkbenchTabClosed(
+        closeTarget,
+        undoForClosedTab(closeTarget, closedEntry, reopenClosedTab),
+      );
     }
     workbenchTabs = previousTabs.filter((tab) => tab.id !== tabId);
     pinnedTabIds = new Set([...pinnedTabIds].filter((id) => id !== tabId));
@@ -2253,9 +2263,15 @@
   }
 
   function reopenLastClosedTab() {
-    const entry = closedWorkbenchTabs[0];
-    if (!entry) return;
-    closedWorkbenchTabs = closedWorkbenchTabs.slice(1);
+    return reopenClosedTab(closedWorkbenchTabs[0]);
+  }
+
+  function reopenClosedTab(wanted: ClosedWorkbenchTab | undefined) {
+    if (!wanted) return;
+    const index = closedWorkbenchTabs.findIndex((item) => isSameClosedTab(item, wanted));
+    if (index === -1) return;
+    const entry = closedWorkbenchTabs[index];
+    closedWorkbenchTabs = closedWorkbenchTabs.filter((_, position) => position !== index);
     void openYamlTarget(entry.target, { scrollIntoView: false }).then(() => {
       if (entry.pinned) {
         const tabId = toYamlTabId(entry.target);

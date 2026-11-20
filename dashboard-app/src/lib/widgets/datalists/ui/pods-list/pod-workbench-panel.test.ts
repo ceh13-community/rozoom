@@ -4,6 +4,9 @@ import { setDashboardDataProfile } from "$shared/lib/dashboard-data-profile.svel
 import PodWorkbenchPanel from "./pod-workbench-panel.svelte";
 import { getPodsWorkbenchStateKey } from "./workbench-session";
 
+const toast = vi.hoisted(() => vi.fn());
+vi.mock("svelte-sonner", () => ({ toast }));
+
 vi.mock("$shared/api/kubectl-proxy", () => ({
   kubectlRawArgsFront: vi.fn(async (args: string[]) => {
     if (args.includes("yaml")) {
@@ -227,5 +230,51 @@ describe("PodWorkbenchPanel", () => {
     });
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(view.getAllByRole("button", { name: "Close api-0 tab" })).toHaveLength(2);
+  });
+
+  it("Undo in the toast of the closed Logs reopens Logs, not the YAML closed after it", async () => {
+    toast.mockClear();
+    const podsByUid = new Map([
+      [
+        "uid-1",
+        {
+          metadata: { uid: "uid-1", name: "api-0", namespace: "prod" },
+          spec: { containers: [{ name: "api" }] },
+        } as unknown as import("$shared/model/clusters").PodItem,
+      ],
+    ]);
+    const props = {
+      clusterId: "cluster-1",
+      podsByUid,
+      metricsByKey: new Map(),
+      metricsError: null,
+      request: { token: 1, kind: "logs" as const, podUid: "uid-1" },
+    };
+    const view = render(PodWorkbenchPanel, { props });
+    await waitFor(() => expect(view.getByText("Pod logs: prod/api-0")).toBeInTheDocument());
+    await view.rerender({
+      ...props,
+      request: { token: 2, kind: "yaml" as const, podUid: "uid-1" },
+    });
+    await waitFor(() =>
+      expect(view.getAllByRole("button", { name: "Close api-0 tab" })).toHaveLength(2),
+    );
+
+    // Logs first, then YAML.
+    await fireEvent.click(view.getAllByRole("button", { name: "Close api-0 tab" })[0]);
+    await waitFor(() =>
+      expect(view.getAllByRole("button", { name: "Close api-0 tab" })).toHaveLength(1),
+    );
+    await fireEvent.click(view.getByRole("button", { name: "Close api-0 tab" }));
+    await waitFor(() =>
+      expect(view.queryByRole("button", { name: "Close api-0 tab" })).not.toBeInTheDocument(),
+    );
+    expect(toast).toHaveBeenCalledTimes(2);
+
+    const logsUndo = (toast.mock.calls[0][1] as { action: { onClick: () => void } }).action;
+    logsUndo.onClick();
+
+    await waitFor(() => expect(view.getByText("Pod logs: prod/api-0")).toBeInTheDocument());
+    expect(view.getAllByRole("button", { name: "Close api-0 tab" })).toHaveLength(1);
   });
 });

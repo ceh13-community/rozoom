@@ -37,6 +37,8 @@
     announceWorkbenchTabClosed,
     confirmWorkbenchTabClose,
     hasUnsavedYaml,
+    isSameClosedTab,
+    undoForClosedTab,
   } from "../common/workbench-confirm";
   import { normalizeWorkbenchVisibilityForDataMode } from "../common/workbench-data-mode";
 
@@ -296,9 +298,16 @@
   }
 
   function reopenLastClosedTab() {
-    const next = closedWorkbenchTabs[0];
-    if (!next?.target) return;
-    closedWorkbenchTabs = closedWorkbenchTabs.slice(1);
+    reopenClosedTab(closedWorkbenchTabs[0]);
+  }
+
+  function reopenClosedTab(wanted: (typeof closedWorkbenchTabs)[number] | undefined) {
+    if (!wanted) return;
+    const index = closedWorkbenchTabs.findIndex((item) => isSameClosedTab(item, wanted));
+    if (index === -1) return;
+    const next = closedWorkbenchTabs[index];
+    closedWorkbenchTabs = closedWorkbenchTabs.filter((_, position) => position !== index);
+    if (!next.target) return;
     const pod = Array.from(podsByUid.values()).find(
       (entry) =>
         entry.metadata?.name === next.target?.name &&
@@ -559,17 +568,18 @@
 
   async function closeWorkbenchTab(tabId: string) {
     const closingTab = workbenchTabs.find((tab) => tab.id === tabId) ?? null;
+    let closeTarget: (WorkbenchTab & { hasUnsavedChanges: boolean }) | null = null;
     if (closingTab) {
       const yamlTab =
         closingTab.kind === "yaml" ? (yamlTabs.find((tab) => tab.id === tabId) ?? null) : null;
-      const confirmed = await confirmWorkbenchTabClose({
+      closeTarget = {
         ...closingTab,
         hasUnsavedChanges: hasUnsavedYaml(
           yamlTab ? { yamlText: yamlTab.yamlText, yamlOriginalText: yamlTab.originalYamlText } : null,
         ),
-      });
+      };
+      const confirmed = await confirmWorkbenchTabClose(closeTarget);
       if (!confirmed) return;
-      announceWorkbenchTabClosed(closingTab, () => void reopenLastClosedTab());
     }
     const parsed = parseWorkbenchTabId(tabId);
     const wasPinned = pinnedTabIds.has(tabId);
@@ -587,6 +597,13 @@
             entry.target?.namespace !== parsed.namespace,
         ),
       ].slice(0, 20);
+    }
+    if (closeTarget) {
+      // Undo reopens the entry this close remembered, not whatever closed last.
+      announceWorkbenchTabClosed(
+        closeTarget,
+        undoForClosedTab(closeTarget, parsed ? closedWorkbenchTabs[0] : undefined, reopenClosedTab),
+      );
     }
     workbenchTabs = workbenchTabs.filter((tab) => tab.id !== tabId);
     logsTabs = logsTabs.filter((tab) => tab.id !== tabId);

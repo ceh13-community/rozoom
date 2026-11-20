@@ -66,6 +66,8 @@
     announceWorkbenchTabClosed,
     confirmWorkbenchTabClose,
     hasUnsavedYaml,
+    isSameClosedTab,
+    undoForClosedTab,
   } from "../common/workbench-confirm";
 
   interface NodesStatusListProps {
@@ -801,20 +803,24 @@
     if (index === -1) return;
 
     const closingTab = previousTabs[index];
+    const closeTarget = {
+      ...closingTab,
+      hasUnsavedChanges: closingTab.kind === "yaml" && hasUnsavedYaml(getYamlTab(tabId)),
+    };
     if (!options.skipConfirm) {
-      const confirmed = await confirmWorkbenchTabClose({
-        ...closingTab,
-        hasUnsavedChanges: closingTab.kind === "yaml" && hasUnsavedYaml(getYamlTab(tabId)),
-      });
+      const confirmed = await confirmWorkbenchTabClose(closeTarget);
       if (!confirmed) return;
     }
-
+    const closedStackBefore = closedWorkbenchTabs;
     rememberClosedTab(tabId);
-
     if (!options.skipConfirm) {
-
-      announceWorkbenchTabClosed(closingTab, () => void reopenLastClosedTab());
-
+      // Undo reopens the entry this close remembered; none when nothing was remembered.
+      const closedEntry =
+        closedWorkbenchTabs !== closedStackBefore ? closedWorkbenchTabs[0] : undefined;
+      announceWorkbenchTabClosed(
+        closeTarget,
+        undoForClosedTab(closeTarget, closedEntry, reopenClosedTab),
+      );
     }
 
     workbenchTabs = previousTabs.filter((tab) => tab.id !== tabId);
@@ -849,10 +855,15 @@
   }
 
   async function reopenLastClosedTab() {
-    const entry = closedWorkbenchTabs[0];
-    if (!entry) return;
-    closedWorkbenchTabs = closedWorkbenchTabs.slice(1);
+    return reopenClosedTab(closedWorkbenchTabs[0]);
+  }
 
+  async function reopenClosedTab(wanted: ClosedWorkbenchTab | undefined) {
+    if (!wanted) return;
+    const index = closedWorkbenchTabs.findIndex((item) => isSameClosedTab(item, wanted));
+    if (index === -1) return;
+    const entry = closedWorkbenchTabs[index];
+    closedWorkbenchTabs = closedWorkbenchTabs.filter((_, position) => position !== index);
     if (!entry.target) return;
     const row = allNodeData.find((item) => item.name === entry.target?.name);
     if (!row) return;

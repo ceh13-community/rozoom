@@ -8,6 +8,7 @@
     announceWorkbenchTabClosed,
     confirmWorkbenchTabClose,
     hasUnsavedYaml,
+    undoForClosedTab,
   } from "./common/workbench-confirm";
   import {
     buildDataModeWorkbenchStorageKey,
@@ -156,8 +157,11 @@
       subtitle: logs.ref,
     });
     if (!confirmed) return;
-    announceWorkbenchTabClosed({ title: "Logs", subtitle: logs.ref }, reopenLastClosedTab);
     markTabClosed("logs");
+    announceWorkbenchTabClosed(
+      { title: "Logs", subtitle: logs.ref },
+      undoForClosedTab({ kind: "logs" }, "logs" as const, reopenClosedTab),
+    );
     pinnedTabIds = new Set([...pinnedTabIds].filter((id) => id !== "logs"));
     if (activeTabId === "logs") {
       activeTabId = yaml.open ? "yaml" : null;
@@ -166,7 +170,7 @@
   }
 
   async function closeYamlTab() {
-    const confirmed = await confirmWorkbenchTabClose({
+    const closeTarget = {
       kind: "yaml",
       title: "YAML",
       subtitle: yaml.ref,
@@ -174,10 +178,14 @@
         yamlText: yaml.yamlText,
         yamlOriginalText: yaml.originalYaml,
       }),
-    });
+    };
+    const confirmed = await confirmWorkbenchTabClose(closeTarget);
     if (!confirmed) return;
-    announceWorkbenchTabClosed({ title: "YAML", subtitle: yaml.ref }, reopenLastClosedTab);
     markTabClosed("yaml");
+    announceWorkbenchTabClosed(
+      closeTarget,
+      undoForClosedTab(closeTarget, "yaml" as const, reopenClosedTab),
+    );
     pinnedTabIds = new Set([...pinnedTabIds].filter((id) => id !== "yaml"));
     if (activeTabId === "yaml") {
       activeTabId = logs.open ? "logs" : null;
@@ -186,9 +194,14 @@
   }
 
   function reopenLastClosedTab() {
-    const next = closedTabs[0] ?? null;
+    const last = closedTabs[0];
+    if (last) reopenClosedTab(last.id);
+  }
+
+  function reopenClosedTab(id: "logs" | "yaml") {
+    const next = closedTabs.find((entry) => entry.id === id) ?? null;
     if (!next) return;
-    closedTabs = closedTabs.slice(1);
+    closedTabs = closedTabs.filter((entry) => entry.id !== id);
     if (next.id === "logs") {
       activeTabId = "logs";
       onOpenLogs?.();

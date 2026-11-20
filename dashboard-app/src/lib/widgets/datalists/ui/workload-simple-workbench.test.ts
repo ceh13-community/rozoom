@@ -1,5 +1,8 @@
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const toast = vi.hoisted(() => vi.fn());
+vi.mock("svelte-sonner", () => ({ toast }));
 import ResourceLogsSheet from "./common/resource-logs-sheet.svelte";
 import ResourceYamlSheet from "./common/resource-yaml-sheet.svelte";
 import WorkloadSimpleWorkbench from "./workload-simple-workbench.svelte";
@@ -209,6 +212,35 @@ describe("workload-simple-workbench", () => {
     expect(view.getByRole("button", { name: "Close YAML tab" })).toBeInTheDocument();
     expect(props.onCloseLogs).not.toHaveBeenCalled();
     expect(props.onCloseYaml).not.toHaveBeenCalled();
+  });
+
+  it("Undo in the Logs toast reopens Logs even after YAML closed later", async () => {
+    toast.mockClear();
+    const props = buildProps("dashboard.test.workbench.undo");
+    const view = render(WorkloadSimpleWorkbench, { props });
+
+    await fireEvent.click(view.getByRole("button", { name: "Close Logs tab" }));
+    await fireEvent.click(view.getByRole("button", { name: "Close YAML tab" }));
+    const logsToast = toast.mock.calls.find(([message]) => String(message).includes("Logs"));
+    expect(logsToast).toBeTruthy();
+
+    (logsToast?.[1] as { action: { onClick: () => void } }).action.onClick();
+
+    expect(props.onOpenLogs).toHaveBeenCalledTimes(1);
+    expect(props.onOpenYaml).not.toHaveBeenCalled();
+  });
+
+  it("offers no Undo after dropping unsaved YAML edits", async () => {
+    toast.mockClear();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const props = buildProps("dashboard.test.workbench.undo-dirty");
+    props.yaml = { ...props.yaml, yamlText: `${props.yaml.yamlText}\n  labels: {}` };
+    const view = render(WorkloadSimpleWorkbench, { props });
+
+    await fireEvent.click(view.getByRole("button", { name: "Close YAML tab" }));
+
+    expect(props.onCloseYaml).toHaveBeenCalledTimes(1);
+    expect((toast.mock.calls.at(-1)?.[1] as { action?: unknown }).action).toBeUndefined();
   });
 
   it("keeps balanced collapse state separate from realtime state", async () => {
