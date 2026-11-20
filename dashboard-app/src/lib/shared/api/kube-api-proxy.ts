@@ -8,8 +8,8 @@ const LOCALHOST_HOST = "127.0.0.1";
 const READY_PATTERN = /Starting to serve on 127\.0\.0\.1:(\d+)/;
 
 type ProxySession = {
-  command: Command<IOPayload>;
-  child: Child;
+  command: Command<IOPayload> | null;
+  child: Child | null;
   refCount: number;
   ready: Promise<string>;
   resolveReady: (baseUrl: string) => void;
@@ -19,6 +19,22 @@ type ProxySession = {
 };
 
 const activeProxies = new Map<string, ProxySession>();
+
+// A stopped proxy reports its exit later, often after a newer proxy for the same cluster
+// took its place. Each session forgets only itself; otherwise the newer proxy drops out of
+// the registry, keeps running with nobody to stop it, and the next request starts another.
+function forgetSession(clusterId: string, session: ProxySession) {
+  if (activeProxies.get(clusterId) === session) activeProxies.delete(clusterId);
+}
+
+async function stopSessionProcess(session: ProxySession) {
+  session.isRunning = false;
+  try {
+    await session.child?.kill();
+  } catch {
+    // ignore shutdown errors
+  }
+}
 
 function createDeferred() {
   let resolve!: (value: string) => void;
@@ -61,8 +77,8 @@ export async function acquireKubeApiProxy(clusterId: string): Promise<string> {
   ];
 
   const session: ProxySession = {
-    command: null as unknown as Command<IOPayload>,
-    child: null as unknown as Child,
+    command: null,
+    child: null,
     refCount: 1,
     ready,
     resolveReady: resolve,
@@ -95,12 +111,12 @@ export async function acquireKubeApiProxy(clusterId: string): Promise<string> {
         if (!session.baseUrl) {
           session.rejectReady(new Error("kubectl proxy closed before becoming ready"));
         }
-        activeProxies.delete(clusterId);
+        forgetSession(clusterId, session);
       },
       onError: (error) => {
         session.isRunning = false;
         session.rejectReady(new Error(String(error)));
-        activeProxies.delete(clusterId);
+        forgetSession(clusterId, session);
       },
     });
 
@@ -108,7 +124,10 @@ export async function acquireKubeApiProxy(clusterId: string): Promise<string> {
     session.child = child;
     return await session.ready;
   } catch (error) {
-    activeProxies.delete(clusterId);
+    // A start that failed after the process was spawned (an early stderr line) still
+    // leaves kubectl running: stop it, since nothing else holds it any more.
+    forgetSession(clusterId, session);
+    await stopSessionProcess(session);
     throw error;
   }
 }
@@ -120,13 +139,8 @@ export async function releaseKubeApiProxy(clusterId: string): Promise<void> {
   session.refCount -= 1;
   if (session.refCount > 0) return;
 
-  activeProxies.delete(clusterId);
-  session.isRunning = false;
-  try {
-    await session.child.kill();
-  } catch {
-    // ignore shutdown errors
-  }
+  forgetSession(clusterId, session);
+  await stopSessionProcess(session);
 }
 
 export function getActiveKubeApiProxyCount() {
