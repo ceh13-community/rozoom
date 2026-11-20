@@ -150,6 +150,9 @@ this update.
   show "Error: No data provided" instead of loading. The main pane had the
   same problem after Pods and back.
 - Closing an Attach window while it was still starting left kubectl running.
+- Background kubectl proxy processes piled up during a long session (one more
+  each time the app reconnected to a cluster) and stayed after a crash. The
+  app now keeps one per cluster and stops the old one.
 - Release notes on the release page and in the update feed no longer break
   sentences in the middle.
 
