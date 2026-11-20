@@ -20,6 +20,7 @@
   import Trash from "@lucide/svelte/icons/trash";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import UserX from "@lucide/svelte/icons/user-x";
+  import { ATTACH_HINT, SHELL_HINT } from "./pod-access-hints";
 
   type PodActionsMenuProps = {
     name: string;
@@ -145,15 +146,25 @@
       {/if}
       <DropdownMenu.Label>Access</DropdownMenu.Label>
       {#if showShell}
-        <DropdownMenu.Item onSelect={() => selectAction(onShell)}>
+        <DropdownMenu.Item
+          title={SHELL_HINT}
+          aria-describedby="pod-action-shell-hint"
+          onSelect={() => selectAction(onShell)}
+        >
           <Terminal class="mr-2 h-4 w-4" />
           Shell
+          <span id="pod-action-shell-hint" class="sr-only">{SHELL_HINT}</span>
         </DropdownMenu.Item>
       {/if}
       {#if showAttach}
-        <DropdownMenu.Item onSelect={() => selectAction(onAttach)}>
+        <DropdownMenu.Item
+          title={ATTACH_HINT}
+          aria-describedby="pod-action-attach-hint"
+          onSelect={() => selectAction(onAttach)}
+        >
           <Plug class="mr-2 h-4 w-4" />
           Attach pod
+          <span id="pod-action-attach-hint" class="sr-only">{ATTACH_HINT}</span>
         </DropdownMenu.Item>
       {/if}
       {#if showLogs}
