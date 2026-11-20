@@ -8,6 +8,7 @@
   } from "$shared/model/cluster-connectivity";
   import { toast } from "svelte-sonner";
   import { writable } from "svelte/store";
+  import { goto } from "$app/navigation";
   import { resolvePageClusterName, type PageData } from "$entities/cluster";
   import type { PodItem } from "$shared/model/clusters";
   import { openPodAttachModal, openPodShellModal } from "$features/shell";
@@ -726,7 +727,20 @@
     });
     if (result.success) {
       const url = portForwardLocalUrl(localPort, firstPort);
-      toast.success(`Port-forward started: ${url} -> ${name}:${firstPort}`);
+      // No page change on its own: the toast says what started and offers the list.
+      toast.success(`Port-forward started: ${url} -> ${name}:${firstPort}`, {
+        description: "Running forwards are listed in Network > Port Forwarding.",
+        // Long enough to reach the button.
+        duration: 10_000,
+        action: {
+          label: "Open port-forwards",
+          onClick: () => {
+            void goto(
+              `/dashboard/clusters/${encodeURIComponent(data.slug)}?workload=portforwarding`,
+            );
+          },
+        },
+      });
       if (mode === "start-and-open") {
         void popOutPortForwardPreview(url);
       }
@@ -781,7 +795,6 @@
       name,
       namespace: pod.metadata?.namespace ?? "default",
     });
-    showActionSuccess(`Opened debug describe for ${getPodRef(pod)}.`);
   }
 
   let deleteDialogTargets = $state<DeleteTarget[]>([]);

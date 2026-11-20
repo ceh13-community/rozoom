@@ -21,4 +21,12 @@ describe("pod port-forward local port", () => {
     expect(body).toContain("popOutPortForwardPreview(url)");
     expect(body).not.toContain("localhost");
   });
+
+  it("offers the port-forward list from the toast instead of leaving the page on its own", () => {
+    expect(body).toContain('label: "Open port-forwards"');
+    expect(body).toContain("?workload=portforwarding");
+    // The only navigation is inside the toast button's handler.
+    expect(body.match(/goto\(/g)).toHaveLength(1);
+    expect(body.indexOf("goto(")).toBeGreaterThan(body.indexOf("onClick"));
+  });
 });
