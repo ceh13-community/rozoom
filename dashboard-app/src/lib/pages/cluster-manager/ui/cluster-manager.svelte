@@ -91,6 +91,7 @@
   import {
     clustersToRecheck,
     startConnectivityRefresh,
+    type ConnectivityRefresh,
   } from "$features/cluster-manager/model/live-connectivity-refresh";
   import { matchesManagedStatusFilter } from "$features/cluster-manager/model/managed-status-filter";
   import { checkClusterConnectivity } from "$shared/api/cluster-connectivity-check";
@@ -374,22 +375,34 @@
 
   // Without this the page kept the last verdict until the user navigated away:
   // a stopped cluster read Online here while its card already said Unreachable.
-  let stopConnectivityRefresh: (() => void) | null = null;
+  let connectivityRefresh: ConnectivityRefresh | null = null;
+  let pageDestroyed = false;
+
+  function handleVisibilityChange() {
+    if (document.visibilityState === "visible") connectivityRefresh?.runNow();
+  }
 
   onMount(async () => {
     window.addEventListener("keydown", handleGlobalKeydown);
-    stopConnectivityRefresh = startConnectivityRefresh({
-      pickClusterIds: () => clustersToRecheck(get(clustersList), get(clusterConnectivity)),
-      check: checkClusterConnectivity,
-      isPageVisible: () => document.visibilityState !== "hidden",
-    });
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     await loadData();
+    // After the list is loaded, so the first round checks the clusters right away
+    // instead of 30 s later.
+    if (!pageDestroyed) {
+      connectivityRefresh = startConnectivityRefresh({
+        pickClusterIds: () => clustersToRecheck(get(clustersList), get(clusterConnectivity)),
+        check: checkClusterConnectivity,
+        isPageVisible: () => document.visibilityState !== "hidden",
+      });
+    }
     await safeDebugLog(`[Hooks on client]. Is dev? ${dev}`);
   });
 
   onDestroy(() => {
+    pageDestroyed = true;
     window.removeEventListener("keydown", handleGlobalKeydown);
-    stopConnectivityRefresh?.();
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
+    connectivityRefresh?.stop();
   });
 
   // Preload auth method info for every managed cluster so the card can

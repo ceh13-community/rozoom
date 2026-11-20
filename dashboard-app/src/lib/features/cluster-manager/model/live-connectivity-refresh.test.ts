@@ -6,7 +6,7 @@ import {
   startConnectivityRefresh,
 } from "./live-connectivity-refresh";
 
-function entry(state: ClusterConnectivity["state"]): ClusterConnectivity {
+function entry(state: ClusterConnectivity["state"], noAnswer = false): ClusterConnectivity {
   return {
     state,
     reason: null,
@@ -15,6 +15,7 @@ function entry(state: ClusterConnectivity["state"]): ClusterConnectivity {
     lastContactAt: null,
     lastKnownVersion: null,
     checkedAt: null,
+    noAnswer,
   };
 }
 
@@ -36,6 +37,17 @@ describe("clustersToRecheck", () => {
     };
     expect(clustersToRecheck(clusters, connectivity)).toEqual(["answered", "stopped"]);
   });
+
+  // A credential plugin waiting for a person (kubelogin in a browser, a device code)
+  // never answers; checking it again would open the login again every round.
+  it("leaves a cluster whose last check got no answer to Retry", () => {
+    const clusters = [{ uuid: "waits-for-login" }, { uuid: "refused" }];
+    const connectivity = {
+      "waits-for-login": entry("unreachable", true),
+      refused: entry("unreachable"),
+    };
+    expect(clustersToRecheck(clusters, connectivity)).toEqual(["refused"]);
+  });
 });
 
 describe("startConnectivityRefresh", () => {
@@ -44,7 +56,7 @@ describe("startConnectivityRefresh", () => {
 
   it("checks at once, then every 30 seconds, and stops when asked", async () => {
     const check = vi.fn<(clusterId: string) => Promise<unknown>>(async () => undefined);
-    const stop = startConnectivityRefresh({ pickClusterIds: () => ["a", "b"], check });
+    const { stop } = startConnectivityRefresh({ pickClusterIds: () => ["a", "b"], check });
     await vi.advanceTimersByTimeAsync(0);
     expect(check.mock.calls.map(([id]) => id)).toEqual(["a", "b"]);
 
@@ -60,7 +72,7 @@ describe("startConnectivityRefresh", () => {
   it("skips rounds while the window is hidden", async () => {
     let visible = false;
     const check = vi.fn(async () => undefined);
-    const stop = startConnectivityRefresh({
+    const refresh = startConnectivityRefresh({
       pickClusterIds: () => ["a"],
       check,
       isPageVisible: () => visible,
@@ -68,10 +80,12 @@ describe("startConnectivityRefresh", () => {
     await vi.advanceTimersByTimeAsync(MANAGER_CONNECTIVITY_REFRESH_MS);
     expect(check).not.toHaveBeenCalled();
 
+    // Back in the window: a round at once, not at the next tick.
     visible = true;
-    await vi.advanceTimersByTimeAsync(MANAGER_CONNECTIVITY_REFRESH_MS);
+    refresh.runNow();
+    await vi.advanceTimersByTimeAsync(0);
     expect(check).toHaveBeenCalledTimes(1);
-    stop();
+    refresh.stop();
   });
 
   it("does not start a new round while the last one still runs", async () => {
@@ -82,7 +96,7 @@ describe("startConnectivityRefresh", () => {
           release = resolve;
         }),
     );
-    const stop = startConnectivityRefresh({ pickClusterIds: () => ["slow"], check });
+    const { stop } = startConnectivityRefresh({ pickClusterIds: () => ["slow"], check });
     await vi.advanceTimersByTimeAsync(MANAGER_CONNECTIVITY_REFRESH_MS * 2);
     expect(check).toHaveBeenCalledTimes(1);
 
@@ -97,7 +111,7 @@ describe("startConnectivityRefresh", () => {
       .fn<(id: string) => Promise<unknown>>()
       .mockRejectedValueOnce(new Error("boom"))
       .mockResolvedValue(undefined);
-    const stop = startConnectivityRefresh({ pickClusterIds: () => ["a", "b"], check });
+    const { stop } = startConnectivityRefresh({ pickClusterIds: () => ["a", "b"], check });
     await vi.advanceTimersByTimeAsync(0);
     expect(check).toHaveBeenCalledTimes(2);
     stop();

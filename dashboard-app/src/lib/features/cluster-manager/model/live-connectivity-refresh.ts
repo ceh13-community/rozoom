@@ -6,10 +6,12 @@ const MAX_PARALLEL_CHECKS = 4;
 
 /**
  * The managed clusters the manage page re-checks on its own: only those that
- * already answered, or stopped answering, in this session. A cluster nothing has
- * talked to yet stays unknown until the user opens it, and an expired credential
- * is not retried in the background, so no credential plugin runs here that the
- * user has not already run.
+ * already answered, or stopped answering with a definite error, in this session.
+ * Never re-checked here: a cluster nothing has talked to yet (unknown), an expired
+ * credential, and a cluster whose last check got no answer at all. The last one is
+ * what a credential plugin waiting for a person looks like (browser login, device
+ * code): checking it again would start that login again every round. Those wait
+ * for Retry or for the user to open the cluster.
  */
 export function clustersToRecheck(
   clusters: ReadonlyArray<{ uuid: string; offline?: boolean }>,
@@ -19,22 +21,29 @@ export function clustersToRecheck(
     .filter((cluster) => !cluster.offline)
     .map((cluster) => cluster.uuid)
     .filter((uuid) => {
-      const state = connectivity[uuid]?.state;
-      return state === "online" || state === "unreachable";
+      const entry = connectivity[uuid];
+      if (!entry || entry.noAnswer) return false;
+      return entry.state === "online" || entry.state === "unreachable";
     });
 }
+
+export type ConnectivityRefresh = {
+  /** Runs a round now, for example when the window becomes visible again. */
+  runNow: () => void;
+  stop: () => void;
+};
 
 /**
  * Re-checks the picked clusters once now and then on an interval, a few at a
  * time, skipping a round while the window is hidden or the last round still
- * runs. Returns the stop function.
+ * runs.
  */
 export function startConnectivityRefresh(options: {
   pickClusterIds: () => string[];
   check: (clusterId: string) => Promise<unknown>;
   isPageVisible?: () => boolean;
   intervalMs?: number;
-}): () => void {
+}): ConnectivityRefresh {
   let stopped = false;
   let running = false;
 
@@ -62,8 +71,13 @@ export function startConnectivityRefresh(options: {
   const timer = setInterval(() => {
     void runRound();
   }, options.intervalMs ?? MANAGER_CONNECTIVITY_REFRESH_MS);
-  return () => {
-    stopped = true;
-    clearInterval(timer);
+  return {
+    runNow: () => {
+      void runRound();
+    },
+    stop: () => {
+      stopped = true;
+      clearInterval(timer);
+    },
   };
 }

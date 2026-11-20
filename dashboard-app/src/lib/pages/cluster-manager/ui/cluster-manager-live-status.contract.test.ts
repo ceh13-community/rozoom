@@ -20,6 +20,16 @@ describe("manage page live status", () => {
     );
     expect(source).toContain("check: checkClusterConnectivity,");
     expect(source).toContain('isPageVisible: () => document.visibilityState !== "hidden",');
-    expect(source).toContain("stopConnectivityRefresh?.();");
+    expect(source).toContain("connectivityRefresh?.stop();");
+    // The first round runs once the list is loaded, and again on return to the window.
+    expect(source.indexOf("await loadData();")).toBeLessThan(
+      source.indexOf("connectivityRefresh = startConnectivityRefresh({"),
+    );
+    expect(source).toContain(
+      'document.addEventListener("visibilitychange", handleVisibilityChange);',
+    );
+    expect(source).toContain(
+      'document.removeEventListener("visibilitychange", handleVisibilityChange);',
+    );
   });
 });
