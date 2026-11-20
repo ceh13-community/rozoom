@@ -1358,7 +1358,7 @@ lokiCanary:
       </Card.Content>
     </Card.Root>
   {:else}
-    <p class="text-xs text-muted-foreground/70 px-1">
+    <p class="text-xs text-muted-foreground px-1">
       Install presets are hidden while searching.
       <button class="ml-1 text-sky-400 hover:underline" onclick={() => (searchQuery = "")}>
         Clear search
@@ -1481,7 +1481,7 @@ lokiCanary:
                           </a>
                         {/if}
                         {#if chart.docsUrl}
-                          <span class="text-muted-foreground/60">·</span>
+                          <span class="text-muted-foreground">·</span>
                           <a
                             href={chart.docsUrl}
                             class="text-sky-400/70 hover:text-sky-300 hover:underline"
@@ -1492,7 +1492,7 @@ lokiCanary:
                             Docs
                           </a>
                         {/if}
-                        <span class="text-muted-foreground/60">·</span>
+                        <span class="text-muted-foreground">·</span>
                         <span
                           class="text-muted-foreground"
                           title={installed && installedNamespace !== chart.namespace
@@ -1502,7 +1502,7 @@ lokiCanary:
                           ns: {installedNamespace}
                         </span>
                         {#if installedReleaseName && installedReleaseName !== chart.releaseName}
-                          <span class="text-muted-foreground/60">·</span>
+                          <span class="text-muted-foreground">·</span>
                           <span
                             class="text-muted-foreground"
                             title={`Release installed as "${installedReleaseName}" (catalog default would be "${chart.releaseName}")`}
@@ -1511,7 +1511,7 @@ lokiCanary:
                           </span>
                         {/if}
                         {#if !installed}
-                          <span class="text-muted-foreground/60">·</span>
+                          <span class="text-muted-foreground">·</span>
                           <input
                             type="text"
                             list={`versions-${chart.id}`}

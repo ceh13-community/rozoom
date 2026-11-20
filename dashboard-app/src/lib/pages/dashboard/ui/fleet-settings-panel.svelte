@@ -436,7 +436,7 @@
       </Button>
     </div>
     {#if logsFolderPath}
-      <div class="mt-1 font-mono text-[11px] text-muted-foreground/80 break-all">
+      <div class="mt-1 font-mono text-[11px] text-muted-foreground break-all">
         {logsFolderPath}
       </div>
     {/if}

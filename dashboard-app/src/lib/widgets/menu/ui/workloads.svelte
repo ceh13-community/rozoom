@@ -772,7 +772,7 @@
     <div class="mb-1">
       <button
         type="button"
-        class="flex w-full items-center justify-between px-3 py-1 text-xs font-semibold uppercase text-muted-foreground/70"
+        class="flex w-full items-center justify-between px-3 py-1 text-xs font-semibold uppercase text-muted-foreground"
         onclick={() => toggleSection(section.key)}
       >
         <span>{section.label}</span>

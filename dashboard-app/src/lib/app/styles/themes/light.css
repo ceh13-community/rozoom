@@ -14,6 +14,29 @@
       0 24px 40px hsl(218 57% 52% / 0.16);
   }
 
+  /* Rail items sit on blue: white text and icons (5.7:1 and up). On is a darker chip with an
+     outline, off is the same white without the chip, so off never looks disabled. */
+  html:not(.dark):not(.k9s) .app-sidebar-rail .rail-toggle,
+  html:not(.dark):not(.k9s) .app-sidebar-rail .rail-notifications {
+    color: hsl(0 0% 100%);
+    background: transparent;
+  }
+
+  html:not(.dark):not(.k9s) .app-sidebar-rail .rail-toggle[aria-pressed="true"] {
+    background: hsl(220 70% 22% / 0.45);
+    box-shadow: inset 0 0 0 1px hsl(0 0% 100% / 0.35);
+  }
+
+  /* Bundled tools list and version under the rail: grey slate text fails on the blue. */
+  html:not(.dark):not(.k9s) .app-sidebar-rail :is(.text-slate-300, .text-slate-400, .text-slate-500) {
+    color: hsl(0 0% 100% / 0.92);
+  }
+
+  html:not(.dark):not(.k9s) .app-sidebar-rail .rail-toggle:hover,
+  html:not(.dark):not(.k9s) .app-sidebar-rail .rail-notifications:hover {
+    background: hsl(220 70% 22% / 0.3);
+  }
+
   html:not(.dark):not(.k9s) .dashboard-workloads-sidebar,
   html:not(.dark):not(.k9s) .cluster-sticky-shell,
   html:not(.dark):not(.k9s) .data-mode-card,

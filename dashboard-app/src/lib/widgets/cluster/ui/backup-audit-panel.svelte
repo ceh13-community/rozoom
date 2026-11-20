@@ -1681,7 +1681,7 @@
           {/if}
         </Button>
         {#if !hasVeleroInstalled}
-          <p class="mt-1 text-xs text-muted-foreground/70">
+          <p class="mt-1 text-xs text-muted-foreground">
             Install Velero in the section above to enable backup restore.
           </p>
         {/if}
@@ -1703,7 +1703,7 @@
           Step 2 - Select backup and namespaces
         </p>
         {#if restoreBackups.length === 0}
-          <p class="text-[11px] text-muted-foreground/60">
+          <p class="text-[11px] text-muted-foreground">
             Scan backups in Step 1 to unlock selection.
           </p>
         {/if}
@@ -1758,7 +1758,7 @@
       <div class="space-y-2 {restoreBackups.length === 0 ? 'pointer-events-none opacity-50' : ''}">
         <p class="text-xs font-medium text-muted-foreground">Step 3 - Preview, then apply</p>
         {#if restoreBackups.length === 0}
-          <p class="text-[11px] text-muted-foreground/60">
+          <p class="text-[11px] text-muted-foreground">
             Complete Steps 1-2 first to unlock restore.
           </p>
         {/if}
