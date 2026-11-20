@@ -131,6 +131,7 @@
   let eventsTabs = $state<EventsTabState[]>([]);
   let pendingWorkbenchState = $state<PersistedPodsWorkbenchState | null | undefined>(undefined);
   let lastRequestToken = $state<number | null>(null);
+  let revealToken = $state<number | null>(null);
   let lastLoadedProfileId = $state<string | null>(null);
   let logsJumpToLine = $state<number | null>(null);
   let incidentTimelineDensity = $state<"all" | "warnings">("all");
@@ -1026,23 +1027,23 @@
 
   $effect(() => {
     if (!request || request.token === lastRequestToken) return;
-    lastRequestToken = request.token;
+    const token = request.token;
+    lastRequestToken = token;
     const pod = getPodForUid(request.podUid);
     if (!pod) return;
 
-    if (request.kind === "logs") {
-      void openLogsForPod(pod, { previous: request.logsPrevious });
-      return;
-    }
-    if (request.kind === "yaml") {
-      void openYamlForPod(pod);
-      return;
-    }
-    if (request.kind === "events") {
-      void openEventsForPod(pod);
-      return;
-    }
-    void openInvestigateForPod(pod);
+    const opened =
+      request.kind === "logs"
+        ? openLogsForPod(pod, { previous: request.logsPrevious })
+        : request.kind === "yaml"
+          ? openYamlForPod(pod)
+          : request.kind === "events"
+            ? openEventsForPod(pod)
+            : openInvestigateForPod(pod);
+    // Reveal once the tab exists, on every request, also when the tab was already active.
+    void opened.finally(() => {
+      revealToken = token;
+    });
   });
 
   $effect(() => {
@@ -1119,6 +1120,7 @@
     timelineMarkers={visibleIncidentTimeline}
     activeTimelineMarkerId={incidentTimelineCursorId}
     onTimelineMarkerClick={jumpToIncidentMarker}
+    {revealToken}
   >
     {#snippet tabActions(tab)}
       {#if tab.id.startsWith("yaml:")}

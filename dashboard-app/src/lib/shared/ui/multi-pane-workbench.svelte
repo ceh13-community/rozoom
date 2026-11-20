@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { tick } from "svelte";
+  import { onDestroy, tick } from "svelte";
+  import { isTypingOutside, restoreFocus, revealResult } from "$shared/lib/reveal-result";
   import type { Snippet } from "svelte";
   import Pin from "@lucide/svelte/icons/pin";
   import PinOff from "@lucide/svelte/icons/pin-off";
@@ -48,6 +49,11 @@
     timelineEmptyLabel?: string;
     tabActions?: Snippet<[any]>;
     body: Snippet;
+    /**
+     * Changes on every row action that opened or re-opened a tab (Logs, YAML, ...): the
+     * panel is revealed and focused even when that tab was already active.
+     */
+    revealToken?: number | null;
   }
 
   let {
@@ -74,6 +80,7 @@
     timelineEmptyLabel = "No warning markers",
     tabActions,
     body,
+    revealToken = null,
   }: Props = $props();
 
   let rootEl = $state<HTMLDivElement | null>(null);
@@ -111,17 +118,86 @@
     }
   });
 
+  // Reveal on each request token: scroll so the panel is visible (its top when it is taller
+  // than the screen) and move focus to it. The element that had focus is kept, so closing
+  // the panel gives focus back to the row menu that opened it.
+  let lastRevealToken: number | null = null;
+  let pendingRevealToken: number | null = null;
+  let revealTrigger: Element | null = null;
+
+  function revealPanel() {
+    const root = rootEl;
+    if (!root) return;
+    const active = document.activeElement;
+    // The request behind the reveal may take seconds: no scroll and no focus when the
+    // person has started typing somewhere else meanwhile.
+    if (isTypingOutside(active, root)) return;
+    if (active && !root.contains(active)) revealTrigger = active;
+    revealResult(root);
+  }
+
+  $effect(() => {
+    const token = revealToken;
+    if (token === null || token === lastRevealToken) return;
+    lastRevealToken = token;
+    if (collapsed || !rootEl) {
+      pendingRevealToken = token;
+      return;
+    }
+    pendingRevealToken = null;
+    void tick().then(revealPanel);
+  });
+
+  $effect(() => {
+    if (!collapsed && pendingRevealToken !== null && rootEl) {
+      pendingRevealToken = null;
+      void tick().then(revealPanel);
+    }
+  });
+
+  function returnFocus() {
+    const root = rootEl;
+    const active = document.activeElement;
+    const focusLost = !active || active === document.body || (root?.contains(active) ?? false);
+    if (focusLost) restoreFocus(revealTrigger);
+  }
+
+  function closeActiveTabFromKeyboard(event: KeyboardEvent) {
+    // Esc on the panel itself (where reveal put focus) closes the active tab. Esc inside an
+    // editor or a field stays theirs.
+    if (event.key !== "Escape" || event.target !== rootEl || !activeTabId) return;
+    event.preventDefault();
+    // Focus goes back to the row menu when the panel goes away (onDestroy); a cancelled
+    // close keeps it on the panel.
+    onCloseTab(activeTabId);
+  }
+
+  onDestroy(returnFocus);
+
+  const activeTab = $derived(tabs.find((tab) => tab.id === activeTabId) ?? null);
+  const regionLabel = $derived(
+    activeTab
+      ? [activeTab.title, activeTab.subtitle].filter(Boolean).join(": ")
+      : "Workbench",
+  );
+
   function formatMarkerTime(ts: number | string) {
     return new Date(ts).toLocaleTimeString();
   }
 </script>
 
+<!-- The region takes focus after a row action; Esc on it closes the active tab. -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
   bind:this={rootEl}
-  class={`overflow-hidden bg-card pointer-events-auto ${
+  tabindex="-1"
+  role="region"
+  aria-label={regionLabel}
+  onkeydown={closeActiveTabFromKeyboard}
+  class={`overflow-hidden bg-card pointer-events-auto outline-none focus-visible:ring-2 focus-visible:ring-ring ${
     fullscreen
       ? "fixed inset-0 z-[120] mb-0 flex h-[100dvh] w-[100vw] flex-col rounded-none border-0 shadow-none"
-      : "relative z-[100] mb-4 rounded-lg border shadow-sm"
+      : "relative z-[100] mb-4 scroll-mt-32 rounded-lg border shadow-sm"
   }`}
 >
   <WorkbenchHeader {tabs}>

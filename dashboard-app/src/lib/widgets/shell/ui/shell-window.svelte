@@ -5,6 +5,7 @@
   import { execCliForCluster, execShellCommand } from "$shared/api/cli";
   import { buildReadOnlyBlockedResult, getClusterSafetyInfo } from "$shared/lib/readonly-guard";
   import { confirmAction } from "$shared/lib/confirm-action";
+  import { restoreFocus } from "$shared/lib/reveal-result";
   import { buildTextExportFilename, exportTextArtifact } from "$shared/lib/text-export";
   import {
     closeShellModal,
@@ -118,7 +119,20 @@
     });
   });
 
+  // The element that opened the window (row menu, toolbar button) gets focus back on close.
+  let openerElement: Element | null = null;
+  let commandInput: HTMLTextAreaElement | null = null;
+  let focusedOnReady = false;
+
+  $: if (shellReady && !focusedOnReady && shellPanel) {
+    focusedOnReady = true;
+    void tick().then(() => {
+      (commandInput ?? shellPanel)?.focus({ preventScroll: true });
+    });
+  }
+
   onMount(() => {
+    openerElement = typeof document === "undefined" ? null : document.activeElement;
     void startSession(windowState);
     if (typeof window !== "undefined") {
       position = {
@@ -142,6 +156,10 @@
   });
 
   onDestroy(() => {
+    const active = typeof document === "undefined" ? null : document.activeElement;
+    if (!active || active === document.body || (shellPanel?.contains(active) ?? false)) {
+      restoreFocus(openerElement);
+    }
     if (
       !podDebugCleanupHandled &&
       shellSessionKind === "pod-debug" &&
@@ -899,8 +917,11 @@
 </script>
 
 <div
-  class="fixed z-[180] pointer-events-auto flex flex-col rounded-2xl border border-slate-800 bg-slate-950/90 shadow-2xl backdrop-blur-lg"
+  class="fixed z-[180] pointer-events-auto flex flex-col rounded-2xl border border-slate-800 bg-slate-950/90 shadow-2xl backdrop-blur-lg outline-none"
   bind:this={shellPanel}
+  role="dialog"
+  aria-label={shellTargetLabel || "Terminal"}
+  tabindex="-1"
   on:pointerdown={handleWindowPointerDown}
   style={`top:${position.y}px; left:${position.x}px; width:${collapsed ? COLLAPSED_WIDTH : expandedWidth}px; height:${collapsed ? COLLAPSED_HEIGHT : expandedHeight}px; resize:none; overflow: hidden;`}
 >
@@ -1057,6 +1078,7 @@
         <div class="flex flex-wrap items-start gap-2">
           <div class="flex-1 min-w-0">
             <textarea
+              bind:this={commandInput}
               class="w-full resize-none rounded border border-slate-700 bg-slate-900/80 px-3 py-2 text-[13px] font-mono text-slate-100 outline-none transition focus:border-slate-500"
               placeholder={shellMode === "pod-exec"
                 ? "Run command inside the selected pod  (Enter = run, Shift+Enter = newline, Ctrl+Enter = run multi-line)"

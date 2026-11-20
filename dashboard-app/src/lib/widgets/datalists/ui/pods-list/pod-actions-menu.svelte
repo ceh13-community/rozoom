@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { tick } from "svelte";
   import { Button } from "$shared/ui/button";
   import * as DropdownMenu from "$shared/ui/dropdown-menu";
   import { MoreVertical } from "$shared/ui/icons";
@@ -110,17 +109,47 @@
     $props();
 
   let open = $state(false);
+  let triggerRef = $state<HTMLElement | null>(null);
+  let pendingAction: (() => void) | null = null;
+  // Set for the whole close after an action: the menu may ask more than once.
+  let suppressCloseFocus = false;
+  let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
-  async function selectAction(callback: () => void) {
+  // A chosen action runs once the menu has finished closing. Run earlier, the menu's own
+  // focus return to its trigger came after the action and scrolled the page back to the
+  // row, away from the panel the action had just revealed. The trigger gets focus without
+  // scrolling, so closing that panel can give focus back to it.
+  function runPendingAction() {
+    if (fallbackTimer) clearTimeout(fallbackTimer);
+    fallbackTimer = null;
+    const action = pendingAction;
+    pendingAction = null;
+    if (!action) return;
+    triggerRef?.focus({ preventScroll: true });
+    action();
+  }
+
+  $effect(() => {
+    if (open) suppressCloseFocus = false;
+  });
+
+  function selectAction(callback: () => void) {
+    suppressCloseFocus = true;
+    pendingAction = callback;
     open = false;
-    await tick();
-    callback();
+    fallbackTimer = setTimeout(runPendingAction, 300);
+  }
+
+  function handleCloseAutoFocus(event: Event) {
+    if (!suppressCloseFocus) return;
+    event.preventDefault();
+    if (pendingAction) setTimeout(runPendingAction, 0);
   }
 </script>
 
 <div data-pod-actions-menu="true">
   <DropdownMenu.Root bind:open>
-    <DropdownMenu.Trigger>
+    <DropdownMenu.Trigger bind:ref={triggerRef}>
       <Button
         variant="ghost"
         size="icon"
@@ -130,7 +159,7 @@
         <MoreVertical class="h-4 w-4" />
       </Button>
     </DropdownMenu.Trigger>
-    <DropdownMenu.Content align="end" class="pt-0">
+    <DropdownMenu.Content align="end" class="pt-0" onCloseAutoFocus={handleCloseAutoFocus}>
       {#if showShowDetails && onShowDetails}
         <DropdownMenu.Item onSelect={() => selectAction(onShowDetails)}>
           <Info class="mr-2 h-4 w-4" />
