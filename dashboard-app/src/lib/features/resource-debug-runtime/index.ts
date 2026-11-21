@@ -21,3 +21,12 @@ export {
   startPodNetworkDebugSession,
 } from "./model/pod-network-debug";
 export type { PodNetworkDebugTarget } from "./model/pod-network-debug";
+export {
+  buildNodeDebugArgs,
+  describeNodeDebugFailure,
+  NODE_DEBUG_IMAGE,
+  parseNodeDebugPodName,
+  startNodeDebugSession,
+  cleanupOrphanNodeDebugPods,
+} from "./model/node-debug-session";
+export type { NodeDebugSessionTarget } from "./model/node-debug-session";

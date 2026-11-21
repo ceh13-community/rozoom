@@ -91,6 +91,10 @@
       <Info class="mr-2 h-4 w-4" />
       Show details
     </DropdownMenu.Item>
+    <DropdownMenu.Separator />
+    <!-- Every section lists items: Diagnostics used to hold only an optional Investigate
+         that nodes never pass, so its label stood alone. -->
+    <DropdownMenu.Label>Diagnostics</DropdownMenu.Label>
     <DropdownMenu.Item onSelect={() => selectAction(onTopNode)}>
       <Activity class="mr-2 h-4 w-4" />
       Top node
@@ -101,8 +105,23 @@
     </DropdownMenu.Item>
     <DropdownMenu.Item onSelect={() => selectAction(onShell)}>
       <Terminal class="mr-2 h-4 w-4" />
-      Shell
+      <span class="flex flex-col">
+        Shell
+        <span class="text-[11px] text-muted-foreground">Debug pod on the node, host at /host</span>
+      </span>
     </DropdownMenu.Item>
+    {#if onRunDebugDescribe}
+      <DropdownMenu.Item onSelect={() => selectAction(onRunDebugDescribe)}>
+        <Bug class="mr-2 h-4 w-4" />
+        Run debug describe
+      </DropdownMenu.Item>
+    {/if}
+    {#if onInvestigate}
+      <DropdownMenu.Item onSelect={() => selectAction(onInvestigate)}>
+        <Search class="mr-2 h-4 w-4" />
+        Investigate
+      </DropdownMenu.Item>
+    {/if}
     <DropdownMenu.Separator />
     <DropdownMenu.Label>Manifest</DropdownMenu.Label>
     <DropdownMenu.Item onSelect={() => selectAction(onEditYaml)}>
@@ -115,24 +134,10 @@
         Copy kubectl describe
       </DropdownMenu.Item>
     {/if}
-    {#if onRunDebugDescribe}
-      <DropdownMenu.Item onSelect={() => selectAction(onRunDebugDescribe)}>
-        <Bug class="mr-2 h-4 w-4" />
-        Run debug describe
-      </DropdownMenu.Item>
-    {/if}
     {#if onDownloadYaml}
       <DropdownMenu.Item onSelect={() => selectAction(onDownloadYaml)}>
         <FileDown class="mr-2 h-4 w-4" />
         Download YAML
-      </DropdownMenu.Item>
-    {/if}
-    <DropdownMenu.Separator />
-    <DropdownMenu.Label>Diagnostics</DropdownMenu.Label>
-    {#if onInvestigate}
-      <DropdownMenu.Item onSelect={() => selectAction(onInvestigate)}>
-        <Search class="mr-2 h-4 w-4" />
-        Investigate
       </DropdownMenu.Item>
     {/if}
     <DropdownMenu.Separator />
