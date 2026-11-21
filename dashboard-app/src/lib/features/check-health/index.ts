@@ -69,6 +69,7 @@ export {
   selectPodsStreamLive,
 } from "./model/stream-watchers/pods/pods-sync";
 export { podsStore, setInitialPods } from "./model/stream-watchers/pods/pods-store";
+export { selectResourceStreamLive } from "./model/api-sync/api-resource-sync";
 export {
   selectClusterPodsSyncStatus,
   setPodsSyncEnabled,

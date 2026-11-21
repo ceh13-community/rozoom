@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { provideListFreshness } from "../common/list-freshness-context.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
   import { liveAge } from "$shared/lib/live-age.svelte";
   import { onDestroy, onMount } from "svelte";
@@ -776,6 +777,23 @@
     }
     stopRefreshTimer();
   });
+
+  // One freshness indicator for the page, shown in the summary strip; the toolbar's
+  // watcher controls read the sync mode from here.
+  provideListFreshness({
+    get state() {
+      return runtimeSourceState;
+    },
+    get mode() {
+      return watcherEnabled ? "poll" : "manual";
+    },
+    get updatedAt() {
+      return lastUpdatedAt;
+    },
+    get watcherEnabled() {
+      return watcherEnabled;
+    },
+  });
 </script>
 
 <div class="grid gap-4">
@@ -788,10 +806,8 @@
 
   <ResourceSummaryStrip
     items={[
-      { label: "Cluster", value: resolvePageClusterName(data), tone: "foreground" },
       { label: "Scope", value: "Cluster-scoped" },
       { label: "Custom Resource Definitions", value: filteredRows.length },
-      { label: "Sync", value: runtimeSourceState },
     ]}
     trailingItem={{ label: "View", value: "Table", valueClass: "text-foreground" }}
   />

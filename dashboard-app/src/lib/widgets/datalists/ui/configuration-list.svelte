@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { provideListFreshness } from "./common/list-freshness-context.svelte";
   import { onDestroy, onMount, tick, untrack } from "svelte";
   import { path } from "@tauri-apps/api";
   import { openExternalUrl } from "$shared/api/in-app-browser";
@@ -4668,6 +4669,26 @@ spec:
       resetConfigurationSyncStatus(clusterId, workloadKey);
     }
   });
+
+  // One freshness indicator for the page, shown in the summary strip; the toolbar's
+  // watcher controls read the sync mode from here.
+  provideListFreshness({
+    get state() {
+      return configurationRuntimeSourceState;
+    },
+    get mode() {
+      return watcherPolicy.mode;
+    },
+    get updatedAt() {
+      return lastWatcherSuccessAt;
+    },
+    get streamLive() {
+      return configurationStreamLive;
+    },
+    get watcherEnabled() {
+      return watcherEnabled;
+    },
+  });
 </script>
 
 <div class="space-y-4">
@@ -5042,10 +5063,9 @@ spec:
 
   <ResourceSummaryStrip
     items={[
-      { label: "Cluster", value: data.name || data.slug, tone: "foreground" },
-      { label: isNamespacesWorkload ? "Scope" : "Namespace", value: configurationScopeSummary },
+      // The namespace selector covers namespaced lists; Namespaces itself has no namespace.
+      ...(isNamespacesWorkload ? [{ label: "Scope", value: configurationScopeSummary }] : []),
       { label: tableTitle, value: filteredRows.length },
-      { label: "Sync", value: configurationRuntimeSourceState },
     ]}
     trailingItem={{
       label: "View",

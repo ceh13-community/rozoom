@@ -25,3 +25,4 @@ export { default as PortForwardingPanel } from "./ui/network/port-forwarding-pan
 export { default as AccessReviewsPanel } from "./ui/access-control/access-reviews-panel.svelte";
 export { default as GlobalTriagePanel } from "./ui/triage/global-triage-panel.svelte";
 export { default as RotateCertsPanel } from "./ui/cluster-health/rotate-certs-panel.svelte";
+export { listFreshnessOwners } from "./ui/common/list-freshness-context.svelte";

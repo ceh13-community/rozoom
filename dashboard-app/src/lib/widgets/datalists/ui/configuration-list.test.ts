@@ -355,6 +355,8 @@ describe("configuration-list", () => {
   });
 
   it("shows pods-style watcher and table controls", () => {
+    // Watcher and Sync sec are poll-mode controls.
+    setDashboardDataProfile("low_load");
     const { getByRole, getByText, queryByText } = render(ConfigurationList, {
       props: {
         data: {
@@ -422,26 +424,35 @@ describe("configuration-list", () => {
       JSON.stringify({ enabled: false, refreshSeconds: 45, viewMode: "namespace" }),
     );
 
-    const { getByDisplayValue, getByRole, findByText } = render(ConfigurationList, {
-      props: {
-        data: {
-          title: "ConfigMaps - Cluster: minikube",
-          slug: "minikube",
-          uuid: "cluster-a",
-          workload: "configmaps",
-          sort_field: null,
-          workloadKey: "configmaps",
-          items: [{ metadata: { name: "first", namespace: "default" }, data: {} }],
+    const { getByDisplayValue, getByRole, findByText, queryByRole, queryByText, getByTestId } =
+      render(ConfigurationList, {
+        props: {
+          data: {
+            title: "ConfigMaps - Cluster: minikube",
+            slug: "minikube",
+            uuid: "cluster-a",
+            workload: "configmaps",
+            sort_field: null,
+            workloadKey: "configmaps",
+            items: [{ metadata: { name: "first", namespace: "default" }, data: {} }],
+          },
         },
-      },
-    });
+      });
 
     await findByText("Watcher: Off");
     expect(getByDisplayValue("45")).toBeInTheDocument();
 
     await fireEvent.click(getByRole("button", { name: "Reset" }));
-    expect(getByRole("button", { name: "Watcher: On" })).toBeInTheDocument();
-    expect(getByDisplayValue("30")).toBeInTheDocument();
+    // On a watch (balanced profile) the controls stay only while the watcher is off.
+    expect(queryByRole("button", { name: "Watcher: On" })).not.toBeInTheDocument();
+    expect(queryByText("Sync sec")).not.toBeInTheDocument();
+    expect(getByTestId("list-freshness")).toBeInTheDocument();
+    const saved = JSON.parse(
+      window.localStorage.getItem(
+        "dashboard.configuration.watcher.settings.v2:cluster-a:configmaps",
+      ) ?? "{}",
+    );
+    expect(saved).toMatchObject({ enabled: true, refreshSeconds: 30 });
   });
 
   it("treats namespaces as cluster-scoped inventory in the toolbar and summary", () => {

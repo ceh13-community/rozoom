@@ -10,10 +10,11 @@ const source = readFileSync(
 describe("pods table PR3 contract", () => {
   it("renders a searchable table with watcher, selection, and opt-in metrics controls", () => {
     expect(source).toContain('placeholder="Filter pods..."');
-    expect(source).toContain('Watcher: <span class="font-medium text-foreground"');
-    // The watcher label never claims Active for a cluster that does not answer.
-    expect(source).toContain('? "Paused: cluster unreachable"');
-    expect(source).toContain('? "Active"');
+    // The watcher state shows once, in the freshness indicator of the summary strip.
+    expect(source).not.toContain("Watcher: <span");
+    expect(source).toContain(
+      'Rows: <span class="font-medium text-foreground">{sortedRows.length}</span>',
+    );
     expect(source).toContain('{enrichedTableEnabled ? "Hide live usage" : "Show live usage"}');
     expect(source).toContain('label="Select all pods"');
     expect(source).not.toContain("showRefreshButton={true}");

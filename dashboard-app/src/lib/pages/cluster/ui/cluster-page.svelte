@@ -13,6 +13,7 @@
   import { handleGlobalKeydown, registerShortcut } from "$shared/lib/keyboard-manager";
   import { NamespaceSelect } from "$widgets/namespace";
   import { WorkloadDisplay } from "$widgets/workload";
+  import { listFreshnessOwners } from "$widgets/datalists";
   import ClusterUnreachableBanner from "$widgets/cluster/ui/connectivity/cluster-unreachable-banner.svelte";
   import {
     claimReconnectReload,
@@ -28,7 +29,7 @@
   import LoadingDots from "$shared/ui/loading-dots.svelte";
   import * as Popover from "$shared/ui/popover";
   import { trackCoreAction } from "$shared/analytics/wau-c";
-  import { getTimeDifference, timeAgo } from "$shared/lib/timeFormatters";
+  import { getTimeDifference } from "$shared/lib/timeFormatters";
   import {
     clustersList,
     isClustersConfigLoading,
@@ -108,13 +109,9 @@
     createEmptyClusterSyncStatusStore,
     createEmptyNodesHealthStatusStore,
     deriveSyncStateText,
-    readWorkloadSyncStatus,
     selectNodesHealthStatusStore,
     selectWorkloadSyncStatusStore,
-    syncBadgeText as formatSyncBadgeText,
-    syncBadgeTone as resolveSyncBadgeTone,
     type ClusterSyncStatus,
-    type GenericSyncStatus,
     type NodesHealthSyncStatus,
   } from "../model/cluster-page-sync-status";
   import {
@@ -676,7 +673,9 @@
   const shouldShowCronJobsSyncStatus = $derived(routeWorkloadType === "cronjobs");
   const shouldShowNodesStatusSync = $derived(routeWorkloadType === "nodesstatus");
   const shouldShowConfigurationSyncStatus = $derived(configurationWorkloads.has(routeWorkloadType));
-  const shouldShowHeaderSyncBadge = true;
+  // One freshness indicator per page: a list shows its own in its summary strip, so the
+  // header shows one only on pages without such a list (Overview, health panels).
+  const shouldShowHeaderSyncBadge = $derived($listFreshnessOwners === 0);
   const podsSyncStatusText = $derived.by(() => {
     return deriveSyncStateText($podsSyncStatus);
   });
@@ -1225,18 +1224,6 @@
 
   function paneStatusClass(paneId: WorkspacePaneId): string {
     return resolvePaneStatusClass(paneStatusLabel(paneId));
-  }
-
-  function syncBadgeTone(workload: WorkloadType, clusterId: string = cluster): string {
-    const status = readWorkloadSyncStatus(workload, clusterId);
-    return resolveSyncBadgeTone(status);
-  }
-
-  function syncBadgeText(workload: WorkloadType, clusterId: string = cluster): string {
-    const status = readWorkloadSyncStatus(workload, clusterId);
-    return formatSyncBadgeText(status as GenericSyncStatus | null, (updatedAt) =>
-      timeAgo(new Date(updatedAt)),
-    );
   }
 
   function workspaceLayoutBadge(tabId: string): string {
@@ -2107,9 +2094,6 @@
             </label>
             <span>Workload: {routeWorkloadType || "overview"}</span>
             <span class={paneStatusClass("pane-1")}>Status: {paneStatusLabel("pane-1")}</span>
-            <span class={syncBadgeTone(routeWorkloadType || "overview")}>
-              Sync: {syncBadgeText(routeWorkloadType || "overview")}
-            </span>
           </div>
         {/if}
 
@@ -2238,9 +2222,6 @@
             </label>
             <span>Workload: {pane.workload}</span>
             <span class={paneStatusClass("pane-2")}>Status: {paneStatusLabel("pane-2")}</span>
-            <span class={syncBadgeTone(pane.workload, pane.clusterId || cluster)}>
-              Sync: {syncBadgeText(pane.workload, pane.clusterId || cluster)}
-            </span>
           </div>
 
           {#if paneLoading("pane-2") && !paneHasData}
@@ -2308,9 +2289,6 @@
             </label>
             <span>Workload: {pane.workload}</span>
             <span class={paneStatusClass("pane-3")}>Status: {paneStatusLabel("pane-3")}</span>
-            <span class={syncBadgeTone(pane.workload, pane.clusterId || cluster)}>
-              Sync: {syncBadgeText(pane.workload, pane.clusterId || cluster)}
-            </span>
           </div>
 
           {#if paneLoading("pane-3") && !paneHasData}

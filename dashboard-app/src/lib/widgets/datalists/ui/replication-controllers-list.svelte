@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { provideListFreshness } from "./common/list-freshness-context.svelte";
   import { invalidateAll } from "$app/navigation";
   import { onMount } from "svelte";
   import { resolvePageClusterName, type PageData } from "$entities/cluster";
@@ -120,6 +121,23 @@
       clearInterval(timer);
     };
   });
+
+  // One freshness indicator for the page, shown in the summary strip; the toolbar's
+  // watcher controls read the sync mode from here.
+  provideListFreshness({
+    get state() {
+      return rows.length > 0 ? ("cached" as const) : ("idle" as const);
+    },
+    get mode() {
+      return "on-demand" as const;
+    },
+    get updatedAt() {
+      return routeLoadedAt;
+    },
+    get watcherEnabled() {
+      return true;
+    },
+  });
 </script>
 
 <div class="grid gap-4">
@@ -132,12 +150,7 @@
     }}
   />
   <ResourceSummaryStrip
-    items={[
-      { label: "Cluster", value: resolvePageClusterName(data), tone: "foreground" },
-      { label: "Namespace", value: $selectedNamespace || "all namespaces" },
-      { label: "Replication Controllers", value: rows.length },
-      { label: "Sync", value: "Route scoped" },
-    ]}
+    items={[{ label: "Replication Controllers", value: rows.length }]}
     trailingItem={{ label: "View", value: "Table", valueClass: "text-foreground" }}
   />
   <SectionRuntimeStatus

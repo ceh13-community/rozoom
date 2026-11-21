@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
   import { onDestroy, onMount } from "svelte";
   import { BaseDirectory, writeTextFile } from "@tauri-apps/plugin-fs";
@@ -2046,6 +2047,27 @@
     destroyStatefulSetsSync(data.slug);
     resetStatefulSetsSyncStatus(data.slug);
   });
+
+  // One freshness indicator for the page, shown in the summary strip; the toolbar's
+  // watcher controls read the sync mode from here.
+  const listStreamLive = watchStreamLive("statefulset", () => data?.slug);
+  provideListFreshness({
+    get state() {
+      return statefulSetsRuntimeSourceState;
+    },
+    get mode() {
+      return watcherPolicy.mode;
+    },
+    get updatedAt() {
+      return lastWatcherSuccessAt;
+    },
+    get streamLive() {
+      return listStreamLive.current;
+    },
+    get watcherEnabled() {
+      return watcherEnabled;
+    },
+  });
 </script>
 
 <div class="grid w-full grid-cols-1 overflow-visible">
@@ -2557,12 +2579,7 @@
     </WorkloadSelectionBar>
   {/if}
   <ResourceSummaryStrip
-    items={[
-      { label: "Cluster", value: resolvePageClusterName(data), tone: "foreground" },
-      { label: "Namespace", value: statefulSetsNamespaceSummary },
-      { label: "Stateful Sets", value: rows.length },
-      { label: "Sync", value: statefulSetsRuntimeSourceState },
-    ]}
+    items={[{ label: "Stateful Sets", value: rows.length }]}
     trailingItem={{
       label: "View",
       value: statefulSetsSummaryView,

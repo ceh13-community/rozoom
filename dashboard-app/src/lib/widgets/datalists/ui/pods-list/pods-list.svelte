@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { provideListFreshness } from "../common/list-freshness-context.svelte";
   import { onDestroy, onMount, untrack } from "svelte";
   import {
     claimReconnectReload,
@@ -1107,6 +1108,27 @@
     setPodsSyncEnabled(activeClusterId, false);
     resetPodsSyncStatus(activeClusterId);
   });
+
+  // One freshness indicator for the page, shown in the summary strip; the toolbar's
+  // watcher controls read the sync mode from here.
+  provideListFreshness({
+    get state() {
+      return podsRuntimeSourceState;
+    },
+    get mode() {
+      return "stream" as const;
+    },
+    get updatedAt() {
+      return podsSyncStatus.lastUpdatedAt ?? cachedPodsAt;
+    },
+    get streamLive() {
+      // Never Live for a cluster that does not answer.
+      return clusterUnreachable ? false : podsStreamLive;
+    },
+    get watcherEnabled() {
+      return watcherEnabled;
+    },
+  });
 </script>
 
 <div class="grid w-full grid-cols-1 gap-4 overflow-visible">
@@ -1217,12 +1239,7 @@
   {/if}
 
   <ResourceSummaryStrip
-    items={[
-      { label: "Cluster", value: resolvePageClusterName(data), tone: "foreground" },
-      { label: "Namespace", value: namespaceSummary },
-      { label: "Pods", value: filteredRows.length },
-      { label: "Sync", value: podsSummarySyncLabel },
-    ]}
+    items={[{ label: "Pods", value: filteredRows.length }]}
     trailingItem={{
       label: "View",
       value: enrichedTableEnabled ? "Enriched" : "Base",

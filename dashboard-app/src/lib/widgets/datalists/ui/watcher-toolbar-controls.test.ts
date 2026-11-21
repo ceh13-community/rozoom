@@ -1,6 +1,8 @@
 import { fireEvent, render } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 import WatcherToolbarControls from "./watcher-toolbar-controls.svelte";
+import { LIST_FRESHNESS_CONTEXT } from "./common/list-freshness-context.svelte";
+import type { ListSyncMode } from "./common/list-freshness";
 
 describe("watcher toolbar controls", () => {
   it("renders shared watcher controls and dispatches callbacks", async () => {
@@ -96,5 +98,40 @@ describe("watcher toolbar controls", () => {
     await fireEvent.change(refreshInput);
     expect(onWatcherRefreshSecondsChange).toHaveBeenCalledWith(3);
     expect(refreshInput.value).toBe("5");
+  });
+
+  describe("in a list that shows its sync mode", () => {
+    function renderIn(mode: ListSyncMode, watcherEnabled: boolean) {
+      return render(WatcherToolbarControls, {
+        props: {
+          watcherEnabled,
+          watcherRefreshSeconds: 30,
+          onToggleWatcher: vi.fn(),
+          onWatcherRefreshSecondsChange: vi.fn(),
+          onResetWatcherSettings: vi.fn(),
+        },
+        context: new Map([
+          [LIST_FRESHNESS_CONTEXT, { state: "live", mode, updatedAt: null, watcherEnabled }],
+        ]),
+      });
+    }
+
+    it("hides Watcher and Sync sec on a live watch", () => {
+      const { queryByRole, queryByText } = renderIn("stream", true);
+      expect(queryByRole("button", { name: "Watcher: On" })).not.toBeInTheDocument();
+      expect(queryByText("Sync sec")).not.toBeInTheDocument();
+      expect(queryByRole("button", { name: "Reset" })).not.toBeInTheDocument();
+    });
+
+    it("keeps them while the watch is paused, so it can be resumed", () => {
+      const { getByRole } = renderIn("stream", false);
+      expect(getByRole("button", { name: "Watcher: Off" })).toBeInTheDocument();
+    });
+
+    it("keeps them in poll mode", () => {
+      const { getByRole, getByText } = renderIn("poll", true);
+      expect(getByRole("button", { name: "Watcher: On" })).toBeInTheDocument();
+      expect(getByText("Sync sec")).toBeInTheDocument();
+    });
   });
 });

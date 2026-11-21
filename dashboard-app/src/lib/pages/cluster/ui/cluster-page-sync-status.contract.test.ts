@@ -21,7 +21,10 @@ const workloadTypes = [
 
 describe("cluster page sync-status contract", () => {
   it("keeps sync status blocks wired for all supported workload pages", () => {
-    expect(source).toContain("const shouldShowHeaderSyncBadge = true;");
+    // One indicator per page: the header shows one only while no list shows its own.
+    expect(source).toContain(
+      "const shouldShowHeaderSyncBadge = $derived($listFreshnessOwners === 0);",
+    );
     expect(source).toContain("effectiveWorkspaceLayout === 1");
     expect(source).toContain("const headerSyncStatus = $derived.by(() => {");
     expect(source).toContain("const headerSyncStatusText = $derived.by(() => {");

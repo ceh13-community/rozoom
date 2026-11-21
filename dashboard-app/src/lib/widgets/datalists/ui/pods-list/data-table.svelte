@@ -573,18 +573,11 @@
     {/snippet}
   </TableToolbarShell>
 
+  <!-- Rows counts after the table's own NS filter and search. The watcher state is in
+       the one freshness indicator of the summary strip. -->
   <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
     <div>
       Rows: <span class="font-medium text-foreground">{sortedRows.length}</span>
-    </div>
-    <div>
-      Watcher: <span class="font-medium text-foreground"
-        >{clusterUnreachable
-          ? "Paused: cluster unreachable"
-          : watcherEnabled
-            ? "Active"
-            : "Paused"}</span
-      >
     </div>
     <div class="min-w-[18rem] flex-1">{metricsSummary}</div>
   </div>

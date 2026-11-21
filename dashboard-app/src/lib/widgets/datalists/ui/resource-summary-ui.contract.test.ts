@@ -42,11 +42,13 @@ describe("resource summary ui contract", () => {
       'import ResourceSummaryStrip from "../common/resource-summary-strip.svelte";',
     );
     expect(podsSource).toContain("<ResourceSummaryStrip");
-    expect(podsSource).toContain('label: "Cluster"');
-    expect(podsSource).toContain('label: "Namespace"');
+    // Cluster and namespace are in the page title and selector; freshness is one indicator.
+    expect(podsSource).not.toContain('label: "Cluster"');
+    expect(podsSource).not.toContain('label: "Namespace"');
     expect(podsSource).toContain('label: "Pods"');
-    expect(podsSource).toContain('label: "Sync"');
+    expect(podsSource).not.toContain('label: "Sync"');
     expect(podsSource).toContain('label: "View"');
+    expect(podsSource).toContain("provideListFreshness({");
 
     expect(deploymentsSource).toContain(
       'import ResourceSummaryStrip from "./common/resource-summary-strip.svelte";',
@@ -103,7 +105,8 @@ describe("resource summary ui contract", () => {
     expect(replicationControllersSource).toContain(
       "{ label: tableTitle, value: filteredRows.length }",
     );
-    expect(replicationControllersSource).toContain('label: "Sync"');
+    expect(replicationControllersSource).not.toContain('label: "Sync"');
+    expect(replicationControllersSource).toContain("provideListFreshness({");
     expect(replicationControllersSource).toContain('label: "View"');
   });
 });

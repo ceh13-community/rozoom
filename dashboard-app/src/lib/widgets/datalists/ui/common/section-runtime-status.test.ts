@@ -4,8 +4,9 @@ import { showRuntimeDiagnostics } from "$features/check-health/model/runtime-dia
 import SectionRuntimeStatus from "./section-runtime-status.svelte";
 
 describe("section runtime status", () => {
-  it("renders only badge when runtime diagnostics disabled (default)", () => {
-    const { getByText, queryByText } = render(SectionRuntimeStatus, {
+  it("renders nothing when runtime diagnostics are off (default)", () => {
+    // The list's summary strip shows the state once; no separate row with a badge.
+    const { queryByText } = render(SectionRuntimeStatus, {
       props: {
         sectionLabel: "Namespaces Runtime Status",
         profileLabel: "Balanced profile",
@@ -17,7 +18,7 @@ describe("section runtime status", () => {
       },
     });
 
-    expect(getByText("Cached")).toBeInTheDocument();
+    expect(queryByText("Cached")).not.toBeInTheDocument();
     expect(queryByText("Namespaces Runtime Status")).not.toBeInTheDocument();
     expect(queryByText(/updated just now/)).not.toBeInTheDocument();
   });
