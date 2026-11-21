@@ -84,6 +84,54 @@ describe("pods data-table", () => {
     );
   });
 
+  it("keeps the last CPU and memory values while metrics refresh", () => {
+    const rows: PodListRow[] = [
+      {
+        uid: "pod-1",
+        name: "api-0",
+        namespace: "default",
+        status: "Running",
+        readyContainers: 1,
+        totalContainers: 1,
+        restarts: 0,
+        node: "minikube",
+        age: "5m",
+        ageSeconds: 300,
+      },
+      {
+        uid: "pod-2",
+        name: "api-1",
+        namespace: "default",
+        status: "Running",
+        readyContainers: 1,
+        totalContainers: 1,
+        restarts: 0,
+        node: "minikube",
+        age: "5m",
+        ageSeconds: 300,
+      },
+    ];
+
+    const { getByText, getAllByText } = render(DataTable, {
+      props: {
+        rows,
+        ...baseProps,
+        metricsLoading: true,
+        metricsByKey: new Map([
+          [
+            "default/api-0",
+            { cpu: "12m", memory: "34Mi", cpuMillicores: 12, memoryBytes: 34 * 1024 * 1024 },
+          ],
+        ]),
+      },
+    });
+
+    expect(getByText("12m")).toBeInTheDocument();
+    expect(getByText("34Mi")).toBeInTheDocument();
+    // Only the pod without a previous value waits for the first sample.
+    expect(getAllByText("Loading…")).toHaveLength(2);
+  });
+
   it("groups pods by node when the node grouping toggle is enabled", async () => {
     const rows: PodListRow[] = [
       {

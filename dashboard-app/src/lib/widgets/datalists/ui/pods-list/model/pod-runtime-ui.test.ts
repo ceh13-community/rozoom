@@ -6,7 +6,7 @@ import {
 } from "./pod-runtime-ui";
 
 describe("pod runtime ui", () => {
-  it("shows the cache banner only while cached refresh is loading or degraded", () => {
+  it("shows the cache banner only when a cached refresh failed", () => {
     expect(
       shouldShowPodsCacheBanner({
         hasCachedPods: true,
@@ -21,6 +21,24 @@ describe("pod runtime ui", () => {
         hasCachedPods: true,
         snapshotRefreshState: "loading",
         syncError: null,
+        syncLoading: true,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldShowPodsCacheBanner({
+        hasCachedPods: true,
+        snapshotRefreshState: "error",
+        syncError: null,
+        syncLoading: false,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldShowPodsCacheBanner({
+        hasCachedPods: true,
+        snapshotRefreshState: "idle",
+        syncError: "watch failed",
         syncLoading: false,
       }),
     ).toBe(true);
