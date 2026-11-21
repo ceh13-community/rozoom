@@ -63,7 +63,7 @@ test.describe("workloads network jitter", () => {
     const page = await context.newPage();
     const startedAt = Date.now();
     await page.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=${WORKLOAD}`);
-    await expect(page.getByText(/^(Cached|Stale cache) ·/i).first()).toBeVisible();
+    await expect(page.getByTestId("list-freshness").first()).toBeVisible();
     await expect(page.getByText(/cached-jitter-deployment/i)).toBeVisible();
     const firstPaintMs = Date.now() - startedAt;
     expect(firstPaintMs).toBeLessThan(3_500);

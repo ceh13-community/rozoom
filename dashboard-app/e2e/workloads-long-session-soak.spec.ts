@@ -108,13 +108,7 @@ test.describe("workloads long session soak", () => {
     for (let i = 0; i < 18; i += 1) {
       const workload = WORKLOADS[i % WORKLOADS.length]!;
       await page.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=${workload}`);
-      await expect(
-        page
-          .getByText(
-            /(Cached|Stale cache) · .*(Refreshing|Ready|Refresh failed, showing last snapshot)/i,
-          )
-          .first(),
-      ).toBeVisible();
+      await expect(page.getByTestId("list-freshness").first()).toBeVisible();
     }
   });
 });

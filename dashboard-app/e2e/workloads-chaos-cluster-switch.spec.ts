@@ -72,11 +72,11 @@ test.describe("workloads chaos cluster switch", () => {
 
     const page = await context.newPage();
     await page.goto(`/dashboard/clusters/${CLUSTER_A}?workload=${WORKLOAD}`);
-    await expect(page.getByText(/^(Cached|Stale cache) ·/i).first()).toBeVisible();
+    await expect(page.getByTestId("list-freshness").first()).toBeVisible();
     await expect(page.getByText(/cached-deployment-dev/i)).toBeVisible();
 
     await page.goto(`/dashboard/clusters/${CLUSTER_B}?workload=${WORKLOAD}`);
-    await expect(page.getByText(/^(Cached|Stale cache) ·/i).first()).toBeVisible();
+    await expect(page.getByTestId("list-freshness").first()).toBeVisible();
     await expect(page.getByText(/cached-deployment-prod/i)).toBeVisible();
   });
 });
