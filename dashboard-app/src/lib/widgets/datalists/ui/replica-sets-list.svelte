@@ -42,6 +42,11 @@
   import DataTable, {
     type ReplicaSetsTableViewMode,
   } from "./replica-sets-list/data-table.svelte";
+  import {
+    applyResumeArgs,
+    createStreamChunkMerger,
+    resumeSinceArg,
+  } from "./common/log-stream-merge";
   import ResourceLogsSheet from "./common/resource-logs-sheet.svelte";
   import ResourceYamlSheet from "./common/resource-yaml-sheet.svelte";
   import ResourceDetailsSheet from "./resource-details-sheet.svelte";
@@ -352,7 +357,6 @@
   let logsJumpToLine = $state<number | null>(null);
   const logsLivePollMs = 2_000;
   const logsStreamReconnectMs = 1_200;
-  const logsMaxChars = 1_000_000;
   const orderedWorkbenchTabs = $derived.by(() => orderPinnedTabs(workbenchTabs, pinnedTabIds));
   const hasWorkbenchTabs = $derived(orderedWorkbenchTabs.length > 0);
   const activeWorkbenchTab = $derived(
@@ -816,10 +820,6 @@
     logsJumpToLine = marker.line ?? null;
   }
 
-  function trimLogs(raw: string) {
-    if (raw.length <= logsMaxChars) return raw;
-    return raw.slice(raw.length - logsMaxChars);
-  }
 
   function clearStreamReconnect(tabId: string) {
     const timer = logsStreamReconnectTimers.get(tabId);
@@ -862,16 +862,21 @@
     const timer = setTimeout(() => {
       logsStreamReconnectTimers.delete(tabId);
       if (!shouldKeepStreaming(tabId)) return;
-      void startFollowStreamForTab(tabId);
+      void startFollowStreamForTab(tabId, { resume: true });
     }, logsStreamReconnectMs);
     logsStreamReconnectTimers.set(tabId, timer);
   }
 
-  async function startFollowStreamForTab(tabId: string) {
+  async function startFollowStreamForTab(tabId: string, options: { resume?: boolean } = {}) {
     if (!data?.slug) return;
     const tab = getLogsTab(tabId);
     if (!tab || !tab.logsLive || tab.logsMode !== "stream-f") return;
     const token = bumpStreamToken(tabId);
+    // A fresh stream repeats the --tail the first load showed, so its first chunk
+    // replaces the text. A reconnect resumes with --since and appends without the
+    // overlap, keeping the text above and the reader's place.
+    const sinceArg = options.resume ? resumeSinceArg(tab.logsText, tab.logsUpdatedAt) : null;
+    const mergeChunk = createStreamChunkMerger({ resume: sinceArg !== null });
     await stopStreamForTab(tabId, false);
     updateLogsTab(tabId, (current) => ({ ...current, logsLoading: true, logsError: null }));
     const args = [
@@ -887,6 +892,7 @@
       "-f",
     ];
     if (tab.logsPrevious) args.push("--previous");
+    applyResumeArgs(args, sinceArg);
     if (tab.logsSelectedContainer !== "all-containers") args.push("-c", tab.logsSelectedContainer);
     try {
       const process = await openStreamWithOptionalFallback(() =>
@@ -897,7 +903,7 @@
               ...current,
               logsLoading: false,
               logsError: null,
-              logsText: trimLogs(`${current.logsText}${chunk}`),
+              logsText: mergeChunk(current.logsText, chunk),
               logsUpdatedAt: Date.now(),
             }));
           },
@@ -1047,7 +1053,7 @@
           logsError: null,
           logsLoading: false,
           logsLive: true,
-          logsMode: "poll",
+          logsMode: "stream-f",
           logsUpdatedAt: null,
           logsPrevious: false,
           logsContainerOptions: ["all-containers", ...containers],

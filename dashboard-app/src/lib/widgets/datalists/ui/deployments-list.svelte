@@ -87,6 +87,11 @@
     loadRolloutCommandOutput,
     type RolloutCommandMode,
   } from "./common/workload-rollout";
+  import {
+    applyResumeArgs,
+    createStreamChunkMerger,
+    resumeSinceArg,
+  } from "./common/log-stream-merge";
   import ResourceLogsSheet from "./common/resource-logs-sheet.svelte";
   import ResourceYamlSheet from "./common/resource-yaml-sheet.svelte";
   import { buildYamlFilename } from "$features/pods-workbench";
@@ -990,12 +995,12 @@
     const timer = setTimeout(() => {
       logsStreamReconnectTimers.delete(tabId);
       if (!shouldKeepStreaming(tabId)) return;
-      void startFollowStreamForTab(tabId);
+      void startFollowStreamForTab(tabId, { resume: true });
     }, logsStreamReconnectMs);
     logsStreamReconnectTimers.set(tabId, timer);
   }
 
-  async function startFollowStreamForTab(tabId: string) {
+  async function startFollowStreamForTab(tabId: string, options: { resume?: boolean } = {}) {
     if (!data?.slug) return;
     const tab = getLogsTab(tabId);
     if (!tab || !tab.logsLive || tab.logsMode !== "stream-f") return;
@@ -1003,6 +1008,11 @@
     if (!deployment) return;
 
     const token = bumpStreamToken(tabId);
+    // A fresh stream repeats the --tail the first load showed, so its first chunk
+    // replaces the text. A reconnect resumes with --since and appends without the
+    // overlap, keeping the text above and the reader's place.
+    const sinceArg = options.resume ? resumeSinceArg(tab.logsText, tab.logsUpdatedAt) : null;
+    const mergeChunk = createStreamChunkMerger({ resume: sinceArg !== null });
     await stopStreamForTab(tabId, false);
     updateLogsTab(tabId, (current) => ({ ...current, logsLoading: true, logsError: null }));
     const args = buildDeploymentLogsArgs(deployment, {
@@ -1011,6 +1021,7 @@
       previous: tab.logsPrevious,
     });
     if (!args) return;
+    applyResumeArgs(args, sinceArg);
     const namespace = deployment.metadata?.namespace ?? "default";
     const streamHandlers = {
       onStdoutData: (chunk: string) => {
@@ -1018,7 +1029,7 @@
         if (!chunk) return;
         updateLogsTab(tabId, (current) => ({
           ...current,
-          logsText: `${current.logsText}${chunk}`,
+          logsText: mergeChunk(current.logsText, chunk),
           logsUpdatedAt: Date.now(),
           logsLoading: false,
           logsError: null,
@@ -1067,6 +1078,7 @@
             container: tab.logsSelectedContainer,
             previous: tab.logsPrevious,
           });
+          applyResumeArgs(fallbackArgs, sinceArg);
           return await openStream(fallbackArgs);
         },
       );
@@ -1118,7 +1130,7 @@
           logsError: null,
           logsLoading: false,
           logsLive: true,
-          logsMode: "poll",
+          logsMode: "stream-f",
           logsUpdatedAt: null,
           logsPrevious: false,
           logsContainerOptions: ["__all__"],

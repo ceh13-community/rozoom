@@ -56,6 +56,11 @@
   import FileDown from "@lucide/svelte/icons/file-down";
   import * as Alert from "$shared/ui/alert";
   import { getTimeDifference, type DaemonSetItem } from "$shared";
+  import {
+    applyResumeArgs,
+    createStreamChunkMerger,
+    resumeSinceArg,
+  } from "./common/log-stream-merge";
   import ResourceLogsSheet from "./common/resource-logs-sheet.svelte";
   import ResourceYamlSheet from "./common/resource-yaml-sheet.svelte";
   import DataTable, { type DaemonSetsTableViewMode } from "./daemon-sets-list/data-table.svelte";
@@ -915,17 +920,22 @@
     const timer = setTimeout(() => {
       logsStreamReconnectTimers.delete(tabId);
       if (!shouldKeepStreaming(tabId)) return;
-      void startFollowStreamForTab(tabId);
+      void startFollowStreamForTab(tabId, { resume: true });
     }, 1_200);
     logsStreamReconnectTimers.set(tabId, timer);
   }
 
-  async function startFollowStreamForTab(tabId: string) {
+  async function startFollowStreamForTab(tabId: string, options: { resume?: boolean } = {}) {
     if (!data?.slug) return;
     const tab = getLogsTab(tabId);
     if (!tab || !tab.logsLive || tab.logsMode !== "stream-f") return;
 
     const token = bumpStreamToken(tabId);
+    // A fresh stream repeats the --tail the first load showed, so its first chunk
+    // replaces the text. A reconnect resumes with --since and appends without the
+    // overlap, keeping the text above and the reader's place.
+    const sinceArg = options.resume ? resumeSinceArg(tab.logsText, tab.logsUpdatedAt) : null;
+    const mergeChunk = createStreamChunkMerger({ resume: sinceArg !== null });
     await stopStreamForTab(tabId, false);
     updateLogsTab(tabId, (current) => ({ ...current, logsLoading: true, logsError: null }));
     const args = [
@@ -934,11 +944,14 @@
       "--namespace",
       tab.target.namespace,
       "--all-containers=true",
+      "--timestamps=true",
       "--tail=500",
-      "--request-timeout=8s",
+      // No request timeout flag here: it bounds the whole request, so a follow stream
+      // was cut every 8 s and reconnected.
       "--follow",
     ];
     if (tab.logsPrevious) args.push("--previous");
+    applyResumeArgs(args, sinceArg);
     if (tab.logsSelectedContainer !== "__all__") {
       args.push("-c", tab.logsSelectedContainer);
     }
@@ -949,7 +962,7 @@
         if (!chunk) return;
         updateLogsTab(tabId, (current) => ({
           ...current,
-          logsText: `${current.logsText}${chunk}`,
+          logsText: mergeChunk(current.logsText, chunk),
           logsUpdatedAt: Date.now(),
           logsLoading: false,
           logsError: null,
@@ -1469,6 +1482,7 @@
       "--namespace",
       tab.target.namespace,
       "--all-containers=true",
+      "--timestamps=true",
       "--tail=500",
       "--request-timeout=8s",
     ];
@@ -1517,7 +1531,7 @@
           logsError: null,
           logsLoading: false,
           logsLive: true,
-          logsMode: "poll",
+          logsMode: "stream-f",
           logsUpdatedAt: null,
           logsPrevious: false,
           logsContainerOptions: ["__all__"],
