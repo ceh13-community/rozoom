@@ -1,3 +1,5 @@
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { isTauriAvailable } from "$shared/lib/tauri-runtime";
 import { acquireKubeApiProxy, releaseKubeApiProxy } from "./kube-api-proxy";
 
 export type KubernetesListResponse<T> = {
@@ -31,6 +33,19 @@ type WatchResourceOptions<T> = {
   onEvent: (event: KubernetesWatchEvent<T>) => void;
 };
 
+/**
+ * Requests to the local kubectl proxy. From the desktop webview they are
+ * cross-origin (tauri://localhost to http://127.0.0.1:<port>) and kubectl proxy
+ * sends no CORS headers, so the webview's fetch rejected every list and watch
+ * and each list fell back to a kubectl watch after two failed attempts. The
+ * HTTP plugin sends them from the Rust side, where CORS does not apply; its
+ * scope already allows http://127.0.0.1:*. Outside the desktop runtime (tests,
+ * browser preview) the global fetch is used.
+ */
+function proxyFetch(url: string, init: RequestInit): Promise<Response> {
+  return isTauriAvailable() ? tauriFetch(url, init) : fetch(url, init);
+}
+
 function buildUrl(baseUrl: string, path: string, query?: URLSearchParams) {
   const suffix = query && Array.from(query.keys()).length > 0 ? `?${query.toString()}` : "";
   return `${baseUrl}${path}${suffix}`;
@@ -50,7 +65,7 @@ export async function listKubeResource<Item>(
 ): Promise<{ items: Item[]; resourceVersion: string }> {
   const proxy = await acquireKubeApiProxy(options.clusterId);
   try {
-    const response = await fetch(buildUrl(proxy.baseUrl, options.path), {
+    const response = await proxyFetch(buildUrl(proxy.baseUrl, options.path), {
       method: "GET",
       cache: "no-store",
       headers: { Accept: "application/json" },
@@ -88,7 +103,7 @@ export async function watchKubeResource<T>(options: WatchResourceOptions<T>) {
   }
 
   try {
-    const response = await fetch(buildUrl(proxy.baseUrl, options.path, query), {
+    const response = await proxyFetch(buildUrl(proxy.baseUrl, options.path, query), {
       method: "GET",
       cache: "no-store",
       headers: { Accept: "application/json" },
