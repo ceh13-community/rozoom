@@ -71,6 +71,43 @@ describe("summarizeKubectlMutation", () => {
   });
 });
 
+describe("values of flags the log does not know", () => {
+  it("never logs them, only the flag name", () => {
+    const text = summarizeKubectlMutation([
+      "create",
+      "secret",
+      "docker-registry",
+      "regcred",
+      "--docker-password",
+      "hunter2",
+      "--docker-username",
+      "me",
+      "-n",
+      "shop",
+    ]).text;
+    expect(text).toBe(
+      "create secret docker-registry regcred -n shop --docker-password --docker-username",
+    );
+    expect(text).not.toContain("hunter2");
+  });
+
+  it("does not take a flag value for a kind or a name", () => {
+    expect(summarizeKubectlMutation(["delete", "--cascade", "orphan", "deploy", "web"]).text).toBe(
+      "delete deployment web --cascade=orphan",
+    );
+  });
+
+  it("reads every kind/name target", () => {
+    expect(summarizeKubectlMutation(["delete", "pod/a", "service/b", "-n", "shop"])).toMatchObject({
+      text: "delete pod a service/b -n shop",
+      targets: [
+        { kind: "pod", name: "a" },
+        { kind: "service", name: "b" },
+      ],
+    });
+  });
+});
+
 describe("normalizeKind", () => {
   it.each([
     ["po", "pod"],
@@ -174,6 +211,26 @@ describe("action lines", () => {
     vi.advanceTimersByTime(FOLLOW_WINDOW_MS);
     expect(lines()).toEqual([
       "[action] deployment shop/api: no update in the open lists within 120s after rollout restart started (no watched list, a polled list, or the change is still running)",
+    ]);
+  });
+
+  it("follows each target of a command with its own kind", () => {
+    startKubectlMutation(["delete", "pod/a", "pod/b", "-n", "shop"], "c1", 0);
+    noteClusterEvent(podEvent("DELETED", "b"), 40);
+    noteClusterEvent(podEvent("DELETED", "a"), 50);
+    expect(lines()).toEqual([
+      "[action] pod shop/b: removed from the list 40ms after delete started",
+      "[action] pod shop/a: removed from the list 50ms after delete started",
+    ]);
+  });
+
+  it("writes a line for a command that never finished, and keeps following it", () => {
+    const started = startKubectlMutation(["delete", "pod", "web-1", "-n", "shop"], "c1", 0);
+    finishKubectlMutation(started, { code: null, stderr: "AbortError: aborted" }, 30);
+    noteClusterEvent(podEvent("DELETED", "web-1"), 900);
+    expect(lines()).toEqual([
+      '[action] kubectl delete pod web-1 -n shop cluster=c1 result=interrupted duration=30ms error="AbortError: aborted"',
+      "[action] pod shop/web-1: removed from the list 900ms after delete started",
     ]);
   });
 

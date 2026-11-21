@@ -33,6 +33,29 @@ const KIND_SHORT_NAMES: Record<string, string> = {
   ep: "endpoint",
 };
 
+/**
+ * Flags that take no value. Every other flag written without "=" takes the next argument
+ * as its value, and that value is never logged: an unknown flag cannot turn its value
+ * (a password, a token) into a logged name.
+ */
+const BOOLEAN_FLAGS = new Set([
+  "--all",
+  "--all-namespaces",
+  "-A",
+  "--force",
+  "--now",
+  "--overwrite",
+  "--ignore-not-found",
+  "--record",
+  "--local",
+  "--wait",
+  "--recursive",
+  "-R",
+  "--server-side",
+  "--force-conflicts",
+  "--prune",
+]);
+
 /** Flags whose value is logged; every other flag is logged by name only. */
 const FLAGS_WITH_SAFE_VALUE = new Set([
   "--replicas",
@@ -44,51 +67,27 @@ const FLAGS_WITH_SAFE_VALUE = new Set([
   "--to-revision",
   "--container",
   "-c",
+  "--timeout",
   "--force",
   "--all",
   "--all-namespaces",
-  "-A",
   "--overwrite",
-]);
-
-/** Flags that take the next argument as their value when written without "=". */
-const FLAGS_WITH_SEPARATE_VALUE = new Set([
-  "-n",
-  "--namespace",
-  "-l",
-  "--selector",
-  "-c",
-  "--container",
-  "-p",
-  "--patch",
-  "--type",
-  "-f",
-  "--filename",
-  "-o",
-  "--output",
-  "--from-literal",
-  "--from-file",
-  "--overrides",
-  "--image",
-  "--field-manager",
-  "--grace-period",
-  "--replicas",
-  "--to-revision",
-  "--timeout",
-  "--context",
-  "--kubeconfig",
 ]);
 
 /** `rollout restart`, `set image`: the subcommand belongs to the verb. */
 const VERBS_WITH_SUBCOMMAND = new Set(["rollout", "set"]);
 
+export type KubectlMutationTarget = { kind: string; name: string };
+
 export type KubectlMutationSummary = {
   /** The command as logged, for example `delete pod web-1 -n shop --wait=false`. */
   text: string;
   verb: string;
-  /** Watch kind (`pod`, `deployment`...), null when the command names no kind. */
+  /** Watch kind (`pod`, `deployment`...) of the first target, null when none is named. */
   kind: string | null;
   names: string[];
+  /** The named objects, each with its kind (`delete pod/a svc/b` names two kinds). */
+  targets: KubectlMutationTarget[];
   namespace: string | null;
 };
 
@@ -116,7 +115,7 @@ export function summarizeKubectlMutation(args: readonly string[]): KubectlMutati
   }
   const verb = verbParts.join(" ");
   let kind: string | null = null;
-  const names: string[] = [];
+  const targets: KubectlMutationTarget[] = [];
   let namespace: string | null = null;
   const flags: string[] = [];
 
@@ -126,9 +125,11 @@ export function summarizeKubectlMutation(args: readonly string[]): KubectlMutati
       const equals = arg.indexOf("=");
       const flag = equals === -1 ? arg : arg.slice(0, equals);
       let value: string | null = equals === -1 ? null : arg.slice(equals + 1);
-      if (value === null && FLAGS_WITH_SEPARATE_VALUE.has(flag) && index + 1 < args.length) {
+      const hasNext = index + 1 < args.length;
+      const next = hasNext ? (args[index + 1] ?? "") : "";
+      if (value === null && !BOOLEAN_FLAGS.has(flag) && hasNext && !next.startsWith("-")) {
         index += 1;
-        value = args[index] ?? null;
+        value = next;
       }
       if (flag === "-n" || flag === "--namespace") {
         namespace = value;
@@ -141,23 +142,36 @@ export function summarizeKubectlMutation(args: readonly string[]): KubectlMutati
     }
     // key=value positionals (`set env`, `label`, `annotate`) can carry secrets.
     if (arg.includes("=")) continue;
-    if (kind === null) {
-      const [rawKind = "", name] = arg.split("/", 2);
-      kind = normalizeKind(rawKind);
-      if (name) names.push(name);
-      continue;
+    const slash = arg.indexOf("/");
+    if (slash !== -1) {
+      const targetKind = normalizeKind(arg.slice(0, slash));
+      kind ??= targetKind;
+      const name = arg.slice(slash + 1);
+      if (name) targets.push({ kind: targetKind, name });
+    } else if (kind === null) {
+      kind = normalizeKind(arg);
+    } else {
+      targets.push({ kind, name: arg });
     }
-    names.push(arg);
   }
 
   const text = [
     verb,
     ...(kind ? [kind] : []),
-    ...names,
+    ...targets.map((target) =>
+      target.kind === kind ? target.name : `${target.kind}/${target.name}`,
+    ),
     ...(namespace ? ["-n", namespace] : []),
     ...flags,
   ].join(" ");
-  return { text, verb, kind, names, namespace };
+  return {
+    text,
+    verb,
+    kind,
+    names: targets.map((target) => target.name),
+    targets,
+    namespace,
+  };
 }
 
 type PendingFollow = {
@@ -208,29 +222,38 @@ export function startKubectlMutation(
 ): StartedKubectlMutation {
   const summary = summarizeKubectlMutation(args);
   const followKeys: string[] = [];
-  if (clusterId && summary.kind) {
-    for (const name of summary.names.slice(0, MAX_FOLLOWS_PER_COMMAND)) {
-      followKeys.push(follow(clusterId, summary, name, now));
+  if (clusterId) {
+    for (const target of summary.targets.slice(0, MAX_FOLLOWS_PER_COMMAND)) {
+      followKeys.push(follow(clusterId, summary, target, now));
     }
   }
   return { summary, clusterId, startedAt: now, followKeys };
 }
 
-/** One line for the finished command. A failed command's objects are no longer followed. */
+/**
+ * One line for the finished command. `code` is null when it never finished (aborted, or
+ * kubectl could not be started). The objects of a command that failed are no longer
+ * followed; an interrupted one may still have reached the cluster, so they stay followed.
+ */
 export function finishKubectlMutation(
   started: StartedKubectlMutation,
-  result: { code: number; stderr?: string },
+  result: { code: number | null; stderr?: string },
   now = Date.now(),
 ): string {
   const { summary } = started;
   const cluster = started.clusterId ? ` cluster=${started.clusterId}` : "";
   const duration = `duration=${now - started.startedAt}ms`;
-  const line =
-    result.code === 0
-      ? `[action] kubectl ${summary.text}${cluster} result=ok ${duration}`
-      : `[action] kubectl ${summary.text}${cluster} result=failed code=${result.code} ${duration} error="${firstLine(result.stderr ?? "")}"`;
+  const error = `error="${firstLine(result.stderr ?? "")}"`;
+  let line: string;
+  if (result.code === 0) {
+    line = `[action] kubectl ${summary.text}${cluster} result=ok ${duration}`;
+  } else if (result.code === null) {
+    line = `[action] kubectl ${summary.text}${cluster} result=interrupted ${duration} ${error}`;
+  } else {
+    line = `[action] kubectl ${summary.text}${cluster} result=failed code=${result.code} ${duration} ${error}`;
+  }
   void safeAppLog(result.code === 0 ? "info" : "warn", line);
-  if (result.code !== 0) {
+  if (result.code !== 0 && result.code !== null) {
     for (const key of started.followKeys) {
       const entry = pending.get(key);
       if (entry?.startedAt !== started.startedAt) continue;
@@ -257,10 +280,10 @@ export function logBlockedKubectlMutation(
 function follow(
   clusterId: string,
   summary: KubectlMutationSummary,
-  name: string,
+  target: KubectlMutationTarget,
   now: number,
 ): string {
-  const kind = summary.kind ?? "";
+  const { kind, name } = target;
   const key = followKey(clusterId, kind, name);
   const previous = pending.get(key);
   if (previous) clearTimeout(previous.timer);

@@ -418,7 +418,10 @@ export async function kubectlRawFront(
     isWatchCommand(splitArgs) ? "watch" : "exec",
     () => executeCommandWithAbort(command, options?.signal),
     options?.signal,
-  );
+  ).catch((error: unknown) => {
+    if (mutation) finishKubectlMutation(mutation, { code: null, stderr: String(error) });
+    throw error;
+  });
   reportExecOutcome(options, result);
   if (mutation) finishKubectlMutation(mutation, result);
 
@@ -529,7 +532,10 @@ export async function kubectlRawArgsFront(
       isWatchCommand(finalArgs) ? "watch" : "exec",
       () => executeCommandWithAbort(command, options?.signal),
       options?.signal,
-    );
+    ).catch((error: unknown) => {
+      if (mutation) finishKubectlMutation(mutation, { code: null, stderr: String(error) });
+      throw error;
+    });
     reportExecOutcome(options, result);
     if (mutation) finishKubectlMutation(mutation, result);
 
