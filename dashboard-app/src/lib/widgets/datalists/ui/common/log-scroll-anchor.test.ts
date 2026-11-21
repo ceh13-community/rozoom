@@ -45,11 +45,23 @@ describe("workload logs defaults", () => {
     "cron-jobs-list.svelte",
   ];
 
-  it.each(lists)("%s opens logs as a follow stream that replaces its first chunk", (file) => {
-    const source = readFileSync(resolve("src/lib/widgets/datalists/ui", file), "utf8");
-    expect(source).toContain('logsMode: "stream-f",');
-    expect(source).not.toContain('logsMode: "poll",');
-    expect(source).toContain("let replaceOnFirstChunk = true;");
-    expect(source).toMatch(/logsText: (trimLogs\()?replace \? chunk : /);
-  });
+  it.each(lists)(
+    "%s streams through the shared bounded merger and resumes on reconnect",
+    (file) => {
+      const source = readFileSync(resolve("src/lib/widgets/datalists/ui", file), "utf8");
+      expect(source).toContain('logsMode: "stream-f",');
+      expect(source).not.toContain('logsMode: "poll",');
+      // Every stream chunk goes through the merger, which trims to LOG_TEXT_MAX_CHARS.
+      expect(source).toContain("const mergeChunk = createStreamChunkMerger({ resume });");
+      expect(source).toContain("logsText: mergeChunk(current.logsText, chunk),");
+      expect(source).not.toMatch(/logsText: `\$\{current\.logsText\}\$\{chunk\}`/);
+      // A reconnect resumes with --since instead of replacing the text.
+      expect(source).toContain("void startFollowStreamForTab(tabId, { resume: true });");
+      expect(source).toContain("if (sinceArg) args.push(sinceArg);");
+      // A follow stream must not carry a request timeout: it cuts the stream.
+      const streamStart = source.indexOf("async function startFollowStreamForTab(");
+      const streamBody = source.slice(streamStart, source.indexOf("onStdoutData", streamStart));
+      expect(streamBody).not.toContain("--request-timeout");
+    },
+  );
 });

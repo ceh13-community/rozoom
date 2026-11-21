@@ -87,6 +87,10 @@
     loadRolloutCommandOutput,
     type RolloutCommandMode,
   } from "./common/workload-rollout";
+  import {
+    createStreamChunkMerger,
+    resumeSinceArg,
+  } from "./common/log-stream-merge";
   import ResourceLogsSheet from "./common/resource-logs-sheet.svelte";
   import ResourceYamlSheet from "./common/resource-yaml-sheet.svelte";
   import { buildYamlFilename } from "$features/pods-workbench";
@@ -990,12 +994,12 @@
     const timer = setTimeout(() => {
       logsStreamReconnectTimers.delete(tabId);
       if (!shouldKeepStreaming(tabId)) return;
-      void startFollowStreamForTab(tabId);
+      void startFollowStreamForTab(tabId, { resume: true });
     }, logsStreamReconnectMs);
     logsStreamReconnectTimers.set(tabId, timer);
   }
 
-  async function startFollowStreamForTab(tabId: string) {
+  async function startFollowStreamForTab(tabId: string, options: { resume?: boolean } = {}) {
     if (!data?.slug) return;
     const tab = getLogsTab(tabId);
     if (!tab || !tab.logsLive || tab.logsMode !== "stream-f") return;
@@ -1003,9 +1007,12 @@
     if (!deployment) return;
 
     const token = bumpStreamToken(tabId);
-    // The stream starts with the same --tail as a poll: its first chunk replaces
-    // the text instead of repeating it below (open, mode switch, reconnect).
-    let replaceOnFirstChunk = true;
+    // A fresh stream repeats the --tail the first load showed, so its first chunk
+    // replaces the text. A reconnect resumes with --since and appends without the
+    // overlap, keeping the text above and the reader's place.
+    const resume = Boolean(options.resume && tab.logsText);
+    const mergeChunk = createStreamChunkMerger({ resume });
+    const sinceArg = resume ? resumeSinceArg(tab.logsUpdatedAt) : null;
     await stopStreamForTab(tabId, false);
     updateLogsTab(tabId, (current) => ({ ...current, logsLoading: true, logsError: null }));
     const args = buildDeploymentLogsArgs(deployment, {
@@ -1014,16 +1021,15 @@
       previous: tab.logsPrevious,
     });
     if (!args) return;
+    if (sinceArg) args.push(sinceArg);
     const namespace = deployment.metadata?.namespace ?? "default";
     const streamHandlers = {
       onStdoutData: (chunk: string) => {
         if (logsStreamTokens.get(tabId) !== token) return;
         if (!chunk) return;
-        const replace = replaceOnFirstChunk;
-        replaceOnFirstChunk = false;
         updateLogsTab(tabId, (current) => ({
           ...current,
-          logsText: replace ? chunk : `${current.logsText}${chunk}`,
+          logsText: mergeChunk(current.logsText, chunk),
           logsUpdatedAt: Date.now(),
           logsLoading: false,
           logsError: null,
@@ -1072,6 +1078,7 @@
             container: tab.logsSelectedContainer,
             previous: tab.logsPrevious,
           });
+          if (sinceArg) fallbackArgs.push(sinceArg);
           return await openStream(fallbackArgs);
         },
       );
