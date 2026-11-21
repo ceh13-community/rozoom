@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, onMount, tick } from "svelte";
+  import { onDestroy, onMount, tick, untrack } from "svelte";
   import { writable } from "svelte/store";
   import { load as parseYaml, YAMLException } from "js-yaml";
   import GitCompareArrows from "@lucide/svelte/icons/git-compare-arrows";
@@ -23,6 +23,10 @@
     type KubectlStreamProcess,
   } from "$shared/api/kubectl-proxy";
   import PodWorkbenchPane from "./pod-workbench-pane.svelte";
+  import { activePortForwards, stopPortForward } from "$shared/api/port-forward";
+  import { popOutPortForwardPreview, withRefreshNonce } from "$shared/lib/port-forward-preview";
+  import { openExternalUrl } from "$shared/api/in-app-browser";
+  import { confirmAction } from "$shared/lib/confirm-action";
   import { buildPodLogsArgs } from "./pod-actions";
   import type { PodMetricsValue } from "./model/pod-row-adapter";
   import { dashboardDataProfile } from "$shared/lib/dashboard-data-profile.svelte";
@@ -44,12 +48,16 @@
 
   export type WorkbenchOpenRequest = {
     token: number;
-    kind: "logs" | "yaml" | "events" | "investigate";
+    kind: "logs" | "yaml" | "events" | "investigate" | "port-forward";
     podUid: string;
     logsPrevious?: boolean;
+    /** Key of the running forward to show, for kind "port-forward". */
+    portForwardKey?: string;
   } | null;
 
-  type WorkbenchTabKind = "logs" | "yaml" | "events";
+  type WorkbenchTabKind = "logs" | "yaml" | "events" | "port-forward";
+  /** Kinds saved with the workbench and offered by Undo; port-forward tabs are neither. */
+  type SavedTabKind = Exclude<WorkbenchTabKind, "port-forward">;
   type WorkbenchTab = {
     id: string;
     kind: WorkbenchTabKind;
@@ -94,6 +102,20 @@
     focusedEventIndex: number | null;
   };
 
+  // A port-forward tab shows a forward that runs in the shared port-forward store, like a
+  // Service port-forward tab: it is not saved with the workbench, it closes when the forward
+  // stops, and closing it stops the forward.
+  type PortForwardTabState = {
+    id: string;
+    podRef: string;
+    podUid: string;
+    uniqueKey: string;
+    url: string;
+    message: string | null;
+    loading: boolean;
+    stopping: boolean;
+  };
+
   interface PodWorkbenchPanelProps {
     clusterId: string;
     podsByUid: Map<string, Partial<PodItem>>;
@@ -131,6 +153,7 @@
   let logsTabs = $state<LogsTabState[]>([]);
   let yamlTabs = $state<YamlTabState[]>([]);
   let eventsTabs = $state<EventsTabState[]>([]);
+  let portForwardTabs = $state<PortForwardTabState[]>([]);
   let pendingWorkbenchState = $state<PersistedPodsWorkbenchState | null | undefined>(undefined);
   let lastRequestToken = $state<number | null>(null);
   let revealToken = $state<number | null>(null);
@@ -190,11 +213,11 @@
 
   function parseWorkbenchTabId(
     tabId: string,
-  ): { kind: WorkbenchTabKind; namespace: string; name: string } | null {
+  ): { kind: SavedTabKind; namespace: string; name: string } | null {
     const match = /^(logs|yaml|events):([^/]+)\/(.+)$/.exec(tabId);
     if (!match) return null;
     return {
-      kind: match[1] as WorkbenchTabKind,
+      kind: match[1] as SavedTabKind,
       namespace: match[2],
       name: match[3],
     };
@@ -383,6 +406,10 @@
       const yamlTab = getPaneYamlTab(paneIndex);
       return yamlTab ? { ...yamlTab, kind: "yaml" as const } : null;
     }
+    if (paneTab.kind === "port-forward") {
+      const portForwardTab = portForwardTabs.find((tab) => tab.id === paneTab.id) ?? null;
+      return portForwardTab ? { ...portForwardTab, kind: "port-forward" as const } : null;
+    }
     const eventsTab = getPaneEventsTab(paneIndex);
     return eventsTab ? { ...eventsTab, kind: "events" as const } : null;
   }
@@ -569,7 +596,9 @@
 
   async function closeWorkbenchTab(tabId: string) {
     const closingTab = workbenchTabs.find((tab) => tab.id === tabId) ?? null;
-    let closeTarget: (WorkbenchTab & { hasUnsavedChanges: boolean }) | null = null;
+    let closeTarget:
+      | (WorkbenchTab & { hasUnsavedChanges: boolean; stopsPortForward: boolean })
+      | null = null;
     if (closingTab) {
       const yamlTab =
         closingTab.kind === "yaml" ? (yamlTabs.find((tab) => tab.id === tabId) ?? null) : null;
@@ -578,6 +607,7 @@
         hasUnsavedChanges: hasUnsavedYaml(
           yamlTab ? { yamlText: yamlTab.yamlText, yamlOriginalText: yamlTab.originalYamlText } : null,
         ),
+        stopsPortForward: closingTab.kind === "port-forward",
       };
       const confirmed = await confirmWorkbenchTabClose(closeTarget);
       if (!confirmed) return;
@@ -610,6 +640,13 @@
     logsTabs = logsTabs.filter((tab) => tab.id !== tabId);
     yamlTabs = yamlTabs.filter((tab) => tab.id !== tabId);
     eventsTabs = eventsTabs.filter((tab) => tab.id !== tabId);
+    const closingPortForward = portForwardTabs.find((tab) => tab.id === tabId) ?? null;
+    portForwardTabs = portForwardTabs.filter((tab) => tab.id !== tabId);
+    if (closingPortForward && $activePortForwards[closingPortForward.uniqueKey]?.isRunning) {
+      await stopPortForward(closingPortForward.uniqueKey).catch((error: unknown) => {
+        onError(error instanceof Error ? error.message : "Failed to stop port-forward.");
+      });
+    }
     pinnedTabIds = new Set([...pinnedTabIds].filter((id) => id !== tabId));
     paneTabIds = paneTabIds.map((paneTabId) => (paneTabId === tabId ? null : paneTabId)) as [
       string | null,
@@ -927,6 +964,119 @@
     }
   }
 
+  function portForwardMessage(uniqueKey: string) {
+    const forward = $activePortForwards[uniqueKey];
+    if (!forward) return null;
+    return forward.lastError ?? `Forwarding ${forward.localPort}:${forward.remotePort}`;
+  }
+
+  function openPortForwardForPod(pod: Partial<PodItem>, uniqueKey: string | undefined) {
+    const forward = uniqueKey ? $activePortForwards[uniqueKey] : undefined;
+    if (!uniqueKey || !forward) return;
+    const tabId = getTabId("port-forward", pod);
+    const podRef = `${pod.metadata?.namespace ?? "default"}/${pod.metadata?.name ?? "unknown"}`;
+    const podUid = pod.metadata?.uid ?? podRef;
+    const scheme = forward.remotePort === 443 || forward.remotePort === 8443 ? "https" : "http";
+    const next: PortForwardTabState = {
+      id: tabId,
+      podRef,
+      podUid,
+      uniqueKey,
+      url: `${scheme}://127.0.0.1:${forward.localPort}`,
+      message: portForwardMessage(uniqueKey),
+      loading: false,
+      stopping: false,
+    };
+    portForwardTabs = portForwardTabs.some((tab) => tab.id === tabId)
+      ? portForwardTabs.map((tab) => (tab.id === tabId ? next : tab))
+      : [...portForwardTabs, next];
+    upsertWorkbenchTab({
+      id: tabId,
+      kind: "port-forward",
+      title: pod.metadata?.name ?? "unknown",
+      subtitle: `port-forward ${forward.localPort}:${forward.remotePort}`,
+      podUid,
+    });
+  }
+
+  function getPortForwardTab(tabId: string) {
+    return portForwardTabs.find((tab) => tab.id === tabId) ?? null;
+  }
+
+  const portForwardActions = {
+    copyUrl(tabId: string) {
+      const tab = getPortForwardTab(tabId);
+      if (!tab || typeof navigator === "undefined" || !navigator.clipboard?.writeText) return;
+      void navigator.clipboard.writeText(tab.url).then(() => {
+        onMessage(`Copied URL: ${tab.url}`);
+      });
+    },
+    openWeb(tabId: string) {
+      const tab = getPortForwardTab(tabId);
+      if (tab) void popOutPortForwardPreview(tab.url);
+    },
+    openExternal(tabId: string) {
+      const tab = getPortForwardTab(tabId);
+      if (tab) void openExternalUrl(tab.url);
+    },
+    refresh(tabId: string) {
+      portForwardTabs = portForwardTabs.map((tab) =>
+        tab.id === tabId ? { ...tab, url: withRefreshNonce(tab.url) } : tab,
+      );
+    },
+    stop(tabId: string) {
+      void stopPortForwardTab(tabId);
+    },
+  };
+
+  async function stopPortForwardTab(tabId: string) {
+    const tab = getPortForwardTab(tabId);
+    if (!tab || tab.stopping) return;
+    const confirmed = await confirmAction("Stop this port-forward?", "Stop port-forward");
+    if (!confirmed) return;
+    portForwardTabs = portForwardTabs.map((entry) =>
+      entry.id === tabId ? { ...entry, stopping: true, message: "Stopping port-forward..." } : entry,
+    );
+    try {
+      await stopPortForward(tab.uniqueKey);
+      onMessage("Port-forward stopped.");
+    } catch (error) {
+      portForwardTabs = portForwardTabs.map((entry) =>
+        entry.id === tabId ? { ...entry, stopping: false, message: "Failed to stop." } : entry,
+      );
+      onError(error instanceof Error ? error.message : "Failed to stop port-forward.");
+    }
+  }
+
+  // Follow the shared store: the tab shows kubectl's state and goes away when the forward
+  // stops, whether from this tab, Network > Port Forwarding or kubectl exiting.
+  $effect(() => {
+    const forwards = $activePortForwards;
+    if (portForwardTabs.length === 0) return;
+    const gone = portForwardTabs.filter((tab) => !forwards[tab.uniqueKey]?.isRunning);
+    const kept = portForwardTabs.filter((tab) => forwards[tab.uniqueKey]?.isRunning);
+    const updated = kept.map((tab) => {
+      const message = portForwardMessage(tab.uniqueKey);
+      return message === tab.message || tab.stopping ? tab : { ...tab, message };
+    });
+    if (gone.length === 0 && updated.every((tab, index) => tab === kept[index])) return;
+    untrack(() => {
+      portForwardTabs = updated;
+      if (gone.length === 0) return;
+      const goneIds = new Set(gone.map((tab) => tab.id));
+      workbenchTabs = workbenchTabs.filter((tab) => !goneIds.has(tab.id));
+      pinnedTabIds = new Set([...pinnedTabIds].filter((id) => !goneIds.has(id)));
+      paneTabIds = paneTabIds.map((id) => (id && goneIds.has(id) ? null : id)) as [
+        string | null,
+        string | null,
+        string | null,
+      ];
+      if (activeWorkbenchTabId && goneIds.has(activeWorkbenchTabId)) {
+        activeWorkbenchTabId = workbenchTabs[0]?.id ?? null;
+      }
+    });
+  });
+
   async function openInvestigateForPod(pod: Partial<PodItem>) {
     const namespace = pod.metadata?.namespace ?? "default";
     const name = pod.metadata?.name ?? "unknown";
@@ -984,7 +1134,7 @@
     const recovered = recoverWorkbenchTabs({
       currentTabs: workbenchTabs,
       candidates: state.tabs
-        .map((tab) => {
+        .map((tab): WorkbenchTab | null => {
           const pod = Array.from(podsByUid.values()).find(
             (entry) =>
               entry.metadata?.name === tab.name && entry.metadata?.namespace === tab.namespace,
@@ -1059,7 +1209,9 @@
           ? openYamlForPod(pod)
           : request.kind === "events"
             ? openEventsForPod(pod)
-            : openInvestigateForPod(pod);
+            : request.kind === "port-forward"
+              ? Promise.resolve(openPortForwardForPod(pod, request.portForwardKey))
+              : openInvestigateForPod(pod);
     // Reveal once the tab exists, on every request, also when the tab was already active.
     void opened.finally(() => {
       revealToken = token;
@@ -1224,6 +1376,7 @@
                     {scheduleLogsPolling}
                     {startFollowStreamForTab}
                     {stopLogsRuntime}
+                    {portForwardActions}
                     onLogsJumpHandled={() => {
                       if (
                         renderablePaneTab.kind === "logs" &&
@@ -1279,6 +1432,7 @@
                       {scheduleLogsPolling}
                       {startFollowStreamForTab}
                       {stopLogsRuntime}
+                    {portForwardActions}
                       onLogsJumpHandled={() => {
                         if (
                           renderablePaneTab.kind === "logs" &&

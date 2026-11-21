@@ -16,10 +16,15 @@
     runDebugDescribe,
     startPodNetworkDebugSession,
   } from "$features/resource-debug-runtime";
-  import PortForwardPanel, {
-    type PortForwardPanelRequest,
-  } from "../common/port-forward-panel.svelte";
-  import { podPortForwardTarget } from "../common/model/port-forward-target";
+  import { startPortForward, usedLocalPorts } from "$shared/api/port-forward";
+  import PortForwardDialog, { type PortForwardChoice } from "../common/port-forward-dialog.svelte";
+  import {
+    podPortForwardTarget,
+    portForwardKey,
+    portForwardResource,
+    type PortForwardTarget,
+  } from "../common/model/port-forward-target";
+  import { popOutPortForwardPreview } from "$shared/lib/port-forward-preview";
   import {
     destroyPodsSync,
     initPodsSync,
@@ -127,6 +132,9 @@
   let detailsOpen = writable(false);
   let workbenchRequest = $state<WorkbenchOpenRequest>(null);
   let workbenchRequestToken = 0;
+  let portForwardDialogPod = $state<Partial<PodItem> | null>(null);
+  let portForwardDialogTarget = $state<PortForwardTarget | null>(null);
+  let portForwardDialogUsedPorts = $state<ReadonlySet<number>>(new Set());
   let previewWorkbenchFallback = $state<{ title: string } | null>(null);
   let metricsRefreshToken = $state(0);
   let podsMetricsLoading = $state(false);
@@ -291,9 +299,6 @@
     return buildMetricsRecommendationText(metricsSourceChecks ?? undefined, "pods");
   });
   const podMetricsSourcesHref = $derived(buildMetricsSourcesHref(data.slug));
-
-  let portForwardRequest = $state<PortForwardPanelRequest>(null);
-  let portForwardRequestToken = 0;
 
   function showActionSuccess(message: string) {
     toast.success(message);
@@ -715,14 +720,44 @@
     await navigator.clipboard.writeText(value);
   }
 
-  // Same dialog and panel as Services: pick a declared container port or type one (a pod
-  // without containerPort can be forwarded too), then Copy URL / Open Web / Stop in place.
+  // Same flow as a Service: the in-app dialog picks the ports (a pod without containerPort
+  // gets a typed port), then the workbench shows the forward in a port-forward tab with
+  // Copy URL, Open Web, Open external and Stop.
   function handlePortForward(pod: Partial<PodItem>) {
-    portForwardRequestToken += 1;
-    portForwardRequest = {
-      token: portForwardRequestToken,
-      target: podPortForwardTarget(pod as Record<string, unknown>),
+    if (!isTauriAvailable()) {
+      toast.error("Port-forward is available only in the desktop app.");
+      return;
+    }
+    portForwardDialogPod = pod;
+    portForwardDialogTarget = podPortForwardTarget(pod as Record<string, unknown>);
+    portForwardDialogUsedPorts = usedLocalPorts();
+  }
+
+  async function startPodPortForward(pod: Partial<PodItem>, choice: PortForwardChoice) {
+    const target = podPortForwardTarget(pod as Record<string, unknown>);
+    const uniqueKey = portForwardKey(data.slug, target, choice.localPort, choice.remotePort);
+    const result = await startPortForward({
+      namespace: target.namespace,
+      resource: portForwardResource(target),
+      remotePort: choice.remotePort,
+      localPort: choice.localPort,
+      clusterId: data.slug,
+      uniqueKey,
+    });
+    if (!result.success) {
+      toast.error(result.error ?? "Failed to start port-forward.");
+      return;
+    }
+    workbenchRequestToken += 1;
+    workbenchRequest = {
+      token: workbenchRequestToken,
+      kind: "port-forward",
+      podUid: getPodUid(pod),
+      portForwardKey: uniqueKey,
     };
+    if (choice.openWeb) {
+      void popOutPortForwardPreview(`${choice.scheme}://127.0.0.1:${choice.localPort}`);
+    }
   }
 
   async function copyDescribeCommand(pod: Partial<PodItem>) {
@@ -1389,11 +1424,20 @@
     }}
   />
 
-  <PortForwardPanel
-    clusterId={data.slug}
-    request={portForwardRequest}
-    onMessage={showActionSuccess}
-    onError={showActionError}
+  <PortForwardDialog
+    open={portForwardDialogTarget !== null}
+    target={portForwardDialogTarget}
+    usedLocalPorts={portForwardDialogUsedPorts}
+    onCancel={() => {
+      portForwardDialogPod = null;
+      portForwardDialogTarget = null;
+    }}
+    onConfirm={(choice) => {
+      const pod = portForwardDialogPod;
+      portForwardDialogPod = null;
+      portForwardDialogTarget = null;
+      if (pod) void startPodPortForward(pod, choice);
+    }}
   />
 
   <PodMetricsBoundary

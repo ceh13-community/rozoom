@@ -230,8 +230,8 @@ describe("port-forward", () => {
 
       expect(result).toEqual({ success: true });
       const forward = get(activePortForwards)[mockUniqueKey];
-      expect(forward.lastError ?? null).toBeNull();
-      expect(forward.lastMessage).toBe("Forwarding from 127.0.0.1:19100 -> 9100");
+      expect(forward?.lastError ?? null).toBeNull();
+      expect(forward?.lastMessage).toBe("Forwarding from 127.0.0.1:19100 -> 9100");
       vi.useFakeTimers();
     });
 
