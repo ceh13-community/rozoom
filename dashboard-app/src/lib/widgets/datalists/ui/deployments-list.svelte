@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
@@ -434,16 +435,17 @@
             if (deployment) openSheet(deployment);
           },
           onLogs: () => {
-            if (deployment) void openLogsForDeployment(deployment);
+            if (deployment) void workbenchReveal.after(openLogsForDeployment(deployment));
           },
           onEvents: () => {
-            if (deployment) void openEventsForDeployment(deployment);
+            if (deployment) void workbenchReveal.after(openEventsForDeployment(deployment));
           },
           onEditYaml: () => {
-            if (deployment) void openYamlForDeployment(deployment);
+            if (deployment) void workbenchReveal.after(openYamlForDeployment(deployment));
           },
           onInvestigate: () => {
-            if (deployment) void openDeploymentInvestigationWorkspace(deployment);
+            if (deployment)
+              void workbenchReveal.after(openDeploymentInvestigationWorkspace(deployment));
           },
           onScale: () => {
             if (deployment) openScaleDialog([deployment]);
@@ -455,10 +457,12 @@
             if (deployment) openDebugDescribeForDeployment(deployment);
           },
           onRolloutStatus: () => {
-            if (deployment) void openRolloutCommandForDeployment("status", deployment);
+            if (deployment)
+              void workbenchReveal.after(openRolloutCommandForDeployment("status", deployment));
           },
           onRolloutHistory: () => {
-            if (deployment) void openRolloutCommandForDeployment("history", deployment);
+            if (deployment)
+              void workbenchReveal.after(openRolloutCommandForDeployment("history", deployment));
           },
           onDownloadYaml: () => {
             if (deployment) void downloadYamlForDeployments([deployment]);
@@ -3102,6 +3106,9 @@
       return watcherEnabled;
     },
   });
+
+  // Row actions reveal the workbench and focus it, as in Pods.
+  const workbenchReveal = createWorkbenchReveal();
 </script>
 
 <svelte:window onkeydown={handleWindowKeydown} />
@@ -3149,6 +3156,7 @@
   {/if}
   {#if hasWorkbenchTabs}
     <MultiPaneWorkbench
+      revealToken={workbenchReveal.token}
       tabs={orderedWorkbenchTabs}
       {paneTabIds}
       activeTabId={activeWorkbenchTabId}
@@ -3775,22 +3783,22 @@
           onLogs={() => {
             const selected = getSelectedDeployments();
             if (selected.length !== 1) return;
-            void openLogsForDeployment(selected[0]);
+            void workbenchReveal.after(openLogsForDeployment(selected[0]));
           }}
           onEvents={() => {
             const selected = getSelectedDeployments();
             if (selected.length !== 1) return;
-            void openEventsForDeployment(selected[0]);
+            void workbenchReveal.after(openEventsForDeployment(selected[0]));
           }}
           onEditYaml={() => {
             const selected = getSelectedDeployments();
             if (selected.length !== 1) return;
-            void openYamlForDeployment(selected[0]);
+            void workbenchReveal.after(openYamlForDeployment(selected[0]));
           }}
           onInvestigate={() => {
             const selected = getSelectedDeployments();
             if (selected.length !== 1) return;
-            void openDeploymentInvestigationWorkspace(selected[0]);
+            void workbenchReveal.after(openDeploymentInvestigationWorkspace(selected[0]));
           }}
           onScale={() => {
             const selected = getSelectedDeployments();
@@ -3810,12 +3818,12 @@
           onRolloutStatus={() => {
             const selected = getSelectedDeployments();
             if (selected.length !== 1) return;
-            void openRolloutCommandForDeployment("status", selected[0]);
+            void workbenchReveal.after(openRolloutCommandForDeployment("status", selected[0]));
           }}
           onRolloutHistory={() => {
             const selected = getSelectedDeployments();
             if (selected.length !== 1) return;
-            void openRolloutCommandForDeployment("history", selected[0]);
+            void workbenchReveal.after(openRolloutCommandForDeployment("history", selected[0]));
           }}
           onDownloadYaml={() => {
             const selected = getSelectedDeployments();
@@ -3927,7 +3935,7 @@
             onClick: () => {
               const item = selectedItem;
               if (!item) return;
-              void runDetailsAction(() => openLogsForDeployment(item));
+              void runDetailsAction(() => workbenchReveal.after(openLogsForDeployment(item)));
             },
           },
           {
@@ -3938,7 +3946,7 @@
             onClick: () => {
               const item = selectedItem;
               if (!item) return;
-              void runDetailsAction(() => openEventsForDeployment(item));
+              void runDetailsAction(() => workbenchReveal.after(openEventsForDeployment(item)));
             },
           },
           {
@@ -3949,7 +3957,7 @@
             onClick: () => {
               const item = selectedItem;
               if (!item) return;
-              void runDetailsAction(() => openYamlForDeployment(item));
+              void runDetailsAction(() => workbenchReveal.after(openYamlForDeployment(item)));
             },
           },
           {
@@ -3960,7 +3968,9 @@
             onClick: () => {
               const item = selectedItem;
               if (!item) return;
-              void runDetailsAction(() => openDeploymentInvestigationWorkspace(item));
+              void runDetailsAction(() =>
+                workbenchReveal.after(openDeploymentInvestigationWorkspace(item)),
+              );
             },
           },
           {
@@ -4004,7 +4014,9 @@
             onClick: () => {
               const item = selectedItem;
               if (!item) return;
-              void runDetailsAction(() => openRolloutCommandForDeployment("status", item));
+              void runDetailsAction(() =>
+                workbenchReveal.after(openRolloutCommandForDeployment("status", item)),
+              );
             },
           },
           {
@@ -4015,7 +4027,9 @@
             onClick: () => {
               const item = selectedItem;
               if (!item) return;
-              void runDetailsAction(() => openRolloutCommandForDeployment("history", item));
+              void runDetailsAction(() =>
+                workbenchReveal.after(openRolloutCommandForDeployment("history", item)),
+              );
             },
           },
           {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
@@ -198,13 +199,13 @@
             if (cronJob) openSheet(cronJob);
           },
           onLogs: () => {
-            if (cronJob) void openLogsForCronJob(cronJob);
+            if (cronJob) void workbenchReveal.after(openLogsForCronJob(cronJob));
           },
           onEditYaml: () => {
-            if (cronJob) openYamlForCronJob(cronJob);
+            if (cronJob) void workbenchReveal.after(openYamlForCronJob(cronJob));
           },
           onInvestigate: () => {
-            if (cronJob) void openCronJobInvestigationWorkspace(cronJob);
+            if (cronJob) void workbenchReveal.after(openCronJobInvestigationWorkspace(cronJob));
           },
           onCopyDescribe: () => {
             if (cronJob) void copyDescribeCommandForCronJob(cronJob);
@@ -1963,6 +1964,9 @@
       return watcherEnabled;
     },
   });
+
+  // Row actions reveal the workbench and focus it, as in Pods.
+  const workbenchReveal = createWorkbenchReveal();
 </script>
 
 <div class="grid w-full grid-cols-1 overflow-visible">
@@ -2004,10 +2008,11 @@
       class={`overflow-hidden bg-card pointer-events-auto ${
         workbenchFullscreen
           ? "fixed inset-0 z-[120] mb-0 flex h-[100dvh] w-[100vw] flex-col rounded-none border-0 shadow-none"
-          : "relative z-[100] mb-4 rounded-lg border shadow-sm"
+          : "relative z-20 has-[[data-fullscreen-panel]]:z-[100] mb-4 scroll-mt-32 rounded-lg border shadow-sm"
       }`}
     >
       <MultiPaneWorkbench
+        revealToken={workbenchReveal.token}
         tabs={orderedWorkbenchTabs}
         {paneTabIds}
         activeTabId={activeWorkbenchTabId}
@@ -2330,15 +2335,15 @@
           }}
           onLogs={() => {
             if (selectedCronJobs.length !== 1) return;
-            void openLogsForCronJob(selectedCronJobs[0]);
+            void workbenchReveal.after(openLogsForCronJob(selectedCronJobs[0]));
           }}
           onEditYaml={() => {
             if (selectedCronJobs.length !== 1) return;
-            openYamlForCronJob(selectedCronJobs[0]);
+            void workbenchReveal.after(openYamlForCronJob(selectedCronJobs[0]));
           }}
           onInvestigate={() => {
             if (selectedCronJobs.length !== 1) return;
-            void openCronJobInvestigationWorkspace(selectedCronJobs[0]);
+            void workbenchReveal.after(openCronJobInvestigationWorkspace(selectedCronJobs[0]));
           }}
           onTrigger={() => {
             if (selectedCronJobs.length !== 1) return;
@@ -2442,7 +2447,7 @@
   eventsLoading={detailsLoading}
   eventsError={detailsError}
   onLogs={(item) => {
-    void openLogsForCronJob(item as unknown as CronJobItem);
+    void workbenchReveal.after(openLogsForCronJob(item as unknown as CronJobItem));
   }}
   onTrigger={(item) => {
     void triggerCronJobs([item as unknown as CronJobItem]);
@@ -2458,10 +2463,10 @@
     openDebugDescribeForCronJob(item as unknown as CronJobItem);
   }}
   onEditYaml={(item) => {
-    void openYamlForCronJob(item as unknown as CronJobItem);
+    void workbenchReveal.after(openYamlForCronJob(item as unknown as CronJobItem));
   }}
   onInvestigate={(item) => {
-    void openCronJobInvestigationWorkspace(item as unknown as CronJobItem);
+    void workbenchReveal.after(openCronJobInvestigationWorkspace(item as unknown as CronJobItem));
   }}
   onDownloadYaml={(item) => {
     void downloadYamlForCronJobs([item as unknown as CronJobItem]);

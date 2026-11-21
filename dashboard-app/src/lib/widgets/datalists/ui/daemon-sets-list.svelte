@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
@@ -441,16 +442,17 @@
             if (daemonSet) openSheet(daemonSet);
           },
           onLogs: () => {
-            if (daemonSet) void openLogsForDaemonSet(daemonSet);
+            if (daemonSet) void workbenchReveal.after(openLogsForDaemonSet(daemonSet));
           },
           onEvents: () => {
-            if (daemonSet) void openEventsForDaemonSet(daemonSet);
+            if (daemonSet) void workbenchReveal.after(openEventsForDaemonSet(daemonSet));
           },
           onEditYaml: () => {
-            if (daemonSet) void openYamlForDaemonSet(daemonSet);
+            if (daemonSet) void workbenchReveal.after(openYamlForDaemonSet(daemonSet));
           },
           onInvestigate: () => {
-            if (daemonSet) void openDaemonSetInvestigationWorkspace(daemonSet);
+            if (daemonSet)
+              void workbenchReveal.after(openDaemonSetInvestigationWorkspace(daemonSet));
           },
           onCopyDescribe: () => {
             if (daemonSet) void copyDescribeCommandForDaemonSet(daemonSet);
@@ -459,10 +461,12 @@
             if (daemonSet) openDebugDescribeForDaemonSet(daemonSet);
           },
           onRolloutStatus: () => {
-            if (daemonSet) void openRolloutCommandForDaemonSet("status", daemonSet);
+            if (daemonSet)
+              void workbenchReveal.after(openRolloutCommandForDaemonSet("status", daemonSet));
           },
           onRolloutHistory: () => {
-            if (daemonSet) void openRolloutCommandForDaemonSet("history", daemonSet);
+            if (daemonSet)
+              void workbenchReveal.after(openRolloutCommandForDaemonSet("history", daemonSet));
           },
           onRestart: () => {
             if (daemonSet) void restartDaemonSets([daemonSet]);
@@ -2558,6 +2562,9 @@
       return watcherEnabled;
     },
   });
+
+  // Row actions reveal the workbench and focus it, as in Pods.
+  const workbenchReveal = createWorkbenchReveal();
 </script>
 
 <svelte:window onkeydown={handleWindowKeydown} />
@@ -2607,10 +2614,11 @@
     class={`overflow-hidden bg-card pointer-events-auto ${
       workbenchFullscreen
         ? "fixed inset-0 z-[120] mb-0 flex h-[100dvh] w-[100vw] flex-col rounded-none border-0 shadow-none"
-        : "relative z-[100] mb-4 rounded-lg border shadow-sm"
+        : "relative z-20 has-[[data-fullscreen-panel]]:z-[100] mb-4 scroll-mt-32 rounded-lg border shadow-sm"
     }`}
   >
     <MultiPaneWorkbench
+      revealToken={workbenchReveal.token}
       tabs={orderedWorkbenchTabs}
       {paneTabIds}
       activeTabId={activeWorkbenchTabId}
@@ -3221,19 +3229,19 @@
         }}
         onLogs={() => {
           if (selectedDaemonSets.length !== 1) return;
-          void openLogsForDaemonSet(selectedDaemonSets[0]);
+          void workbenchReveal.after(openLogsForDaemonSet(selectedDaemonSets[0]));
         }}
         onEvents={() => {
           if (selectedDaemonSets.length !== 1) return;
-          void openEventsForDaemonSet(selectedDaemonSets[0]);
+          void workbenchReveal.after(openEventsForDaemonSet(selectedDaemonSets[0]));
         }}
         onEditYaml={() => {
           if (selectedDaemonSets.length !== 1) return;
-          void openYamlForDaemonSet(selectedDaemonSets[0]);
+          void workbenchReveal.after(openYamlForDaemonSet(selectedDaemonSets[0]));
         }}
         onInvestigate={() => {
           if (selectedDaemonSets.length !== 1) return;
-          void openDaemonSetInvestigationWorkspace(selectedDaemonSets[0]);
+          void workbenchReveal.after(openDaemonSetInvestigationWorkspace(selectedDaemonSets[0]));
         }}
         onCopyDescribe={() => {
           if (selectedDaemonSets.length !== 1) return;
@@ -3248,11 +3256,15 @@
         }}
         onRolloutStatus={() => {
           if (selectedDaemonSets.length !== 1) return;
-          void openRolloutCommandForDaemonSet("status", selectedDaemonSets[0]);
+          void workbenchReveal.after(
+            openRolloutCommandForDaemonSet("status", selectedDaemonSets[0]),
+          );
         }}
         onRolloutHistory={() => {
           if (selectedDaemonSets.length !== 1) return;
-          void openRolloutCommandForDaemonSet("history", selectedDaemonSets[0]);
+          void workbenchReveal.after(
+            openRolloutCommandForDaemonSet("history", selectedDaemonSets[0]),
+          );
         }}
         onRestart={() => {
           void restartDaemonSets(selectedDaemonSets);
@@ -3363,7 +3375,7 @@
             onClick: () => {
               const item = $selectedItem;
               if (!item) return;
-              void runDetailsAction(() => openLogsForDaemonSet(item));
+              void runDetailsAction(() => workbenchReveal.after(openLogsForDaemonSet(item)));
             },
           },
           {
@@ -3374,7 +3386,7 @@
             onClick: () => {
               const item = $selectedItem;
               if (!item) return;
-              void runDetailsAction(() => openEventsForDaemonSet(item));
+              void runDetailsAction(() => workbenchReveal.after(openEventsForDaemonSet(item)));
             },
           },
           {
@@ -3385,7 +3397,7 @@
             onClick: () => {
               const item = $selectedItem;
               if (!item) return;
-              void runDetailsAction(() => openYamlForDaemonSet(item));
+              void runDetailsAction(() => workbenchReveal.after(openYamlForDaemonSet(item)));
             },
           },
           {
@@ -3407,7 +3419,9 @@
             onClick: () => {
               const item = $selectedItem;
               if (!item) return;
-              void runDetailsAction(() => openRolloutCommandForDaemonSet("status", item));
+              void runDetailsAction(() =>
+                workbenchReveal.after(openRolloutCommandForDaemonSet("status", item)),
+              );
             },
           },
           {
@@ -3418,7 +3432,9 @@
             onClick: () => {
               const item = $selectedItem;
               if (!item) return;
-              void runDetailsAction(() => openRolloutCommandForDaemonSet("history", item));
+              void runDetailsAction(() =>
+                workbenchReveal.after(openRolloutCommandForDaemonSet("history", item)),
+              );
             },
           },
           {
@@ -3429,7 +3445,9 @@
             onClick: () => {
               const item = $selectedItem;
               if (!item) return;
-              void runDetailsAction(() => openDaemonSetInvestigationWorkspace(item));
+              void runDetailsAction(() =>
+                workbenchReveal.after(openDaemonSetInvestigationWorkspace(item)),
+              );
             },
           },
           {

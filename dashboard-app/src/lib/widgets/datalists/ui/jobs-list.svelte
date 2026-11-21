@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
@@ -194,13 +195,13 @@
             if (job) openSheet(job);
           },
           onLogs: () => {
-            if (job) openLogsForJob(job);
+            if (job) void workbenchReveal.after(openLogsForJob(job));
           },
           onEditYaml: () => {
-            if (job) openYamlForJob(job);
+            if (job) void workbenchReveal.after(openYamlForJob(job));
           },
           onInvestigate: () => {
-            if (job) openJobInvestigationWorkspace(job);
+            if (job) void workbenchReveal.after(openJobInvestigationWorkspace(job));
           },
           onCopyDescribe: () => {
             if (job) void copyDescribeCommandForJob(job);
@@ -1750,6 +1751,9 @@
       return watcherEnabled;
     },
   });
+
+  // Row actions reveal the workbench and focus it, as in Pods.
+  const workbenchReveal = createWorkbenchReveal();
 </script>
 
 <div class="grid w-full grid-cols-1 overflow-visible">
@@ -1791,10 +1795,11 @@
       class={`overflow-hidden bg-card pointer-events-auto ${
         workbenchFullscreen
           ? "fixed inset-0 z-[120] mb-0 flex h-[100dvh] w-[100vw] flex-col rounded-none border-0 shadow-none"
-          : "relative z-[100] mb-4 rounded-lg border shadow-sm"
+          : "relative z-20 has-[[data-fullscreen-panel]]:z-[100] mb-4 scroll-mt-32 rounded-lg border shadow-sm"
       }`}
     >
       <MultiPaneWorkbench
+        revealToken={workbenchReveal.token}
         tabs={orderedWorkbenchTabs}
         {paneTabIds}
         activeTabId={activeWorkbenchTabId}
@@ -2116,15 +2121,15 @@
           }}
           onLogs={() => {
             if (selectedJobs.length !== 1) return;
-            openLogsForJob(selectedJobs[0]);
+            void workbenchReveal.after(openLogsForJob(selectedJobs[0]));
           }}
           onEditYaml={() => {
             if (selectedJobs.length !== 1) return;
-            openYamlForJob(selectedJobs[0]);
+            void workbenchReveal.after(openYamlForJob(selectedJobs[0]));
           }}
           onInvestigate={() => {
             if (selectedJobs.length !== 1) return;
-            openJobInvestigationWorkspace(selectedJobs[0]);
+            void workbenchReveal.after(openJobInvestigationWorkspace(selectedJobs[0]));
           }}
           onCopyDescribe={() => {
             if (selectedJobs.length !== 1) return;
@@ -2219,13 +2224,13 @@
   eventsLoading={detailsLoading}
   eventsError={detailsError}
   onLogs={(item) => {
-    void openLogsForJob(item as unknown as JobItem);
+    void workbenchReveal.after(openLogsForJob(item as unknown as JobItem));
   }}
   onEditYaml={(item) => {
-    void openYamlForJob(item as unknown as JobItem);
+    void workbenchReveal.after(openYamlForJob(item as unknown as JobItem));
   }}
   onInvestigate={(item) => {
-    void openJobInvestigationWorkspace(item as unknown as JobItem);
+    void workbenchReveal.after(openJobInvestigationWorkspace(item as unknown as JobItem));
   }}
   onCopyDescribe={(item) => {
     void copyDescribeCommandForJob(item as unknown as JobItem);

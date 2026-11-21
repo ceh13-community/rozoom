@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from "svelte";
+  import { createMenuAction } from "../common/menu-action";
   import { Button } from "$shared/ui/button";
   import * as DropdownMenu from "$shared/ui/dropdown-menu";
   import { MoreVertical } from "$shared/ui/icons";
@@ -58,15 +58,24 @@
 
   let open = $state(false);
 
-  async function selectAction(callback: () => void) {
-    open = false;
-    await tick();
-    callback();
-  }
+  let triggerRef = $state<HTMLElement | null>(null);
+  // The action runs after the menu closed, so the menu's focus return cannot scroll the
+  // page back to the row after the action revealed its panel.
+  const menuAction = createMenuAction({
+    close: () => {
+      open = false;
+    },
+    getTrigger: () => triggerRef,
+  });
+  const selectAction = (callback: () => void) => menuAction.select(callback);
+
+  $effect(() => {
+    if (open) menuAction.reset();
+  });
 </script>
 
 <DropdownMenu.Root bind:open>
-  <DropdownMenu.Trigger>
+  <DropdownMenu.Trigger bind:ref={triggerRef}>
     <Button
       variant="ghost"
       size="icon"
@@ -77,7 +86,7 @@
       <MoreVertical class="h-4 w-4" />
     </Button>
   </DropdownMenu.Trigger>
-  <DropdownMenu.Content align="end" class="pt-0">
+  <DropdownMenu.Content align="end" class="pt-0" onCloseAutoFocus={menuAction.onCloseAutoFocus}>
     <DropdownMenu.Item onSelect={() => selectAction(onShowDetails)}>
       <Info class="mr-2 h-4 w-4" />
       Show details

@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { untrack } from "svelte";
+  import { revealListFilteredTo } from "$shared/lib/jump-reveal";
+  import { tick, untrack } from "svelte";
+  import { revealResult } from "$shared/lib/reveal-result";
   import {
     buildDependencyGraph,
     type DependencyGraph,
@@ -24,6 +26,16 @@
 
   let graph = $state<DependencyGraph | null>(null);
   let selectedNode = $state<GraphNode | null>(null);
+  let selectedDetailEl = $state<HTMLElement | null>(null);
+
+  // The details show under a grid that scrolls on its own, often below the screen. Bring
+  // them into view; focus stays on the node so arrow and Tab keys keep browsing the grid.
+  async function selectNode(node: GraphNode) {
+    selectedNode = selectedNode?.id === node.id ? null : node;
+    if (!selectedNode) return;
+    await tick();
+    if (selectedDetailEl) revealResult(selectedDetailEl, { focus: false });
+  }
   let filterKind = $state<string>("all");
   let filterText = $state("");
   // The scan starts as soon as the panel has a cluster: start in the loading state, so the
@@ -179,7 +191,8 @@
     );
   }
 
-  function jumpToWorkload(node: GraphNode) {
+  // Lands on the list filtered to that resource, with the filter focused.
+  async function jumpToWorkload(node: GraphNode) {
     const params = new URLSearchParams($page.url.search);
     const map: Record<string, string> = {
       Deployment: "deployments",
@@ -202,7 +215,8 @@
       return;
     }
     params.set("workload", workload);
-    void goto(`?${params.toString()}`, { keepFocus: false });
+    await goto(`?${params.toString()}`, { keepFocus: false });
+    await revealListFilteredTo(node.name);
   }
 
   const kindIcons: Record<string, string> = {
@@ -431,7 +445,7 @@
             ] ?? 'bg-slate-500/20 border-slate-500/40 text-slate-300'} {selectedNode?.id === node.id
               ? 'ring-1 ring-indigo-400'
               : ''}"
-            onclick={() => (selectedNode = selectedNode?.id === node.id ? null : node)}
+            onclick={() => void selectNode(node)}
           >
             <div class="flex items-center gap-1.5">
               <span class="text-[9px] font-bold opacity-60 w-4">{kindIcons[node.kind] ?? "?"}</span>
@@ -451,7 +465,11 @@
 
       <!-- Selected node detail -->
       {#if selectedNode}
-        <div class="rounded-lg border border-indigo-500/30 bg-indigo-950/20 p-3 space-y-1.5">
+        <div
+          bind:this={selectedDetailEl}
+          aria-live="polite"
+          class="scroll-mt-32 rounded-lg border border-indigo-500/30 bg-indigo-950/20 p-3 space-y-1.5"
+        >
           <div class="flex items-center gap-2">
             <span class="text-xs font-semibold text-indigo-300"
               >{selectedNode.kind}/{selectedNode.name}</span
@@ -475,7 +493,7 @@
               {@const sel = selectedNode}
               <button
                 class="text-[10px] rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-700/40"
-                onclick={() => jumpToWorkload(sel)}>Jump to {sel.kind} page</button
+                onclick={() => void jumpToWorkload(sel)}>Jump to {sel.kind} page</button
               >
               <button
                 class="text-[10px] rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-700/40"
