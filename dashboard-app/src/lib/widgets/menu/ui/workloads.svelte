@@ -1,4 +1,7 @@
 <script lang="ts">
+  // Not a native title: WebKitGTK kept that tooltip on screen after the click until the
+  // mouse moved, over the page the click opened.
+  import { hint } from "$shared/lib/hint";
   import { browser } from "$app/environment";
   import "./styles.css";
   import LayoutDashboard from "@lucide/svelte/icons/layout-dashboard";
@@ -753,7 +756,7 @@
       class={menuItemClass}
       class:active={isActive(item.key)}
       onclick={onItemClick}
-      title={withNavigationHint(collapsed ? item.label : item.title)}
+      use:hint={withNavigationHint(collapsed ? item.label : item.title)}
       aria-label={item.label}
     >
       {#if item.icon}
@@ -788,7 +791,7 @@
               class={menuItemClass}
               class:active={isActive(item.key)}
               onclick={onItemClick}
-              title={withNavigationHint(item.title)}
+              use:hint={withNavigationHint(item.title)}
             >
               <div class="flex items-center gap-2">
                 {#if item.icon}
@@ -798,7 +801,7 @@
                 {#if item.key === "plugins" && $disabledPluginsCount > 0}
                   <span
                     class="ml-auto rounded-full bg-amber-500/15 px-1.5 text-[10px] font-semibold text-amber-300"
-                    title={`${$disabledPluginsCount} plugins disabled - pages hidden from sidebar`}
+                    use:hint={`${$disabledPluginsCount} plugins disabled - pages hidden from sidebar`}
                   >
                     {$disabledPluginsCount} off
                   </span>
@@ -819,7 +822,7 @@
           class={menuItemClass}
           class:active={isActive(item.key)}
           onclick={onItemClick}
-          title={withNavigationHint(item.label)}
+          use:hint={withNavigationHint(item.label)}
           aria-label={item.label}
         >
           {#if item.icon}
