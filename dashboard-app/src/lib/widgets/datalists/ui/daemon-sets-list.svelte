@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
   import DetailsSheetPortal from "$shared/ui/details-sheet-portal.svelte";
   import { hasOpenOverlay } from "$shared/lib/keyboard-manager";
@@ -2381,11 +2382,13 @@
     workbenchStateRestored = true;
   });
 
-  $effect(() => {
-    if ($dashboardDataProfile.id !== "realtime") return;
-    if (workbenchCollapsed) workbenchCollapsed = false;
-    if (collapsedPaneIndexes.length > 0) collapsedPaneIndexes = [];
-  });
+  expandWorkbenchOnRealtimeSwitch(
+    () => $dashboardDataProfile?.id,
+    () => {
+      workbenchCollapsed = false;
+      collapsedPaneIndexes = [];
+    },
+  );
 
   $effect(() => {
     if (!workbenchStateRestored) return;
@@ -3019,7 +3022,7 @@
                               selectedContainer={paneLogsTab.logsSelectedContainer}
                               containerOptions={paneLogsTab.logsContainerOptions}
                               bookmarks={paneLogsTab.bookmarks}
-                              canVerticalCollapse={getPaneCount() > 1}
+                              canVerticalCollapse={getPaneCount() - collapsedPaneIndexes.length > 1}
                               isVerticallyCollapsed={false}
                               onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
                               onToggleLive={() => {
@@ -3101,7 +3104,7 @@
                               hasChanges={paneYamlTab.yamlText !== paneYamlTab.yamlOriginalText}
                               externalDiffLines={getYamlCompareDiffLines(paneYamlTab.id)}
                               error={paneYamlTab.yamlError}
-                              canVerticalCollapse={getPaneCount() > 1}
+                              canVerticalCollapse={getPaneCount() - collapsedPaneIndexes.length > 1}
                               isVerticallyCollapsed={false}
                               onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
                               onYamlChange={(value) => {
@@ -3129,7 +3132,7 @@
                               events={paneEventsTab.events}
                               loading={paneEventsTab.eventsLoading}
                               error={paneEventsTab.eventsError}
-                              canVerticalCollapse={getPaneCount() > 1}
+                              canVerticalCollapse={getPaneCount() - collapsedPaneIndexes.length > 1}
                               isVerticallyCollapsed={false}
                               onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
                             />
@@ -3150,7 +3153,7 @@
                               output={paneRolloutTab.output}
                               loading={paneRolloutTab.loading}
                               error={paneRolloutTab.error}
-                              canVerticalCollapse={getPaneCount() > 1}
+                              canVerticalCollapse={getPaneCount() - collapsedPaneIndexes.length > 1}
                               isVerticallyCollapsed={false}
                               onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
                               onRefresh={() => {

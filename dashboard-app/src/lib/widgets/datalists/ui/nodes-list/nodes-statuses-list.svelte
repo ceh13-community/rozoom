@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { expandWorkbenchOnRealtimeSwitch } from "../common/realtime-expand.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
   import { onDestroy, onMount } from "svelte";
   import { writable, readable, type Readable } from "svelte/store";
@@ -1002,11 +1003,13 @@
     }
   });
 
-  $effect(() => {
-    if ($dashboardDataProfile.id !== "realtime") return;
-    if (workbenchCollapsed) workbenchCollapsed = false;
-    if (collapsedPaneIndexes.length > 0) collapsedPaneIndexes = [];
-  });
+  expandWorkbenchOnRealtimeSwitch(
+    () => $dashboardDataProfile?.id,
+    () => {
+      workbenchCollapsed = false;
+      collapsedPaneIndexes = [];
+    },
+  );
 
   async function refreshYamlForTab(tabId: string) {
     if (!data?.slug) return;
@@ -1496,7 +1499,7 @@
                         hasChanges={(tab?.yamlText ?? "") !== (tab?.yamlOriginalText ?? "")}
                         externalDiffLines={tab ? getYamlCompareDiffLines(tab.id) : []}
                         error={tab?.yamlError ?? null}
-                        canVerticalCollapse={getPaneCount() > 1}
+                        canVerticalCollapse={getPaneCount() - collapsedPaneIndexes.length > 1}
                         isVerticallyCollapsed={isPaneCollapsed(paneIndex)}
                         onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
                         onYamlChange={(value) => {

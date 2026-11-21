@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { expandWorkbenchOnRealtimeSwitch } from "../common/realtime-expand.svelte";
   import { onDestroy, onMount, tick, untrack } from "svelte";
   import { writable } from "svelte/store";
   import { load as parseYaml, YAMLException } from "js-yaml";
@@ -421,6 +422,11 @@
   function canCollapsePane(paneIndex: number) {
     if (paneCount <= 1) return false;
     return getPaneTabId(paneIndex) !== null;
+  }
+
+  /** Collapse only while another pane stays open to take the space. */
+  function canCollapseExpandedPane(paneIndex: number) {
+    return canCollapsePane(paneIndex) && paneCount - collapsedPaneIndexes.length > 1;
   }
 
   function togglePaneCollapsed(paneIndex: number) {
@@ -1225,11 +1231,13 @@
     applyWorkbenchState(state);
   });
 
-  $effect(() => {
-    if (!$dashboardDataProfile || $dashboardDataProfile.id !== "realtime") return;
-    if (workbenchCollapsed) workbenchCollapsed = false;
-    if (collapsedPaneIndexes.length > 0) collapsedPaneIndexes = [];
-  });
+  expandWorkbenchOnRealtimeSwitch(
+    () => $dashboardDataProfile?.id,
+    () => {
+      workbenchCollapsed = false;
+      collapsedPaneIndexes = [];
+    },
+  );
 
   $effect(() => {
     if (!$dashboardDataProfile || !clusterId) return;
@@ -1419,6 +1427,7 @@
                       {yamlOpen}
                       {eventsOpen}
                       isVerticallyCollapsed={false}
+                      canVerticalCollapse={canCollapseExpandedPane(paneIndex)}
                       onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
                       {logsJumpToLine}
                       activeLogsTabId={activeLogsTab?.id ?? null}
