@@ -46,6 +46,17 @@ function backendOf(backend: unknown): { service: string; port: string } {
   };
 }
 
+/** An IPv6 load balancer address goes in brackets in a URL. */
+function urlHost(address: string) {
+  return address.includes(":") && !address.startsWith("[") ? `[${address}]` : address;
+}
+
+/** A regex path (ImplementationSpecific, `/api(/|$)(.*)`) cannot be opened as written: "/". */
+function openablePath(path: string) {
+  if (/[()[\]{}*+?^$|\\]/.test(path)) return "/";
+  return path.startsWith("/") ? path : `/${path}`;
+}
+
 export function summarizeIngress(item: GenericRecord): IngressSummary {
   const metadata = asRecord(item.metadata);
   const spec = asRecord(item.spec);
@@ -74,20 +85,23 @@ export function summarizeIngress(item: GenericRecord): IngressSummary {
     .filter(Boolean);
   const tls = asArray(spec.tls).map(asRecord);
   const tlsHosts = new Set(tls.flatMap((entry) => asArray(entry.hosts).map(asString)));
+  // A TLS entry without hosts covers every host of the Ingress.
+  const tlsForAllHosts = tls.some((entry) => asArray(entry.hosts).length === 0);
 
   // kubectl prints "80" and adds "443" when the Ingress has a TLS section.
   const ports = tls.length > 0 ? "80, 443" : "80";
 
-  const first = rules.find((rule) => rule.host !== "*" && rule.path !== "(default)");
+  // The first host that can be opened: not `*` and not a wildcard like `*.example.com`.
+  const first = rules.find((rule) => !rule.host.startsWith("*") && rule.path !== "(default)");
   const fallback: IngressRuleRow | undefined =
     rules.find((rule) => rule.path !== "(default)") ?? rules.at(0);
   let url: string | null = null;
   if (first) {
-    const scheme = tlsHosts.has(first.host) ? "https" : "http";
-    url = `${scheme}://${first.host}${first.path.startsWith("/") ? first.path : `/${first.path}`}`;
+    const scheme = tlsForAllHosts || tlsHosts.has(first.host) ? "https" : "http";
+    url = `${scheme}://${first.host}${openablePath(first.path)}`;
   } else if (addresses[0]) {
-    const path = fallback && fallback.path !== "(default)" ? fallback.path : "/";
-    url = `${tls.length > 0 ? "https" : "http"}://${addresses[0]}${path}`;
+    const path = fallback && fallback.path !== "(default)" ? openablePath(fallback.path) : "/";
+    url = `${tls.length > 0 ? "https" : "http"}://${urlHost(addresses[0])}${path}`;
   }
 
   return {

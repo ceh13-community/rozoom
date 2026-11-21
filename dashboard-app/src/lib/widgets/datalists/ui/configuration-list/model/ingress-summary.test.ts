@@ -108,4 +108,51 @@ describe("summarizeIngress", () => {
       { host: "*", path: "(default)", service: "fallback", port: "80" },
     ]);
   });
+
+  const rule = (host: string | undefined, path: string) => ({
+    ...(host ? { host } : {}),
+    http: { paths: [{ path, backend: { service: { name: "web", port: { number: 80 } } } }] },
+  });
+
+  it("skips wildcard hosts for the URL, then uses the address, then has none", () => {
+    expect(
+      summarizeIngress(
+        ingress({ rules: [rule("*.example.com", "/"), rule("shop.example.com", "/")] }),
+      ).url,
+    ).toBe("http://shop.example.com/");
+    expect(
+      summarizeIngress(
+        ingress(
+          { rules: [rule("*.example.com", "/app")] },
+          { status: { loadBalancer: { ingress: [{ ip: "10.0.0.5" }] } } },
+        ),
+      ).url,
+    ).toBe("http://10.0.0.5/app");
+    expect(summarizeIngress(ingress({ rules: [rule("*.example.com", "/")] })).url).toBeNull();
+  });
+
+  it("puts an IPv6 address in brackets", () => {
+    expect(
+      summarizeIngress(
+        ingress(
+          { rules: [rule(undefined, "/")] },
+          { status: { loadBalancer: { ingress: [{ ip: "2001:db8::10" }] } } },
+        ),
+      ).url,
+    ).toBe("http://[2001:db8::10]/");
+  });
+
+  it("opens https when a TLS entry has no hosts", () => {
+    expect(
+      summarizeIngress(
+        ingress({ tls: [{ secretName: "tls" }], rules: [rule("shop.example.com", "/")] }),
+      ).url,
+    ).toBe("https://shop.example.com/");
+  });
+
+  it("opens / for a regex path", () => {
+    expect(
+      summarizeIngress(ingress({ rules: [rule("shop.example.com", "/api(/|$)(.*)")] })).url,
+    ).toBe("http://shop.example.com/");
+  });
 });
