@@ -12,7 +12,9 @@ describe("pods list stream bootstrap contract", () => {
     expect(source).toContain("untrack(() => initPodsSync(clusterId));");
     expect(source).toContain("destroyPodsSync(clusterId);");
     expect(source).toContain("selectPodsStreamLive(clusterId).subscribe");
-    expect(source).toContain("if (!podsStreamLive) await loadPodsSnapshot();");
+    expect(source).toMatch(
+      /if \(podsStreamLive\) metricsRefreshToken \+= 1;\s*else await loadPodsSnapshot\(\);/,
+    );
     expect(source).toContain("if (!podsStreamLive) setInitialPods(data.slug, items);");
     expect(source).toContain("scheduleRefresh();");
   });

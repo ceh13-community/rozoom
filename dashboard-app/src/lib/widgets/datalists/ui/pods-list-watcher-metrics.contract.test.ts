@@ -22,4 +22,15 @@ describe("pods watcher sequencing contract", () => {
     expect(setInitialPodsIndex).toBeLessThan(successIndex);
     expect(successIndex).toBeLessThan(metricsRefreshIndex);
   });
+
+  // With the pod watch live the timer skips the snapshot load, and the snapshot load
+  // was the only thing that refreshed `kubectl top`: a new pod kept CPU and Memory at
+  // n/a, and every pod kept its first sample. The timer bumps the metrics itself.
+  it("refreshes pod metrics on the watcher timer while the pod stream is live", () => {
+    const timer = /function scheduleRefresh\(\) \{([\s\S]*?)\n  \}/.exec(source)?.[1] ?? "";
+    expect(timer).toContain("setTimeout(");
+    expect(timer).toMatch(
+      /if \(podsStreamLive\) metricsRefreshToken \+= 1;\s*else await loadPodsSnapshot\(\);/,
+    );
+  });
 });

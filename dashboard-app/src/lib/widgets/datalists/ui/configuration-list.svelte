@@ -47,6 +47,7 @@
   import * as Table from "$shared/ui/table";
   import TableSurface from "$shared/ui/table-surface.svelte";
   import { getTimeDifference } from "$shared";
+  import { liveAge } from "$shared/lib/live-age.svelte";
   import GitCompareArrows from "@lucide/svelte/icons/git-compare-arrows";
   import Pin from "@lucide/svelte/icons/pin";
   import PinOff from "@lucide/svelte/icons/pin-off";
@@ -81,10 +82,7 @@
     upsertSavedView,
   } from "$features/workloads-management";
   import { checkYamlDrift, buildDriftMessage } from "$features/pod-yaml-editor";
-  import {
-    formatApplyErrorMessage,
-    orderPinnedTabs,
-  } from "$features/pods-workbench";
+  import { formatApplyErrorMessage, orderPinnedTabs } from "$features/pods-workbench";
   import {
     applyConfigurationItemEvent,
     destroyConfigurationSync,
@@ -1777,7 +1775,7 @@
       const values = [
         row.name,
         ...(columnsVisible.namespace ? [row.namespace] : []),
-        ...(columnsVisible.createdAt ? [row.age] : []),
+        ...(columnsVisible.createdAt ? [liveAge(row.createdAt, row.age)] : []),
         ...(columnsVisible.keys ? [row.keys] : []),
         ...(columnsVisible.labels ? [row.labels] : []),
         ...(columnsVisible.type ? [row.type] : []),
@@ -5649,7 +5647,7 @@ spec:
                 <Table.TableCell class="truncate">{row.namespace}</Table.TableCell>
               {/if}
               {#if columnsVisible.createdAt}
-                <Table.TableCell>{row.age}</Table.TableCell>
+                <Table.TableCell>{liveAge(row.createdAt, row.age)}</Table.TableCell>
               {/if}
               {#if columnsVisible.keys}
                 <Table.TableCell>{row.keys}</Table.TableCell>
@@ -5901,7 +5899,7 @@ spec:
                     <Table.TableCell class="truncate">{row.namespace}</Table.TableCell>
                   {/if}
                   {#if columnsVisible.createdAt}
-                    <Table.TableCell>{row.age}</Table.TableCell>
+                    <Table.TableCell>{liveAge(row.createdAt, row.age)}</Table.TableCell>
                   {/if}
                   {#if columnsVisible.keys}
                     <Table.TableCell>{row.keys}</Table.TableCell>

@@ -1,3 +1,4 @@
+import { toTimestampString } from "$shared/lib/live-age.svelte";
 import type { ReplicaSetItem } from "$shared/model/clusters";
 import { getSelectedNamespaceList } from "$features/namespace-management";
 import { buildReplicaSetProblemScore } from "../model/problem-priority";
@@ -10,6 +11,8 @@ export type ReplicaSetRow = {
   current: number;
   ready: number;
   age: string;
+  /** metadata.creationTimestamp; the Age cell counts from it on its own. */
+  createdAt?: string | null;
   problemScore: number;
 };
 
@@ -50,6 +53,7 @@ export function toReplicaSetRow(
     current: status.replicas ?? 0,
     ready: status.readyReplicas ?? 0,
     age: getAge(runtime.metadata?.creationTimestamp),
+    createdAt: toTimestampString(runtime.metadata?.creationTimestamp),
     problemScore: buildReplicaSetProblemScore({
       desired: spec.replicas ?? status.replicas ?? 0,
       current: status.replicas ?? 0,

@@ -1,3 +1,4 @@
+import { toTimestampString } from "$shared/lib/live-age.svelte";
 import type { StatefulSetItem } from "$shared/model/clusters";
 import { getSelectedNamespaceList } from "$features/namespace-management";
 import { buildStatefulSetProblemScore } from "../model/problem-priority";
@@ -9,6 +10,8 @@ export type StatefulSetRow = {
   pods: string;
   replicas: number;
   age: string;
+  /** metadata.creationTimestamp; the Age cell counts from it on its own. */
+  createdAt?: string | null;
   problemScore: number;
 };
 
@@ -48,6 +51,7 @@ export function toStatefulSetRow(
     pods: `${ready}/${replicas}`,
     replicas,
     age: getAge(runtime.metadata?.creationTimestamp),
+    createdAt: toTimestampString(runtime.metadata?.creationTimestamp),
     problemScore: buildStatefulSetProblemScore({ replicas, ready }),
   };
 }

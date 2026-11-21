@@ -5,6 +5,8 @@ import type { PodItem } from "$shared/model/clusters";
 export type PodListRow = {
   age: string;
   ageSeconds: number;
+  /** status.startTime; the Age cell counts from it on its own (liveAge). */
+  startedAt?: string | null;
   name: string;
   namespace: string;
   node: string;
@@ -68,6 +70,7 @@ export function buildPodListRow(pod: Partial<PodItem>): PodListRow {
   return {
     age: pod.status?.startTime ? getTimeDifference(pod.status.startTime) : "-",
     ageSeconds,
+    startedAt: pod.status?.startTime ? String(pod.status.startTime) : null,
     name: pod.metadata?.name ?? "",
     namespace: pod.metadata?.namespace ?? "default",
     node: pod.spec?.nodeName ?? "-",

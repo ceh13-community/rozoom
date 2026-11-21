@@ -52,6 +52,7 @@ describe("toStatefulSetRow", () => {
       pods: "2/3",
       replicas: 3,
       age: "1d",
+      createdAt: "2026-01-01T00:00:00.000Z",
       problemScore: 170,
     });
   });
@@ -66,6 +67,7 @@ describe("toStatefulSetRow", () => {
       pods: "0/0",
       replicas: 0,
       age: "-",
+      createdAt: null,
       problemScore: 0,
     });
   });

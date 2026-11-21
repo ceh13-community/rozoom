@@ -1,3 +1,4 @@
+import { toTimestampString } from "$shared/lib/live-age.svelte";
 import type { DaemonSetItem } from "$shared";
 import { getSelectedNamespaceList } from "$features/namespace-management";
 import { buildDaemonSetProblemScore } from "../model/problem-priority";
@@ -14,6 +15,8 @@ export type DaemonSetRow = {
   available: number;
   nodeSelector: string;
   age: string;
+  /** metadata.creationTimestamp; the Age cell counts from it on its own. */
+  createdAt?: string | null;
   problemScore: number;
 };
 
@@ -76,6 +79,7 @@ export function toDaemonSetRow(
     available: status.numberAvailable ?? 0,
     nodeSelector: formatDaemonSetNodeSelector(item),
     age: getAge(runtime.metadata?.creationTimestamp),
+    createdAt: toTimestampString(runtime.metadata?.creationTimestamp),
     problemScore: buildDaemonSetProblemScore({
       desired: status.desiredNumberScheduled ?? 0,
       ready: status.numberReady ?? 0,

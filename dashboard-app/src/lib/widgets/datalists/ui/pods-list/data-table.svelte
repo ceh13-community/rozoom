@@ -15,6 +15,7 @@
   import PodSelectionCheckbox from "./pod-selection-checkbox.svelte";
   import { buildPodMetricsSummary } from "./model/pod-runtime-ui";
   import { getPodMetricsKey, type PodMetricsValue } from "./model/pod-row-adapter";
+  import { liveAge } from "$shared/lib/live-age.svelte";
   import { GROUPED_VIEW_MAX_ROWS, type PodListRow } from "./model/pod-list-row";
 
   type DataTableProps = {
@@ -203,7 +204,10 @@
     if (column === "ready") return row.readyContainers / Math.max(row.totalContainers, 1);
     if (column === "restarts") return row.restarts;
     if (column === "node") return row.node;
-    if (column === "age") return row.ageSeconds;
+    // Age now, from the start time: ageSeconds froze when the row was built, and rows
+    // built at different moments would sort by stale ages.
+    if (column === "age")
+      return row.startedAt ? (Date.now() - Date.parse(row.startedAt)) / 1000 : row.ageSeconds;
     if (column === "cpu") return getMetricsForRow(row)?.cpuMillicores ?? -1;
     if (column === "memory") return getMetricsForRow(row)?.memoryBytes ?? -1;
     return row.name;
@@ -438,7 +442,7 @@
         values.push(getMetricsForRow(row)?.memory ?? "n/a");
       if (isColumnVisible("restarts")) values.push(row.restarts);
       if (isColumnVisible("node")) values.push(row.node);
-      if (isColumnVisible("age")) values.push(row.age);
+      if (isColumnVisible("age")) values.push(liveAge(row.startedAt, row.age));
       lines.push(values.map(toCsvCell).join(","));
     }
     await exportCsvArtifact({ filename: "pods.csv", csv: lines.join("\n") });
@@ -803,7 +807,9 @@
                     <div class="min-w-0 truncate text-muted-foreground">{row.node}</div>
                   {/if}
                   {#if isColumnVisible("age")}
-                    <div class="min-w-0 truncate text-muted-foreground">{row.age}</div>
+                    <div class="min-w-0 truncate text-muted-foreground">
+                      {liveAge(row.startedAt, row.age)}
+                    </div>
                   {/if}
                 </div>
               {/each}
@@ -923,7 +929,9 @@
               <div class="min-w-0 truncate text-muted-foreground">{row.node}</div>
             {/if}
             {#if isColumnVisible("age")}
-              <div class="min-w-0 truncate text-muted-foreground">{row.age}</div>
+              <div class="min-w-0 truncate text-muted-foreground">
+                {liveAge(row.startedAt, row.age)}
+              </div>
             {/if}
           </div>
         {/each}

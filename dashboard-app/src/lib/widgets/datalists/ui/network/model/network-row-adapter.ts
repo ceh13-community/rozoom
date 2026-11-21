@@ -1,3 +1,4 @@
+import { toTimestampString } from "$shared/lib/live-age.svelte";
 import { getTimeDifference } from "$shared";
 
 type GenericItem = Record<string, unknown>;
@@ -226,6 +227,7 @@ export function adaptNetworkRow(item: GenericItem, workloadKey: string) {
     summary,
     ports,
     age: createdAt ? getTimeDifference(new Date(createdAt)) : "-",
+    createdAt: toTimestampString(createdAt),
     raw: item,
   };
 }

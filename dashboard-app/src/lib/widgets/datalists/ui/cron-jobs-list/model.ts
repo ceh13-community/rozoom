@@ -1,3 +1,4 @@
+import { toTimestampString } from "$shared/lib/live-age.svelte";
 import type { CronJobItem } from "$shared/model/clusters";
 import { getSelectedNamespaceList } from "$features/namespace-management";
 import { buildCronJobProblemScore } from "../model/problem-priority";
@@ -13,6 +14,8 @@ export type CronJobRow = {
   nextExecution: string;
   timeZone: string;
   age: string;
+  /** metadata.creationTimestamp; the Age cell counts from it on its own. */
+  createdAt?: string | null;
   problemScore: number;
 };
 
@@ -66,6 +69,7 @@ export function toCronJobRow(
     nextExecution: nextExecutionTime ? getNextExecutionLabel(nextExecutionTime) : "-",
     timeZone: runtime.spec?.timeZone ?? "-",
     age: getAge(runtime.metadata?.creationTimestamp),
+    createdAt: toTimestampString(runtime.metadata?.creationTimestamp),
     problemScore: buildCronJobProblemScore({
       suspend,
       active,

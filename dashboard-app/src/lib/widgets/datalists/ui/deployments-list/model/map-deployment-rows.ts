@@ -35,6 +35,8 @@ export type DeploymentRowLike = {
   replicas: number;
   age: string;
   ageSeconds: number;
+  /** metadata.creationTimestamp; the Age cell counts from it on its own. */
+  createdAt?: string | null;
   status: string;
   problemScore: number;
 };
@@ -77,6 +79,7 @@ export function mapDeploymentRows(source: DeploymentInput[]): DeploymentRowLike[
       replicas,
       age: toAgeLabel(ageSeconds),
       ageSeconds,
+      createdAt: Number.isFinite(createdMs) ? new Date(createdMs).toISOString() : null,
       status,
       problemScore: buildDeploymentProblemScore({
         replicas,
