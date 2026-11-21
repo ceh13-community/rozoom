@@ -872,6 +872,9 @@
     const tab = getLogsTab(tabId);
     if (!tab || !tab.logsLive || tab.logsMode !== "stream-f") return;
     const token = bumpStreamToken(tabId);
+    // The stream starts with the same --tail as a poll: its first chunk replaces
+    // the text instead of repeating it below (open, mode switch, reconnect).
+    let replaceOnFirstChunk = true;
     await stopStreamForTab(tabId, false);
     updateLogsTab(tabId, (current) => ({ ...current, logsLoading: true, logsError: null }));
     const args = [
@@ -893,11 +896,13 @@
         kubectlStreamArgsFront(args, { clusterId: data.slug }, {
           onStdoutData: (chunk) => {
             if (logsStreamTokens.get(tabId) !== token || !chunk) return;
+            const replace = replaceOnFirstChunk;
+            replaceOnFirstChunk = false;
             updateLogsTab(tabId, (current) => ({
               ...current,
               logsLoading: false,
               logsError: null,
-              logsText: trimLogs(`${current.logsText}${chunk}`),
+              logsText: trimLogs(replace ? chunk : `${current.logsText}${chunk}`),
               logsUpdatedAt: Date.now(),
             }));
           },
@@ -1047,7 +1052,7 @@
           logsError: null,
           logsLoading: false,
           logsLive: true,
-          logsMode: "poll",
+          logsMode: "stream-f",
           logsUpdatedAt: null,
           logsPrevious: false,
           logsContainerOptions: ["all-containers", ...containers],

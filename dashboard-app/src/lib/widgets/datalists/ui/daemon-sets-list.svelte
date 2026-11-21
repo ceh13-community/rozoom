@@ -926,6 +926,9 @@
     if (!tab || !tab.logsLive || tab.logsMode !== "stream-f") return;
 
     const token = bumpStreamToken(tabId);
+    // The stream starts with the same --tail as a poll: its first chunk replaces
+    // the text instead of repeating it below (open, mode switch, reconnect).
+    let replaceOnFirstChunk = true;
     await stopStreamForTab(tabId, false);
     updateLogsTab(tabId, (current) => ({ ...current, logsLoading: true, logsError: null }));
     const args = [
@@ -947,9 +950,11 @@
       onStdoutData: (chunk: string) => {
         if (logsStreamTokens.get(tabId) !== token) return;
         if (!chunk) return;
+        const replace = replaceOnFirstChunk;
+        replaceOnFirstChunk = false;
         updateLogsTab(tabId, (current) => ({
           ...current,
-          logsText: `${current.logsText}${chunk}`,
+          logsText: replace ? chunk : `${current.logsText}${chunk}`,
           logsUpdatedAt: Date.now(),
           logsLoading: false,
           logsError: null,
@@ -1517,7 +1522,7 @@
           logsError: null,
           logsLoading: false,
           logsLive: true,
-          logsMode: "poll",
+          logsMode: "stream-f",
           logsUpdatedAt: null,
           logsPrevious: false,
           logsContainerOptions: ["__all__"],
