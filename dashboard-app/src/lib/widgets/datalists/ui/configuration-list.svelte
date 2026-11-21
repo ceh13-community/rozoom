@@ -24,7 +24,11 @@
   import TablePagination from "$shared/ui/table-pagination.svelte";
   import { totalPages as calcTotalPages } from "$shared/lib/use-pagination";
   import { popOutPortForwardPreview, withRefreshNonce } from "$shared/lib/port-forward-preview";
-  import { requestPortForwardStartMode } from "$shared/lib/port-forward-start-mode";
+  import PortForwardDialog, { type PortForwardChoice } from "./common/port-forward-dialog.svelte";
+  import {
+    servicePortForwardTarget,
+    type PortForwardTarget,
+  } from "./common/model/port-forward-target";
   import {
     isRunningForwardByKey,
     selectLatestPortForwardsByTabId,
@@ -137,6 +141,7 @@
     activePortForwards,
     startPortForward,
     stopPortForward,
+    usedLocalPorts,
     type PortForwardProcess,
   } from "$shared/api/port-forward";
   import Bug from "@lucide/svelte/icons/bug";
@@ -879,6 +884,9 @@
   let workbenchTabs = $state<WorkbenchTab[]>([]);
   let yamlTabs = $state<YamlTabState[]>([]);
   let portForwardTabs = $state<PortForwardBrowserTabState[]>([]);
+  let portForwardDialogRow = $state<ConfigurationRow | null>(null);
+  let portForwardDialogTarget = $state<PortForwardTarget | null>(null);
+  let portForwardDialogUsedPorts = $state<ReadonlySet<number>>(new Set());
   let closedWorkbenchTabs = $state<ClosedWorkbenchTab[]>([]);
   let pinnedTabIds = $state(new Set<string>());
   let paneTabIds = $state<[string | null, string | null, string | null]>([null, null, null]);
@@ -3338,62 +3346,8 @@
     await openYamlTarget({ name: row.name, namespace: row.namespace });
   }
 
-  function getServiceEndpoint(row: ConfigurationRow): {
-    remotePort: number;
-    scheme: "http" | "https";
-  } {
-    const spec = asRecord(asRecord(row.raw).spec);
-    const ports = asArray(spec.ports);
-    if (ports.length === 0) return { remotePort: 80, scheme: "http" };
-    const discovered = ports
-      .map((entry) => asRecord(entry))
-      .map((entry) => ({
-        number: Number(entry.port ?? 0),
-        name: String(entry.name ?? "").toLowerCase(),
-        appProtocol: String(entry.appProtocol ?? "").toLowerCase(),
-        protocol: String(entry.protocol ?? "TCP").toUpperCase(),
-      }))
-      .filter(
-        (entry) => Number.isFinite(entry.number) && entry.number > 0 && entry.protocol === "TCP",
-      );
-    const nonMetrics = discovered.filter(
-      (entry) => !entry.name.includes("metrics") && !entry.name.includes("prometheus"),
-    );
-    const candidates = nonMetrics.length > 0 ? nonMetrics : discovered;
-    const best = candidates[0];
-    if (!best) return { remotePort: 80, scheme: "http" };
-    const scheme: "http" | "https" =
-      best.name.includes("https") ||
-      best.appProtocol.includes("https") ||
-      best.number === 443 ||
-      best.number === 8443
-        ? "https"
-        : "http";
-    return { remotePort: best.number, scheme };
-  }
-
   function getServicePortForwardTabId(row: ConfigurationRow) {
     return `port-forward:${row.namespace}/${row.name}`;
-  }
-
-  function getRandomLocalPort() {
-    return Math.floor(Math.random() * (60999 - 30000 + 1)) + 30000;
-  }
-
-  function requestLocalPort(remotePort: number): number | null {
-    if (typeof window === "undefined") return getRandomLocalPort();
-    const suggested = getRandomLocalPort();
-    const raw = window.prompt(
-      `Remote port: ${remotePort}\nEnter local port (1-65535):`,
-      String(suggested),
-    );
-    if (raw === null) return null;
-    const parsed = Number(raw.trim());
-    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
-      errorMessage = "Invalid local port. Use integer 1-65535.";
-      return null;
-    }
-    return parsed;
   }
 
   function isLocalPortInUse(localPort: number): boolean {
@@ -3407,26 +3361,29 @@
     });
   }
 
+  // The in-app dialog picks the ports; the same dialog starts a pod port-forward.
   async function openServicePortForward(row: ConfigurationRow) {
     if (!clusterId || workloadKey !== "services") return;
     if (!isTauriAvailable()) {
       errorMessage = "Port-forward preview is available only in the desktop runtime.";
       return;
     }
-    const endpoint = getServiceEndpoint(row);
-    const remotePort = endpoint.remotePort;
-    const startMode = requestPortForwardStartMode(remotePort);
-    if (!startMode) return;
-    const selectedLocalPort = requestLocalPort(remotePort);
-    if (!selectedLocalPort) return;
-    const localPort = selectedLocalPort;
+    portForwardDialogRow = row;
+    portForwardDialogTarget = servicePortForwardTarget(asRecord(row.raw));
+    portForwardDialogUsedPorts = usedLocalPorts();
+  }
+
+  async function startServicePortForward(row: ConfigurationRow, choice: PortForwardChoice) {
+    if (!clusterId || workloadKey !== "services") return;
+    const { remotePort, localPort } = choice;
+    const startMode = choice.openWeb ? "start-and-open" : "start-only";
     if (isLocalPortInUse(localPort)) {
       errorMessage = `Local port ${localPort} is already in use by another running port-forward.`;
       return;
     }
     const target = `svc/${row.name}`;
     const uniqueKey = `${clusterId}:${row.namespace}:${target}:${localPort}:${remotePort}`;
-    const url = `${endpoint.scheme}://127.0.0.1:${localPort}`;
+    const url = `${choice.scheme}://127.0.0.1:${localPort}`;
     const tabId = getServicePortForwardTabId(row);
 
     const existing = getPortForwardTab(tabId);
@@ -6632,4 +6589,20 @@ spec:
       </div>
     </DetailsSheetPortal>
   {/if}
+
+  <PortForwardDialog
+    open={portForwardDialogTarget !== null}
+    target={portForwardDialogTarget}
+    usedLocalPorts={portForwardDialogUsedPorts}
+    onCancel={() => {
+      portForwardDialogRow = null;
+      portForwardDialogTarget = null;
+    }}
+    onConfirm={(choice) => {
+      const row = portForwardDialogRow;
+      portForwardDialogRow = null;
+      portForwardDialogTarget = null;
+      if (row) void startServicePortForward(row, choice);
+    }}
+  />
 </div>

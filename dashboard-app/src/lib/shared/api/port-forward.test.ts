@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { startPortForward, stopPortForward, usedLocalPorts } from "./port-forward";
+import {
+  activePortForwards,
+  isKubectlErrorLine,
+  startPortForward,
+  stopPortForward,
+  usedLocalPorts,
+} from "./port-forward";
+import { get } from "svelte/store";
 import * as tauriPath from "@tauri-apps/api/path";
 import * as cli from "$shared/api/cli";
 import {
@@ -195,6 +202,47 @@ describe("port-forward", () => {
           "resource=pod/web-frontend-1 ports=30080:80 " +
           "reason=error: unable to listen on any of the requested ports: [{30080 80}]",
       );
+    });
+
+    it("keeps kubectl's --v=2 info lines out of lastError", async () => {
+      vi.useRealTimers();
+      let onStderrLine: ((line: string) => void) | undefined;
+      vi.mocked(cli.spawnCli).mockImplementation(async (_tool, _args, handlers) => {
+        onStderrLine = handlers?.onStderrLine;
+        setTimeout(() => {
+          onStderrLine?.(
+            'I1121 15:07:19.793300 1426131 envvar.go:195] "Feature gate default state" feature="ClientsAllowCBOR" enabled=false',
+          );
+          onStderrLine?.("W1121 15:07:20.000000 1426131 warnings.go:70] some deprecation");
+          handlers?.onStdoutLine?.("Forwarding from 127.0.0.1:19100 -> 9100");
+        }, 50);
+        return { command: mockCommand, child: mockChild };
+      });
+
+      const result = await startPortForward({
+        namespace: mockNamespace,
+        resource: mockResource,
+        remotePort: 9100,
+        localPort: 19100,
+        clusterId: mockClusterId,
+        uniqueKey: mockUniqueKey,
+      });
+
+      expect(result).toEqual({ success: true });
+      const forward = get(activePortForwards)[mockUniqueKey];
+      expect(forward?.lastError ?? null).toBeNull();
+      expect(forward?.lastMessage).toBe("Forwarding from 127.0.0.1:19100 -> 9100");
+      vi.useFakeTimers();
+    });
+
+    it("tells kubectl errors from klog info and warning lines", () => {
+      expect(isKubectlErrorLine("I1121 15:07:19.793300 1426131 envvar.go:195] x")).toBe(false);
+      expect(isKubectlErrorLine("W1121 15:07:19.793300 1426131 warnings.go:70] x")).toBe(false);
+      expect(isKubectlErrorLine("E1121 15:07:19.793300 1426131 portforward.go:413] x")).toBe(true);
+      expect(isKubectlErrorLine("error: unable to listen on any of the requested ports")).toBe(
+        true,
+      );
+      expect(isKubectlErrorLine("   ")).toBe(false);
     });
 
     it("should return error when timeout waiting for ready", async () => {
