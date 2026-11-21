@@ -980,7 +980,12 @@
 
   async function openYamlForPod(pod: Partial<PodItem>) {
     const tabId = getTabId("yaml", pod);
-    if (!yamlTabs.some((tab) => tab.id === tabId)) {
+    const existing = yamlTabs.find((tab) => tab.id === tabId);
+    // A tab with unsaved edits is only shown again: loading the YAML would drop the edits.
+    const keepEdits = hasUnsavedYaml(
+      existing ? { yamlText: existing.yamlText, yamlOriginalText: existing.originalYamlText } : null,
+    );
+    if (!existing) {
       yamlTabs = [
         ...yamlTabs,
         {
@@ -1008,6 +1013,7 @@
         pod.metadata?.uid ??
         `${pod.metadata?.namespace ?? "default"}/${pod.metadata?.name ?? "unknown"}`,
     });
+    if (keepEdits) return;
     try {
       const yaml = await readPodYaml(pod);
       updateYamlTab(tabId, {

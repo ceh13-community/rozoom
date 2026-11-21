@@ -1611,6 +1611,8 @@
 
     const tabId = `yaml:${namespace}/${name}`;
     const existing = getYamlTab(tabId);
+    // A tab with unsaved edits is only shown again: loading the YAML would drop the edits.
+    const keepEdits = hasUnsavedYaml(existing);
 
     if (!existing) {
       yamlTabs = [
@@ -1625,7 +1627,7 @@
           yamlOriginalText: "",
         },
       ];
-    } else {
+    } else if (!keepEdits) {
       updateYamlTab(tabId, (current) => ({
         ...current,
         target: { name, namespace },
@@ -1642,6 +1644,7 @@
     });
     workbenchCollapsed = false;
     workbenchFullscreen = false;
+    if (keepEdits) return;
     await refreshYamlForTab(tabId);
   }
 

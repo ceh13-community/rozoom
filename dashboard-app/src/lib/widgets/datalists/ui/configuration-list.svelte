@@ -3340,6 +3340,8 @@
   ) {
     const nextTabId = toYamlTabId(target);
     const existing = getYamlTab(nextTabId);
+    // A tab with unsaved edits is only shown again: loading the YAML would drop the edits.
+    const keepEdits = hasUnsavedYaml(existing);
     if (!existing) {
       yamlTabs = [
         ...yamlTabs,
@@ -3389,6 +3391,7 @@
     workbenchCollapsed = false;
     workbenchFullscreen = false;
     await tick();
+    if (keepEdits) return;
     await loadYamlForTab(nextTabId);
   }
 

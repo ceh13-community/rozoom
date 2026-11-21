@@ -1171,6 +1171,8 @@
     const tabId = `yaml:cluster/${name}`;
 
     const existing = getYamlTab(tabId);
+    // A tab with unsaved edits is only shown again: loading the YAML would drop the edits.
+    const keepEdits = hasUnsavedYaml(existing);
     if (!existing) {
       yamlTabs = [
         ...yamlTabs,
@@ -1184,7 +1186,7 @@
           yamlOriginalText: "",
         },
       ];
-    } else {
+    } else if (!keepEdits) {
       updateYamlTab(tabId, (current) => ({
         ...current,
         target: { name },
@@ -1197,6 +1199,7 @@
     workbenchCollapsed = false;
     workbenchFullscreen = false;
 
+    if (keepEdits) return;
     await refreshYamlForTab(tabId);
   }
 

@@ -1196,6 +1196,8 @@
     if (!name) return;
     const nextTabId = `yaml:${namespace}/${name}`;
     const existing = getYamlTab(nextTabId);
+    // A tab with unsaved edits is only shown again: loading the YAML would drop the edits.
+    const keepEdits = hasUnsavedYaml(existing);
     if (!existing) {
       yamlTabs = [
         ...yamlTabs,
@@ -1212,7 +1214,7 @@
           yamlDriftClusterYaml: "",
         },
       ];
-    } else {
+    } else if (!keepEdits) {
       updateYamlTab(nextTabId, (tab) => ({
         ...tab,
         target: { name, namespace },
@@ -1228,6 +1230,7 @@
     });
     workbenchCollapsed = false;
     workbenchFullscreen = false;
+    if (keepEdits) return;
     try {
       const response = await kubectlRawArgsFront(
         ["get", "deployment", name, "--namespace", namespace, "-o", "yaml"],

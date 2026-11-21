@@ -1090,6 +1090,8 @@
     if (!name) return;
     const tabId = `yaml:${namespace}/${name}`;
     const existing = getYamlTab(tabId);
+    // A tab with unsaved edits is only shown again: loading the YAML would drop the edits.
+    const keepEdits = hasUnsavedYaml(existing);
     if (!existing) {
       yamlTabs = [
         ...yamlTabs,
@@ -1103,12 +1105,13 @@
           yamlOriginalText: "",
         },
       ];
-    } else {
+    } else if (!keepEdits) {
       updateYamlTab(tabId, (current) => ({ ...current, target: { name, namespace }, yamlLoading: true, yamlError: null }));
     }
     upsertWorkbenchTab({ id: tabId, kind: "yaml", title: `YAML ${name}`, subtitle: namespace });
     workbenchCollapsed = false;
     workbenchFullscreen = false;
+    if (keepEdits) return;
     await refreshYamlForTab(tabId);
   }
 

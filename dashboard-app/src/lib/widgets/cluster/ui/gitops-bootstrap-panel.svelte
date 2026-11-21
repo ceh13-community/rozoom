@@ -315,7 +315,12 @@
     const tabId = "yaml:new";
     const existing = yamlTabs.find((t) => t.id === tabId);
     if (existing) {
-      updateTab(tabId, { yamlText: generatedYaml, originalYaml: generatedYaml });
+      // Edits in the tab are kept; only an untouched tab takes the newly generated YAML.
+      if (
+        !hasUnsavedYaml({ yamlText: existing.yamlText, yamlOriginalText: existing.originalYaml })
+      ) {
+        updateTab(tabId, { yamlText: generatedYaml, originalYaml: generatedYaml });
+      }
       activeTabId = tabId;
       workbenchCollapsed = false;
       return;
