@@ -10,7 +10,6 @@
   import { Layers3, List, Server } from "$shared/ui/icons";
   import TableChecklistDropdown from "../table-checklist-dropdown.svelte";
   import TableToolbarShell from "../table-toolbar-shell.svelte";
-  import GroupsToggleButton from "../groups-toggle-button.svelte";
   import WatcherToolbarControls from "../watcher-toolbar-controls.svelte";
   import PodActionsMenu from "./pod-actions-menu.svelte";
   import PodSelectionCheckbox from "./pod-selection-checkbox.svelte";
@@ -563,13 +562,6 @@
         {onWatcherRefreshSecondsChange}
         {onResetWatcherSettings}
       />
-      <!-- Always laid out, hidden in the flat view: the toolbar keeps its width and does
-           not wrap onto a new row when a grouped view is chosen. -->
-      <GroupsToggleButton
-        visible={isGroupedView && getGroupedRows().length > 0}
-        label={getToggleAllGroupsLabel()}
-        onclick={toggleAllGroups}
-      />
     {/snippet}
   </TableToolbarShell>
 
@@ -684,6 +676,18 @@
           </div>
         {/if}
       {:else if isGroupedView}
+        <!-- In the table, not the toolbar: a toolbar button that exists only in grouped
+             views made the toolbar wrap and moved the table down when grouping. -->
+        <div class="flex justify-end border-b border-border/60 px-4 py-1">
+          <button
+            type="button"
+            class="rounded-sm text-xs font-medium text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            data-testid="groups-toggle"
+            onclick={toggleAllGroups}
+          >
+            {getToggleAllGroupsLabel()}
+          </button>
+        </div>
         {#each getGroupedRows() as [groupKey, groupRows] (groupKey)}
           <div class="border-b border-border/60">
             <button
