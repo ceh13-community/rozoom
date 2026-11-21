@@ -1231,16 +1231,38 @@ describe("configuration-list", () => {
           items: [
             {
               metadata: { name: "web", namespace: "default" },
-              spec: { rules: [{ host: "example.local" }] },
+              spec: {
+                ingressClassName: "nginx",
+                tls: [{ hosts: ["example.local"] }],
+                rules: [
+                  {
+                    host: "example.local",
+                    http: {
+                      paths: [
+                        { path: "/", backend: { service: { name: "web", port: { number: 80 } } } },
+                      ],
+                    },
+                  },
+                ],
+              },
               status: { loadBalancer: { ingress: [{ ip: "10.0.0.10" }] } },
             },
           ],
         },
       },
     });
-    expect(ingress.getByText("LoadBalancers")).toBeInTheDocument();
-    expect(ingress.getByText("Rules")).toBeInTheDocument();
+    // The columns of `kubectl get ingress` (CLASS, HOSTS, ADDRESS, PORTS) and the URL.
+    for (const header of ["Class", "Hosts", "Address", "Ports", "URL"]) {
+      expect(ingress.getByRole("button", { name: header })).toBeInTheDocument();
+    }
+    expect(ingress.queryByText("LoadBalancers")).not.toBeInTheDocument();
+    expect(ingress.getByText("nginx")).toBeInTheDocument();
     expect(ingress.getByText("10.0.0.10")).toBeInTheDocument();
+    expect(ingress.getByText("80, 443")).toBeInTheDocument();
+    expect(ingress.getByTestId("ingress-url")).toHaveAttribute("href", "https://example.local/");
+    expect(
+      ingress.getByRole("button", { name: "Copy https://example.local/" }),
+    ).toBeInTheDocument();
     ingress.unmount();
 
     const netpol = render(ConfigurationList, {
