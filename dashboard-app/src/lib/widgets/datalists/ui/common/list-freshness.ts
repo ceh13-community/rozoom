@@ -90,10 +90,21 @@ export function describeListFreshness(
   };
 }
 
+export type WatcherControlsInput = {
+  /** Whether the watch is connected; null or absent when the list cannot tell. */
+  streamLive?: boolean | null;
+  watcherEnabled: boolean;
+  /** Sync sec also times data the watch does not carry (Pods: CPU and Memory). */
+  syncSecondsAlwaysApplies?: boolean;
+};
+
 /**
- * Watcher toggle and Sync sec only matter when the list polls. They stay when the
- * watcher is off, so a paused list can be resumed.
+ * While a watch is connected, Watcher and Sync sec change nothing the user can see:
+ * the list follows the cluster. The controls show while the list polls, which includes
+ * a watch that dropped and polls until it reconnects, while the watcher is off so a
+ * paused list can be resumed, and where Sync sec times more than the poll.
  */
-export function showsWatcherControls(mode: ListSyncMode, watcherEnabled: boolean) {
-  return mode !== "stream" || !watcherEnabled;
+export function showsWatcherControls(input: WatcherControlsInput) {
+  if (!input.watcherEnabled || input.syncSecondsAlwaysApplies) return true;
+  return input.streamLive !== true;
 }

@@ -54,9 +54,27 @@ describe("describeListFreshness", () => {
 });
 
 describe("showsWatcherControls", () => {
-  it("hides the watcher toggle and Sync sec on a watch, keeps them to resume a pause", () => {
-    expect(showsWatcherControls("stream", true)).toBe(false);
-    expect(showsWatcherControls("stream", false)).toBe(true);
-    expect(showsWatcherControls("poll", true)).toBe(true);
+  it("hides the watcher toggle and Sync sec while a watch is connected", () => {
+    expect(showsWatcherControls({ streamLive: true, watcherEnabled: true })).toBe(false);
+  });
+
+  it("keeps them while the list polls, also when a watch dropped", () => {
+    expect(showsWatcherControls({ streamLive: false, watcherEnabled: true })).toBe(true);
+    expect(showsWatcherControls({ streamLive: null, watcherEnabled: true })).toBe(true);
+    expect(showsWatcherControls({ watcherEnabled: true })).toBe(true);
+  });
+
+  it("keeps them to resume a pause", () => {
+    expect(showsWatcherControls({ streamLive: true, watcherEnabled: false })).toBe(true);
+  });
+
+  it("keeps them where Sync sec times more than the poll", () => {
+    expect(
+      showsWatcherControls({
+        streamLive: true,
+        watcherEnabled: true,
+        syncSecondsAlwaysApplies: true,
+      }),
+    ).toBe(true);
   });
 });

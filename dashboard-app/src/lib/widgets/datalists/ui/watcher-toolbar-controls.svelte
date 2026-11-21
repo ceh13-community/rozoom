@@ -29,12 +29,12 @@
     onResetWatcherSettings,
   }: Props = $props();
 
-  // On a live watch, Watcher and Sync sec change nothing the user can see: the list
-  // follows the cluster. They show in poll mode, and while paused so it can be resumed.
+  // While a watch is connected, Watcher and Sync sec change nothing the user can see:
+  // the list follows the cluster. They show while the list polls (no watch, or a watch
+  // that dropped), while paused so it can be resumed, and in Pods, where Sync sec also
+  // times CPU and Memory.
   const freshness = readListFreshness();
-  const visible = $derived(
-    !freshness || showsWatcherControls(freshness.mode, freshness.watcherEnabled),
-  );
+  const visible = $derived(!freshness || showsWatcherControls(freshness));
 </script>
 
 {#if visible}

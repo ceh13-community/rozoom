@@ -1128,6 +1128,9 @@
     get watcherEnabled() {
       return watcherEnabled;
     },
+    // CPU and Memory come from `kubectl top` on the Sync sec timer also while the
+    // watch is live, so the controls stay.
+    syncSecondsAlwaysApplies: true,
   });
 </script>
 

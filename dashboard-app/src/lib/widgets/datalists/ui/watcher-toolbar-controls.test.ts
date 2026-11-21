@@ -1,8 +1,10 @@
 import { fireEvent, render } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 import WatcherToolbarControls from "./watcher-toolbar-controls.svelte";
-import { LIST_FRESHNESS_CONTEXT } from "./common/list-freshness-context.svelte";
-import type { ListSyncMode } from "./common/list-freshness";
+import {
+  LIST_FRESHNESS_CONTEXT,
+  type ListFreshnessSource,
+} from "./common/list-freshness-context.svelte";
 
 describe("watcher toolbar controls", () => {
   it("renders shared watcher controls and dispatches callbacks", async () => {
@@ -100,38 +102,63 @@ describe("watcher toolbar controls", () => {
     expect(refreshInput.value).toBe("5");
   });
 
-  describe("in a list that shows its sync mode", () => {
-    function renderIn(mode: ListSyncMode, watcherEnabled: boolean) {
+  describe("in a list that shows its freshness", () => {
+    function renderIn(source: Partial<ListFreshnessSource> & { watcherEnabled: boolean }) {
       return render(WatcherToolbarControls, {
         props: {
-          watcherEnabled,
+          watcherEnabled: source.watcherEnabled,
           watcherRefreshSeconds: 30,
           onToggleWatcher: vi.fn(),
           onWatcherRefreshSecondsChange: vi.fn(),
           onResetWatcherSettings: vi.fn(),
         },
         context: new Map([
-          [LIST_FRESHNESS_CONTEXT, { state: "live", mode, updatedAt: null, watcherEnabled }],
+          [
+            LIST_FRESHNESS_CONTEXT,
+            { state: "live", mode: "stream", updatedAt: null, streamLive: true, ...source },
+          ],
         ]),
       });
     }
 
-    it("hides Watcher and Sync sec on a live watch", () => {
-      const { queryByRole, queryByText } = renderIn("stream", true);
+    it("hides Watcher and Sync sec while the watch is connected", () => {
+      const { queryByRole, queryByText } = renderIn({ streamLive: true, watcherEnabled: true });
       expect(queryByRole("button", { name: "Watcher: On" })).not.toBeInTheDocument();
       expect(queryByText("Sync sec")).not.toBeInTheDocument();
       expect(queryByRole("button", { name: "Reset" })).not.toBeInTheDocument();
     });
 
     it("keeps them while the watch is paused, so it can be resumed", () => {
-      const { getByRole } = renderIn("stream", false);
+      const { getByRole } = renderIn({ streamLive: true, watcherEnabled: false });
       expect(getByRole("button", { name: "Watcher: Off" })).toBeInTheDocument();
     });
 
-    it("keeps them in poll mode", () => {
-      const { getByRole, getByText } = renderIn("poll", true);
+    it("keeps them while the watch is down and the list polls", () => {
+      const { getByRole, getByText } = renderIn({ streamLive: false, watcherEnabled: true });
       expect(getByRole("button", { name: "Watcher: On" })).toBeInTheDocument();
       expect(getByText("Sync sec")).toBeInTheDocument();
+    });
+
+    it("keeps them in poll mode", () => {
+      const { getByRole, getByText } = renderIn({
+        mode: "poll",
+        streamLive: false,
+        watcherEnabled: true,
+      });
+      expect(getByRole("button", { name: "Watcher: On" })).toBeInTheDocument();
+      expect(getByText("Sync sec")).toBeInTheDocument();
+    });
+
+    it("keeps Sync sec in Pods, where it times CPU and Memory on a live watch", () => {
+      const { getByRole, getByText } = renderIn({
+        mode: "stream",
+        streamLive: true,
+        watcherEnabled: true,
+        syncSecondsAlwaysApplies: true,
+      });
+      expect(getByText("Sync sec")).toBeInTheDocument();
+      expect(getByRole("button", { name: "Watcher: On" })).toBeInTheDocument();
+      expect(getByRole("button", { name: "Reset" })).toBeInTheDocument();
     });
   });
 });

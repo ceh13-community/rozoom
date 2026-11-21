@@ -10,6 +10,8 @@ export type ListFreshnessSource = {
   readonly updatedAt: number | null;
   readonly streamLive?: boolean | null;
   readonly watcherEnabled: boolean;
+  /** Sync sec also times data the watch does not carry (Pods: CPU and Memory). */
+  readonly syncSecondsAlwaysApplies?: boolean;
 };
 
 export const LIST_FRESHNESS_CONTEXT = Symbol("list-freshness");
