@@ -35,9 +35,10 @@
   import WorkloadSelectionBar from "../common/workload-selection-bar.svelte";
   import TableChecklistDropdown from "../table-checklist-dropdown.svelte";
   import CustomResourcesDetailsSheet from "./custom-resources-details-sheet.svelte";
-  import ResourceYamlWorkbenchPanel, {
-    type ResourceYamlWorkbenchRequest,
-  } from "../common/resource-yaml-workbench-panel.svelte";
+  // Edit YAML opens an editor tab, as on the workload lists (it was a read-only side panel).
+  import ResourceYamlTabs, {
+    type ResourceYamlTabsRequest,
+  } from "../common/resource-yaml-tabs.svelte";
 
   type CrWorkbenchTarget = {
     title: string;
@@ -98,7 +99,7 @@
   } from "$shared/lib/action-notification";
   let actionNotification = $state<ActionNotification>(null);
 
-  let workbenchRequest = $state<ResourceYamlWorkbenchRequest>(null);
+  let workbenchRequest = $state<ResourceYamlTabsRequest>(null);
   let workbenchRequestToken = 0;
   let activeInstancesDefinition = $state<CustomResourceRow | null>(null);
   let instanceRows = $state<CustomResourceInstanceRow[]>([]);
@@ -450,15 +451,11 @@
     workbenchRequestToken += 1;
     workbenchRequest = {
       token: workbenchRequestToken,
-      kind: "yaml",
       name: t.name,
       resource: t.resource,
       namespace: t.namespace,
       namespaceScoped: t.namespaceScoped,
-      title: t.title,
-      copyLabel: t.copyLabel,
-      loadedLabel: t.loadedLabel,
-      errorLabel: t.errorLabel,
+      title: "CRD",
     };
   }
 
@@ -562,15 +559,11 @@
     workbenchRequestToken += 1;
     workbenchRequest = {
       token: workbenchRequestToken,
-      kind: "yaml",
       name: t.name,
       resource: t.resource,
       namespace: t.namespace,
       namespaceScoped: t.namespaceScoped,
-      title: t.title,
-      copyLabel: t.copyLabel,
-      loadedLabel: t.loadedLabel,
-      errorLabel: t.errorLabel,
+      title: [row.raw.kind ?? definition.resource, t.namespace].filter(Boolean).join(" "),
     };
   }
 
@@ -797,6 +790,17 @@
 </script>
 
 <div class="grid gap-4">
+  <ResourceYamlTabs
+    clusterId={data.slug}
+    request={workbenchRequest}
+    onMessage={(message) => {
+      actionNotification = notifySuccess(message);
+    }}
+    onError={(message) => {
+      actionNotification = notifyError(message);
+    }}
+  />
+
   <ActionNotificationBar
     notification={actionNotification}
     onDismiss={() => {
@@ -1161,7 +1165,7 @@
                 size="sm"
                 onclick={() => openInstanceYaml(requireActiveInstancesDefinition(), instance)}
               >
-                YAML
+                Edit YAML
               </Button>
               <Button
                 variant="ghost"
@@ -1233,17 +1237,6 @@
     }}
     onDelete={(row) => {
       void deleteRows([row]);
-    }}
-  />
-
-  <ResourceYamlWorkbenchPanel
-    clusterId={data.slug}
-    request={workbenchRequest}
-    onMessage={(message) => {
-      actionNotification = notifySuccess(message);
-    }}
-    onError={(message) => {
-      actionNotification = notifyError(message);
     }}
   />
 </div>

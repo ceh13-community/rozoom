@@ -29,7 +29,8 @@ describe("custom resources list interactions contract", () => {
     expect(source).toContain("onRunDebugDescribe");
     expect(source).toContain("openDebugDescribe(");
     expect(source).toContain("<CustomResourcesDetailsSheet");
-    expect(source).toContain("<ResourceYamlWorkbenchPanel");
-    expect(source).toContain('kind: "yaml"');
+    // Edit YAML opens an editor tab as on the workload lists, not a read-only side panel.
+    expect(source).toContain("<ResourceYamlTabs");
+    expect(source).not.toContain("ResourceYamlWorkbenchPanel");
   });
 });
