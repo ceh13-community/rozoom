@@ -216,6 +216,11 @@ export function createApiResourceSync<Item>(options: {
 
     try {
       const initial = await listWithResolvedPath(clusterId, controller.signal);
+      // A watch starts from the list's resourceVersion; without one there is
+      // nothing safe to watch from (no sendInitialEvents, see the client).
+      if (!initial.resourceVersion) {
+        throw new Error(`Kubernetes list returned no resourceVersion for ${initial.path}`);
+      }
       options.setInitial(clusterId, initial.items);
       session.resourceVersion = initial.resourceVersion;
       updateRuntimeState(clusterId, (prev) => ({
@@ -234,7 +239,6 @@ export function createApiResourceSync<Item>(options: {
           path: initial.path,
           resourceVersion: session.resourceVersion,
           signal: controller.signal,
-          sendInitialEvents: session.resourceVersion.length === 0,
           onEvent: (event) => {
             const nextResourceVersion =
               (event.object as { metadata?: { resourceVersion?: string } } | undefined)?.metadata
@@ -276,6 +280,9 @@ export function createApiResourceSync<Item>(options: {
             path: initial.path,
             signal: controller.signal,
           });
+          if (!relist.resourceVersion) {
+            throw new Error(`Kubernetes list returned no resourceVersion for ${initial.path}`);
+          }
           options.setInitial(clusterId, relist.items);
           session.resourceVersion = relist.resourceVersion;
           updateRuntimeState(clusterId, (prev) => ({
