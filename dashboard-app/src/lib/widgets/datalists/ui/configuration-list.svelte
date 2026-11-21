@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import { onDestroy, onMount, tick, untrack } from "svelte";
@@ -4691,12 +4692,16 @@ spec:
       return watcherEnabled;
     },
   });
+
+  // Row actions reveal the workbench and focus it, as in Pods.
+  const workbenchReveal = createWorkbenchReveal();
 </script>
 
 <div class="space-y-4">
   {#if hasWorkbenchTabs}
     <div bind:this={workbenchRootEl}>
       <MultiPaneWorkbench
+        revealToken={workbenchReveal.token}
         tabs={orderedWorkbenchTabs}
         {paneTabIds}
         activeTabId={activeWorkbenchTabId}
@@ -4944,7 +4949,7 @@ spec:
           }}
           onEditYaml={() => {
             const row = firstSelected();
-            if (row) void openYamlEditor(row);
+            if (row) void workbenchReveal.after(openYamlEditor(row));
           }}
           onCopyKubectlGetYaml={() => {
             const row = firstSelected();
@@ -5565,7 +5570,7 @@ spec:
                   disabled={actionInFlight}
                   isBusy={actionInFlight}
                   onShowDetails={() => showDetails(row)}
-                  onEditYaml={() => void openYamlEditor(row)}
+                  onEditYaml={() => void workbenchReveal.after(openYamlEditor(row))}
                   onCopyKubectlGetYaml={() =>
                     void copyRowCommand(
                       row,
@@ -5830,7 +5835,7 @@ spec:
                       disabled={actionInFlight}
                       isBusy={actionInFlight}
                       onShowDetails={() => showDetails(row)}
-                      onEditYaml={() => void openYamlEditor(row)}
+                      onEditYaml={() => void workbenchReveal.after(openYamlEditor(row))}
                       onCopyKubectlGetYaml={() =>
                         void copyRowCommand(
                           row,
@@ -6104,7 +6109,7 @@ spec:
               icon: Pencil,
               onClick: () => {
                 detailsOpen = false;
-                void tick().then(() => openYamlEditor(detailRow));
+                void tick().then(() => workbenchReveal.after(openYamlEditor(detailRow)));
               },
             },
             ...(workloadKey === "services"
@@ -6631,7 +6636,7 @@ spec:
       const row = portForwardDialogRow;
       portForwardDialogRow = null;
       portForwardDialogTarget = null;
-      if (row) void startServicePortForward(row, choice);
+      if (row) void workbenchReveal.after(startServicePortForward(row, choice));
     }}
   />
 </div>

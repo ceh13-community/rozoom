@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import ScaleDialog from "$shared/ui/scale-dialog.svelte";
@@ -216,19 +217,21 @@
             if (statefulSet) openSheet(statefulSet);
           },
           onLogs: () => {
-            if (statefulSet) openLogsForStatefulSet(statefulSet);
+            if (statefulSet) void workbenchReveal.after(openLogsForStatefulSet(statefulSet));
           },
           onEvents: () => {
-            if (statefulSet) void openEventsForStatefulSet(statefulSet);
+            if (statefulSet) void workbenchReveal.after(openEventsForStatefulSet(statefulSet));
           },
           onScale: () => {
             if (statefulSet) void scaleStatefulSets([statefulSet]);
           },
           onEditYaml: () => {
-            if (statefulSet) openYamlForStatefulSet(statefulSet);
+            if (statefulSet) void workbenchReveal.after(openYamlForStatefulSet(statefulSet));
           },
           onInvestigate: () => {
-            if (statefulSet) openStatefulSetInvestigationWorkspace(statefulSet);
+            if (statefulSet) {
+              void workbenchReveal.after(openStatefulSetInvestigationWorkspace(statefulSet));
+            }
           },
           onCopyDescribe: () => {
             if (statefulSet) void copyDescribeCommandForStatefulSet(statefulSet);
@@ -237,10 +240,14 @@
             if (statefulSet) openDebugDescribeForStatefulSet(statefulSet);
           },
           onRolloutStatus: () => {
-            if (statefulSet) void openRolloutCommandForStatefulSet("status", statefulSet);
+            if (statefulSet) {
+              void workbenchReveal.after(openRolloutCommandForStatefulSet("status", statefulSet));
+            }
           },
           onRolloutHistory: () => {
-            if (statefulSet) void openRolloutCommandForStatefulSet("history", statefulSet);
+            if (statefulSet) {
+              void workbenchReveal.after(openRolloutCommandForStatefulSet("history", statefulSet));
+            }
           },
           onRestart: () => {
             if (statefulSet) void restartStatefulSets([statefulSet]);
@@ -2063,6 +2070,9 @@
       return watcherEnabled;
     },
   });
+
+  // Row actions reveal the workbench and focus it, as in Pods.
+  const workbenchReveal = createWorkbenchReveal();
 </script>
 
 <div class="grid w-full grid-cols-1 overflow-visible">
@@ -2108,6 +2118,7 @@
       }`}
     >
       <MultiPaneWorkbench
+        revealToken={workbenchReveal.token}
         tabs={orderedWorkbenchTabs}
         {paneTabIds}
         activeTabId={activeWorkbenchTabId}
@@ -2517,19 +2528,21 @@
           }}
           onLogs={() => {
             if (selectedStatefulSets.length !== 1) return;
-            openLogsForStatefulSet(selectedStatefulSets[0]);
+            void workbenchReveal.after(openLogsForStatefulSet(selectedStatefulSets[0]));
           }}
           onEvents={() => {
             if (selectedStatefulSets.length !== 1) return;
-            void openEventsForStatefulSet(selectedStatefulSets[0]);
+            void workbenchReveal.after(openEventsForStatefulSet(selectedStatefulSets[0]));
           }}
           onEditYaml={() => {
             if (selectedStatefulSets.length !== 1) return;
-            openYamlForStatefulSet(selectedStatefulSets[0]);
+            void workbenchReveal.after(openYamlForStatefulSet(selectedStatefulSets[0]));
           }}
           onInvestigate={() => {
             if (selectedStatefulSets.length !== 1) return;
-            openStatefulSetInvestigationWorkspace(selectedStatefulSets[0]);
+            void workbenchReveal.after(
+              openStatefulSetInvestigationWorkspace(selectedStatefulSets[0]),
+            );
           }}
           onCopyDescribe={() => {
             if (selectedStatefulSets.length !== 1) return;
@@ -2544,11 +2557,15 @@
           }}
           onRolloutStatus={() => {
             if (selectedStatefulSets.length !== 1) return;
-            void openRolloutCommandForStatefulSet("status", selectedStatefulSets[0]);
+            void workbenchReveal.after(
+              openRolloutCommandForStatefulSet("status", selectedStatefulSets[0]),
+            );
           }}
           onRolloutHistory={() => {
             if (selectedStatefulSets.length !== 1) return;
-            void openRolloutCommandForStatefulSet("history", selectedStatefulSets[0]);
+            void workbenchReveal.after(
+              openRolloutCommandForStatefulSet("history", selectedStatefulSets[0]),
+            );
           }}
           onScale={() => {
             void scaleStatefulSets(selectedStatefulSets);
@@ -2638,19 +2655,21 @@
   eventsLoading={detailsLoading}
   eventsError={detailsError}
   onLogs={(item) => {
-    void openLogsForStatefulSet(item as unknown as StatefulSetItem);
+    void workbenchReveal.after(openLogsForStatefulSet(item as unknown as StatefulSetItem));
   }}
   onEvents={(item) => {
-    void openEventsForStatefulSet(item as unknown as StatefulSetItem);
+    void workbenchReveal.after(openEventsForStatefulSet(item as unknown as StatefulSetItem));
   }}
   onScale={(item) => {
     void scaleStatefulSets([item as unknown as StatefulSetItem]);
   }}
   onEditYaml={(item) => {
-    void openYamlForStatefulSet(item as unknown as StatefulSetItem);
+    void workbenchReveal.after(openYamlForStatefulSet(item as unknown as StatefulSetItem));
   }}
   onInvestigate={(item) => {
-    void openStatefulSetInvestigationWorkspace(item as unknown as StatefulSetItem);
+    void workbenchReveal.after(
+      openStatefulSetInvestigationWorkspace(item as unknown as StatefulSetItem),
+    );
   }}
   onCopyDescribe={(item) => {
     void copyDescribeCommandForStatefulSet(item as unknown as StatefulSetItem);
@@ -2662,10 +2681,14 @@
     void downloadYamlForStatefulSets([item as unknown as StatefulSetItem]);
   }}
   onRolloutStatus={(item) => {
-    void openRolloutCommandForStatefulSet("status", item as unknown as StatefulSetItem);
+    void workbenchReveal.after(
+      openRolloutCommandForStatefulSet("status", item as unknown as StatefulSetItem),
+    );
   }}
   onRolloutHistory={(item) => {
-    void openRolloutCommandForStatefulSet("history", item as unknown as StatefulSetItem);
+    void workbenchReveal.after(
+      openRolloutCommandForStatefulSet("history", item as unknown as StatefulSetItem),
+    );
   }}
   onRestart={(item) => {
     void restartStatefulSets([item as unknown as StatefulSetItem]);

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import ScaleDialog from "$shared/ui/scale-dialog.svelte";
@@ -195,13 +196,15 @@
             if (statefulSet) openSheet(statefulSet);
           },
           onLogs: () => {
-            if (statefulSet) openLogsForReplicaSet(statefulSet);
+            if (statefulSet) void workbenchReveal.after(openLogsForReplicaSet(statefulSet));
           },
           onEditYaml: () => {
-            if (statefulSet) openYamlForReplicaSet(statefulSet);
+            if (statefulSet) void workbenchReveal.after(openYamlForReplicaSet(statefulSet));
           },
           onInvestigate: () => {
-            if (statefulSet) openReplicaSetInvestigationWorkspace(statefulSet);
+            if (statefulSet) {
+              void workbenchReveal.after(openReplicaSetInvestigationWorkspace(statefulSet));
+            }
           },
           onCopyDescribe: () => {
             if (statefulSet) void copyDescribeCommandForReplicaSet(statefulSet);
@@ -1832,6 +1835,9 @@
       return watcherEnabled;
     },
   });
+
+  // Row actions reveal the workbench and focus it, as in Pods.
+  const workbenchReveal = createWorkbenchReveal();
 </script>
 
 <div class="grid w-full grid-cols-1 overflow-visible">
@@ -1877,6 +1883,7 @@
       }`}
     >
       <MultiPaneWorkbench
+        revealToken={workbenchReveal.token}
         tabs={orderedWorkbenchTabs}
         {paneTabIds}
         activeTabId={activeWorkbenchTabId}
@@ -2198,15 +2205,17 @@
           }}
           onLogs={() => {
             if (selectedReplicaSets.length !== 1) return;
-            openLogsForReplicaSet(selectedReplicaSets[0]);
+            void workbenchReveal.after(openLogsForReplicaSet(selectedReplicaSets[0]));
           }}
           onEditYaml={() => {
             if (selectedReplicaSets.length !== 1) return;
-            openYamlForReplicaSet(selectedReplicaSets[0]);
+            void workbenchReveal.after(openYamlForReplicaSet(selectedReplicaSets[0]));
           }}
           onInvestigate={() => {
             if (selectedReplicaSets.length !== 1) return;
-            openReplicaSetInvestigationWorkspace(selectedReplicaSets[0]);
+            void workbenchReveal.after(
+              openReplicaSetInvestigationWorkspace(selectedReplicaSets[0]),
+            );
           }}
           onCopyDescribe={() => {
             if (selectedReplicaSets.length !== 1) return;
@@ -2304,16 +2313,18 @@
   eventsLoading={detailsLoading}
   eventsError={detailsError}
   onLogs={(item) => {
-    void openLogsForReplicaSet(item as unknown as ReplicaSetItem);
+    void workbenchReveal.after(openLogsForReplicaSet(item as unknown as ReplicaSetItem));
   }}
   onScale={(item) => {
     void scaleReplicaSets([item as unknown as ReplicaSetItem]);
   }}
   onEditYaml={(item) => {
-    void openYamlForReplicaSet(item as unknown as ReplicaSetItem);
+    void workbenchReveal.after(openYamlForReplicaSet(item as unknown as ReplicaSetItem));
   }}
   onInvestigate={(item) => {
-    void openReplicaSetInvestigationWorkspace(item as unknown as ReplicaSetItem);
+    void workbenchReveal.after(
+      openReplicaSetInvestigationWorkspace(item as unknown as ReplicaSetItem),
+    );
   }}
   onCopyDescribe={(item) => {
     void copyDescribeCommandForReplicaSet(item as unknown as ReplicaSetItem);

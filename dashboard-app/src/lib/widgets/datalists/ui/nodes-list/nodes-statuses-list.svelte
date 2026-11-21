@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createWorkbenchReveal } from "../common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "../common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "../common/realtime-expand.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
@@ -1338,7 +1339,7 @@
         void handleDrain(row);
       },
       onEditYaml: (row) => {
-        void openNodeYamlEditor(row);
+        void workbenchReveal.after(openNodeYamlEditor(row));
       },
       onCopyDescribe: (row) => {
         void copyDescribeForNode(row);
@@ -1378,6 +1379,9 @@
       return watcherEnabled;
     },
   });
+
+  // Row actions reveal the workbench and focus it, as in Pods.
+  const workbenchReveal = createWorkbenchReveal();
 </script>
 
 {#if allNodeData.length}
@@ -1392,6 +1396,7 @@
 
   {#if hasWorkbenchTabs}
     <MultiPaneWorkbench
+      revealToken={workbenchReveal.token}
       tabs={orderedWorkbenchTabs}
       {paneTabIds}
       activeTabId={activeWorkbenchTabId}
@@ -1593,7 +1598,7 @@
           onEditYaml={() => {
             const selected = selectedNodes[0];
             if (!selected) return;
-            void openNodeYamlEditor(selected);
+            void workbenchReveal.after(openNodeYamlEditor(selected));
           }}
           onCopyDescribe={() => {
             const selected = selectedNodes[0];

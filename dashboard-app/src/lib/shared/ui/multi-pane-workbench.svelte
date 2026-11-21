@@ -201,6 +201,8 @@
 </script>
 
 <!-- The region takes focus after a row action; Esc on it closes the active tab. -->
+<!-- z-20: above sticky table headers (z-10), under the sticky page header (z-30), which
+     a scrolled workbench used to cover. Menus render in body and are not affected. -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
   bind:this={rootEl}
@@ -211,7 +213,7 @@
   class={`overflow-hidden bg-card pointer-events-auto outline-none focus-visible:ring-2 focus-visible:ring-ring ${
     fullscreen
       ? "fixed inset-0 z-[120] mb-0 flex h-[100dvh] w-[100vw] flex-col rounded-none border-0 shadow-none"
-      : "relative z-[100] mb-4 scroll-mt-32 rounded-lg border shadow-sm"
+      : "relative z-20 mb-4 scroll-mt-32 rounded-lg border shadow-sm"
   }`}
 >
   <WorkbenchHeader {tabs}>

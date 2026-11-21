@@ -2,7 +2,8 @@
   import { provideListFreshness } from "../common/list-freshness-context.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
   import { liveAge } from "$shared/lib/live-age.svelte";
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, tick } from "svelte";
+  import { isTypingOutside, revealResult } from "$shared/lib/reveal-result";
   import { resolvePageClusterName, type PageData } from "$entities/cluster";
   import { runDebugDescribe } from "$features/resource-debug-runtime";
   import { confirmAction } from "$shared/lib/confirm-action";
@@ -521,6 +522,22 @@
     actionNotification = notifySuccess(`Opened debug describe for ${row.name}.`);
   }
 
+  let instancesSection = $state<HTMLElement | null>(null);
+
+  /**
+   * Browse instances fills a section below the definitions table: show it and move focus
+   * there right away (it shows the loading state), unless the person is typing elsewhere.
+   */
+  function browseInstances(row: CustomResourceRow) {
+    const loading = loadInstances(row);
+    void tick().then(() => {
+      const section = instancesSection;
+      if (!section || isTypingOutside(document.activeElement, section)) return;
+      revealResult(section);
+    });
+    return loading;
+  }
+
   async function loadInstances(row: CustomResourceRow) {
     if (!data.slug) return;
     activeInstancesDefinition = row;
@@ -888,7 +905,7 @@
           onBrowseInstances={() => {
             const row = selectedRows[0];
             if (!row) return;
-            void loadInstances(row);
+            void browseInstances(row);
           }}
           onCopyKubectlGetYaml={() => {
             const row = selectedRows[0];
@@ -1033,7 +1050,7 @@
                       label: "Browse instances",
                       icon: FolderSearch,
                       action: () => {
-                        void loadInstances(row);
+                        void browseInstances(row);
                       },
                     },
                   ]}
@@ -1082,7 +1099,12 @@
   </TableSurface>
 
   {#if activeInstancesDefinition}
-    <section class="rounded-lg border border-border/60 bg-background/40">
+    <section
+      bind:this={instancesSection}
+      tabindex="-1"
+      aria-label={`Instances for ${activeInstancesDefinition.resource}.${activeInstancesDefinition.group}`}
+      class="scroll-mt-32 rounded-lg border border-border/60 bg-background/40 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       <div class="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
         <div>
           <div class="text-sm font-semibold text-foreground">
@@ -1229,7 +1251,7 @@
     }}
     onBrowseInstances={(row) => {
       detailsOpen = false;
-      void loadInstances(row);
+      void browseInstances(row);
     }}
     onDelete={(row) => {
       void deleteRows([row]);
