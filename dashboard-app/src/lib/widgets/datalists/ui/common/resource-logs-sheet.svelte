@@ -52,6 +52,10 @@
     mode: "poll" | "stream-f";
     lastUpdatedAt: number | null;
     previous: boolean;
+    /** False when the container has no earlier instance: Previous is disabled. */
+    previousAvailable?: boolean;
+    /** Why Previous is disabled, shown on hover and read by screen readers. */
+    previousHint?: string;
     selectedContainer: string;
     containerOptions: string[];
     bookmarks: LogBookmark[];
@@ -86,6 +90,8 @@
     mode,
     lastUpdatedAt,
     previous,
+    previousAvailable = true,
+    previousHint = "",
     selectedContainer,
     containerOptions,
     bookmarks,
@@ -102,6 +108,10 @@
     isVerticallyCollapsed = false,
     onToggleVerticalCollapse = () => {},
   }: ResourceLogsSheetProps = $props();
+
+  // Several log panes can be open at once: ids must not repeat.
+  const componentId = $props.id();
+  const previousHintId = `${componentId}-previous-hint`;
 
   const LINE_HEIGHT = 18;
   const BUFFER_LINES = 40;
@@ -415,9 +425,24 @@
         <option value={containerName}>{containerName}</option>
       {/each}
     </select>
-    <Button variant={previous ? "default" : "outline"} size="sm" onclick={() => onTogglePrevious()}>
-      {previous ? "Previous: On" : "Previous: Off"}
-    </Button>
+    <!-- The hint sits on a wrapper: a disabled button gets no pointer events. -->
+    <span class="inline-flex" title={!previousAvailable && !previous ? previousHint : undefined}>
+      <Button
+        variant={previous ? "default" : "outline"}
+        size="sm"
+        disabled={!previousAvailable && !previous}
+        aria-describedby={!previousAvailable && !previous && previousHint
+          ? previousHintId
+          : undefined}
+        data-testid="logs-previous-toggle"
+        onclick={() => onTogglePrevious()}
+      >
+        {previous ? "Previous: On" : "Previous: Off"}
+      </Button>
+      {#if !previousAvailable && !previous && previousHint}
+        <span id={previousHintId} class="sr-only">{previousHint}</span>
+      {/if}
+    </span>
     <div class="text-xs text-muted-foreground">{allLines.length} lines</div>
     <Button
       variant="outline"
