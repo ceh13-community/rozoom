@@ -29,6 +29,7 @@ describe("pods-watcher", () => {
       "get pods --all-namespaces -o json --watch-only --output-watch-events --request-timeout=300s",
       "cluster-1",
       expect.any(Function),
+      expect.any(Function),
     );
   });
 

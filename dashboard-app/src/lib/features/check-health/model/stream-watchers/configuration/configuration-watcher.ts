@@ -3,6 +3,7 @@ import type { WorkloadType } from "$shared/model/workloads";
 import { KubectlWatcher } from "../watcher-model";
 import { buildKubectlWatchCommand } from "../watch-command";
 import { reportWatcherRuntimeError } from "../watcher-runtime-error";
+import { createConfigurationJsonLineParser } from "./configuration-parser";
 
 const active = new Map<string, KubectlWatcher>();
 
@@ -24,9 +25,14 @@ export function startConfigurationWatcher(clusterId: string, workloadType: Workl
   if (!command) return;
   const watcher = new KubectlWatcher();
   active.set(key, watcher);
-  void watcher.start(command, clusterId, (error) => {
-    reportWatcherRuntimeError({ clusterId, kind: workloadType }, error);
-  });
+  void watcher.start(
+    command,
+    clusterId,
+    (error) => {
+      reportWatcherRuntimeError({ clusterId, kind: workloadType }, error);
+    },
+    createConfigurationJsonLineParser(workloadType),
+  );
 }
 
 export function stopConfigurationWatcher(clusterId: string, workloadType: WorkloadType) {

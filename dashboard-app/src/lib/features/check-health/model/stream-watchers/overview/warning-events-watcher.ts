@@ -1,6 +1,7 @@
 import { derived, writable, type Readable } from "svelte/store";
 import { KubectlWatcher } from "../watcher-model";
 import { buildKubectlWatchCommand } from "../watch-command";
+import { parseWarningEventJsonLine } from "./warning-events-parser";
 
 const active = new Map<string, KubectlWatcher>();
 const watcherErrors = writable<Record<string, string | null>>({});
@@ -43,9 +44,14 @@ export function startOverviewWarningEventsWatcher(clusterId: string) {
   setWatcherError(clusterId, null);
 
   void watcher
-    .start(WARNING_EVENTS_WATCH_COMMAND, clusterId, (err) => {
-      setWatcherError(clusterId, err || "Warning events watcher failed.");
-    })
+    .start(
+      WARNING_EVENTS_WATCH_COMMAND,
+      clusterId,
+      (err) => {
+        setWatcherError(clusterId, err || "Warning events watcher failed.");
+      },
+      parseWarningEventJsonLine,
+    )
     .catch((error: unknown) => {
       active.delete(clusterId);
       setWatcherError(
