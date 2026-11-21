@@ -29,7 +29,6 @@ type WatchResourceOptions<T> = {
   resourceVersion: string;
   signal?: AbortSignal;
   timeoutSeconds?: number;
-  sendInitialEvents?: boolean;
   onEvent: (event: KubernetesWatchEvent<T>) => void;
 };
 
@@ -44,6 +43,28 @@ type WatchResourceOptions<T> = {
  */
 function proxyFetch(url: string, init: RequestInit): Promise<Response> {
   return isTauriAvailable() ? tauriFetch(url, init) : fetch(url, init);
+}
+
+/**
+ * One AbortController per request, linked to the caller's long-lived signal and
+ * unlinked when the request is done. The HTTP plugin adds abort listeners to the
+ * signal it gets and never removes them; given the session signal directly,
+ * every list and watch of the session left two listeners behind, and aborting
+ * the session fired cancels for requests that had long finished.
+ */
+function linkRequestSignal(signal?: AbortSignal) {
+  const controller = new AbortController();
+  const abort = () => {
+    controller.abort(signal?.reason);
+  };
+  if (signal?.aborted) abort();
+  else signal?.addEventListener("abort", abort, { once: true });
+  return {
+    signal: controller.signal,
+    dispose: () => {
+      signal?.removeEventListener("abort", abort);
+    },
+  };
 }
 
 function buildUrl(baseUrl: string, path: string, query?: URLSearchParams) {
@@ -64,12 +85,13 @@ export async function listKubeResource<Item>(
   options: ListResourceOptions,
 ): Promise<{ items: Item[]; resourceVersion: string }> {
   const proxy = await acquireKubeApiProxy(options.clusterId);
+  const request = linkRequestSignal(options.signal);
   try {
     const response = await proxyFetch(buildUrl(proxy.baseUrl, options.path), {
       method: "GET",
       cache: "no-store",
       headers: { Accept: "application/json" },
-      signal: options.signal,
+      signal: request.signal,
     });
 
     if (!response.ok) {
@@ -82,6 +104,7 @@ export async function listKubeResource<Item>(
       resourceVersion: payload.metadata?.resourceVersion ?? "",
     };
   } finally {
+    request.dispose();
     await releaseKubeApiProxy(proxy);
   }
 }
@@ -94,20 +117,18 @@ export async function watchKubeResource<T>(options: WatchResourceOptions<T>) {
     resourceVersion: options.resourceVersion,
     timeoutSeconds: String(options.timeoutSeconds ?? 300),
   });
-  // resourceVersionMatch on a watch is only valid together with sendInitialEvents;
-  // the API server answers 422 otherwise. A plain watch from the list's
-  // resourceVersion continues exactly where the list ended.
-  if (options.sendInitialEvents) {
-    query.set("sendInitialEvents", "true");
-    query.set("resourceVersionMatch", "NotOlderThan");
-  }
+  // A plain watch from the list's resourceVersion continues exactly where the
+  // list ended. No resourceVersionMatch: the API server rejects it on a watch
+  // unless sendInitialEvents is set, and that needs the WatchList feature gate
+  // (off on 1.33 by default), so it is not used at all.
 
+  const request = linkRequestSignal(options.signal);
   try {
     const response = await proxyFetch(buildUrl(proxy.baseUrl, options.path, query), {
       method: "GET",
       cache: "no-store",
       headers: { Accept: "application/json" },
-      signal: options.signal,
+      signal: request.signal,
     });
 
     if (response.status === 410) {
@@ -165,6 +186,7 @@ export async function watchKubeResource<T>(options: WatchResourceOptions<T>) {
 
     return { expired: false as const, resourceVersion: latestResourceVersion };
   } finally {
+    request.dispose();
     await releaseKubeApiProxy(proxy);
   }
 }

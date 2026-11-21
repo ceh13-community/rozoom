@@ -240,6 +240,24 @@ describe("api-resource-sync", () => {
     sync.stop("cluster-a");
   });
 
+  it("does not open a watch when the list has no resourceVersion to start from", async () => {
+    listMock.mockResolvedValue({ items: [], resourceVersion: "" });
+
+    const { createApiResourceSync } = await import("./api-resource-sync");
+    const sync = createApiResourceSync({
+      getPath: () => "/api/v1/pods",
+      kind: "pod",
+      setInitial: vi.fn(),
+    });
+    sync.start("cluster-a");
+
+    await vi.waitFor(() => {
+      expect(get(sync.selectRuntimeState("cluster-a")).error).toContain("no resourceVersion");
+    });
+    expect(watchMock).not.toHaveBeenCalled();
+    sync.stop("cluster-a");
+  });
+
   it("ref-counts subscribers so one cluster session is shared", async () => {
     let resolveList:
       | ((value: {

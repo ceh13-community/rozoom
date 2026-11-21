@@ -172,11 +172,66 @@ describe("kube-api-client", () => {
       clusterId: "cluster-a",
       path: "/api/v1/pods",
       resourceVersion: "55",
-      sendInitialEvents: true,
       onEvent: vi.fn(),
     });
 
     expect(result).toEqual({ expired: true, resourceVersion: "55" });
-    expect(vi.mocked(fetch).mock.calls[0]?.[0]).toContain("sendInitialEvents=true");
+  });
+
+  it("links each request to the caller's signal and unlinks it when done", async () => {
+    isTauriAvailableMock.mockReturnValue(true);
+    tauriFetchMock
+      .mockResolvedValueOnce(makeJsonResponse({ metadata: { resourceVersion: "7" }, items: [] }))
+      .mockResolvedValueOnce(
+        new Response(
+          '{"type":"ADDED","object":{"metadata":{"name":"a","resourceVersion":"8"}}}\n',
+          {
+            status: 200,
+          },
+        ),
+      );
+    const session = new AbortController();
+    const added = vi.spyOn(session.signal, "addEventListener");
+    const removed = vi.spyOn(session.signal, "removeEventListener");
+
+    const { listKubeResource, watchKubeResource } = await import("./kube-api-client");
+    await listKubeResource({
+      clusterId: "cluster-a",
+      path: "/api/v1/pods",
+      signal: session.signal,
+    });
+    await watchKubeResource({
+      clusterId: "cluster-a",
+      path: "/api/v1/pods",
+      resourceVersion: "7",
+      signal: session.signal,
+      onEvent: vi.fn(),
+    });
+
+    // The plugin gets a per-request signal, never the long-lived session signal.
+    for (const call of tauriFetchMock.mock.calls) {
+      expect((call[1] as RequestInit).signal).not.toBe(session.signal);
+    }
+    expect(added).toHaveBeenCalledTimes(2);
+    expect(removed).toHaveBeenCalledTimes(2);
+  });
+
+  it("aborts the request when the caller's signal aborts", async () => {
+    isTauriAvailableMock.mockReturnValue(true);
+    let requestSignal: AbortSignal | undefined;
+    tauriFetchMock.mockImplementationOnce((_url: string, init: RequestInit) => {
+      requestSignal = init.signal ?? undefined;
+      return new Promise<Response>(() => {});
+    });
+    const session = new AbortController();
+
+    const { listKubeResource } = await import("./kube-api-client");
+    void listKubeResource({ clusterId: "cluster-a", path: "/api/v1/pods", signal: session.signal });
+    await vi.waitFor(() => {
+      expect(requestSignal).toBeDefined();
+    });
+    session.abort();
+
+    expect(requestSignal?.aborted).toBe(true);
   });
 });
