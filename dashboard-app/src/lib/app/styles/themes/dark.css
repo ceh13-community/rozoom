@@ -16,7 +16,8 @@
 
   .dark:not(.k9s) .dashboard-workloads-sidebar,
   .dark:not(.k9s) .cluster-sticky-shell {
-    background: linear-gradient(180deg, hsl(222 34% 11% / 0.96) 0%, hsl(223 31% 10% / 0.92) 100%);
+    /* Opaque: the page scrolls under the sticky header, and table rows showed through. */
+    background: linear-gradient(180deg, hsl(222 34% 11%) 0%, hsl(223 31% 10%) 100%);
     border-color: hsl(217 24% 20%);
     box-shadow:
       inset 0 1px 0 hsl(217 91% 60% / 0.06),

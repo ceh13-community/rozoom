@@ -49,9 +49,13 @@
       inset 0 1px 0 hsl(0 0% 100% / 0.75);
   }
 
-  html:not(.dark):not(.k9s) .dashboard-workloads-sidebar,
-  html:not(.dark):not(.k9s) .cluster-sticky-shell {
+  html:not(.dark):not(.k9s) .dashboard-workloads-sidebar {
     background: linear-gradient(180deg, hsl(0 0% 100% / 0.96) 0%, hsl(208 100% 98% / 0.92) 100%);
+  }
+
+  /* Opaque: the page scrolls under this sticky header, and table rows showed through. */
+  html:not(.dark):not(.k9s) .cluster-sticky-shell {
+    background: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(208 100% 98%) 100%);
   }
 
   html:not(.dark):not(.k9s) .data-mode-card,
