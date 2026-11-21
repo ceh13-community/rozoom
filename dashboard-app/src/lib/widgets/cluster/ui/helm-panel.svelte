@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { tick } from "svelte";
+  import { isTypingOutside, revealResult } from "$shared/lib/reveal-result";
   import {
     addHelmRepo,
     getHelmReleaseHistory,
@@ -119,6 +121,18 @@
   ) {
     const name = "releaseName" in release ? release.releaseName : release.name;
     return `release:${action}:${release.namespace}:${name}`;
+  }
+
+  let releaseInspectorEl = $state<HTMLElement | null>(null);
+
+  // History, Status, Values and Manifest fill the inspector below the releases table:
+  // bring it into view and focus it, as row actions do in the lists, unless the person
+  // is typing elsewhere meanwhile.
+  async function revealInspector() {
+    await tick();
+    const inspector = releaseInspectorEl;
+    if (!inspector || isTypingOutside(document.activeElement, inspector)) return;
+    revealResult(inspector);
   }
 
   function clearInspector() {
@@ -438,6 +452,7 @@
     actionNotice = null;
     selectedRelease = { releaseName: release.name, namespace: release.namespace };
     clearInspector();
+    void revealInspector();
     try {
       const result = await getHelmReleaseStatus(clusterId, selectedRelease);
       if (result.error) {
@@ -456,6 +471,7 @@
     actionNotice = null;
     selectedRelease = { releaseName: release.name, namespace: release.namespace };
     clearInspector();
+    void revealInspector();
     try {
       const result = await getHelmReleaseHistory(clusterId, selectedRelease);
       if (result.error) {
@@ -474,6 +490,7 @@
     actionNotice = null;
     selectedRelease = { releaseName: release.name, namespace: release.namespace };
     clearInspector();
+    void revealInspector();
     try {
       const result = await getHelmReleaseValues(clusterId, {
         ...selectedRelease,
@@ -495,6 +512,7 @@
     actionNotice = null;
     selectedRelease = { releaseName: release.name, namespace: release.namespace };
     clearInspector();
+    void revealInspector();
     try {
       const result = await getHelmReleaseManifest(clusterId, selectedRelease);
       if (result.error) {
@@ -1174,7 +1192,12 @@
       </Table.Table>
     </TableSurface>
 
-    <div class="rounded-lg border border-border p-4">
+    <div
+      bind:this={releaseInspectorEl}
+      tabindex="-1"
+      aria-label="Release inspector"
+      class="scroll-mt-32 rounded-lg border border-border p-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       <div class="flex flex-wrap items-center gap-2">
         <p class="text-sm font-semibold">Release inspector</p>
         {#if selectedRelease}

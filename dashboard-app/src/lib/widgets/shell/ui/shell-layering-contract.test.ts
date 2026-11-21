@@ -17,8 +17,12 @@ describe("shell/workbench layering contract", () => {
     expect(namespaceSelect).toContain("z-[95]");
     expect(multiPaneWorkbench).toContain("fixed inset-0 z-[120]");
     expect(daemonSetsList).toContain("fixed inset-0 z-[120]");
-    expect(multiPaneWorkbench).toContain("relative z-[100]");
-    expect(daemonSetsList).toContain("relative z-[100]");
+    // In the page the workbench sits above sticky table headers (z-10) and under the
+    // sticky page header (z-30); at z-[100] a scrolled workbench covered that header.
+    expect(multiPaneWorkbench).toContain("relative z-20");
+    expect(daemonSetsList).toContain("relative z-20");
+    expect(multiPaneWorkbench).not.toContain("relative z-[100]");
+    expect(daemonSetsList).not.toContain("relative z-[100]");
   });
 
   it("renders cluster action panels and workbench fullscreen above the shell terminal", () => {

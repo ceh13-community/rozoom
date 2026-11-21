@@ -1879,7 +1879,7 @@
       class={`overflow-hidden bg-card pointer-events-auto ${
         workbenchFullscreen
           ? "fixed inset-0 z-[120] mb-0 flex h-[100dvh] w-[100vw] flex-col rounded-none border-0 shadow-none"
-          : "relative z-[100] mb-4 rounded-lg border shadow-sm"
+          : "relative z-20 mb-4 scroll-mt-32 rounded-lg border shadow-sm"
       }`}
     >
       <MultiPaneWorkbench

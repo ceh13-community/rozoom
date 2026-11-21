@@ -32,10 +32,17 @@ describe("workbench reveal after row actions", () => {
     expect(deployments).toMatch(/function refreshYamlForTab[\s\S]*?void openYamlForDeployment\(/);
   });
 
-  it("keeps the workbench under the sticky page header", () => {
-    const workbench = read("../../../shared/ui/multi-pane-workbench.svelte");
-    expect(workbench).toContain('"relative z-20 mb-4 scroll-mt-32');
-    expect(workbench).not.toContain("relative z-[100]");
+  it.each([
+    "../../../shared/ui/multi-pane-workbench.svelte",
+    "cron-jobs-list.svelte",
+    "jobs-list.svelte",
+    "stateful-sets-list.svelte",
+    "daemon-sets-list.svelte",
+    "replica-sets-list.svelte",
+  ])("%s keeps the workbench under the sticky page header", (file) => {
+    const source = read(file);
+    expect(source).toContain('"relative z-20 mb-4 scroll-mt-32');
+    expect(source).not.toContain("relative z-[100]");
   });
 
   it("shows and focuses the CRD instances after Browse instances, not after its Refresh", () => {
@@ -45,5 +52,17 @@ describe("workbench reveal after row actions", () => {
     expect(source).toContain("bind:this={instancesSection}");
     expect(source.match(/void browseInstances\(row\)/g)).toHaveLength(3);
     expect(source).toContain("void loadInstances(activeInstancesDefinition);");
+  });
+
+  it("reveals the Helm release inspector after History, Status, Values and Manifest", () => {
+    const helm = read("../../cluster/ui/helm-panel.svelte");
+    expect(helm.match(/clearInspector\(\);\n    void revealInspector\(\);/g)).toHaveLength(4);
+    expect(helm).toContain("bind:this={releaseInspectorEl}");
+  });
+
+  it("brings the Workload Map node details into view, focus stays on the node", () => {
+    const map = read("../../../shared/plugins/contrib/workload-visualizer/visualizer-panel.svelte");
+    expect(map).toContain("revealResult(selectedDetailEl, { focus: false })");
+    expect(map).toContain("onclick={() => void selectNode(node)}");
   });
 });
