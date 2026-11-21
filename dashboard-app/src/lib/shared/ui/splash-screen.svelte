@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
+  // Same source as the sidebar: package.json at build time, set by the release bump.
+  const appVersion: string = __APP_VERSION__;
+
   let visible = $state(true);
   let fadeOut = $state(false);
 
@@ -105,6 +108,8 @@
         <span class="tag tag-green">Linter</span>
         <span class="tag tag-amber">IDE</span>
       </div>
+
+      <div class="version" data-testid="splash-version">v{appVersion}</div>
 
       <!-- Loading dots -->
       <div class="dots">
@@ -229,6 +234,12 @@
     border: 1px solid rgba(240, 176, 64, 0.28);
   }
 
+  .version {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    color: rgba(200, 220, 255, 0.55);
+    margin-top: -2px;
+  }
   .dots {
     display: flex;
     gap: 6px;
