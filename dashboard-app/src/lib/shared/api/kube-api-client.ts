@@ -94,9 +94,9 @@ export async function watchKubeResource<T>(options: WatchResourceOptions<T>) {
     resourceVersion: options.resourceVersion,
     timeoutSeconds: String(options.timeoutSeconds ?? 300),
   });
-  if (options.resourceVersion) {
-    query.set("resourceVersionMatch", "NotOlderThan");
-  }
+  // resourceVersionMatch on a watch is only valid together with sendInitialEvents;
+  // the API server answers 422 otherwise. A plain watch from the list's
+  // resourceVersion continues exactly where the list ended.
   if (options.sendInitialEvents) {
     query.set("sendInitialEvents", "true");
     query.set("resourceVersionMatch", "NotOlderThan");

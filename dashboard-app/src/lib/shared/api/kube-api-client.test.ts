@@ -133,6 +133,12 @@ describe("kube-api-client", () => {
 
     expect(events).toEqual([{ type: "ADDED" }, { type: "BOOKMARK" }]);
     expect(result).toEqual({ expired: false, resourceVersion: "57" });
+    // The API server rejects resourceVersionMatch on a watch without
+    // sendInitialEvents (422), so a plain watch must not send it.
+    const watchUrl = new URL(String(vi.mocked(fetch).mock.calls[0]?.[0]));
+    expect(watchUrl.searchParams.get("resourceVersion")).toBe("55");
+    expect(watchUrl.searchParams.has("resourceVersionMatch")).toBe(false);
+    expect(watchUrl.searchParams.has("sendInitialEvents")).toBe(false);
     expect(releaseMock).toHaveBeenCalledWith({
       clusterId: "cluster-a",
       baseUrl: "http://127.0.0.1:39123",
