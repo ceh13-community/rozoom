@@ -24,7 +24,8 @@
 
   .k9s .dashboard-workloads-sidebar,
   .k9s .cluster-sticky-shell {
-    background: linear-gradient(180deg, hsl(0 0% 3% / 0.96) 0%, hsl(210 26% 6% / 0.9) 100%);
+    /* Opaque: the page scrolls under the sticky header, and table rows showed through. */
+    background: linear-gradient(180deg, hsl(0 0% 3%) 0%, hsl(210 26% 6%) 100%);
   }
 
   .k9s .dashboard-workloads-nav::after {

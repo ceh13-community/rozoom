@@ -428,7 +428,7 @@
     <div class="flex-1 overflow-y-auto p-4">
       {#if $data}
         <div
-          class="-mx-4 mb-4 sticky top-0 z-20 border-b bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/85"
+          class="-mx-4 mb-4 sticky top-0 z-20 border-b bg-background px-4 py-3"
         >
           <div class="flex items-center justify-between gap-2">
             <div class="min-w-0 flex items-center gap-2">

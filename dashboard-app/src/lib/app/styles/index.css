@@ -111,16 +111,17 @@
 }
 
 @layer components {
+  /* Opaque: rows scroll under sticky table headers and showed through the 80-95% fill. */
   .sticky-table-header {
-    @apply sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80;
+    @apply sticky top-0 z-10 bg-background;
   }
 
   .sticky-table-cell {
-    @apply sticky top-0 z-10 h-10 bg-background/95 text-muted-foreground backdrop-blur supports-[backdrop-filter]:bg-background/80;
+    @apply sticky top-0 z-10 h-10 bg-background text-muted-foreground;
   }
 
   .sticky-table-group-header {
-    @apply sticky top-0 z-10 bg-muted/95 py-2 text-xs font-medium text-muted-foreground backdrop-blur supports-[backdrop-filter]:bg-muted/80;
+    @apply sticky top-0 z-10 bg-muted py-2 text-xs font-medium text-muted-foreground;
   }
 }
 

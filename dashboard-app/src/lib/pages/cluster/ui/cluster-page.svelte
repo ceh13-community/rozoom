@@ -1540,7 +1540,7 @@
 
 <div class="cluster-page">
   <div
-    class="cluster-sticky-shell sticky top-0 z-30 mb-3 rounded-lg border border-border/60 bg-background/95 px-3 pb-2 pt-1 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-4 sm:pb-3"
+    class="cluster-sticky-shell sticky top-0 z-30 mb-3 rounded-lg border border-border/60 bg-background px-3 pb-2 pt-1 sm:px-4 sm:pb-3"
   >
     <header class="cluster-page__header mb-0">
       <div
