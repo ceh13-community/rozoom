@@ -430,4 +430,56 @@ describe("api-resource-sync", () => {
     sync.stop("cluster-a");
     await Promise.resolve();
   });
+
+  it("delivers configuration events in the payload shape the configuration store reads", async () => {
+    vi.doUnmock("../stream-watchers/event-bus");
+    const { eventBus } = await import("../stream-watchers/event-bus");
+    const { initConfigurationSync, destroyConfigurationSync } = await import(
+      "../stream-watchers/configuration/configuration-sync"
+    );
+    const { selectClusterConfigurationItems } = await import(
+      "../stream-watchers/configuration/configuration-store"
+    );
+    const service = (name: string, resourceVersion: string) => ({
+      apiVersion: "v1",
+      kind: "Service",
+      metadata: { name, namespace: "probe", uid: `uid-${name}`, resourceVersion },
+    });
+    listMock.mockResolvedValue({ items: [service("svc-a", "10")], resourceVersion: "10" });
+    let pushEvent: ((event: unknown) => void) | null = null;
+    watchMock.mockImplementation(
+      ({ signal, onEvent }) =>
+        new Promise((resolve) => {
+          pushEvent = onEvent;
+          signal.addEventListener(
+            "abort",
+            () => resolve({ expired: false, resourceVersion: "12" }),
+            { once: true },
+          );
+        }),
+    );
+    const received: unknown[] = [];
+    const unsubscribe = eventBus.subscribe((event) => {
+      if (event.kind === "configuration") received.push(event.payload);
+    });
+
+    initConfigurationSync("cluster-a", "services", []);
+    await vi.waitFor(() => {
+      expect(pushEvent).not.toBeNull();
+    });
+    pushEvent?.({ type: "ADDED", object: service("svc-b", "11") });
+    pushEvent?.({ type: "DELETED", object: service("svc-a", "12") });
+
+    expect(received).toEqual([
+      { workloadType: "services", event: { type: "ADDED", object: service("svc-b", "11") } },
+      { workloadType: "services", event: { type: "DELETED", object: service("svc-a", "12") } },
+    ]);
+    const names = get(selectClusterConfigurationItems("cluster-a", "services")).map(
+      (item) => (item as { metadata?: { name?: string } }).metadata?.name,
+    );
+    expect(names).toEqual(["svc-b"]);
+
+    unsubscribe();
+    destroyConfigurationSync("cluster-a", "services");
+  });
 });

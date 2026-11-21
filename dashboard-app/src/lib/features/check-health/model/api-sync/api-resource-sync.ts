@@ -1,6 +1,10 @@
 import { eventBus } from "../stream-watchers/event-bus";
 import { derived, get, writable, type Readable } from "svelte/store";
-import { listKubeResource, watchKubeResource } from "$shared/api/kube-api-client";
+import {
+  listKubeResource,
+  watchKubeResource,
+  type KubernetesWatchEvent,
+} from "$shared/api/kube-api-client";
 import { activeApiSyncClusterIds } from "./api-sync-activity";
 import {
   markApiPathCapability,
@@ -87,6 +91,11 @@ export function createApiResourceSync<Item>(options: {
   setInitial: (clusterId: string, items: Item[]) => void;
   fallbackStart?: (clusterId: string) => void;
   fallbackStop?: (clusterId: string) => void;
+  /**
+   * Shapes an API watch event into the payload this kind's event-bus consumers
+   * read, so both transports deliver the same shape. Defaults to the raw event.
+   */
+  toEventPayload?: (event: KubernetesWatchEvent<Item>) => unknown;
 }): ApiResourceSyncController<Item> {
   const active = new Map<string, ActiveSession>();
   const runtimeStates = writable<Record<string, ApiResourceRuntimeState>>({});
@@ -250,7 +259,7 @@ export function createApiResourceSync<Item>(options: {
             eventBus.emit({
               clusterId,
               kind: options.kind,
-              payload: event,
+              payload: options.toEventPayload ? options.toEventPayload(event) : event,
             });
           },
         });
