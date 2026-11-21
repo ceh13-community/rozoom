@@ -7,6 +7,7 @@ import {
   type KubernetesWatchEvent,
 } from "$shared/api/kube-api-client";
 import { activeApiSyncClusterIds } from "./api-sync-activity";
+import { logWatchState } from "$shared/lib/sync-log";
 import {
   markApiPathCapability,
   markApiPathCapabilityFromError,
@@ -156,6 +157,7 @@ export function createApiResourceSync<Item>(options: {
       return { ...current, [clusterId]: next };
     });
     const live = isResourceStreamLive(next);
+    logWatchState(scope, clusterId, { transport: next.transport, live, error: next.error });
     const key = streamLivenessKey(scope, clusterId);
     if ((get(resourceStreamLiveness)[key] ?? false) !== live) {
       resourceStreamLiveness.update((current) => ({ ...current, [key]: live }));

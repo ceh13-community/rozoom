@@ -1,6 +1,7 @@
 import { writable } from "svelte/store";
 import { get } from "svelte/store";
 import { readJsonFromStorage, writeJsonToStorage } from "./local-storage";
+import { logDataMode } from "./sync-log";
 
 export type DashboardDataProfileId = "realtime" | "balanced" | "low_load" | "fleet" | "manual";
 
@@ -384,6 +385,10 @@ export function hydrateDashboardRuntimeControlPlane() {
 
 export function setDashboardDataProfile(profileId: DashboardDataProfileId) {
   const next = resolveDashboardDataProfile(profileId);
+  logDataMode(
+    getDashboardDataProfileDisplayName(next),
+    getDashboardDataProfileDisplayName(getDashboardDataProfile()),
+  );
   dashboardDataProfileHydrated = true;
   dashboardDataProfileStore.set(next);
   persistDashboardDataProfileId(next.id);
