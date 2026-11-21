@@ -34,6 +34,16 @@ const CONFIG_DIR = "configs";
 const pendingLocalPorts = new Set<number>();
 
 /** Local ports held by the app's own forwards, running or starting. */
+// klog header: severity letter, MMDD, time, e.g. "I1121 15:07:19.793300 1426131 envvar.go:195]".
+const KLOG_INFO_OR_WARNING = /^[IW]\d{4} \d{2}:\d{2}:\d{2}/;
+
+/** A kubectl stderr line that is a failure, not klog info or warning output. */
+export function isKubectlErrorLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  return !KLOG_INFO_OR_WARNING.test(trimmed);
+}
+
 export function usedLocalPorts(): Set<number> {
   const used = new Set(pendingLocalPorts);
   for (const proc of Object.values(get(activeForwards))) {
@@ -157,15 +167,26 @@ export async function startPortForward(
         console.log("[kubectl]", line.trim());
       },
       onStderrLine: (line) => {
-        lastErr = line;
         const trimmed = line.trim();
+        // With --v=2 kubectl writes its info and warning log to stderr. Only real errors
+        // count: an info line as lastError marked every healthy forward "Degraded" and
+        // showed klog text in the port-forward panel.
+        if (!isKubectlErrorLine(trimmed)) {
+          updateForward(startArgs.uniqueKey, (current) => ({
+            ...current,
+            lastHeartbeatAt: Date.now(),
+          }));
+          console.debug("[kubectl]", trimmed);
+          return;
+        }
+        lastErr = line;
         updateForward(startArgs.uniqueKey, (current) => ({
           ...current,
           lastHeartbeatAt: Date.now(),
           lastError: trimmed || current.lastError,
           lastMessage: trimmed || current.lastMessage,
         }));
-        console.error("[kubectl]", line.trim());
+        console.error("[kubectl]", trimmed);
       },
       onClose: (e) => {
         console.warn("[kubectl] port-forward closed:", e);
