@@ -446,11 +446,11 @@ describe("api-resource-sync", () => {
       metadata: { name, namespace: "probe", uid: `uid-${name}`, resourceVersion },
     });
     listMock.mockResolvedValue({ items: [service("svc-a", "10")], resourceVersion: "10" });
-    let pushEvent: ((event: unknown) => void) | null = null;
+    const watch: { push?: (event: unknown) => void } = {};
     watchMock.mockImplementation(
       ({ signal, onEvent }) =>
         new Promise((resolve) => {
-          pushEvent = onEvent;
+          watch.push = onEvent;
           signal.addEventListener(
             "abort",
             () => resolve({ expired: false, resourceVersion: "12" }),
@@ -465,10 +465,10 @@ describe("api-resource-sync", () => {
 
     initConfigurationSync("cluster-a", "services", []);
     await vi.waitFor(() => {
-      expect(pushEvent).not.toBeNull();
+      expect(watch.push).toBeDefined();
     });
-    pushEvent?.({ type: "ADDED", object: service("svc-b", "11") });
-    pushEvent?.({ type: "DELETED", object: service("svc-a", "12") });
+    watch.push?.({ type: "ADDED", object: service("svc-b", "11") });
+    watch.push?.({ type: "DELETED", object: service("svc-a", "12") });
 
     expect(received).toEqual([
       { workloadType: "services", event: { type: "ADDED", object: service("svc-b", "11") } },
