@@ -56,10 +56,19 @@ full_offline_name() {
 }
 
 # 1. Rename assets in place via the API; remember old->new for the manifest.
+#    A second release run into the same draft (RC2 after RC1) finds the previous run's
+#    `_full-offline` assets still there: GitHub refuses a rename onto an existing name
+#    (HTTP 422). The fresh build is the one to keep, so the older asset with the target
+#    name is deleted first.
 : > "$tmp/renames.tsv"
 while IFS=$'\t' read -r asset_id name; do
   new_name="$(full_offline_name "$name")"
   [[ -n "$new_name" && "$new_name" != "$name" ]] || continue
+  stale_id="$(awk -F'\t' -v n="$new_name" '$2 == n { print $1; exit }' "$tmp/assets.tsv")"
+  if [[ -n "$stale_id" ]]; then
+    gh api -X DELETE "repos/${REPO}/releases/assets/${stale_id}" >/dev/null
+    echo "deleted older asset: $new_name (id $stale_id)"
+  fi
   gh api -X PATCH "repos/${REPO}/releases/assets/${asset_id}" -f name="$new_name" >/dev/null
   printf '%s\t%s\n' "$name" "$new_name" >> "$tmp/renames.tsv"
   echo "renamed asset: $name -> $new_name"
