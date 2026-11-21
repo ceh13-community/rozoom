@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, tick } from "svelte";
+  import { onDestroy, tick, untrack } from "svelte";
   import type { Writable } from "svelte/store";
   import { Button } from "$shared/ui/button";
   import { Input } from "$shared/ui/input";
@@ -18,6 +18,7 @@
   import ResourceMetricsBadge from "../common/resource-metrics-badge.svelte";
   import WorkbenchSheetShell from "../common/workbench-sheet-shell.svelte";
   import LoadingDots from "$shared/ui/loading-dots.svelte";
+  import { findAnchoredLineIndex } from "./log-scroll-anchor";
 
   const ansiUp = new AnsiUp();
   ansiUp.use_classes = true;
@@ -191,6 +192,25 @@
     if (logContainer) {
       containerHeight = logContainer.clientHeight;
     }
+  });
+
+  // Lines as last rendered, to find where the reader's top line moved.
+  let renderedLines: string[] = [];
+
+  $effect(() => {
+    const lines = allLines;
+    untrack(() => {
+      const previous = renderedLines;
+      renderedLines = lines;
+      if (followTail || !logContainer || previous.length === 0) return;
+      const currentTop = logContainer.scrollTop;
+      const topIndex = Math.floor(currentTop / LINE_HEIGHT);
+      const nextIndex = findAnchoredLineIndex(previous, lines, topIndex);
+      if (nextIndex === null || nextIndex === topIndex) return;
+      const nextTop = nextIndex * LINE_HEIGHT + (currentTop - topIndex * LINE_HEIGHT);
+      logContainer.scrollTop = nextTop;
+      scrollTop = logContainer.scrollTop;
+    });
   });
 
   $effect(() => {
