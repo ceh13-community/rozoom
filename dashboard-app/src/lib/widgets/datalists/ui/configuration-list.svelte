@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import { onDestroy, onMount, tick, untrack } from "svelte";
   import { path } from "@tauri-apps/api";
   import { openExternalUrl } from "$shared/api/in-app-browser";
@@ -4592,11 +4593,13 @@ spec:
     loadSavedViewsForScope();
   });
 
-  $effect(() => {
-    if ($dashboardDataProfile.id !== "realtime") return;
-    if (workbenchCollapsed) workbenchCollapsed = false;
-    if (collapsedPaneIndexes.length > 0) collapsedPaneIndexes = [];
-  });
+  expandWorkbenchOnRealtimeSwitch(
+    () => $dashboardDataProfile?.id,
+    () => {
+      workbenchCollapsed = false;
+      collapsedPaneIndexes = [];
+    },
+  );
 
   $effect(() => {
     if (!workbenchStateRestored) return;
@@ -4847,7 +4850,7 @@ spec:
                             error={paneYamlTab?.yamlError ?? null}
                             driftDetected={paneYamlTab?.yamlDriftDetected ?? false}
                             driftMessage={paneYamlTab?.yamlDriftMessage ?? null}
-                            canVerticalCollapse={getPaneCount() > 1}
+                            canVerticalCollapse={getPaneCount() - collapsedPaneIndexes.length > 1}
                             isVerticallyCollapsed={isPaneCollapsed(paneIndex)}
                             onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
                             onYamlChange={(value) => {

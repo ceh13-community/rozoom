@@ -71,6 +71,8 @@
     yamlOpen: Writable<boolean>;
     eventsOpen: Writable<boolean>;
     isVerticallyCollapsed?: boolean;
+    /** False with one pane: there is nothing to give the space to, so no button. */
+    canVerticalCollapse?: boolean;
     onToggleVerticalCollapse: () => void;
     logsJumpToLine: number | null;
     activeLogsTabId: string | null;
@@ -107,6 +109,7 @@
     yamlOpen,
     eventsOpen,
     isVerticallyCollapsed = false,
+    canVerticalCollapse = false,
     onToggleVerticalCollapse,
     logsJumpToLine,
     activeLogsTabId,
@@ -141,7 +144,7 @@
     selectedContainer={paneTab.logsSelectedContainer}
     containerOptions={paneTab.logsContainerOptions}
     bookmarks={paneTab.bookmarks}
-    canVerticalCollapse={true}
+    canVerticalCollapse={canVerticalCollapse || isVerticallyCollapsed}
     {isVerticallyCollapsed}
     {onToggleVerticalCollapse}
     onToggleLive={() => {
@@ -212,7 +215,7 @@
     driftDetected={paneTab.driftDetected}
     driftMessage={paneTab.driftMessage}
     externalDiffLines={getYamlCompareDiffLines(paneTab.id)}
-    canVerticalCollapse={true}
+    canVerticalCollapse={canVerticalCollapse || isVerticallyCollapsed}
     {isVerticallyCollapsed}
     {onToggleVerticalCollapse}
     onYamlChange={(value) => {
@@ -250,7 +253,7 @@
     loading={paneTab.eventsLoading}
     error={paneTab.eventsError}
     focusedEventIndex={paneTab.focusedEventIndex}
-    canVerticalCollapse={true}
+    canVerticalCollapse={canVerticalCollapse || isVerticallyCollapsed}
     {isVerticallyCollapsed}
     {onToggleVerticalCollapse}
   />
