@@ -9,7 +9,7 @@ const source = readFileSync(
 
 describe("pods stream reconnect contract", () => {
   it("keeps reconnect backoff for stream-f mode", () => {
-    expect(source).toContain("const logsStreamReconnectMs = 1_200;");
+    expect(source).toContain("logStreamReconnectDelay(attempt)");
     expect(source).toContain("function scheduleStreamReconnect(tabId: string)");
     expect(source).toContain("setTimeout(() => {");
     expect(source).toContain("void startFollowStreamForTab(tabId);");

@@ -86,7 +86,6 @@
       tabId: string,
       patch: Partial<Extract<PaneTab, { kind: "yaml" }>>,
     ) => void;
-    refreshLogsTab: (tabId: string) => Promise<void>;
     saveYamlTab: (tabId: string) => Promise<void>;
     /** Runs the stream, polling or one read the tab's settings ask for. */
     restartLogsTab: (tabId: string) => void;
@@ -115,7 +114,6 @@
     openYamlForPod,
     updateLogsTab,
     updateYamlTab,
-    refreshLogsTab,
     saveYamlTab,
     restartLogsTab,
     onLogsJumpHandled,
@@ -174,7 +172,8 @@
       restartLogsTab(paneTab.id);
     }}
     onRefresh={() => {
-      void refreshLogsTab(paneTab.id);
+      // A fresh stream or read; a one-shot read mixed into a running stream duplicated lines.
+      restartLogsTab(paneTab.id);
     }}
     onAddBookmark={(line) => {
       updateLogsTab(paneTab.id, {

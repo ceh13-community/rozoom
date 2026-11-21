@@ -34,6 +34,7 @@
     resumeSinceArg,
   } from "../common/log-stream-merge";
   import { previousLogsAvailability } from "./model/previous-logs";
+  import { logStreamEndReason, logStreamReconnectDelay } from "./model/log-stream-end";
   import type { PodMetricsValue } from "./model/pod-row-adapter";
   import { dashboardDataProfile } from "$shared/lib/dashboard-data-profile.svelte";
   import {
@@ -145,7 +146,6 @@
   const logsOpen = writable(true);
   const yamlOpen = writable(true);
   const eventsOpen = writable(true);
-  const logsStreamReconnectMs = 1_200;
 
   let workbenchCollapsed = $state(false);
   let workbenchFullscreen = $state(false);
@@ -175,6 +175,8 @@
   let logsStreamReconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
   // Bumped on every stop and start, so callbacks of a stopped stream are ignored.
   let logsStreamTokens = new Map<string, number>();
+  // Failed reconnects in a row, for the backoff; reset by the first line that arrives.
+  let logsStreamReconnectAttempts = new Map<string, number>();
 
   const orderedWorkbenchTabs = $derived.by(() => orderPinnedTabs(workbenchTabs, pinnedTabIds));
   const activeWorkbenchTab = $derived.by(
@@ -582,18 +584,39 @@
     return Boolean(tab && tab.logsLive && tab.logsMode === "stream-f" && !tab.logsPrevious);
   }
 
+  /** Why the tab's stream will get no new lines (finished pod), or null. */
+  function streamEndReason(tabId: string) {
+    const tab = logsTabs.find((entry) => entry.id === tabId);
+    if (!tab) return null;
+    return logStreamEndReason(getPodForUid(tab.podUid), tab.logsSelectedContainer);
+  }
+
   function scheduleStreamReconnect(tabId: string) {
     const previous = logsStreamReconnectTimers.get(tabId);
     if (previous) clearTimeout(previous);
     if (!shouldKeepStreaming(tabId)) return;
+    const ended = streamEndReason(tabId);
+    if (ended) {
+      updateLogsTab(tabId, { logsLoading: false, logsError: ended });
+      return;
+    }
+    // Backoff: a container in CrashLoopBackOff closed the stream every second.
+    const attempt = (logsStreamReconnectAttempts.get(tabId) ?? 0) + 1;
+    logsStreamReconnectAttempts.set(tabId, attempt);
     const timer = setTimeout(() => {
       logsStreamReconnectTimers.delete(tabId);
       if (!shouldKeepStreaming(tabId)) return;
+      // The pod may have finished while the stream was down.
+      const endedNow = streamEndReason(tabId);
+      if (endedNow) {
+        updateLogsTab(tabId, { logsLoading: false, logsError: endedNow });
+        return;
+      }
       updateLogsTab(tabId, {
         logsError: "Stream disconnected. Reconnecting...",
       });
       void startFollowStreamForTab(tabId, { resume: true });
-    }, logsStreamReconnectMs);
+    }, logStreamReconnectDelay(attempt));
     logsStreamReconnectTimers.set(tabId, timer);
   }
 
@@ -604,6 +627,7 @@
    */
   function restartLogsTab(tabId: string) {
     stopLogsRuntime(tabId);
+    logsStreamReconnectAttempts.delete(tabId);
     if (shouldKeepStreaming(tabId)) {
       void startFollowStreamForTab(tabId);
       return;
@@ -746,8 +770,12 @@
       logsLoading: true,
       logsError: null,
     });
+    // A read that returns after the tab moved on (Previous off, container switch, a
+    // stream started) must not overwrite the newer text.
+    const token = logsStreamTokens.get(tabId) ?? 0;
     try {
       const response = await kubectlRawArgsFront(args, { clusterId });
+      if (logsStreamTokens.get(tabId) !== token) return;
       if (response.errors) {
         throw new Error(response.errors);
       }
@@ -757,6 +785,7 @@
         logsUpdatedAt: Date.now(),
       });
     } catch (error) {
+      if (logsStreamTokens.get(tabId) !== token) return;
       updateLogsTab(tabId, {
         logsLoading: false,
         logsError: error instanceof Error ? error.message : "Failed to load logs.",
@@ -807,6 +836,7 @@
         {
           onStdoutData: (chunk: string) => {
             if (!isCurrent() || !chunk) return;
+            logsStreamReconnectAttempts.delete(tabId);
             const current = logsTabs.find((entry) => entry.id === tabId);
             if (!current) return;
             updateLogsTab(tabId, {
@@ -1438,7 +1468,6 @@
                     {openYamlForPod}
                     {updateLogsTab}
                     {updateYamlTab}
-                    {refreshLogsTab}
                     {saveYamlTab}
                     {restartLogsTab}
                     {portForwardActions}
@@ -1492,8 +1521,7 @@
                       {openYamlForPod}
                       {updateLogsTab}
                       {updateYamlTab}
-                      {refreshLogsTab}
-                      {saveYamlTab}
+                        {saveYamlTab}
                       {restartLogsTab}
                     {portForwardActions}
                       onLogsJumpHandled={() => {
