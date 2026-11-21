@@ -2015,7 +2015,11 @@
     if (watcherError) return "error";
     if (watcherIsStale) return "stale";
     if (watcherInFlight && rowsSnapshot.length > 0) return "cached";
-    if (configurationStreamLive || lastWatcherSuccessAt) return "live";
+    if (configurationStreamLive) return "live";
+    // In stream mode only a live stream is live: a stream that stopped (gave up,
+    // lost access) leaves the last rows as a cached copy right away, not after
+    // the freshness budget runs out.
+    if (lastWatcherSuccessAt && watcherPolicy.mode !== "stream") return "live";
     if (rowsSnapshot.length > 0) return "cached";
     return "idle";
   });
