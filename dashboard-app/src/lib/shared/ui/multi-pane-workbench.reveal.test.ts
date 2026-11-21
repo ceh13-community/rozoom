@@ -109,4 +109,40 @@ describe("workbench reveal after a row action", () => {
 
     expect(document.activeElement).toBe(opener);
   });
+
+  // Restoring a saved session and Undo (Reopen) set tabs and the active tab without a row
+  // action: a list that uses a reveal token must not scroll or take focus for them.
+  it("does not scroll or take focus when a session is restored or a tab is reopened", async () => {
+    const restoredTabs = [
+      { id: "logs:web", title: "Logs", subtitle: "shop/web" },
+      { id: "yaml:web", title: "YAML", subtitle: "shop/web" },
+    ];
+    const view = render(MultiPaneWorkbench, {
+      props: props({ tabs: [], activeTabId: null, revealToken: null }),
+    });
+    await settle();
+    // Session restore: the saved tabs come back with their active tab.
+    await view.rerender(props({ tabs: restoredTabs, activeTabId: "yaml:web", revealToken: null }));
+    await settle();
+    // Undo / Reopen, or a click on another tab: only the active tab changes.
+    await view.rerender(props({ tabs: restoredTabs, activeTabId: "logs:web", revealToken: null }));
+    await settle();
+    expect(scroll).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it("keeps the old scroll on tab change for workbenches without a reveal token", async () => {
+    const restoredTabs = [
+      { id: "logs:web", title: "Logs", subtitle: "shop/web" },
+      { id: "yaml:web", title: "YAML", subtitle: "shop/web" },
+    ];
+    const view = render(MultiPaneWorkbench, {
+      props: props({ tabs: restoredTabs, activeTabId: "logs:web" }),
+    });
+    await settle();
+    scroll.mockClear();
+    await view.rerender(props({ tabs: restoredTabs, activeTabId: "yaml:web" }));
+    await settle();
+    expect(scroll).toHaveBeenCalled();
+  });
 });

@@ -19,9 +19,11 @@
 
   interface Props {
     clusterId: string;
+    /** Selects a namespace on the cluster page before a jump to a list. */
+    onSelectNamespace?: (namespace: string) => void;
   }
 
-  const { clusterId }: Props = $props();
+  const { clusterId, onSelectNamespace }: Props = $props();
 
   type SvcPort = { port: number; name?: string; protocol?: string; targetPort?: string | number };
 
@@ -603,7 +605,7 @@
   }
 
   // Lands on the list filtered to that resource, with the filter focused.
-  async function jumpToWorkload(kind: string, name: string) {
+  async function jumpToWorkload(kind: string, name: string, namespace?: string) {
     const params = new URLSearchParams($page.url.search);
     const map: Record<string, string> = {
       Deployment: "deployments",
@@ -622,6 +624,7 @@
       return;
     }
     params.set("workload", workload);
+    if (namespace) onSelectNamespace?.(namespace);
     await goto(`?${params.toString()}`, { keepFocus: false });
     await revealListFilteredTo(name);
   }
@@ -1034,7 +1037,7 @@
           <div class="flex flex-col gap-1">
             <button
               class="text-left rounded px-2 py-1 hover:bg-muted"
-              onclick={() => void jumpToWorkload(node.kind, node.name)}
+              onclick={() => void jumpToWorkload(node.kind, node.name, node.namespace)}
               >Jump to {node.kind} page</button
             >
             {#if node.managedBy === "helm"}

@@ -72,7 +72,7 @@ describe("workbench reveal after row actions", () => {
     const chains = read("../../cluster/ui/resource-map-panel.svelte");
     const map = read("../../../shared/plugins/contrib/workload-visualizer/visualizer-panel.svelte");
     expect(chains).toContain("await revealListFilteredTo(name);");
-    expect(chains).toContain("void jumpToWorkload(node.kind, node.name)");
+    expect(chains).toContain("void jumpToWorkload(node.kind, node.name, node.namespace)");
     expect(map).toContain("await revealListFilteredTo(node.name);");
   });
 
@@ -86,5 +86,25 @@ describe("workbench reveal after row actions", () => {
   it("reveals Edit YAML from the node details too", () => {
     const nodes = read("nodes-list/nodes-statuses-list.svelte");
     expect(nodes.match(/workbenchReveal\.after\(openNodeYamlEditor\(/g)).toHaveLength(3);
+  });
+
+  it("selects the resource's namespace before a jump from the maps", () => {
+    const chains = read("../../cluster/ui/resource-map-panel.svelte");
+    const map = read("../../../shared/plugins/contrib/workload-visualizer/visualizer-panel.svelte");
+    for (const source of [chains, map]) {
+      const jump = source.slice(source.indexOf("async function jumpToWorkload("));
+      const select = jump.indexOf("onSelectNamespace?.(");
+      expect(select).toBeGreaterThan(0);
+      expect(select).toBeLessThan(jump.indexOf("await goto("));
+    }
+    expect(chains).toContain("void jumpToWorkload(node.kind, node.name, node.namespace)");
+    for (const wrapper of [
+      "cluster-health/resource-map-panel.svelte",
+      "cluster-health/workload-visualizer-panel.svelte",
+    ]) {
+      expect(read(wrapper)).toContain(
+        "onSelectNamespace={(namespace) => setSelectedNamespace(data.slug, namespace)}",
+      );
+    }
   });
 });
