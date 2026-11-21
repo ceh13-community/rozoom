@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { requestText } from "$shared/lib/text-prompt.svelte";
   import TextSizeControl from "$shared/ui/text-size-control.svelte";
   import { onDestroy, onMount } from "svelte";
   import { get } from "svelte/store";
@@ -699,12 +700,14 @@
   async function handleBulkSetNamespace() {
     const selected = getSelectedManagedUuids();
     if (!selected.length) return;
-    const next = prompt(
-      `Set default namespace on ${selected.length} selected cluster${
+    const next = await requestText({
+      title: "Set default namespace",
+      description: `On ${selected.length} selected cluster${
         selected.length > 1 ? "s" : ""
       }. Leave blank to clear.`,
-      "",
-    );
+      placeholder: "default",
+      allowEmpty: true,
+    });
     if (next === null) return;
     const ns = next.trim() || undefined;
     for (const uuid of selected) {
@@ -720,10 +723,11 @@
   async function handleBulkAddTag() {
     const selected = getSelectedManagedUuids();
     if (!selected.length) return;
-    const raw = prompt(
-      `Add a tag to ${selected.length} selected cluster${selected.length > 1 ? "s" : ""}. Duplicate tags are skipped.`,
-      "",
-    );
+    const raw = await requestText({
+      title: "Add tag",
+      description: `To ${selected.length} selected cluster${selected.length > 1 ? "s" : ""}. Duplicate tags are skipped.`,
+      placeholder: "team-a",
+    });
     if (raw === null) return;
     const tag = raw.trim().replace(/^#/, "");
     if (!tag) return;
@@ -2131,10 +2135,11 @@
                             role="button"
                             tabindex="0"
                             onclick={async () => {
-                              const newName = prompt(
-                                "Rename cluster context:",
-                                cluster.displayName,
-                              );
+                              const newName = await requestText({
+                                title: "Rename cluster context",
+                                initialValue: cluster.displayName,
+                                confirmLabel: "Rename",
+                              });
                               if (
                                 newName &&
                                 newName.trim() &&
@@ -2555,7 +2560,12 @@
             </Button>
             <Button
               onclick={async () => {
-                const json = prompt("Paste catalog JSON:");
+                const json = await requestText({
+                  title: "Import catalog",
+                  description: "Paste catalog JSON",
+                  multiline: true,
+                  confirmLabel: "Import",
+                });
                 if (!json?.trim()) return;
                 const { importCatalog } = await import(
                   "$features/cluster-manager/model/catalog-export"

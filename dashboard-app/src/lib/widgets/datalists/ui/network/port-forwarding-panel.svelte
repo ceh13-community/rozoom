@@ -7,7 +7,6 @@
   import { openExternalUrl } from "$shared/api/in-app-browser";
   import { confirmAction } from "$shared/lib/confirm-action";
   import { popOutPortForwardPreview } from "$shared/lib/port-forward-preview";
-  import { requestPortForwardStartMode } from "$shared/lib/port-forward-start-mode";
   import { isTauriAvailable } from "$shared/lib/tauri-runtime";
   import { resolveClusterIds, resolvePrimaryClusterId } from "$shared/lib/cluster-ids";
   import { Button, SortingButton } from "$shared/ui/button";
@@ -48,6 +47,8 @@
   let localPort = $state(String(getRandomLocalPort()));
   let remotePort = $state("80");
   let busy = $state(false);
+  // Replaces the "1 or 2" system prompt that asked for the start mode.
+  let openAfterStart = $state(true);
   let loadingResources = $state(false);
   let errorMessage = $state<string | null>(null);
   let stoppingForwardKeys = $state<Set<string>>(new Set());
@@ -304,8 +305,7 @@
       errorMessage = "Port-forwarding is available only in the desktop runtime.";
       return;
     }
-    const startMode = requestPortForwardStartMode(remote);
-    if (!startMode) return;
+    const startMode = openAfterStart ? "start-and-open" : "start-only";
     const existingTargetForward = clusterForwards.find(
       (forward) =>
         forward.namespace === ns && forward.resource === targetResource && forward.remotePort === remote,
@@ -497,7 +497,11 @@
           Detected: {resourceSuggestions.length}
         {/if}
       </div>
-      <div class="flex gap-2">
+      <div class="flex items-center gap-2">
+        <label class="flex items-center gap-2 text-xs text-muted-foreground">
+          <input type="checkbox" bind:checked={openAfterStart} />
+          Open the page after it starts
+        </label>
         <Button type="button" variant="outline" loading={loadingResources} onclick={loadResourceSuggestions}>
           Refresh resources
         </Button>

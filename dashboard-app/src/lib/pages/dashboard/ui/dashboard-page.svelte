@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { requestText } from "$shared/lib/text-prompt.svelte";
   import { onDestroy, onMount } from "svelte";
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
@@ -498,8 +499,8 @@
         <button
           class="text-[10px] text-slate-500 hover:text-rose-400 transition"
           title="Save current search as view"
-          onclick={() => {
-            const name = prompt("View name:");
+          onclick={async () => {
+            const name = await requestText({ title: "Save view", description: "View name" });
             if (name?.trim()) {
               const filters: SavedViewFilters = {};
               if (searchQuery.trim()) filters.search = searchQuery.trim();
@@ -511,8 +512,8 @@
       {:else}
         <button
           class="text-[10px] text-slate-500 hover:text-indigo-400 transition"
-          onclick={() => {
-            const name = prompt("View name:");
+          onclick={async () => {
+            const name = await requestText({ title: "Create view", description: "View name" });
             if (name?.trim()) {
               savedViews = addView(savedViews, name.trim(), {});
               void saveSavedViews(savedViews);
@@ -534,8 +535,8 @@
     <div class="flex gap-2 mb-3">
       <button
         class="text-[10px] text-slate-500 hover:text-indigo-400 transition"
-        onclick={() => {
-          const name = prompt("View name:");
+        onclick={async () => {
+          const name = await requestText({ title: "Create view", description: "View name" });
           if (name?.trim()) {
             savedViews = addView(savedViews, name.trim(), {});
             void saveSavedViews(savedViews);
@@ -545,7 +546,7 @@
       <button
         class="text-[10px] text-slate-500 hover:text-amber-400 transition"
         onclick={async () => {
-          const name = prompt("Group name:");
+          const name = await requestText({ title: "Create group", description: "Group name" });
           if (name?.trim()) {
             groups = addGroup(groups, name.trim());
             await saveGroups(groups);
@@ -563,7 +564,7 @@
         <button
           class="text-slate-500 hover:text-emerald-400 transition"
           onclick={async () => {
-            const name = prompt("New group name:");
+            const name = await requestText({ title: "Add group", description: "Group name" });
             if (name?.trim()) {
               groups = addGroup(groups, name.trim());
               await saveGroups(groups);

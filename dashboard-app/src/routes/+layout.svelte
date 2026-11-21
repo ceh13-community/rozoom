@@ -20,6 +20,7 @@
   import { loadPluginState } from "$shared/plugins";
   import { initAnalytics, trackAppOpened } from "$shared/analytics/wau-c";
   import SplashScreen from "$shared/ui/splash-screen.svelte";
+  import TextPromptHost from "$shared/ui/text-prompt-host.svelte";
   import { installUiZoom } from "$shared/lib/ui-zoom";
 
   import "$lib/app/styles/index.css";
@@ -115,6 +116,8 @@
 </svelte:head>
 <ModeWatcher />
 <Toaster richColors />
+<!-- In-app text dialog for requestText(); replaces window.prompt. -->
+<TextPromptHost />
 
 <SplashScreen />
 <KeyboardShortcutsDialog

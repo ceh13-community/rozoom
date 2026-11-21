@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { confirmAction } from "$shared/lib/confirm-action";
   import {
     installTrivyProvider,
     markTrivyHubUnavailable,
@@ -751,9 +752,10 @@
   async function doUninstall() {
     if (!trivyProvider?.releaseName || !trivyProvider.namespace) return;
     if (
-      !confirm(
+      !(await confirmAction(
         `Uninstall Trivy Operator release '${trivyProvider.releaseName}' from namespace '${trivyProvider.namespace}'? Reports may be deleted.`,
-      )
+        "Uninstall Trivy Operator",
+      ))
     )
       return;
     uninstalling = true;
