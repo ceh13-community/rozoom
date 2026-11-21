@@ -26,6 +26,11 @@ describe("api-resource-sync", () => {
   beforeEach(async () => {
     vi.resetModules();
     vi.useFakeTimers();
+    // The api retry backoff adds 0-499 ms of jitter. With a random value near 0 the
+    // fallback started 1.0 s into the 2 s setup, and its 60 s api retry landed exactly on
+    // the 59 s mark the retry test checks: list ran a third time ("expected 3 to be 2").
+    // A fixed value makes every timer in this suite land at the same time on every run.
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
     listMock.mockReset();
     watchMock.mockReset();
     emitMock.mockReset();
@@ -193,7 +198,9 @@ describe("api-resource-sync", () => {
     hooks().onRelist?.([]);
     const listCalls = listMock.mock.calls.length;
 
-    await vi.advanceTimersByTimeAsync(59_000);
+    // The fallback started 1.25 s in (1 s backoff + 250 ms jitter); its api retry is due
+    // 60 s later, at 61.25 s. Setup ended at 2 s: at 60 s nothing has run yet.
+    await vi.advanceTimersByTimeAsync(58_000);
     expect(listMock.mock.calls.length).toBe(listCalls);
 
     listMock.mockResolvedValue({ items: [{ metadata: { name: "s1" } }], resourceVersion: "20" });
