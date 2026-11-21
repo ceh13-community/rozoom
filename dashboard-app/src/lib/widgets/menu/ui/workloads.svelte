@@ -801,7 +801,7 @@
                 {#if item.key === "plugins" && $disabledPluginsCount > 0}
                   <span
                     class="ml-auto rounded-full bg-amber-500/15 px-1.5 text-[10px] font-semibold text-amber-300"
-                    title={`${$disabledPluginsCount} plugins disabled - pages hidden from sidebar`}
+                    use:hint={`${$disabledPluginsCount} plugins disabled - pages hidden from sidebar`}
                   >
                     {$disabledPluginsCount} off
                   </span>

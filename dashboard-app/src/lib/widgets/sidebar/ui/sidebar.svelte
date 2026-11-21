@@ -1,4 +1,7 @@
 <script lang="ts">
+  // In-app hints, not native titles: WebKitGTK kept a title tooltip after the click
+  // until the mouse moved (with the old state text on the toggles).
+  import { hint } from "$shared/lib/hint";
   import { onMount } from "svelte";
   import { readTextFile } from "@tauri-apps/plugin-fs";
   import { resourceDir, join } from "@tauri-apps/api/path";
@@ -120,32 +123,34 @@
 >
   <div class="flex h-full flex-col">
     <nav class="flex-1 space-y-0.5 p-1">
-      <Button
-        class="w-full p-2 justify-start"
-        variant="ghost"
-        onclick={() => gotoPage("/cluster-manager")}
-        title="Settings"
-        aria-label="Settings"
-      >
-        <Settings class="h-4 w-4" />
-        <span class={cn(sidebarOpen ? "block" : "hidden")}>Settings</span>
-      </Button>
-      <Button
-        class="w-full p-2 justify-start"
-        variant="ghost"
-        onclick={() => void openExternalUrl(DOCS_URL)}
-        title="Documentation"
-        aria-label="Documentation"
-      >
-        <BookCopy class="h-4 w-4" />
-        <span class={cn(sidebarOpen ? "block" : "hidden")}>Documentation</span>
-      </Button>
+      <span class="block" use:hint={"Settings"}>
+        <Button
+          class="w-full p-2 justify-start"
+          variant="ghost"
+          onclick={() => gotoPage("/cluster-manager")}
+          aria-label="Settings"
+        >
+          <Settings class="h-4 w-4" />
+          <span class={cn(sidebarOpen ? "block" : "hidden")}>Settings</span>
+        </Button>
+      </span>
+      <span class="block" use:hint={"Documentation"}>
+        <Button
+          class="w-full p-2 justify-start"
+          variant="ghost"
+          onclick={() => void openExternalUrl(DOCS_URL)}
+          aria-label="Documentation"
+        >
+          <BookCopy class="h-4 w-4" />
+          <span class={cn(sidebarOpen ? "block" : "hidden")}>Documentation</span>
+        </Button>
+      </span>
       <LightSwitch showLabel={sidebarOpen} />
       <Popover.Root>
         <Popover.Trigger class="w-full">
           <button
             class="rail-notifications flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium text-muted-foreground hover:bg-muted relative"
-            title="Notifications"
+            use:hint={"Notifications"}
             aria-label={$unreadCount > 0
               ? `Notifications, ${$unreadCount} unread`
               : "Notifications"}
@@ -282,7 +287,8 @@
                       e.stopPropagation();
                       dismissNotification(notif.id);
                     }}
-                    title="Dismiss">&times;</button
+                    aria-label="Dismiss notification"
+                    use:hint={{ text: "Dismiss", placement: "bottom" }}>&times;</button
                   >
                 </div>
               {/each}
@@ -300,7 +306,7 @@
         onclick={toggleLinter}
         aria-pressed={linterEnabled}
         aria-label="Toggle linter"
-        title={linterEnabled ? "Linter on - click to disable" : "Linter off - click to enable"}
+        use:hint={linterEnabled ? "Linter on - click to disable" : "Linter off - click to enable"}
       >
         {#if linterEnabled}
           <ShieldCheck class="h-4 w-4" />
@@ -321,7 +327,7 @@
         onclick={toggleDiagnostics}
         aria-pressed={diagnosticsEnabled}
         aria-label="Toggle runtime info"
-        title={diagnosticsEnabled
+        use:hint={diagnosticsEnabled
           ? "Runtime info shown - click to hide"
           : "Runtime info hidden - click to show"}
       >
@@ -344,7 +350,7 @@
         onclick={toggleCliNotifications}
         aria-pressed={cliNotificationsEnabled}
         aria-label="Toggle CLI toasts"
-        title={cliNotificationsEnabled
+        use:hint={cliNotificationsEnabled
           ? "CLI toasts shown - click to hide"
           : "CLI toasts hidden - click to show"}
       >
@@ -380,19 +386,20 @@
         sidebarOpen ? "justify-between" : "justify-center",
       )}
     >
-      <Button
-        variant="ghost"
-        size="icon"
-        title="Toggle sidebar"
-        aria-label="Toggle sidebar"
-        aria-expanded={sidebarOpen}
-        onclick={toggleSidebar}
-      >
-        <SquareChevronRight class="w-4 h-4" />
-      </Button>
+      <span class="inline-flex" use:hint={"Toggle sidebar"}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Toggle sidebar"
+          aria-expanded={sidebarOpen}
+          onclick={toggleSidebar}
+        >
+          <SquareChevronRight class="w-4 h-4" />
+        </Button>
+      </span>
       <span
         class={cn("font-mono text-[10px] text-slate-500", sidebarOpen ? "pr-2" : "hidden")}
-        title="ROZOOM version">v{appVersion}</span
+        use:hint={"ROZOOM version"}>v{appVersion}</span
       >
     </div>
   </div>

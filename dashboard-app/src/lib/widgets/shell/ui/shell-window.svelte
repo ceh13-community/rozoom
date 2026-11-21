@@ -893,11 +893,21 @@
     resizePointerId = null;
   }
 
-  /** Bottom-right, stacked by window: a minimized window covers neither the sidebar nor the page header. */
+  // Toasts stack bottom-right (svelte-sonner: 32 px offset, a front toast up to about
+  // 80 px, the ones behind it peeking out above): keep the docked card above that zone.
+  const TOAST_ZONE_PX = 148;
+
+  /**
+   * Bottom-right above the toasts, stacked by window: a minimized window covers neither
+   * the sidebar and page header nor the toasts.
+   */
   function dockedPosition() {
     return {
       x: Math.max(0, window.innerWidth - COLLAPSED_WIDTH - 16),
-      y: Math.max(0, window.innerHeight - (COLLAPSED_HEIGHT + 8) * (windowIndex + 1) - 8),
+      y: Math.max(
+        0,
+        window.innerHeight - TOAST_ZONE_PX - (COLLAPSED_HEIGHT + 8) * (windowIndex + 1),
+      ),
     };
   }
 

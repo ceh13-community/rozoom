@@ -50,4 +50,31 @@ describe("hint", () => {
     action.destroy();
     expect(bubble()).toBeNull();
   });
+
+  it("describes the control for screen readers, also through a wrapper", () => {
+    const wrapper = document.createElement("span");
+    const button = document.createElement("button");
+    button.textContent = "Minimize";
+    wrapper.appendChild(button);
+    document.body.appendChild(wrapper);
+    const action = hint(wrapper, { text: "Minimize the window", placement: "bottom" });
+    expect(button).toHaveAccessibleDescription("Minimize the window");
+    action.update({ text: "Expand the window", placement: "bottom" });
+    expect(button).toHaveAccessibleDescription("Expand the window");
+    action.destroy();
+    expect(button).not.toHaveAttribute("aria-describedby");
+  });
+
+  it("shows on keyboard focus of a wrapped button and hides when focus leaves", () => {
+    const wrapper = document.createElement("span");
+    const button = document.createElement("button");
+    wrapper.appendChild(button);
+    document.body.appendChild(wrapper);
+    hint(wrapper, "Close");
+    button.focus();
+    vi.advanceTimersByTime(500);
+    expect(bubble()?.textContent).toBe("Close");
+    button.blur();
+    expect(bubble()).toBeNull();
+  });
 });

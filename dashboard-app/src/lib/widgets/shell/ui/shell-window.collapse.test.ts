@@ -30,9 +30,10 @@ describe("minimized pod shell", () => {
     expect(screen.queryByTestId("pod-session-line")).toBeNull();
     expect(screen.getByLabelText("Expand shell")).toBeInTheDocument();
     expect(screen.getByLabelText("Close Shell")).toBeInTheDocument();
-    // Bottom-right, not at the top-left corner over the sidebar.
+    // Bottom-right, not at the top-left corner over the sidebar, and above the toasts.
     expect(card.style.left).toBe(`${1920 - 360 - 16}px`);
-    expect(card.style.top).toBe(`${1000 - 64 - 8}px`);
+    // Above the toast zone (148 px) that svelte-sonner uses bottom-right.
+    expect(card.style.top).toBe(`${1000 - 148 - 64}px`);
 
     await fireEvent.click(screen.getByLabelText("Expand shell"));
     expect(screen.getByLabelText("Minimize shell")).toBeInTheDocument();
