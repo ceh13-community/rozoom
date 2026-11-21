@@ -55,19 +55,52 @@ export function describeNodeDebugFailure(
   return fallback;
 }
 
+/** Pod Security (baseline or restricted) refuses the host namespaces a node shell needs. */
+export function isPodSecurityRejection(message: string) {
+  return /violates PodSecurity/i.test(message);
+}
+
+/**
+ * Namespaces to try for the debug pod: the requested one, then kube-system. Many
+ * clusters enforce Pod Security "baseline" on default, which refuses host namespaces;
+ * kube-system is usually exempt. kubectl itself fails in that case.
+ */
+export function nodeDebugNamespaces(requested?: string | null) {
+  const first = requested?.trim() || "default";
+  return first === "kube-system" ? [first] : [first, "kube-system"];
+}
+
 export async function startNodeDebugSession(target: NodeDebugSessionTarget) {
   const clusterId = target.clusterId.trim();
   const nodeName = target.nodeName.trim();
-  const namespace = target.namespace?.trim() || "default";
   const image = target.image?.trim() || NODE_DEBUG_IMAGE;
   if (!clusterId || !nodeName) {
     throw new Error("Node shell requires a cluster id and a node name.");
   }
 
-  const created = await kubectlRawArgsFront(buildNodeDebugArgs(target), { clusterId });
-  const podName = parseNodeDebugPodName(`${created.output}\n${created.errors}`);
-  if (created.code !== 0 || !podName) {
-    throw new Error(created.errors || "Failed to start a debug pod on the node.");
+  let podName: string | null = null;
+  let namespace = "";
+  const refused: string[] = [];
+  for (const candidate of nodeDebugNamespaces(target.namespace)) {
+    const created = await kubectlRawArgsFront(
+      buildNodeDebugArgs({ ...target, namespace: candidate }),
+      { clusterId },
+    );
+    const output = `${created.output}\n${created.errors}`;
+    if (created.code === 0 && parseNodeDebugPodName(output)) {
+      podName = parseNodeDebugPodName(output);
+      namespace = candidate;
+      break;
+    }
+    if (!isPodSecurityRejection(created.errors)) {
+      throw new Error(created.errors || "Failed to start a debug pod on the node.");
+    }
+    refused.push(candidate);
+  }
+  if (!podName) {
+    throw new Error(
+      `Node shell did not start: Pod Security in ${refused.join(" and ")} forbids the host namespaces a node debug pod needs. Allow privileged pods in one of them (pod-security.kubernetes.io/enforce=privileged).`,
+    );
   }
 
   const ready = await kubectlRawArgsFront(buildPodDebugWaitArgs(podName, namespace), {

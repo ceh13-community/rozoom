@@ -80,4 +80,35 @@ describe("node debug session", () => {
       "Node shell did not start: CreateContainerError.",
     );
   });
+
+  it("moves to kube-system when Pod Security refuses the pod in default", async () => {
+    const refused =
+      'Error from server (Forbidden): pods "node-debugger-minikube-a" is forbidden: violates PodSecurity "baseline:latest": host namespaces';
+    kubectlRawArgsFront
+      .mockResolvedValueOnce({
+        output: "Creating debugging pod node-debugger-minikube-a",
+        errors: refused,
+        code: 1,
+      })
+      .mockResolvedValueOnce({ output: CREATED, errors: "", code: 0 })
+      .mockResolvedValueOnce({ output: "condition met", errors: "", code: 0 });
+    await startNodeDebugSession({ clusterId: "c1", nodeName: "minikube" });
+    expect((kubectlRawArgsFront.mock.calls[1][0] as string[]).slice(2, 4)).toEqual([
+      "-n",
+      "kube-system",
+    ]);
+    expect(openPodDebugShellModal.mock.calls[0][2].cleanupPod).toEqual({
+      name: "node-debugger-minikube-x7k2q",
+      namespace: "kube-system",
+    });
+  });
+
+  it("says Pod Security is the cause when every namespace refuses", async () => {
+    const refused = 'pods "x" is forbidden: violates PodSecurity "baseline:latest"';
+    kubectlRawArgsFront.mockResolvedValue({ output: "", errors: refused, code: 1 });
+    await expect(startNodeDebugSession({ clusterId: "c1", nodeName: "minikube" })).rejects.toThrow(
+      "Pod Security in default and kube-system forbids the host namespaces",
+    );
+    expect(openPodDebugShellModal).not.toHaveBeenCalled();
+  });
 });
