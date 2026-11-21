@@ -100,6 +100,47 @@ describe("api-resource-sync", () => {
     sync.stop("cluster-a");
   });
 
+  it("keeps a running fallback instead of retrying the api on every activity update", async () => {
+    listMock.mockRejectedValue(new Error("Load failed"));
+    const fallbackStart = vi.fn();
+    const fallbackStop = vi.fn();
+
+    const { setActiveApiSyncClusters } = await import("./api-sync-activity");
+    const { createApiResourceSync, selectResourceStreamLive } = await import("./api-resource-sync");
+    const sync = createApiResourceSync({
+      getPath: () => "/api/v1/services",
+      kind: "configuration",
+      scope: "configuration:services",
+      setInitial: vi.fn(),
+      fallbackStart,
+      fallbackStop,
+    });
+    const live = selectResourceStreamLive("configuration:services", "cluster-a");
+
+    sync.start("cluster-a");
+    expect(get(live)).toBe(false);
+    await vi.advanceTimersByTimeAsync(2_000);
+    await vi.waitFor(() => {
+      expect(fallbackStart).toHaveBeenCalledTimes(1);
+    });
+    const listCallsAtFallback = listMock.mock.calls.length;
+    expect(get(live)).toBe(true);
+    expect(get(sync.selectRuntimeState("cluster-a")).transport).toBe("fallback");
+
+    // Unrelated runtime context changes re-emit the active cluster list.
+    setActiveApiSyncClusters(["cluster-a"]);
+    setActiveApiSyncClusters(["cluster-a"]);
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(listMock.mock.calls.length).toBe(listCallsAtFallback);
+    expect(fallbackStop).not.toHaveBeenCalled();
+    expect(get(live)).toBe(true);
+
+    sync.stop("cluster-a");
+    expect(fallbackStop).toHaveBeenCalledWith("cluster-a");
+    expect(get(live)).toBe(false);
+  });
+
   it("ref-counts subscribers so one cluster session is shared", async () => {
     let resolveList:
       | ((value: {

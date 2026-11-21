@@ -195,6 +195,7 @@ export {
 export {
   initConfigurationSync,
   destroyConfigurationSync,
+  selectConfigurationStreamLive,
 } from "./model/stream-watchers/configuration/configuration-sync";
 export {
   getWatcherHealthSnapshot,

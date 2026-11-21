@@ -72,6 +72,29 @@ function computeRetryDelay(retryCount: number) {
 
 const MAX_API_RETRIES_BEFORE_FALLBACK = 2;
 
+/**
+ * A stream is live while its session runs on a working transport: an API watch
+ * after a successful list, or the kubectl watch fallback. A live stream with no
+ * events means nothing changed, so its data is fresh. Lists read this instead of
+ * the time of the last data change.
+ */
+export function isResourceStreamLive(state: ApiResourceRuntimeState): boolean {
+  if (!state.isRunning || state.refCount <= 0) return false;
+  if (state.transport === "fallback") return true;
+  return state.transport === "api" && state.lastListAt !== null && state.error === null;
+}
+
+const resourceStreamLiveness = writable<Record<string, boolean>>({});
+
+function streamLivenessKey(scope: string, clusterId: string) {
+  return `${scope}|${clusterId}`;
+}
+
+export function selectResourceStreamLive(scope: string, clusterId: string): Readable<boolean> {
+  const key = streamLivenessKey(scope, clusterId);
+  return derived(resourceStreamLiveness, ($liveness) => $liveness[key] ?? false);
+}
+
 type ApiResourceSyncController<Item> = {
   start(clusterId: string): void;
   stop(clusterId: string): void;
@@ -84,6 +107,8 @@ export function createApiResourceSync<Item>(options: {
   getPath?: () => string;
   getPaths?: () => string[];
   kind: string;
+  /** Liveness key for selectResourceStreamLive; defaults to kind. */
+  scope?: string;
   setInitial: (clusterId: string, items: Item[]) => void;
   fallbackStart?: (clusterId: string) => void;
   fallbackStop?: (clusterId: string) => void;
@@ -95,14 +120,22 @@ export function createApiResourceSync<Item>(options: {
     return get(activeApiSyncClusterIds).includes(clusterId);
   }
 
+  const scope = options.scope ?? options.kind;
+
   function updateRuntimeState(
     clusterId: string,
     updater: (prev: ApiResourceRuntimeState) => ApiResourceRuntimeState,
   ) {
-    runtimeStates.update((current) => ({
-      ...current,
-      [clusterId]: updater(current[clusterId] ?? DEFAULT_RUNTIME_STATE),
-    }));
+    let next = DEFAULT_RUNTIME_STATE;
+    runtimeStates.update((current) => {
+      next = updater(current[clusterId] ?? DEFAULT_RUNTIME_STATE);
+      return { ...current, [clusterId]: next };
+    });
+    const live = isResourceStreamLive(next);
+    const key = streamLivenessKey(scope, clusterId);
+    if ((get(resourceStreamLiveness)[key] ?? false) !== live) {
+      resourceStreamLiveness.update((current) => ({ ...current, [key]: live }));
+    }
   }
 
   function getPathCandidates() {
@@ -357,9 +390,11 @@ export function createApiResourceSync<Item>(options: {
       stopSession(clusterId, session);
       return;
     }
-    if (session.controller) return;
+    // A running fallback watch is the session. Starting another API attempt on
+    // every activity-store emission opened a new kubectl proxy each time, failed
+    // the same way and flapped the stream state.
+    if (session.controller || session.fallbackActive) return;
     session.controller = new AbortController();
-    session.fallbackActive = false;
     trackWatcherSessionStart({
       clusterId,
       kind: options.kind,
