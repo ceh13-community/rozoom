@@ -424,8 +424,9 @@ describe("configuration-list", () => {
       JSON.stringify({ enabled: false, refreshSeconds: 45, viewMode: "namespace" }),
     );
 
-    const { getByDisplayValue, getByRole, findByText, queryByRole, queryByText, getByTestId } =
-      render(ConfigurationList, {
+    const { getByDisplayValue, getByRole, getByText, findByText, getByTestId } = render(
+      ConfigurationList,
+      {
         props: {
           data: {
             title: "ConfigMaps - Cluster: minikube",
@@ -437,15 +438,17 @@ describe("configuration-list", () => {
             items: [{ metadata: { name: "first", namespace: "default" }, data: {} }],
           },
         },
-      });
+      },
+    );
 
     await findByText("Watcher: Off");
     expect(getByDisplayValue("45")).toBeInTheDocument();
 
     await fireEvent.click(getByRole("button", { name: "Reset" }));
-    // On a watch (balanced profile) the controls stay only while the watcher is off.
-    expect(queryByRole("button", { name: "Watcher: On" })).not.toBeInTheDocument();
-    expect(queryByText("Sync sec")).not.toBeInTheDocument();
+    // Reset turns the watcher on; without a connected watch the list polls, so the
+    // controls stay next to the one freshness indicator.
+    expect(getByRole("button", { name: "Watcher: On" })).toBeInTheDocument();
+    expect(getByText("Sync sec")).toBeInTheDocument();
     expect(getByTestId("list-freshness")).toBeInTheDocument();
     const saved = JSON.parse(
       window.localStorage.getItem(
