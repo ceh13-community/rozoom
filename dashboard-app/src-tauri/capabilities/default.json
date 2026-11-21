@@ -14,6 +14,12 @@
     "dialog:default",
     "updater:default",
     "process:allow-restart",
+    "allow-relax-webview-tls",
+    "allow-read-recent-log-tail",
+    "allow-open-logs-folder",
+    "allow-logs-folder-path",
+    "allow-harden-private-files",
+    "allow-linux-package-kind",
     {
       "identifier": "shell:allow-execute",
       "allow": [
