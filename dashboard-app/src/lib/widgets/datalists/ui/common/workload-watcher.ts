@@ -1,5 +1,6 @@
 import { createWatcherEngine } from "$shared/lib/watcher-engine";
 import { trackWorkloadEvent } from "$features/workloads-management";
+import { logPollSchedule, logPollStopped } from "$shared/lib/sync-log";
 
 type WorkloadWatcherOptions = {
   isEnabled: () => boolean;
@@ -13,13 +14,14 @@ export function createWorkloadWatcher(options: WorkloadWatcherOptions) {
     typeof options.workloadName === "function"
       ? options.workloadName()
       : (options.workloadName ?? "unknown");
-  return createWatcherEngine({
+  const engine = createWatcherEngine({
     isEnabled: options.isEnabled,
     getRefreshSeconds: options.getRefreshSeconds,
     isVisible: () =>
       typeof document === "undefined" ? true : document.visibilityState === "visible",
     onTick: options.onTick,
     onSchedule: ({ refreshSeconds, errorStreak }) => {
+      logPollSchedule(resolveWorkloadName(), refreshSeconds, errorStreak);
       if (errorStreak === 0) return;
       trackWorkloadEvent("workloads.watcher_backoff_ms", {
         workload: resolveWorkloadName(),
@@ -43,4 +45,11 @@ export function createWorkloadWatcher(options: WorkloadWatcherOptions) {
       });
     },
   });
+  return {
+    ...engine,
+    stop: () => {
+      engine.stop();
+      logPollStopped(resolveWorkloadName());
+    },
+  };
 }
