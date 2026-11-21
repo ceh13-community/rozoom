@@ -13,6 +13,11 @@ import { getBrowserInvokeFallback, isTauriAvailable } from "$shared/lib/tauri-ru
 import { isRuntimeDebugEnabled, writeRuntimeDebugLog } from "$shared/lib/runtime-debug";
 import { emitCliNotification, isUserFacingCommand } from "$shared/lib/cli-notification";
 import { isMutatingKubectlCommand } from "$shared/analytics/kubectl-mutation";
+import {
+  finishKubectlMutation,
+  logBlockedKubectlMutation,
+  startKubectlMutation,
+} from "$shared/lib/action-log";
 import { buildReadOnlyBlockedResult, checkKubectlReadOnly } from "$shared/lib/readonly-guard";
 import { withJsonOutput } from "./kubectl-json-output";
 import { trackCoreAction } from "$shared/analytics/wau-c";
@@ -365,8 +370,16 @@ export async function kubectlRawFront(
   args: string,
   options?: KubectlOptions,
 ): Promise<{ output: string; errors: string; code?: number }> {
-  const readOnlyCheck = checkKubectlReadOnly(options?.clusterId, args.trim().split(/\s+/));
+  const userArgs = args.trim().split(/\s+/);
+  const readOnlyCheck = checkKubectlReadOnly(options?.clusterId, userArgs);
   if (readOnlyCheck.blocked) {
+    if (isMutatingKubectlCommand(userArgs)) {
+      logBlockedKubectlMutation(
+        userArgs,
+        options?.clusterId,
+        readOnlyCheck.reason ?? "read-only cluster",
+      );
+    }
     return buildReadOnlyBlockedResult(readOnlyCheck.reason);
   }
   if (getBrowserInvoke()) {
@@ -398,12 +411,16 @@ export async function kubectlRawFront(
       budget: getKubectlExecutionBudget(),
     });
   }
+  const mutation = isMutatingKubectlCommand(userArgs)
+    ? startKubectlMutation(userArgs, options?.clusterId)
+    : null;
   const result = await runKubectlBudgeted(
     isWatchCommand(splitArgs) ? "watch" : "exec",
     () => executeCommandWithAbort(command, options?.signal),
     options?.signal,
   );
   reportExecOutcome(options, result);
+  if (mutation) finishKubectlMutation(mutation, result);
 
   // Kubectl sometimes prints warnings into stderr even with exit code 0.
   // Treat as "error" only when exit code is non-zero.
@@ -455,6 +472,13 @@ export async function kubectlRawArgsFront(
 ): Promise<KubectlRawResult> {
   const readOnlyCheck = checkKubectlReadOnly(options?.clusterId, args);
   if (readOnlyCheck.blocked) {
+    if (isMutatingKubectlCommand(args)) {
+      logBlockedKubectlMutation(
+        args,
+        options?.clusterId,
+        readOnlyCheck.reason ?? "read-only cluster",
+      );
+    }
     return buildReadOnlyBlockedResult(readOnlyCheck.reason);
   }
   const dedupeKey = isCoalescibleReadCommand(args, options?.signal)
@@ -498,12 +522,16 @@ export async function kubectlRawArgsFront(
         coalescedRead: Boolean(dedupeKey),
       });
     }
+    const mutation = isMutatingKubectlCommand(args)
+      ? startKubectlMutation(args, options?.clusterId)
+      : null;
     const result = await runKubectlBudgeted(
       isWatchCommand(finalArgs) ? "watch" : "exec",
       () => executeCommandWithAbort(command, options?.signal),
       options?.signal,
     );
     reportExecOutcome(options, result);
+    if (mutation) finishKubectlMutation(mutation, result);
 
     if (result.code !== 0 && result.stderr.length > 0) {
       const shouldSuppressCommandUnavailable =
