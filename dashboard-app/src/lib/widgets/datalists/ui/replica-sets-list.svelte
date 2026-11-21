@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { registerUnsavedWork } from "$shared/lib/unsaved-work";
   import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
@@ -1841,6 +1842,13 @@
 
   // Row actions reveal the workbench and focus it, as in Pods.
   const workbenchReveal = createWorkbenchReveal();
+
+  // Leaving the page or the workload drops these tabs: the layout asks first.
+  $effect(() =>
+    registerUnsavedWork(() =>
+      yamlTabs.filter((tab) => hasUnsavedYaml(tab)).map((tab) => `YAML ${tab.target.name}`),
+    ),
+  );
 </script>
 
 <div class="grid w-full grid-cols-1 overflow-visible">

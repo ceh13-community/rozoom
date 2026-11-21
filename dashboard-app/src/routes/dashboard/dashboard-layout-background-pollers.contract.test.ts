@@ -10,8 +10,12 @@ describe("dashboard layout background pollers contract", () => {
       'import { stopAllBackgroundPollers } from "$shared/lib/background-pollers";',
     );
     expect(source).toContain("stopAllBackgroundPollers();");
-    expect(source).toContain("beforeNavigate(() => {");
-    expect(source).toContain("stopAllBackgroundPollers();");
+    // Before a navigation that goes ahead; one cancelled for unsaved YAML keeps the pollers.
+    const hook = source.slice(source.indexOf("beforeNavigate((navigation) => {"));
+    expect(hook.length).toBeLessThan(source.length);
+    expect(hook.slice(0, hook.indexOf("\n  });"))).toMatch(
+      /navigation\.cancel\(\);[\s\S]*return;[\s\S]*stopAllBackgroundPollers\(\);/,
+    );
   });
 
   it("tracks the active dashboard cluster for runtime plane gating", () => {

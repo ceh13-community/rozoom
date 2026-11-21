@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { registerUnsavedWork } from "$shared/lib/unsaved-work";
   // Edit YAML for kinds a list has no workbench of its own for (custom resource
   // definitions, custom resources): the same tab editor as the workload lists, with
   // Apply, drift check, pin, panes, full screen, close confirm and Undo. It replaces the
@@ -247,6 +248,17 @@
       revealToken = (revealToken ?? 0) + 1;
     });
   });
+
+  // Leaving the page or the workload drops these tabs: the layout asks first.
+  $effect(() =>
+    registerUnsavedWork(() =>
+      tabs
+        .filter((tab) =>
+          hasUnsavedYaml({ yamlText: tab.yamlText, yamlOriginalText: tab.originalYaml }),
+        )
+        .map((tab) => `YAML ${tab.title}`),
+    ),
+  );
 </script>
 
 {#if tabs.length > 0}

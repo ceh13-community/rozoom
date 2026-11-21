@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { registerUnsavedWork } from "$shared/lib/unsaved-work";
   import { goto } from "$app/navigation";
   import { revealListFilteredTo } from "$shared/lib/jump-reveal";
   import IngressUrlCell from "./configuration-list/ingress-url-cell.svelte";
@@ -4769,6 +4770,13 @@ spec:
 
   // Row actions reveal the workbench and focus it, as in Pods.
   const workbenchReveal = createWorkbenchReveal();
+
+  // Leaving the page or the workload drops these tabs: the layout asks first.
+  $effect(() =>
+    registerUnsavedWork(() =>
+      yamlTabs.filter((tab) => hasUnsavedYaml(tab)).map((tab) => `YAML ${tab.target.name}`),
+    ),
+  );
 </script>
 
 <div class="space-y-4">

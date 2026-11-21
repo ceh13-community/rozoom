@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { registerUnsavedWork } from "$shared/lib/unsaved-work";
   import { onMount, onDestroy, untrack } from "svelte";
   import { PRIVATE_FILE_MODE } from "$shared/lib/private-files";
   import { writable } from "svelte/store";
@@ -1073,6 +1074,17 @@
       updateTab("yaml:new", { yamlText: nextYaml, originalYaml: nextYaml });
     });
   });
+
+  // Leaving the page or the workload drops these tabs: the layout asks first.
+  $effect(() =>
+    registerUnsavedWork(() =>
+      yamlTabs
+        .filter((tab) =>
+          hasUnsavedYaml({ yamlText: tab.yamlText, yamlOriginalText: tab.originalYaml }),
+        )
+        .map((tab) => tab.title),
+    ),
+  );
 </script>
 
 <svelte:window onkeydown={handleWindowKeydown} />

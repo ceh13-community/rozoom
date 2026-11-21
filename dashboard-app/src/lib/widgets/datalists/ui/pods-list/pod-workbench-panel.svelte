@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { registerUnsavedWork } from "$shared/lib/unsaved-work";
   import { expandWorkbenchOnRealtimeSwitch } from "../common/realtime-expand.svelte";
   import { onDestroy, onMount, tick, untrack } from "svelte";
   import { writable } from "svelte/store";
@@ -1369,6 +1370,17 @@
       stopLogsRuntime(tabId);
     }
   });
+
+  // Leaving the page or the workload drops these tabs: the layout asks first.
+  $effect(() =>
+    registerUnsavedWork(() =>
+      yamlTabs
+        .filter((tab) =>
+          hasUnsavedYaml({ yamlText: tab.yamlText, yamlOriginalText: tab.originalYamlText }),
+        )
+        .map((tab) => `YAML ${tab.podRef}`),
+    ),
+  );
 </script>
 
 {#if hasWorkbenchTabs}
