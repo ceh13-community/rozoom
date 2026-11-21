@@ -47,6 +47,7 @@ describe("toReplicaSetRow", () => {
       current: 4,
       ready: 2,
       age: "1d",
+      createdAt: "2026-01-01T00:00:00.000Z",
       problemScore: 340,
     });
   });
@@ -62,6 +63,7 @@ describe("toReplicaSetRow", () => {
       current: 0,
       ready: 0,
       age: "-",
+      createdAt: null,
       problemScore: 0,
     });
   });

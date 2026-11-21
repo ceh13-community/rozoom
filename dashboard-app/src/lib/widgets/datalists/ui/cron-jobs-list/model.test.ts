@@ -57,6 +57,7 @@ describe("toCronJobRow", () => {
       nextExecution: "2026-01-02T13:00:00.000Z",
       timeZone: "UTC",
       age: "7d",
+      createdAt: "2026-01-01T00:00:00.000Z",
       problemScore: 40,
     });
   });
@@ -80,6 +81,7 @@ describe("toCronJobRow", () => {
       nextExecution: "-",
       timeZone: "-",
       age: "-",
+      createdAt: null,
       problemScore: 200,
     });
   });

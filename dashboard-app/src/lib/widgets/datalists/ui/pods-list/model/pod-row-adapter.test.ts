@@ -31,6 +31,7 @@ describe("pod row adapter", () => {
     expect(row).toEqual({
       age: "5m",
       ageSeconds: expect.any(Number),
+      startedAt: "2026-03-08T10:00:00.000Z",
       name: "api-0",
       namespace: "prod",
       node: "node-a",

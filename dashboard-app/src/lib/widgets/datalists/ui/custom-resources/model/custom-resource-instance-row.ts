@@ -1,3 +1,4 @@
+import { toTimestampString } from "$shared/lib/live-age.svelte";
 import { getTimeDifference } from "$shared";
 
 type GenericItem = Record<string, unknown>;
@@ -45,6 +46,7 @@ export function adaptCustomResourceInstanceRow(item: GenericItem) {
     namespace: asString(metadata.namespace, "cluster"),
     status: summarizeStatus(status),
     age: createdAt ? getTimeDifference(new Date(createdAt)) : "-",
+    createdAt: toTimestampString(createdAt),
     raw: item,
   };
 }

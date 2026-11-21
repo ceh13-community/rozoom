@@ -110,6 +110,7 @@ describe("toDaemonSetRow and mapDaemonSetRows", () => {
       available: 11,
       nodeSelector: "-",
       age: "5d",
+      createdAt: "2026-01-01T00:00:00.000Z",
       problemScore: 1740,
     });
   });

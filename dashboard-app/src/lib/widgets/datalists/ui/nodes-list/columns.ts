@@ -1,3 +1,4 @@
+import { liveNowMs } from "$shared/lib/live-age.svelte";
 import { timeAgo } from "$shared/lib/timeFormatters";
 import type { ColumnDef } from "@tanstack/table-core";
 import { createRawSnippet } from "svelte";
@@ -299,12 +300,11 @@ export const createColumns = ({
         onclick: column.getToggleSortingHandler(),
         class: compactSortingButtonClass,
       }),
+    // A plain string read inside the cell keeps counting with the shared clock;
+    // a raw snippet was rendered once and froze.
     cell: ({ row }) => {
-      const ageSnippet = createRawSnippet(() => {
-        const seconds = Math.floor((Date.now() - row.original.age.getTime()) / 1000);
-        return { render: () => (seconds < 60 ? "just now" : timeAgo(row.original.age)) };
-      });
-      return renderSnippet(ageSnippet, {});
+      const seconds = Math.floor((liveNowMs() - row.original.age.getTime()) / 1000);
+      return seconds < 60 ? "just now" : timeAgo(row.original.age);
     },
   },
   {

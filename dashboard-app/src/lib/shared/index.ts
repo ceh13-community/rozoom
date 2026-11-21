@@ -2,6 +2,7 @@ export { sortClustersArrayByState } from "./ui/formatters";
 export { getSearchParams } from "./lib/formatters";
 export { cn } from "./lib/css";
 export { getTimeDifference, timeAgo } from "./lib/timeFormatters";
+export { ageSortKey, liveAge, liveNowMs, toTimestampString } from "./lib/live-age.svelte";
 export { checkResponseStatus } from "./lib/parsers";
 export type { KubectlVersion } from "./model/metrics";
 export type {

@@ -1,7 +1,9 @@
-export const getTimeDifference = (isoDate = new Date()) => {
-  const now = new Date();
-  const pastDate = new Date(isoDate);
-  const diffMs = Math.max(0, now.getTime() - pastDate.getTime());
+export const getTimeDifference = (isoDate = new Date()) =>
+  formatAgeMs(Date.now() - new Date(isoDate).getTime());
+
+/** Age label for a duration in ms: "12s", "3m", "5h", "2d". Negative counts as 0s. */
+export const formatAgeMs = (elapsedMs: number) => {
+  const diffMs = Math.max(0, elapsedMs);
   const diffSeconds = Math.floor(diffMs / 1000);
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));

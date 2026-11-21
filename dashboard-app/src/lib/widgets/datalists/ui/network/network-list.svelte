@@ -1,5 +1,6 @@
 <script lang="ts">
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
+  import { liveAge } from "$shared/lib/live-age.svelte";
   import { invalidateAll } from "$app/navigation";
   import { resolvePageClusterName, type PageData } from "$entities/cluster";
   import { runDebugDescribe } from "$features/resource-debug-runtime";
@@ -427,7 +428,9 @@
             <div class="min-w-0 truncate text-muted-foreground">{row.subtype}</div>
             <div class="min-w-0 truncate text-muted-foreground">{row.summary}</div>
             <div class="min-w-0 truncate text-muted-foreground">{row.ports}</div>
-            <div class="min-w-0 truncate text-muted-foreground">{row.age}</div>
+            <div class="min-w-0 truncate text-muted-foreground">
+              {liveAge(row.createdAt, row.age)}
+            </div>
           </div>
         {/each}
         <TablePagination

@@ -29,6 +29,7 @@
   import { getDeploymentStatus } from "$entities/deployment";
   import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
   import { getTimeDifference, type DeploymentItem } from "$shared";
+  import { ageSortKey, liveAge } from "$shared/lib/live-age.svelte";
   import { renderComponent, renderSnippet } from "$shared/ui/data-table";
   import { Button, SortingButton } from "$shared/ui/button";
   import { confirmAction } from "$shared/lib/confirm-action";
@@ -198,6 +199,7 @@
     replicas: number;
     age: string;
     ageSeconds: number;
+    createdAt?: string | null;
     status: string;
     problemScore: number;
   };
@@ -507,14 +509,14 @@
     },
     { accessorKey: "replicas", header: "Replicas" },
     {
-      accessorFn: (row) => row.ageSeconds,
+      accessorFn: (row) => ageSortKey(row.createdAt),
       id: "age",
       header: ({ column }) =>
         renderComponent(SortingButton, {
           label: "Age",
           onclick: column.getToggleSortingHandler(),
         }),
-      cell: ({ row }) => row.original.age,
+      cell: ({ row }) => liveAge(row.original.createdAt, row.original.age),
     },
     {
       accessorKey: "status",

@@ -1,5 +1,6 @@
 <script lang="ts">
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
+  import { liveAge } from "$shared/lib/live-age.svelte";
   import { onDestroy, onMount } from "svelte";
   import { resolvePageClusterName, type PageData } from "$entities/cluster";
   import { runDebugDescribe } from "$features/resource-debug-runtime";
@@ -702,7 +703,15 @@
     const lines = [
       ["name", "group", "version", "scope", "resource", "summary", "age"].join(","),
       ...filteredRows.map((row) =>
-        [row.name, row.group, row.version, row.scope, row.resource, row.summary, row.age]
+        [
+          row.name,
+          row.group,
+          row.version,
+          row.scope,
+          row.resource,
+          row.summary,
+          liveAge(row.createdAt, row.age),
+        ]
           .map((value) => `"${String(value).replaceAll('"', '""')}"`)
           .join(","),
       ),
@@ -1046,7 +1055,7 @@
               {/if}
               {#if isColumnVisible("age")}
                 <Table.TableCell class="min-w-0 truncate text-muted-foreground"
-                  >{row.age}</Table.TableCell
+                  >{liveAge(row.createdAt, row.age)}</Table.TableCell
                 >
               {/if}
             </Table.TableRow>
@@ -1127,7 +1136,9 @@
             <div class="min-w-0 truncate font-medium text-foreground">{instance.name}</div>
             <div class="min-w-0 truncate text-muted-foreground">{instance.namespace}</div>
             <div class="min-w-0 truncate text-muted-foreground">{instance.status}</div>
-            <div class="min-w-0 truncate text-muted-foreground">{instance.age}</div>
+            <div class="min-w-0 truncate text-muted-foreground">
+              {liveAge(instance.createdAt, instance.age)}
+            </div>
             <div class="flex items-center gap-2">
               <Button
                 variant="outline"

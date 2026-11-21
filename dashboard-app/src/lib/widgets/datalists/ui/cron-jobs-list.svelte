@@ -34,6 +34,7 @@
   } from "$shared/api/kubectl-proxy";
   import { openStreamWithOptionalFallback } from "$features/pods-workbench";
   import { getTimeDifference } from "$shared";
+  import { ageSortKey, liveAge } from "$shared/lib/live-age.svelte";
   import { renderComponent } from "$shared/ui/data-table";
   import { Button, SortingButton } from "$shared/ui/button";
   import MultiPaneWorkbench from "$shared/ui/multi-pane-workbench.svelte";
@@ -256,12 +257,14 @@
     { accessorKey: "nextExecution", header: "Next Execution" },
     { accessorKey: "timeZone", header: "Time zone" },
     {
-      accessorKey: "age",
+      accessorFn: (row) => ageSortKey(row.createdAt),
+      id: "age",
       header: ({ column }) =>
         renderComponent(SortingButton, {
           label: "Age",
           onclick: column.getToggleSortingHandler(),
         }),
+      cell: ({ row }) => liveAge(row.original.createdAt, row.original.age),
     },
   ];
 

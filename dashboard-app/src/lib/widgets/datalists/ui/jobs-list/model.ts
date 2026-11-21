@@ -1,3 +1,4 @@
+import { toTimestampString } from "$shared/lib/live-age.svelte";
 import type { JobItem } from "$shared/model/clusters";
 import { getSelectedNamespaceList } from "$features/namespace-management";
 import { buildJobProblemScore } from "../model/problem-priority";
@@ -8,6 +9,8 @@ export type JobRow = {
   namespace: string;
   completions: string;
   age: string;
+  /** metadata.creationTimestamp; the Age cell counts from it on its own. */
+  createdAt?: string | null;
   status: string;
   problemScore: number;
 };
@@ -77,6 +80,7 @@ export function toJobRow(
     namespace,
     completions: `${succeeded}/${completions}`,
     age: getAge(runtime.metadata?.creationTimestamp),
+    createdAt: toTimestampString(runtime.metadata?.creationTimestamp),
     status,
     problemScore: buildJobProblemScore({
       status,

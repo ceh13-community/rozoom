@@ -56,6 +56,7 @@
   import FileDown from "@lucide/svelte/icons/file-down";
   import * as Alert from "$shared/ui/alert";
   import { getTimeDifference, type DaemonSetItem } from "$shared";
+  import { ageSortKey, liveAge } from "$shared/lib/live-age.svelte";
   import {
     applyResumeArgs,
     createStreamChunkMerger,
@@ -506,12 +507,14 @@
     { accessorKey: "available", header: "Available" },
     { accessorKey: "nodeSelector", header: "Node selector" },
     {
-      accessorKey: "age",
+      accessorFn: (row) => ageSortKey(row.createdAt),
+      id: "age",
       header: ({ column }) =>
         renderComponent(SortingButton, {
           label: "Age",
           onclick: column.getToggleSortingHandler(),
         }),
+      cell: ({ row }) => liveAge(row.original.createdAt, row.original.age),
     },
   ];
 

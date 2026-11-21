@@ -1,3 +1,4 @@
+import { toTimestampString } from "$shared/lib/live-age.svelte";
 import { getTimeDifference } from "$shared";
 import type { WorkloadType } from "$shared/model/workloads";
 import { renderConfigurationSummary } from "../../configuration-list/model/resource-renderers";
@@ -43,6 +44,7 @@ export function adaptCustomResourceRow(item: GenericItem) {
     summary: summary.details,
     problemScore: summary.scoreDelta,
     age: createdAt ? getTimeDifference(new Date(createdAt)) : "-",
+    createdAt: toTimestampString(createdAt),
     raw: item,
   };
 }
