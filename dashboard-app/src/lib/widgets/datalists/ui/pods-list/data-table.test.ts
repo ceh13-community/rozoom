@@ -112,7 +112,7 @@ describe("pods data-table", () => {
       },
     ];
 
-    const { getByText, getAllByText } = render(DataTable, {
+    const { getByText, getAllByText, queryAllByText } = render(DataTable, {
       props: {
         rows,
         ...baseProps,
@@ -128,7 +128,31 @@ describe("pods data-table", () => {
 
     expect(getByText("12m")).toBeInTheDocument();
     expect(getByText("34Mi")).toBeInTheDocument();
-    // Only the pod without a previous value waits for the first sample.
+    // A refresh never blanks a cell: a pod with no sample keeps showing n/a.
+    expect(queryAllByText("Loading…")).toHaveLength(0);
+    expect(getAllByText("n/a")).toHaveLength(2);
+  });
+
+  it("shows Loading only until the first metrics sample arrives", () => {
+    const rows: PodListRow[] = [
+      {
+        uid: "pod-1",
+        name: "api-0",
+        namespace: "default",
+        status: "Running",
+        readyContainers: 1,
+        totalContainers: 1,
+        restarts: 0,
+        node: "minikube",
+        age: "5m",
+        ageSeconds: 300,
+      },
+    ];
+
+    const { getAllByText } = render(DataTable, {
+      props: { rows, ...baseProps, metricsLoading: true, metricsByKey: new Map() },
+    });
+
     expect(getAllByText("Loading…")).toHaveLength(2);
   });
 

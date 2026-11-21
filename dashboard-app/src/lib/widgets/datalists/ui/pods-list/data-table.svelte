@@ -778,7 +778,7 @@
                     <div class="min-w-0 truncate text-muted-foreground">
                       {#if getMetricsForRow(row)}
                         {getMetricsForRow(row)?.cpu}
-                      {:else if metricsLoading}
+                      {:else if metricsLoading && metricsByKey.size === 0}
                         Loading…
                       {:else}
                         n/a
@@ -789,7 +789,7 @@
                     <div class="min-w-0 truncate text-muted-foreground">
                       {#if getMetricsForRow(row)}
                         {getMetricsForRow(row)?.memory}
-                      {:else if metricsLoading}
+                      {:else if metricsLoading && metricsByKey.size === 0}
                         Loading…
                       {:else}
                         n/a
@@ -898,7 +898,7 @@
               <div class="min-w-0 truncate text-muted-foreground">
                 {#if getMetricsForRow(row)}
                   {getMetricsForRow(row)?.cpu}
-                {:else if metricsLoading}
+                {:else if metricsLoading && metricsByKey.size === 0}
                   Loading…
                 {:else}
                   n/a
@@ -909,7 +909,7 @@
               <div class="min-w-0 truncate text-muted-foreground">
                 {#if getMetricsForRow(row)}
                   {getMetricsForRow(row)?.memory}
-                {:else if metricsLoading}
+                {:else if metricsLoading && metricsByKey.size === 0}
                   Loading…
                 {:else}
                   n/a
