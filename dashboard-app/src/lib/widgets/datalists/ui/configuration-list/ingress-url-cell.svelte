@@ -6,16 +6,11 @@
   interface Props {
     url: string;
     onOpen: (url: string) => void | Promise<void>;
-    onCopied: (url: string) => void;
+    /** Copies through the list's clipboard helper, which reports success or failure. */
+    onCopy: (url: string) => void | Promise<void>;
   }
 
-  const { url, onOpen, onCopied }: Props = $props();
-
-  async function copy() {
-    if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) return;
-    await navigator.clipboard.writeText(url);
-    onCopied(url);
-  }
+  const { url, onOpen, onCopy }: Props = $props();
 </script>
 
 {#if url}
@@ -37,7 +32,7 @@
       aria-label={`Copy ${url}`}
       onclick={(event) => {
         event.stopPropagation();
-        void copy();
+        void onCopy(url);
       }}
     >
       <Copy class="h-3.5 w-3.5" />

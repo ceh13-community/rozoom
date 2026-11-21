@@ -5815,9 +5815,7 @@ spec:
                   <IngressUrlCell
                     url={row.url}
                     onOpen={openUrlInExternalBrowser}
-                    onCopied={(value) => {
-                      actionNotification = notifySuccess(`Copied ${value}`);
-                    }}
+                    onCopy={(value) => copyTextToClipboard(value, `Copied ${value}`)}
                   />
                 </Table.TableCell>
               {/if}
@@ -6101,9 +6099,7 @@ spec:
                       <IngressUrlCell
                         url={row.url}
                         onOpen={openUrlInExternalBrowser}
-                        onCopied={(value) => {
-                          actionNotification = notifySuccess(`Copied ${value}`);
-                        }}
+                        onCopy={(value) => copyTextToClipboard(value, `Copied ${value}`)}
                       />
                     </Table.TableCell>
                   {/if}
