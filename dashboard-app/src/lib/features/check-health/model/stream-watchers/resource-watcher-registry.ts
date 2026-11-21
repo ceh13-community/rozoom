@@ -1,4 +1,4 @@
-import { KubectlWatcher } from "./watcher-model";
+import { KubectlWatcher, type WatchLifecycleHooks } from "./watcher-model";
 import { buildKubectlWatchCommand } from "./watch-command";
 import { reportWatcherRuntimeError } from "./watcher-runtime-error";
 import type { EventParser } from "./watcher-parser";
@@ -8,7 +8,7 @@ export function createResourceWatcherRegistry(command: string, parser: EventPars
   const watchCommand = buildKubectlWatchCommand(command);
 
   return {
-    start(clusterId: string) {
+    start(clusterId: string, hooks?: WatchLifecycleHooks) {
       if (active.has(clusterId)) return;
       const watcher = new KubectlWatcher();
       active.set(clusterId, watcher);
@@ -19,6 +19,7 @@ export function createResourceWatcherRegistry(command: string, parser: EventPars
           reportWatcherRuntimeError({ clusterId, kind: command }, err);
         },
         parser,
+        hooks,
       );
     },
     stop(clusterId: string) {

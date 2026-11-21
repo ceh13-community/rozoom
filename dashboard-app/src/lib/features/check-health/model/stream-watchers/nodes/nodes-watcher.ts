@@ -1,4 +1,4 @@
-import { KubectlWatcher } from "../watcher-model";
+import { KubectlWatcher, type WatchLifecycleHooks } from "../watcher-model";
 import { buildKubectlWatchCommand } from "../watch-command";
 import { reportWatcherRuntimeError } from "../watcher-runtime-error";
 import { parseNodeJsonLine } from "./nodes-parser";
@@ -6,7 +6,7 @@ import { parseNodeJsonLine } from "./nodes-parser";
 const active = new Map<string, KubectlWatcher>();
 const NODES_WATCH_COMMAND = buildKubectlWatchCommand("get nodes -o json");
 
-export function startNodesWatcher(clusterId: string) {
+export function startNodesWatcher(clusterId: string, hooks?: WatchLifecycleHooks) {
   if (active.has(clusterId)) return;
 
   const watcher = new KubectlWatcher();
@@ -20,6 +20,7 @@ export function startNodesWatcher(clusterId: string) {
       reportWatcherRuntimeError({ clusterId, kind: "nodes" }, err);
     },
     parseNodeJsonLine,
+    hooks,
   );
 }
 

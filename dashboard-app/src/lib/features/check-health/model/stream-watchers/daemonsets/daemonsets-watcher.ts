@@ -1,3 +1,4 @@
+import type { WatchLifecycleHooks } from "../watcher-model";
 import { createResourceWatcherRegistry } from "../resource-watcher-registry";
 import { parseDaemonSetJsonLine } from "./daemonsets-parser";
 
@@ -6,8 +7,8 @@ const registry = createResourceWatcherRegistry(
   parseDaemonSetJsonLine,
 );
 
-export function startDaemonSetsWatcher(clusterId: string) {
-  registry.start(clusterId);
+export function startDaemonSetsWatcher(clusterId: string, hooks?: WatchLifecycleHooks) {
+  registry.start(clusterId, hooks);
 }
 
 export function stopDaemonSetsWatcher(clusterId: string) {

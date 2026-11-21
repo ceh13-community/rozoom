@@ -33,8 +33,8 @@ function getConfigurationApiSync(workloadType: WorkloadType) {
     setInitial: (clusterId, items) => {
       setInitialConfigurationItems(clusterId, workloadType, items);
     },
-    fallbackStart: (clusterId) => {
-      startConfigurationWatcher(clusterId, workloadType);
+    fallbackStart: (clusterId, hooks) => {
+      startConfigurationWatcher(clusterId, workloadType, hooks);
     },
     fallbackStop: (clusterId) => {
       stopConfigurationWatcher(clusterId, workloadType);

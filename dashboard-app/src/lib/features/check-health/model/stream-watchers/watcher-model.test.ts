@@ -154,4 +154,84 @@ describe("KubectlWatcher", () => {
     expect(sidecarMock).toHaveBeenCalledTimes(9);
     expect(onError).not.toHaveBeenCalled();
   });
+
+  it("reports giving up to the lifecycle hooks", async () => {
+    const harnesses = Array.from({ length: 7 }, () => createCommandHarness());
+    const queue = [...harnesses];
+    sidecarMock.mockImplementation(() => queue.shift()?.command);
+
+    const { KubectlWatcher } = await import("./watcher-model");
+    const watcher = new KubectlWatcher();
+    const onGiveUp = vi.fn();
+
+    await watcher.start("get secrets -A -o json", "cluster-a", vi.fn(), parser, { onGiveUp });
+    for (let index = 0; index < 7; index += 1) {
+      harnesses[index]?.emitClose();
+      await vi.advanceTimersByTimeAsync(8_000);
+    }
+
+    expect(onGiveUp).toHaveBeenCalledTimes(1);
+    expect(onGiveUp.mock.calls[0]?.[0]).toContain("stopping restarts");
+  });
+
+  it("lists after each watch start and replays the events that arrived meanwhile", async () => {
+    const watch = createCommandHarness();
+    const list = {
+      execute: vi.fn().mockResolvedValue({
+        code: 0,
+        stdout: JSON.stringify({ items: [{ metadata: { name: "a" } }] }),
+        stderr: "",
+      }),
+    };
+    sidecarMock.mockReturnValueOnce(watch.command).mockReturnValueOnce(list);
+    dispatchClusterEventMock.mockReturnValue({ kind: "deployment", event: {} });
+    const order: string[] = [];
+    dispatchClusterEventMock.mockImplementation((_cluster: string, line: string) => {
+      order.push(`event ${line}`);
+      return { kind: "deployment", event: {} };
+    });
+    const onRelist = vi.fn((items: unknown[]) => {
+      order.push(`relist ${items.length}`);
+    });
+
+    const { KubectlWatcher } = await import("./watcher-model");
+    const watcher = new KubectlWatcher();
+    await watcher.start(
+      "get deployments --all-namespaces -o json --watch-only --output-watch-events --request-timeout=300s",
+      "cluster-a",
+      vi.fn(),
+      parser,
+      { onRelist },
+    );
+    watch.emitStdout("e1");
+    await vi.advanceTimersByTimeAsync(1_000);
+    await vi.waitFor(() => {
+      expect(onRelist).toHaveBeenCalled();
+    });
+
+    expect(sidecarMock.mock.calls[1]?.[1]).toEqual([
+      "--kubeconfig",
+      "/tmp/appdata/configs/cluster-a.yaml",
+      "get",
+      "deployments",
+      "--all-namespaces",
+      "-o",
+      "json",
+      "--request-timeout=30s",
+    ]);
+    // The event seen before the list is applied again over it.
+    expect(order).toEqual(["event e1", "relist 1", "event e1"]);
+  });
+
+  it("does not list when no relist hook is given", async () => {
+    const watch = createCommandHarness();
+    sidecarMock.mockReturnValueOnce(watch.command);
+
+    const { KubectlWatcher } = await import("./watcher-model");
+    const watcher = new KubectlWatcher();
+    await watcher.start("get pods -o json", "cluster-a", vi.fn(), parser);
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    expect(sidecarMock).toHaveBeenCalledTimes(1);
+  });
 });

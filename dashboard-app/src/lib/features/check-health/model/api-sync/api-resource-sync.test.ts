@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { get } from "svelte/store";
+import type { WatchLifecycleHooks } from "../stream-watchers/watcher-model";
 
 const listMock = vi.fn();
 const watchMock = vi.fn();
@@ -95,7 +96,10 @@ describe("api-resource-sync", () => {
     await vi.advanceTimersByTimeAsync(2_000);
 
     await vi.waitFor(() => {
-      expect(fallbackStart).toHaveBeenCalledWith("cluster-a");
+      expect(fallbackStart).toHaveBeenCalledWith(
+        "cluster-a",
+        expect.objectContaining({ onGiveUp: expect.any(Function) }),
+      );
     });
     sync.stop("cluster-a");
   });
@@ -124,6 +128,10 @@ describe("api-resource-sync", () => {
       expect(fallbackStart).toHaveBeenCalledTimes(1);
     });
     const listCallsAtFallback = listMock.mock.calls.length;
+    // Not live until the fallback delivered its first full list.
+    expect(get(live)).toBe(false);
+    const hooks = fallbackStart.mock.calls[0]?.[1] as WatchLifecycleHooks;
+    hooks.onRelist?.([]);
     expect(get(live)).toBe(true);
     expect(get(sync.selectRuntimeState("cluster-a")).transport).toBe("fallback");
 
@@ -139,6 +147,97 @@ describe("api-resource-sync", () => {
     sync.stop("cluster-a");
     expect(fallbackStop).toHaveBeenCalledWith("cluster-a");
     expect(get(live)).toBe(false);
+  });
+
+  async function startOnFallback() {
+    listMock.mockRejectedValue(new Error("Load failed"));
+    const fallbackStart = vi.fn();
+    const fallbackStop = vi.fn();
+    const setInitial = vi.fn();
+    const { createApiResourceSync, selectResourceStreamLive } = await import("./api-resource-sync");
+    const sync = createApiResourceSync({
+      getPath: () => "/api/v1/secrets",
+      kind: "configuration",
+      scope: "configuration:secrets",
+      setInitial,
+      fallbackStart,
+      fallbackStop,
+    });
+    const live = selectResourceStreamLive("configuration:secrets", "cluster-a");
+    sync.start("cluster-a");
+    await vi.advanceTimersByTimeAsync(2_000);
+    await vi.waitFor(() => {
+      expect(fallbackStart).toHaveBeenCalledTimes(1);
+    });
+    const hooks = () =>
+      fallbackStart.mock.calls[fallbackStart.mock.calls.length - 1]?.[1] as WatchLifecycleHooks;
+    return { sync, live, fallbackStart, fallbackStop, setInitial, hooks };
+  }
+
+  it("shows a fallback stream that gave up as not live", async () => {
+    const { sync, live, setInitial, hooks } = await startOnFallback();
+    hooks().onRelist?.([{ metadata: { name: "s1" } }]);
+    expect(setInitial).toHaveBeenLastCalledWith("cluster-a", [{ metadata: { name: "s1" } }]);
+    expect(get(live)).toBe(true);
+
+    // kubectl get --watch fails (403, expired token) until the watcher stops restarting.
+    hooks().onGiveUp?.("watch stream exited 6 times without a successful event");
+
+    expect(get(live)).toBe(false);
+    expect(get(sync.selectRuntimeState("cluster-a")).error).toContain("exited 6 times");
+    sync.stop("cluster-a");
+  });
+
+  it("retries the api from the fallback on a timer and hands over when it works", async () => {
+    const { sync, live, fallbackStop, hooks } = await startOnFallback();
+    hooks().onRelist?.([]);
+    const listCalls = listMock.mock.calls.length;
+
+    await vi.advanceTimersByTimeAsync(59_000);
+    expect(listMock.mock.calls.length).toBe(listCalls);
+
+    listMock.mockResolvedValue({ items: [{ metadata: { name: "s1" } }], resourceVersion: "20" });
+    watchMock.mockImplementation(
+      ({ signal }) =>
+        new Promise((resolve) => {
+          signal.addEventListener(
+            "abort",
+            () => resolve({ expired: false, resourceVersion: "21" }),
+            { once: true },
+          );
+        }),
+    );
+    await vi.advanceTimersByTimeAsync(1_500);
+
+    await vi.waitFor(() => {
+      expect(fallbackStop).toHaveBeenCalledWith("cluster-a");
+    });
+    expect(get(sync.selectRuntimeState("cluster-a")).transport).toBe("api");
+    expect(get(live)).toBe(true);
+    sync.stop("cluster-a");
+  });
+
+  it("restarts a fallback that gave up when the api retry fails too", async () => {
+    const { sync, live, fallbackStart, fallbackStop, hooks } = await startOnFallback();
+    hooks().onGiveUp?.("watch stream exited 6 times without a successful event");
+    expect(get(live)).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(61_000);
+
+    await vi.waitFor(() => {
+      expect(fallbackStart).toHaveBeenCalledTimes(2);
+    });
+    expect(fallbackStop).toHaveBeenCalledTimes(1);
+    // The restarted watch is live only after its own list.
+    expect(get(live)).toBe(false);
+    hooks().onRelist?.([]);
+    expect(get(live)).toBe(true);
+
+    // The next api retry backs off to 120 s.
+    const listCalls = listMock.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(100_000);
+    expect(listMock.mock.calls.length).toBe(listCalls);
+    sync.stop("cluster-a");
   });
 
   it("ref-counts subscribers so one cluster session is shared", async () => {

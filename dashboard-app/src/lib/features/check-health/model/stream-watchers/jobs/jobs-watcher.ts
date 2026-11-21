@@ -1,3 +1,4 @@
+import type { WatchLifecycleHooks } from "../watcher-model";
 import { createResourceWatcherRegistry } from "../resource-watcher-registry";
 import { parseJobJsonLine } from "./jobs-parser";
 
@@ -6,8 +7,8 @@ const registry = createResourceWatcherRegistry(
   parseJobJsonLine,
 );
 
-export function startJobsWatcher(clusterId: string) {
-  registry.start(clusterId);
+export function startJobsWatcher(clusterId: string, hooks?: WatchLifecycleHooks) {
+  registry.start(clusterId, hooks);
 }
 
 export function stopJobsWatcher(clusterId: string) {

@@ -30,6 +30,7 @@ describe("pods-watcher", () => {
       "cluster-1",
       expect.any(Function),
       expect.any(Function),
+      undefined,
     );
   });
 

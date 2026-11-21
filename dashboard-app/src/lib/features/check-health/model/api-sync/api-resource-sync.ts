@@ -1,4 +1,5 @@
 import { eventBus } from "../stream-watchers/event-bus";
+import type { WatchLifecycleHooks } from "../stream-watchers/watcher-model";
 import { derived, get, writable, type Readable } from "svelte/store";
 import { listKubeResource, watchKubeResource } from "$shared/api/kube-api-client";
 import { activeApiSyncClusterIds } from "./api-sync-activity";
@@ -29,11 +30,19 @@ export type ApiResourceRuntimeState = {
   error: string | null;
   relistCount: number;
   retryCount: number;
+  /** The kubectl watch fallback has delivered a full list since it (re)started. */
+  fallbackSynced: boolean;
 };
 
 type ActiveSession = {
   controller: AbortController | null;
   fallbackActive: boolean;
+  /** The fallback watcher gave up restarting; its stream is dead. */
+  fallbackDead: boolean;
+  /** Bumped on every fallback start/stop so late hooks of an old watcher are ignored. */
+  fallbackGeneration: number;
+  fallbackRetryTimer: ReturnType<typeof setTimeout> | null;
+  fallbackRetryAttempt: number;
   refCount: number;
   resourceVersion: string;
   retryCount: number;
@@ -49,6 +58,7 @@ const DEFAULT_RUNTIME_STATE: ApiResourceRuntimeState = {
   error: null,
   relistCount: 0,
   retryCount: 0,
+  fallbackSynced: false,
 };
 
 function sleep(ms: number, signal: AbortSignal) {
@@ -71,16 +81,21 @@ function computeRetryDelay(retryCount: number) {
 }
 
 const MAX_API_RETRIES_BEFORE_FALLBACK = 2;
+// While on the kubectl watch fallback, the API path is tried again on a timer:
+// 60 s, then doubling up to 5 min. A working API watch replaces the fallback.
+const FALLBACK_API_RETRY_BASE_MS = 60_000;
+const FALLBACK_API_RETRY_MAX_MS = 300_000;
 
 /**
  * A stream is live while its session runs on a working transport: an API watch
- * after a successful list, or the kubectl watch fallback. A live stream with no
- * events means nothing changed, so its data is fresh. Lists read this instead of
- * the time of the last data change.
+ * after a successful list, or the kubectl watch fallback after it delivered a
+ * full list and while it has not given up. A live stream with no events means
+ * nothing changed, so its data is fresh. Lists read this instead of the time of
+ * the last data change.
  */
 export function isResourceStreamLive(state: ApiResourceRuntimeState): boolean {
   if (!state.isRunning || state.refCount <= 0) return false;
-  if (state.transport === "fallback") return true;
+  if (state.transport === "fallback") return state.fallbackSynced && state.error === null;
   return state.transport === "api" && state.lastListAt !== null && state.error === null;
 }
 
@@ -110,7 +125,7 @@ export function createApiResourceSync<Item>(options: {
   /** Liveness key for selectResourceStreamLive; defaults to kind. */
   scope?: string;
   setInitial: (clusterId: string, items: Item[]) => void;
-  fallbackStart?: (clusterId: string) => void;
+  fallbackStart?: (clusterId: string, hooks: WatchLifecycleHooks) => void;
   fallbackStop?: (clusterId: string) => void;
 }): ApiResourceSyncController<Item> {
   const active = new Map<string, ActiveSession>();
@@ -202,14 +217,89 @@ export function createApiResourceSync<Item>(options: {
     throw lastError;
   }
 
+  function clearFallbackRetry(session: ActiveSession) {
+    if (!session.fallbackRetryTimer) return;
+    clearTimeout(session.fallbackRetryTimer);
+    session.fallbackRetryTimer = null;
+  }
+
+  function startFallback(clusterId: string, session: ActiveSession) {
+    session.fallbackActive = true;
+    session.fallbackDead = false;
+    const generation = ++session.fallbackGeneration;
+    const isCurrent = () => session.fallbackActive && session.fallbackGeneration === generation;
+    updateRuntimeState(clusterId, (prev) => ({
+      ...prev,
+      isRunning: true,
+      transport: "fallback",
+      error: null,
+      fallbackSynced: false,
+    }));
+    options.fallbackStart?.(clusterId, {
+      onRelist: (items) => {
+        if (!isCurrent()) return;
+        options.setInitial(clusterId, items as Item[]);
+        updateRuntimeState(clusterId, (prev) => ({ ...prev, error: null, fallbackSynced: true }));
+      },
+      onGiveUp: (reason) => {
+        if (!isCurrent()) return;
+        session.fallbackDead = true;
+        updateRuntimeState(clusterId, (prev) => ({
+          ...prev,
+          error: reason,
+          fallbackSynced: false,
+        }));
+        trackWatcherTransportError({
+          clusterId,
+          kind: options.kind,
+          stage: "fallback",
+          error: reason,
+          retryCount: session.retryCount,
+        });
+      },
+    });
+  }
+
+  function stopFallback(clusterId: string, session: ActiveSession) {
+    clearFallbackRetry(session);
+    if (!session.fallbackActive) return;
+    session.fallbackActive = false;
+    session.fallbackDead = false;
+    session.fallbackGeneration += 1;
+    options.fallbackStop?.(clusterId);
+  }
+
+  function scheduleFallbackRetry(clusterId: string, session: ActiveSession) {
+    clearFallbackRetry(session);
+    const delay = Math.min(
+      FALLBACK_API_RETRY_BASE_MS * 2 ** session.fallbackRetryAttempt,
+      FALLBACK_API_RETRY_MAX_MS,
+    );
+    session.fallbackRetryAttempt += 1;
+    trackWatcherRetry({
+      clusterId,
+      kind: options.kind,
+      retryCount: session.retryCount,
+      backoffMs: delay,
+      transport: "fallback",
+    });
+    session.fallbackRetryTimer = setTimeout(() => {
+      session.fallbackRetryTimer = null;
+      if (!session.fallbackActive || session.controller || session.refCount <= 0) return;
+      if (!isClusterActive(clusterId)) return;
+      // Try the API path while the fallback keeps running; runSession stops the
+      // fallback once the list succeeds, or schedules the next try.
+      session.controller = new AbortController();
+      void runSession(clusterId, session);
+    }, delay);
+  }
+
   function stopSession(clusterId: string, session: ActiveSession) {
     session.controller?.abort();
     const stoppedTransport = session.fallbackActive ? "fallback" : "api";
     session.controller = null;
-    if (session.fallbackActive) {
-      options.fallbackStop?.(clusterId);
-      session.fallbackActive = false;
-    }
+    stopFallback(clusterId, session);
+    session.fallbackRetryAttempt = 0;
     updateRuntimeState(clusterId, (prev) => ({
       ...prev,
       isRunning: false,
@@ -229,17 +319,15 @@ export function createApiResourceSync<Item>(options: {
 
     const enableFallback = () => {
       if (session.fallbackActive) return;
-      session.fallbackActive = true;
-      options.fallbackStart?.(clusterId);
-      updateRuntimeState(clusterId, (prev) => ({
-        ...prev,
-        isRunning: true,
-        transport: "fallback",
-      }));
+      startFallback(clusterId, session);
+      scheduleFallbackRetry(clusterId, session);
     };
 
     try {
       const initial = await listWithResolvedPath(clusterId, controller.signal);
+      // A retry from the fallback succeeded: the API watch takes over from the
+      // list's resourceVersion, so nothing between the two is lost.
+      stopFallback(clusterId, session);
       options.setInitial(clusterId, initial.items);
       session.resourceVersion = initial.resourceVersion;
       updateRuntimeState(clusterId, (prev) => ({
@@ -264,6 +352,7 @@ export function createApiResourceSync<Item>(options: {
               (event.object as { metadata?: { resourceVersion?: string } } | undefined)?.metadata
                 ?.resourceVersion ?? session.resourceVersion;
             session.resourceVersion = nextResourceVersion;
+            session.fallbackRetryAttempt = 0;
             trackWatcherEvent({
               clusterId,
               kind: options.kind,
@@ -317,6 +406,7 @@ export function createApiResourceSync<Item>(options: {
 
         session.resourceVersion = result.resourceVersion;
         session.retryCount = 0;
+        session.fallbackRetryAttempt = 0;
         updateRuntimeState(clusterId, (prev) => ({
           ...prev,
           isRunning: true,
@@ -327,6 +417,16 @@ export function createApiResourceSync<Item>(options: {
         }));
       }
     } catch (error) {
+      if (!controller.signal.aborted && session.fallbackActive) {
+        // A retry from the fallback failed at the list: keep the fallback, bring
+        // it back if it gave up, and try again later.
+        if (session.fallbackDead) {
+          stopFallback(clusterId, session);
+          startFallback(clusterId, session);
+        }
+        scheduleFallbackRetry(clusterId, session);
+        return;
+      }
       if (!controller.signal.aborted) {
         trackWatcherTransportError({
           clusterId,
@@ -435,6 +535,10 @@ export function createApiResourceSync<Item>(options: {
       const session: ActiveSession = {
         controller: null,
         fallbackActive: false,
+        fallbackDead: false,
+        fallbackGeneration: 0,
+        fallbackRetryTimer: null,
+        fallbackRetryAttempt: 0,
         refCount: 1,
         resourceVersion: "",
         retryCount: 0,
