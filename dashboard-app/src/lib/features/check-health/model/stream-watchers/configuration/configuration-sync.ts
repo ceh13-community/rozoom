@@ -39,6 +39,8 @@ function getConfigurationApiSync(workloadType: WorkloadType) {
     fallbackStop: (clusterId) => {
       stopConfigurationWatcher(clusterId, workloadType);
     },
+    // Same payload as the kubectl watch parser: the store routes by workloadType.
+    toEventPayload: (event) => ({ workloadType, event }),
   });
   configurationApiSyncByWorkload.set(workloadType, sync);
   return sync;

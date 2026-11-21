@@ -3,9 +3,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const acquireMock = vi.fn();
 const releaseMock = vi.fn();
 
+const tauriFetchMock = vi.fn();
+const isTauriAvailableMock = vi.fn(() => false);
+
 vi.mock("./kube-api-proxy", () => ({
   acquireKubeApiProxy: acquireMock,
   releaseKubeApiProxy: releaseMock,
+}));
+
+vi.mock("@tauri-apps/plugin-http", () => ({
+  fetch: tauriFetchMock,
+}));
+
+vi.mock("$shared/lib/tauri-runtime", () => ({
+  isTauriAvailable: isTauriAvailableMock,
 }));
 
 function makeJsonResponse(body: unknown, init?: ResponseInit) {
@@ -24,6 +35,40 @@ describe("kube-api-client", () => {
     acquireMock.mockResolvedValue({ clusterId: "cluster-a", baseUrl: "http://127.0.0.1:39123" });
     releaseMock.mockResolvedValue(undefined);
     vi.stubGlobal("fetch", vi.fn());
+    tauriFetchMock.mockReset();
+    isTauriAvailableMock.mockReturnValue(false);
+  });
+
+  it("sends desktop requests to the kubectl proxy through the HTTP plugin, not the webview", async () => {
+    isTauriAvailableMock.mockReturnValue(true);
+    tauriFetchMock.mockResolvedValueOnce(
+      makeJsonResponse({ metadata: { resourceVersion: "7" }, items: [] }),
+    );
+    tauriFetchMock.mockResolvedValueOnce(
+      new Response(
+        '{"type":"ADDED","object":{"metadata":{"name":"svc","resourceVersion":"8"}}}\n',
+        {
+          status: 200,
+        },
+      ),
+    );
+
+    const { listKubeResource, watchKubeResource } = await import("./kube-api-client");
+    await listKubeResource({ clusterId: "cluster-a", path: "/api/v1/services" });
+    const onEvent = vi.fn();
+    const result = await watchKubeResource({
+      clusterId: "cluster-a",
+      path: "/api/v1/services",
+      resourceVersion: "7",
+      onEvent,
+    });
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(tauriFetchMock).toHaveBeenCalledTimes(2);
+    expect(tauriFetchMock.mock.calls[0]?.[0]).toBe("http://127.0.0.1:39123/api/v1/services");
+    expect(tauriFetchMock.mock.calls[1]?.[0]).toContain("/api/v1/services?watch=1");
+    expect(onEvent).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ expired: false, resourceVersion: "8" });
   });
 
   it("lists resources and returns the list resourceVersion", async () => {
@@ -88,6 +133,12 @@ describe("kube-api-client", () => {
 
     expect(events).toEqual([{ type: "ADDED" }, { type: "BOOKMARK" }]);
     expect(result).toEqual({ expired: false, resourceVersion: "57" });
+    // The API server rejects resourceVersionMatch on a watch without
+    // sendInitialEvents (422), so a plain watch must not send it.
+    const watchUrl = new URL(String(vi.mocked(fetch).mock.calls[0]?.[0]));
+    expect(watchUrl.searchParams.get("resourceVersion")).toBe("55");
+    expect(watchUrl.searchParams.has("resourceVersionMatch")).toBe(false);
+    expect(watchUrl.searchParams.has("sendInitialEvents")).toBe(false);
     expect(releaseMock).toHaveBeenCalledWith({
       clusterId: "cluster-a",
       baseUrl: "http://127.0.0.1:39123",
