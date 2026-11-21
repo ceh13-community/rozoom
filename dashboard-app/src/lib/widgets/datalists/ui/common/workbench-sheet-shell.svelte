@@ -41,7 +41,10 @@
 </script>
 
 {#if embedded}
+  <!-- data-fullscreen-panel lifts the workbench above the page header and sidebar while
+       this panel covers the screen (see multi-pane-workbench). -->
   <div
+    data-fullscreen-panel={isFullscreen ? "" : undefined}
     class={`flex flex-col ${
       isFullscreen
         ? "fixed inset-3 z-[195] rounded-lg border bg-background shadow-2xl"

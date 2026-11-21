@@ -84,7 +84,7 @@
     tabActions,
     paneTabIds = [],
     body,
-    revealToken = null,
+    revealToken = undefined,
   }: Props = $props();
 
   const LAYOUT_OPTIONS: Array<{ value: MultiPaneWorkbenchLayout; label: string; panes: number }> = [
@@ -104,8 +104,14 @@
   // Scroll workbench into view when a tab is activated (user clicked edit/logs/investigate).
   // Two-phase approach: if the workbench is still collapsed when the tab changes,
   // store the intent and scroll once it expands.
+  // Only for workbenches without a reveal token: a list that passes one reveals after row
+  // actions alone, so restoring a session, Undo or a tab click does not pull the page.
   $effect(() => {
     const tabId = activeTabId;
+    if (revealToken !== undefined) {
+      prevActiveTabId = tabId;
+      return;
+    }
     if (tabId && tabId !== prevActiveTabId) {
       prevActiveTabId = tabId;
       if (!collapsed && rootEl) {
@@ -152,7 +158,7 @@
 
   $effect(() => {
     const token = revealToken;
-    if (token === null || token === lastRevealToken) return;
+    if (token === null || token === undefined || token === lastRevealToken) return;
     lastRevealToken = token;
     if (collapsed || !rootEl) {
       pendingRevealToken = token;
@@ -202,7 +208,9 @@
 
 <!-- The region takes focus after a row action; Esc on it closes the active tab. -->
 <!-- z-20: above sticky table headers (z-10), under the sticky page header (z-30), which
-     a scrolled workbench used to cover. Menus render in body and are not affected. -->
+     a scrolled workbench used to cover. While a pane panel is full screen (fixed, inside
+     this stacking context) the workbench goes to z-[100], above the header and sidebar and
+     under shell windows (z-[180]). Menus render in body and are not affected. -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
   bind:this={rootEl}
@@ -213,7 +221,7 @@
   class={`overflow-hidden bg-card pointer-events-auto outline-none focus-visible:ring-2 focus-visible:ring-ring ${
     fullscreen
       ? "fixed inset-0 z-[120] mb-0 flex h-[100dvh] w-[100vw] flex-col rounded-none border-0 shadow-none"
-      : "relative z-20 mb-4 scroll-mt-32 rounded-lg border shadow-sm"
+      : "relative z-20 has-[[data-fullscreen-panel]]:z-[100] mb-4 scroll-mt-32 rounded-lg border shadow-sm"
   }`}
 >
   <WorkbenchHeader {tabs}>

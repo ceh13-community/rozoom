@@ -21,6 +21,13 @@ describe("shell/workbench layering contract", () => {
     // sticky page header (z-30); at z-[100] a scrolled workbench covered that header.
     expect(multiPaneWorkbench).toContain("relative z-20");
     expect(daemonSetsList).toContain("relative z-20");
+    // A pane panel in full screen is fixed inside the workbench's stacking context: the
+    // workbench rises to z-[100] for that time, above the header (z-30) and the sidebar
+    // (z-40), still under shell windows (z-[180]).
+    const sheetShell = read("src/lib/widgets/datalists/ui/common/workbench-sheet-shell.svelte");
+    expect(sheetShell).toContain('data-fullscreen-panel={isFullscreen ? "" : undefined}');
+    expect(multiPaneWorkbench).toContain("has-[[data-fullscreen-panel]]:z-[100]");
+    expect(daemonSetsList).toContain("has-[[data-fullscreen-panel]]:z-[100]");
     expect(multiPaneWorkbench).not.toContain("relative z-[100]");
     expect(daemonSetsList).not.toContain("relative z-[100]");
   });

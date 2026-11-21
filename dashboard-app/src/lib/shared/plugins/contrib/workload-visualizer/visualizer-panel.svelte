@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { revealListFilteredTo } from "$shared/lib/jump-reveal";
   import { tick, untrack } from "svelte";
   import { revealResult } from "$shared/lib/reveal-result";
   import {
@@ -190,7 +191,8 @@
     );
   }
 
-  function jumpToWorkload(node: GraphNode) {
+  // Lands on the list filtered to that resource, with the filter focused.
+  async function jumpToWorkload(node: GraphNode) {
     const params = new URLSearchParams($page.url.search);
     const map: Record<string, string> = {
       Deployment: "deployments",
@@ -213,7 +215,8 @@
       return;
     }
     params.set("workload", workload);
-    void goto(`?${params.toString()}`, { keepFocus: false });
+    await goto(`?${params.toString()}`, { keepFocus: false });
+    await revealListFilteredTo(node.name);
   }
 
   const kindIcons: Record<string, string> = {
@@ -490,7 +493,7 @@
               {@const sel = selectedNode}
               <button
                 class="text-[10px] rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-700/40"
-                onclick={() => jumpToWorkload(sel)}>Jump to {sel.kind} page</button
+                onclick={() => void jumpToWorkload(sel)}>Jump to {sel.kind} page</button
               >
               <button
                 class="text-[10px] rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-700/40"

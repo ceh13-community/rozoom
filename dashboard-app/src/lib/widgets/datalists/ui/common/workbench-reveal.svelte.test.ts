@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createWorkbenchReveal } from "./workbench-reveal.svelte";
 
 describe("createWorkbenchReveal", () => {
-  it("changes the token after each opened tab, also a failed open", async () => {
+  it("changes the token after each opened tab, not after a failed open", async () => {
     let reveal!: ReturnType<typeof createWorkbenchReveal>;
     const tokens: Array<number | null> = [];
     const cleanup = $effect.root(() => {
@@ -22,7 +22,7 @@ describe("createWorkbenchReveal", () => {
     await reveal.after(undefined);
     flushSync();
 
-    expect(tokens).toEqual([null, 1, 2, 3]);
+    expect(tokens).toEqual([null, 1, 2]);
     cleanup();
   });
 

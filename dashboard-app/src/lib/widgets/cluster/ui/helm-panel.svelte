@@ -610,8 +610,12 @@
     }
   }
 
+  // Install, upgrade, test and rollback stream into the console: bring it into view and
+  // focus it, unless the person is typing elsewhere (the values editor, a field).
   function scrollToConsole() {
-    helmConsoleEl?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const consoleEl = helmConsoleEl;
+    if (!consoleEl || isTypingOutside(document.activeElement, consoleEl)) return;
+    revealResult(consoleEl);
   }
 
   function computeLineDiff(
@@ -755,7 +759,12 @@
       </Alert.Root>
     {/if}
 
-    <div bind:this={helmConsoleEl}>
+    <div
+      bind:this={helmConsoleEl}
+      tabindex="-1"
+      aria-label="Helm console"
+      class="scroll-mt-32 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       <CommandConsole session={helmSession} label={helmSessionLabel} />
     </div>
 

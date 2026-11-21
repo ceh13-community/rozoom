@@ -1714,7 +1714,7 @@
         ? (allNodeData.find((item) => item.name === node.metadata?.name) ?? null)
         : null;
       if (!row) return;
-      void openNodeYamlEditor(row);
+      void workbenchReveal.after(openNodeYamlEditor(row));
     }}
     onCopyDescribe={() => {
       const node = $selectedNode;

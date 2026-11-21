@@ -13,10 +13,15 @@ export function createWorkbenchReveal() {
     get token() {
       return token;
     },
-    /** Reveals the workbench once `opened` settles (the tab exists by then). */
+    /**
+     * Reveals the workbench once `opened` resolves (the tab exists by then). An open that
+     * throws reveals nothing: there may be no tab to show, and the error is reported where
+     * it was raised.
+     */
     after<T>(opened: Promise<T> | T): Promise<T> {
-      return Promise.resolve(opened).finally(() => {
+      return Promise.resolve(opened).then((value) => {
         token = (token ?? 0) + 1;
+        return value;
       });
     },
   };

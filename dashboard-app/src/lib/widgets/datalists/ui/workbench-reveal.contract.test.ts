@@ -41,7 +41,9 @@ describe("workbench reveal after row actions", () => {
     "replica-sets-list.svelte",
   ])("%s keeps the workbench under the sticky page header", (file) => {
     const source = read(file);
-    expect(source).toContain('"relative z-20 mb-4 scroll-mt-32');
+    expect(source).toContain(
+      '"relative z-20 has-[[data-fullscreen-panel]]:z-[100] mb-4 scroll-mt-32',
+    );
     expect(source).not.toContain("relative z-[100]");
   });
 
@@ -64,5 +66,25 @@ describe("workbench reveal after row actions", () => {
     const map = read("../../../shared/plugins/contrib/workload-visualizer/visualizer-panel.svelte");
     expect(map).toContain("revealResult(selectedDetailEl, { focus: false })");
     expect(map).toContain("onclick={() => void selectNode(node)}");
+  });
+
+  it("lands a Jump to page from Service Chains and Workload Map on the filtered list", () => {
+    const chains = read("../../cluster/ui/resource-map-panel.svelte");
+    const map = read("../../../shared/plugins/contrib/workload-visualizer/visualizer-panel.svelte");
+    expect(chains).toContain("await revealListFilteredTo(name);");
+    expect(chains).toContain("void jumpToWorkload(node.kind, node.name)");
+    expect(map).toContain("await revealListFilteredTo(node.name);");
+  });
+
+  it("brings the Helm console into view with focus, not while typing elsewhere", () => {
+    const helm = read("../../cluster/ui/helm-panel.svelte");
+    expect(helm).toMatch(
+      /function scrollToConsole\(\) \{[\s\S]*?isTypingOutside\(document\.activeElement, consoleEl\)[\s\S]*?revealResult\(consoleEl\)/,
+    );
+  });
+
+  it("reveals Edit YAML from the node details too", () => {
+    const nodes = read("nodes-list/nodes-statuses-list.svelte");
+    expect(nodes.match(/workbenchReveal\.after\(openNodeYamlEditor\(/g)).toHaveLength(3);
   });
 });

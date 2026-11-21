@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { revealListFilteredTo } from "$shared/lib/jump-reveal";
   import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
   import { Button } from "$shared/ui/button";
   import LoadingDots from "$shared/ui/loading-dots.svelte";
@@ -601,7 +602,8 @@
     );
   }
 
-  function jumpToWorkload(kind: string) {
+  // Lands on the list filtered to that resource, with the filter focused.
+  async function jumpToWorkload(kind: string, name: string) {
     const params = new URLSearchParams($page.url.search);
     const map: Record<string, string> = {
       Deployment: "deployments",
@@ -620,7 +622,8 @@
       return;
     }
     params.set("workload", workload);
-    void goto(`?${params.toString()}`, { keepFocus: false });
+    await goto(`?${params.toString()}`, { keepFocus: false });
+    await revealListFilteredTo(name);
   }
 
   function jumpToManagedPage(managedBy: string | undefined) {
@@ -1031,7 +1034,8 @@
           <div class="flex flex-col gap-1">
             <button
               class="text-left rounded px-2 py-1 hover:bg-muted"
-              onclick={() => jumpToWorkload(node.kind)}>Jump to {node.kind} page</button
+              onclick={() => void jumpToWorkload(node.kind, node.name)}
+              >Jump to {node.kind} page</button
             >
             {#if node.managedBy === "helm"}
               <button
