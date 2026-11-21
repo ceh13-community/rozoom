@@ -8,9 +8,12 @@ const source = readFileSync(
 );
 
 describe("pods list stream bootstrap contract", () => {
-  it("does not wire stream sync into the PR1 table runtime", () => {
-    expect(source).not.toContain("initPodsSync(");
-    expect(source).not.toContain('podsSyncPolicy.mode === "stream"');
+  it("runs the pod watch while the list is open and keeps the snapshot as a fallback", () => {
+    expect(source).toContain("untrack(() => initPodsSync(clusterId));");
+    expect(source).toContain("destroyPodsSync(clusterId);");
+    expect(source).toContain("selectPodsStreamLive(clusterId).subscribe");
+    expect(source).toContain("if (!podsStreamLive) await loadPodsSnapshot();");
+    expect(source).toContain("if (!podsStreamLive) setInitialPods(data.slug, items);");
     expect(source).toContain("scheduleRefresh();");
   });
 });

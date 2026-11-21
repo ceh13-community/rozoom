@@ -4,7 +4,9 @@ import type { PodWatchEvent } from "./pods-parser";
 import { eventBus } from "../event-bus";
 
 const podStore = createResourceStore<Partial<PodItem>>({
-  getId: (pod) => pod.metadata?.name || "unknownPod",
+  // Pod names repeat across namespaces; keyed by name alone, a watch event for
+  // one namespace replaced or deleted the same-named pod of another.
+  getId: (pod) => `${pod.metadata?.namespace ?? "default"}/${pod.metadata?.name || "unknownPod"}`,
 });
 
 eventBus.subscribe((event) => {

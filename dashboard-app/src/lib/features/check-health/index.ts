@@ -63,7 +63,11 @@ export { checkLimitRanges } from "./api/check-limit-ranges";
 export { checkStorageStatus } from "./api/check-storage-status";
 export { checkRbacOverview } from "./api/check-rbac-overview";
 export { startPodsWatcher, stopPodsWatcher } from "./model/stream-watchers/pods/pods-watcher";
-export { initPodsSync, destroyPodsSync } from "./model/stream-watchers/pods/pods-sync";
+export {
+  initPodsSync,
+  destroyPodsSync,
+  selectPodsStreamLive,
+} from "./model/stream-watchers/pods/pods-sync";
 export { podsStore, setInitialPods } from "./model/stream-watchers/pods/pods-store";
 export {
   selectClusterPodsSyncStatus,

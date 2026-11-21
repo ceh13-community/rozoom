@@ -26,12 +26,14 @@
   import { popOutPortForwardPreview } from "$shared/lib/port-forward-preview";
   import {
     destroyPodsSync,
+    initPodsSync,
     markPodsSyncError,
     markPodsSyncLoading,
     markPodsSyncSuccess,
     podsStore,
     resetPodsSyncStatus,
     selectClusterPodsSyncStatus,
+    selectPodsStreamLive,
     setInitialPods,
     setPodsSyncEnabled,
   } from "$features/check-health";
@@ -149,7 +151,15 @@
   let manualSnapshotBootstrapKey = $state<string | null>(null);
   let browserSnapshotDegradeTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const clusterPods = $derived.by(() => $podsStore[data.slug] ?? []);
+  // True while the pod watch (API watch or kubectl watch fallback) is running.
+  // Rows then change on each watch event: Terminating, Pending,
+  // ContainerCreating and removals show as they happen. The periodic snapshot
+  // only covers the time before the watch is up or after it stops; a snapshot
+  // finishing after newer watch events would put deleted pods back.
+  let podsStreamLive = $state(false);
+  // The store mutates its array in place on watch events; a copy gives the
+  // derived chain a new reference, otherwise the rows would not re-render.
+  const clusterPods = $derived.by(() => ($podsStore[data.slug] ?? []).slice());
   const sourcePods = $derived.by(() =>
     (clusterPods.length > 0 ? clusterPods : cachedSnapshotPods).filter((pod) =>
       namespaceMatches($selectedNamespace, pod.metadata?.namespace),
@@ -571,7 +581,7 @@
           throw new Error("Pod watcher sync failed.");
         }
         cachedSnapshotPods = items;
-        setInitialPods(data.slug, items);
+        if (!podsStreamLive) setInitialPods(data.slug, items);
         markPodsSyncSuccess(data.slug);
         snapshotRefreshState = "idle";
         metricsRefreshToken += 1;
@@ -605,7 +615,7 @@
     refreshTimer = setTimeout(async () => {
       refreshTimer = null;
       if (!isDocumentVisible()) return;
-      await loadPodsSnapshot();
+      if (!podsStreamLive) await loadPodsSnapshot();
       scheduleRefresh();
     }, watcherRefreshSeconds * 1000);
   }
@@ -1008,7 +1018,6 @@
     if (activeClusterId && activeClusterId !== clusterId) {
       const previousClusterId = activeClusterId;
       setPodsSyncEnabled(previousClusterId, false);
-      destroyPodsSync(previousClusterId);
       resetPodsSyncStatus(previousClusterId);
       clearRefreshTimer();
     }
@@ -1018,6 +1027,23 @@
   $effect(() => {
     if (!data.slug || !watcherSettingsLoaded) return;
     persistWatcherSettings(data.slug);
+  });
+
+  $effect(() => {
+    const clusterId = data.slug;
+    if (!clusterId || !watcherSettingsLoaded || !watcherEnabled) {
+      podsStreamLive = false;
+      return;
+    }
+    untrack(() => initPodsSync(clusterId));
+    const unsubscribe = selectPodsStreamLive(clusterId).subscribe((live) => {
+      podsStreamLive = live;
+    });
+    return () => {
+      unsubscribe();
+      podsStreamLive = false;
+      destroyPodsSync(clusterId);
+    };
   });
 
   $effect(() => {
@@ -1078,7 +1104,6 @@
     clearBrowserSnapshotDegradeTimer();
     if (!activeClusterId) return;
     setPodsSyncEnabled(activeClusterId, false);
-    destroyPodsSync(activeClusterId);
     resetPodsSyncStatus(activeClusterId);
   });
 </script>

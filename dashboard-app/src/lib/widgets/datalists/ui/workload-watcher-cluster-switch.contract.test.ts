@@ -51,7 +51,9 @@ describe("workload watcher cluster switch contract", () => {
       "utf8",
     );
     expect(source).toContain("setPodsSyncEnabled(previousClusterId, false);");
-    expect(source).toContain("destroyPodsSync(previousClusterId);");
+    // The pod watch is owned by one effect keyed on the cluster: its cleanup
+    // stops the previous cluster's watch on a switch.
+    expect(source).toContain("destroyPodsSync(clusterId);");
     expect(source).toContain("let activeClusterId");
     expect(source).toContain("if (!data.slug || !watcherSettingsLoaded) return;");
   });

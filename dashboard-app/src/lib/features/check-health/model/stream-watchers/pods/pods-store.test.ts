@@ -130,4 +130,25 @@ describe("podsStore", () => {
     expect(state["cluster-1"]).toHaveLength(1);
     expect(state["cluster-2"]).toHaveLength(1);
   });
+
+  it("keeps same-named pods of different namespaces apart", () => {
+    setInitialPods(clusterId, [
+      { metadata: { name: "web-0", namespace: "a" }, status: { phase: "Running" } },
+      { metadata: { name: "web-0", namespace: "b" }, status: { phase: "Running" } },
+    ]);
+
+    emitPodEvent({
+      type: "MODIFIED",
+      object: { metadata: { name: "web-0", namespace: "b" }, status: { phase: "Pending" } },
+    });
+    emitPodEvent({
+      type: "DELETED",
+      object: { metadata: { name: "web-0", namespace: "a" }, status: { phase: "Running" } },
+    });
+
+    const pods = get(podsStore)[clusterId] ?? [];
+    expect(pods.map((pod) => `${pod.metadata?.namespace}/${pod.status?.phase}`)).toEqual([
+      "b/Pending",
+    ]);
+  });
 });
