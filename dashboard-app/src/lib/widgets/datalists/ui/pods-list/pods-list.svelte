@@ -615,7 +615,11 @@
     refreshTimer = setTimeout(async () => {
       refreshTimer = null;
       if (!isDocumentVisible()) return;
-      if (!podsStreamLive) await loadPodsSnapshot();
+      // A live stream keeps the pods current, but CPU and Memory come from
+      // `kubectl top`, which only the snapshot load used to trigger: poll them on
+      // the same timer, or a new pod stays at n/a after its first sample.
+      if (podsStreamLive) metricsRefreshToken += 1;
+      else await loadPodsSnapshot();
       scheduleRefresh();
     }, watcherRefreshSeconds * 1000);
   }
