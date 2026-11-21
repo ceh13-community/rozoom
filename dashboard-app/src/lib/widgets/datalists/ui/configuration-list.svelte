@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, onMount, tick } from "svelte";
+  import { onDestroy, onMount, tick, untrack } from "svelte";
   import { path } from "@tauri-apps/api";
   import { openExternalUrl } from "$shared/api/in-app-browser";
   import { confirmAction } from "$shared/lib/confirm-action";
@@ -94,6 +94,7 @@
     markConfigurationSyncSuccess,
     resetConfigurationSyncStatus,
     selectClusterConfigurationItems,
+    selectConfigurationStreamLive,
     setInitialConfigurationItems,
     setConfigurationSyncEnabled,
   } from "$features/check-health";
@@ -832,6 +833,8 @@
     refresh: () => refreshNow("watcher"),
   });
   let lastWatcherSuccessAt = $state<number | null>(null);
+  // A live watch with no events means nothing changed: the rows are fresh.
+  let configurationStreamLive = $state(false);
   let errorMessage = $state<string | null>(null);
   let actionNotification = $state<ActionNotification>(null);
 
@@ -1972,6 +1975,17 @@
     }
     void deleteRows(selectedRowsDeletable);
   }
+  $effect(() => {
+    if (!clusterId || !workloadKey || !watcherPolicy.enabled || watcherPolicy.mode !== "stream") {
+      configurationStreamLive = false;
+      return;
+    }
+    return selectConfigurationStreamLive(clusterId, workloadKey).subscribe((live) => {
+      // Rows were confirmed fresh up to the moment the stream stopped.
+      if (!live && untrack(() => configurationStreamLive)) lastWatcherSuccessAt = Date.now();
+      configurationStreamLive = live;
+    });
+  });
   const watcherStaleThresholdMs = $derived(
     normalizeWatcherRefreshSeconds(watcherRefreshSeconds) * 2000,
   );
@@ -1980,6 +1994,7 @@
   );
   const watcherIsStale = $derived(
     watcherEnabled &&
+      !configurationStreamLive &&
       Number.isFinite(watcherFreshnessAgeMs) &&
       watcherFreshnessAgeMs > watcherStaleThresholdMs,
   );
@@ -2000,7 +2015,11 @@
     if (watcherError) return "error";
     if (watcherIsStale) return "stale";
     if (watcherInFlight && rowsSnapshot.length > 0) return "cached";
-    if (lastWatcherSuccessAt) return "live";
+    if (configurationStreamLive) return "live";
+    // In stream mode only a live stream is live: a stream that stopped (gave up,
+    // lost access) leaves the last rows as a cached copy right away, not after
+    // the freshness budget runs out.
+    if (lastWatcherSuccessAt && watcherPolicy.mode !== "stream") return "live";
     if (rowsSnapshot.length > 0) return "cached";
     return "idle";
   });
@@ -2011,8 +2030,12 @@
       return `Showing the last successful ${configurationRuntimeSubjectLabel} snapshot while background refresh is degraded.`;
     }
     if (watcherError) return `${tableTitle} sync is degraded and needs operator attention.`;
-    if (watcherIsStale)
-      return `${tableTitle} data has exceeded the freshness budget and should be refreshed.`;
+    if (watcherIsStale) {
+      const lastSync = lastWatcherSuccessAt
+        ? ` Last successful sync was ${getTimeDifference(new Date(lastWatcherSuccessAt))} ago.`
+        : "";
+      return `${tableTitle} data has exceeded the freshness budget and should be refreshed.${lastSync}`;
+    }
     if (watcherInFlight)
       return `Background ${configurationRuntimeSubjectLabel} refresh is currently in flight.`;
     return `${tableTitle} sync is operating within the current runtime budget.`;
@@ -5099,16 +5122,6 @@ spec:
       class="mb-3 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm text-amber-800"
     >
       {watcherError}
-    </div>
-  {/if}
-  {#if watcherIsStale}
-    <div
-      class="mb-3 rounded-md border border-rose-300/60 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-500/30 dark:bg-rose-950/30 dark:text-rose-300"
-    >
-      Watcher freshness SLO breached: data is stale. Last successful sync was
-      {lastWatcherSuccessAt
-        ? ` ${getTimeDifference(new Date(lastWatcherSuccessAt))} ago`
-        : " unavailable"}.
     </div>
   {/if}
   <ActionNotificationBar

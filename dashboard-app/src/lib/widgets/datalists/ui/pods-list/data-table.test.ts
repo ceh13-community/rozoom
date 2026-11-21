@@ -84,6 +84,78 @@ describe("pods data-table", () => {
     );
   });
 
+  it("keeps the last CPU and memory values while metrics refresh", () => {
+    const rows: PodListRow[] = [
+      {
+        uid: "pod-1",
+        name: "api-0",
+        namespace: "default",
+        status: "Running",
+        readyContainers: 1,
+        totalContainers: 1,
+        restarts: 0,
+        node: "minikube",
+        age: "5m",
+        ageSeconds: 300,
+      },
+      {
+        uid: "pod-2",
+        name: "api-1",
+        namespace: "default",
+        status: "Running",
+        readyContainers: 1,
+        totalContainers: 1,
+        restarts: 0,
+        node: "minikube",
+        age: "5m",
+        ageSeconds: 300,
+      },
+    ];
+
+    const { getByText, getAllByText, queryAllByText } = render(DataTable, {
+      props: {
+        rows,
+        ...baseProps,
+        metricsLoading: true,
+        metricsByKey: new Map([
+          [
+            "default/api-0",
+            { cpu: "12m", memory: "34Mi", cpuMillicores: 12, memoryBytes: 34 * 1024 * 1024 },
+          ],
+        ]),
+      },
+    });
+
+    expect(getByText("12m")).toBeInTheDocument();
+    expect(getByText("34Mi")).toBeInTheDocument();
+    // A refresh never blanks a cell: a pod with no sample keeps showing n/a.
+    expect(queryAllByText("Loading…")).toHaveLength(0);
+    expect(getAllByText("n/a")).toHaveLength(2);
+  });
+
+  it("shows Loading only until the first metrics sample arrives", () => {
+    const rows: PodListRow[] = [
+      {
+        uid: "pod-1",
+        name: "api-0",
+        namespace: "default",
+        status: "Running",
+        readyContainers: 1,
+        totalContainers: 1,
+        restarts: 0,
+        node: "minikube",
+        age: "5m",
+        ageSeconds: 300,
+      },
+    ];
+
+    const { getAllByText } = render(DataTable, {
+      props: { rows, ...baseProps, metricsLoading: true, metricsByKey: new Map() },
+    });
+
+    expect(getAllByText("Loading…")).toHaveLength(2);
+  });
+
   it("groups pods by node when the node grouping toggle is enabled", async () => {
     const rows: PodListRow[] = [
       {

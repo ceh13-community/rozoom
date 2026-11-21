@@ -32,8 +32,8 @@ describe("pods enriched table contract", () => {
     expect(tableSource).toContain('label="CPU"');
     expect(tableSource).toContain('label="Memory"');
     expect(tableSource).toContain("Loading…");
-    expect(tableSource).toContain('{getMetricsForRow(row)?.cpu ?? "n/a"}');
-    expect(tableSource).toContain('{getMetricsForRow(row)?.memory ?? "n/a"}');
+    expect(tableSource).toContain("{getMetricsForRow(row)?.cpu}");
+    expect(tableSource).toContain("{getMetricsForRow(row)?.memory}");
   });
 
   it("tracks metrics loading state outside the base table path", () => {

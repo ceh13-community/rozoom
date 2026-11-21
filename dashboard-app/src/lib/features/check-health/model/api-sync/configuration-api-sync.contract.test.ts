@@ -13,8 +13,8 @@ describe("configuration api sync contract", () => {
 
     expect(source).toContain("createApiResourceSync");
     expect(source).toContain("getPaths: () => getConfigurationApiPaths(workloadType)");
-    expect(source).toContain("fallbackStart: (clusterId) => {");
-    expect(source).toContain("startConfigurationWatcher(clusterId, workloadType);");
+    expect(source).toContain("fallbackStart: (clusterId, hooks) => {");
+    expect(source).toContain("startConfigurationWatcher(clusterId, workloadType, hooks);");
     expect(source).toContain("fallbackStop: (clusterId) => {");
     expect(source).toContain("stopConfigurationWatcher(clusterId, workloadType);");
   });

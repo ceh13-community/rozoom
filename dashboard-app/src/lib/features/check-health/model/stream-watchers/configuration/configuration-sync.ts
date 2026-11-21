@@ -2,10 +2,18 @@ import type { WorkloadType } from "$shared/model/workloads";
 import { initWatchParsers } from "../register-parsers";
 import { setInitialConfigurationItems } from "./configuration-store";
 import { startConfigurationWatcher, stopConfigurationWatcher } from "./configuration-watcher";
-import { createApiResourceSync } from "../../api-sync/api-resource-sync";
+import { createApiResourceSync, selectResourceStreamLive } from "../../api-sync/api-resource-sync";
 import { getConfigurationApiPaths } from "../../api-sync/configuration-api-paths";
 
 type GenericItem = Record<string, unknown>;
+
+function configurationStreamScope(workloadType: WorkloadType) {
+  return `configuration:${workloadType}`;
+}
+
+export function selectConfigurationStreamLive(clusterId: string, workloadType: WorkloadType) {
+  return selectResourceStreamLive(configurationStreamScope(workloadType), clusterId);
+}
 
 const configurationApiSyncByWorkload = new Map<
   WorkloadType,
@@ -21,11 +29,12 @@ function getConfigurationApiSync(workloadType: WorkloadType) {
   const sync = createApiResourceSync<GenericItem>({
     getPaths: () => getConfigurationApiPaths(workloadType),
     kind: "configuration",
+    scope: configurationStreamScope(workloadType),
     setInitial: (clusterId, items) => {
       setInitialConfigurationItems(clusterId, workloadType, items);
     },
-    fallbackStart: (clusterId) => {
-      startConfigurationWatcher(clusterId, workloadType);
+    fallbackStart: (clusterId, hooks) => {
+      startConfigurationWatcher(clusterId, workloadType, hooks);
     },
     fallbackStop: (clusterId) => {
       stopConfigurationWatcher(clusterId, workloadType);

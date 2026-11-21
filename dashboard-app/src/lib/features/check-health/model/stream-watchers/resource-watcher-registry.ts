@@ -1,19 +1,26 @@
-import { KubectlWatcher } from "./watcher-model";
+import { KubectlWatcher, type WatchLifecycleHooks } from "./watcher-model";
 import { buildKubectlWatchCommand } from "./watch-command";
 import { reportWatcherRuntimeError } from "./watcher-runtime-error";
+import type { EventParser } from "./watcher-parser";
 
-export function createResourceWatcherRegistry(command: string) {
+export function createResourceWatcherRegistry(command: string, parser: EventParser) {
   const active = new Map<string, KubectlWatcher>();
   const watchCommand = buildKubectlWatchCommand(command);
 
   return {
-    start(clusterId: string) {
+    start(clusterId: string, hooks?: WatchLifecycleHooks) {
       if (active.has(clusterId)) return;
       const watcher = new KubectlWatcher();
       active.set(clusterId, watcher);
-      void watcher.start(watchCommand, clusterId, (err) => {
-        reportWatcherRuntimeError({ clusterId, kind: command }, err);
-      });
+      void watcher.start(
+        watchCommand,
+        clusterId,
+        (err) => {
+          reportWatcherRuntimeError({ clusterId, kind: command }, err);
+        },
+        parser,
+        hooks,
+      );
     },
     stop(clusterId: string) {
       const watcher = active.get(clusterId);

@@ -776,19 +776,23 @@
                   {/if}
                   {#if enrichedTableEnabled && isColumnVisible("cpu")}
                     <div class="min-w-0 truncate text-muted-foreground">
-                      {#if metricsLoading}
+                      {#if getMetricsForRow(row)}
+                        {getMetricsForRow(row)?.cpu}
+                      {:else if metricsLoading && metricsByKey.size === 0}
                         Loading…
                       {:else}
-                        {getMetricsForRow(row)?.cpu ?? "n/a"}
+                        n/a
                       {/if}
                     </div>
                   {/if}
                   {#if enrichedTableEnabled && isColumnVisible("memory")}
                     <div class="min-w-0 truncate text-muted-foreground">
-                      {#if metricsLoading}
+                      {#if getMetricsForRow(row)}
+                        {getMetricsForRow(row)?.memory}
+                      {:else if metricsLoading && metricsByKey.size === 0}
                         Loading…
                       {:else}
-                        {getMetricsForRow(row)?.memory ?? "n/a"}
+                        n/a
                       {/if}
                     </div>
                   {/if}
@@ -892,19 +896,23 @@
             {/if}
             {#if enrichedTableEnabled && isColumnVisible("cpu")}
               <div class="min-w-0 truncate text-muted-foreground">
-                {#if metricsLoading}
+                {#if getMetricsForRow(row)}
+                  {getMetricsForRow(row)?.cpu}
+                {:else if metricsLoading && metricsByKey.size === 0}
                   Loading…
                 {:else}
-                  {getMetricsForRow(row)?.cpu ?? "n/a"}
+                  n/a
                 {/if}
               </div>
             {/if}
             {#if enrichedTableEnabled && isColumnVisible("memory")}
               <div class="min-w-0 truncate text-muted-foreground">
-                {#if metricsLoading}
+                {#if getMetricsForRow(row)}
+                  {getMetricsForRow(row)?.memory}
+                {:else if metricsLoading && metricsByKey.size === 0}
                   Loading…
                 {:else}
-                  {getMetricsForRow(row)?.memory ?? "n/a"}
+                  n/a
                 {/if}
               </div>
             {/if}

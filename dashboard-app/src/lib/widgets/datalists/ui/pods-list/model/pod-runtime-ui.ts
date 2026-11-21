@@ -8,14 +8,12 @@ export function shouldShowPodsCacheBanner(options: {
   syncError: string | null;
   syncLoading: boolean;
 }) {
-  const { hasCachedPods, snapshotRefreshState, syncError, syncLoading } = options;
+  const { hasCachedPods, snapshotRefreshState, syncError } = options;
   if (!hasCachedPods) return false;
-  return (
-    snapshotRefreshState === "error" ||
-    snapshotRefreshState === "loading" ||
-    Boolean(syncError) ||
-    syncLoading
-  );
+  // A routine refresh over cached rows is shown in the runtime status, not as a
+  // notice above the table: inserting it for a moment every cycle moved the
+  // whole table down and back. Only a failed refresh earns the notice.
+  return snapshotRefreshState === "error" || Boolean(syncError);
 }
 
 export function isPodLiveUsageEligible(row: PodListRow) {

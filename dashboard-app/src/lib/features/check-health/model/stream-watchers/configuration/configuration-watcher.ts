@@ -1,8 +1,9 @@
 import { KUBECTL_COMMANDS } from "$shared/config/kubectl-commands";
 import type { WorkloadType } from "$shared/model/workloads";
-import { KubectlWatcher } from "../watcher-model";
+import { KubectlWatcher, type WatchLifecycleHooks } from "../watcher-model";
 import { buildKubectlWatchCommand } from "../watch-command";
 import { reportWatcherRuntimeError } from "../watcher-runtime-error";
+import { createConfigurationJsonLineParser } from "./configuration-parser";
 
 const active = new Map<string, KubectlWatcher>();
 
@@ -17,16 +18,26 @@ function buildWatchCommand(workloadType: WorkloadType) {
   return buildKubectlWatchCommand(`${resolved} -o json`);
 }
 
-export function startConfigurationWatcher(clusterId: string, workloadType: WorkloadType) {
+export function startConfigurationWatcher(
+  clusterId: string,
+  workloadType: WorkloadType,
+  hooks?: WatchLifecycleHooks,
+) {
   const key = makeScopeKey(clusterId, workloadType);
   if (active.has(key)) return;
   const command = buildWatchCommand(workloadType);
   if (!command) return;
   const watcher = new KubectlWatcher();
   active.set(key, watcher);
-  void watcher.start(command, clusterId, (error) => {
-    reportWatcherRuntimeError({ clusterId, kind: workloadType }, error);
-  });
+  void watcher.start(
+    command,
+    clusterId,
+    (error) => {
+      reportWatcherRuntimeError({ clusterId, kind: workloadType }, error);
+    },
+    createConfigurationJsonLineParser(workloadType),
+    hooks,
+  );
 }
 
 export function stopConfigurationWatcher(clusterId: string, workloadType: WorkloadType) {
