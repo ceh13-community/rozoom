@@ -1,6 +1,12 @@
 <script lang="ts">
   import { onMount, onDestroy, afterUpdate, tick } from "svelte";
   import { Button } from "$shared/ui/button";
+  import { hint } from "$shared/lib/hint";
+  import ChevronUp from "@lucide/svelte/icons/chevron-up";
+  import Maximize2 from "@lucide/svelte/icons/maximize-2";
+  import Minimize2 from "@lucide/svelte/icons/minimize-2";
+  import Minus from "@lucide/svelte/icons/minus";
+  import X from "@lucide/svelte/icons/x";
   import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
   import { execCliForCluster, execShellCommand } from "$shared/api/cli";
   import { buildReadOnlyBlockedResult, getClusterSafetyInfo } from "$shared/lib/readonly-guard";
@@ -21,7 +27,10 @@
   } from "$widgets/datalists/ui/pods-list/pod-shell";
   import { podSessionLine } from "$widgets/datalists/ui/pods-list/pod-access-hints";
   import { parseCliCommand, SUPPORTED_CLI_TOOLS } from "$widgets/shell/lib/parse-cli-command";
-  import { startPodOutputStream, type PodOutputStream } from "$widgets/shell/model/pod-output-stream";
+  import {
+    startPodOutputStream,
+    type PodOutputStream,
+  } from "$widgets/shell/model/pod-output-stream";
   import {
     canCopyCommandLine,
     COPY_BLOCKED_MESSAGE,
@@ -71,6 +80,7 @@
   let expandedHeight = 420;
   let maximized = false;
   let restoreBounds: { x: number; y: number; width: number; height: number } | null = null;
+  let positionBeforeCollapse: { x: number; y: number } | null = null;
   let resizeObserver: ResizeObserver | null = null;
   let activeSessionId = 0;
   const MAX_COMMAND_HISTORY = 200;
@@ -101,7 +111,8 @@
     }
   }
 
-  const COLLAPSED_HEIGHT = 72;
+  // One header row: title, target and the three buttons.
+  const COLLAPSED_HEIGHT = 56;
   const COLLAPSED_WIDTH = 360;
 
   let shellStatus = getShellStatusMeta(shellReady, shellBusy, shellMode);
@@ -208,7 +219,12 @@
   }
 
   function handleWindowResize() {
-    if (!maximized || typeof window === "undefined") return;
+    if (typeof window === "undefined") return;
+    if (collapsed) {
+      position = dockedPosition();
+      return;
+    }
+    if (!maximized) return;
     position = { x: 8, y: 8 };
     expandedWidth = Math.max(320, window.innerWidth - 16);
     expandedHeight = Math.max(220, window.innerHeight - 16);
@@ -877,15 +893,30 @@
     resizePointerId = null;
   }
 
+  /** Bottom-right, stacked by window: a minimized window covers neither the sidebar nor the page header. */
+  function dockedPosition() {
+    return {
+      x: Math.max(0, window.innerWidth - COLLAPSED_WIDTH - 16),
+      y: Math.max(0, window.innerHeight - (COLLAPSED_HEIGHT + 8) * (windowIndex + 1) - 8),
+    };
+  }
+
   function toggleCollapse() {
-    if (maximized) return;
+    if (typeof window === "undefined") return;
     if (collapsed) {
       collapsed = false;
+      // Back where it was before it was docked.
+      if (positionBeforeCollapse) position = positionBeforeCollapse;
+      positionBeforeCollapse = null;
       observePanelSize();
       persistWindowState();
-    } else {
-      collapsed = true;
+      return;
     }
+    // Minimize works from full screen too: leave it first.
+    if (maximized) toggleMaximize();
+    positionBeforeCollapse = { ...position };
+    collapsed = true;
+    position = dockedPosition();
   }
 
   function toggleMaximize() {
@@ -927,11 +958,11 @@
   style={`top:${position.y}px; left:${position.x}px; width:${collapsed ? COLLAPSED_WIDTH : expandedWidth}px; height:${collapsed ? COLLAPSED_HEIGHT : expandedHeight}px; resize:none; overflow: hidden;`}
 >
   <header
-    class="flex items-center justify-between gap-3 border-b border-slate-800 px-4 py-3 text-sm text-white cursor-grab select-none"
+    class={`flex items-center justify-between gap-3 border-b border-slate-800 px-4 ${collapsed ? "py-2" : "py-3"} text-sm text-white cursor-grab select-none`}
     on:pointerdown={handlePointerDown}
   >
-    <div>
-      <div class="text-base font-semibold">
+    <div class="min-w-0">
+      <div class="truncate text-base font-semibold">
         {shellMode === "debug"
           ? "Terminal"
           : shellSessionKind === "pod-debug"
@@ -939,62 +970,85 @@
             : shellMode === "pod-attach"
               ? "Pod attach"
               : "Pod shell"}
+        {#if collapsed}
+          <span class="ml-1 text-xs font-normal text-muted-foreground">{shellTargetLabel}</span>
+        {/if}
       </div>
-      <div class="text-xs text-muted-foreground">
-        {shellTargetLabel} (namespace: {shellTargetNamespace})
-        <span class="ml-2 inline-flex items-center gap-1 text-[10px] uppercase tracking-wide">
-          <span
-            class={`h-2 w-2 rounded-full ${shellStatus.dotClass} ${shellStatus.pulse ? "animate-pulse" : ""}`}
-            aria-hidden="true"
-          ></span>
-          {shellStatus.label}
-        </span>
-      </div>
-      {#if shellMode !== "debug"}
-        <div class="mt-0.5 text-xs text-slate-400" data-testid="pod-session-line">
-          {podSessionLine(
-            shellMode,
-            shellTargetContainer ?? (shellTargetPod ? pickMainContainer(shellTargetPod) : undefined),
-          )}
+      {#if !collapsed}
+        <div class="text-xs text-muted-foreground">
+          {shellTargetLabel} (namespace: {shellTargetNamespace})
+          <span class="ml-2 inline-flex items-center gap-1 text-[10px] uppercase tracking-wide">
+            <span
+              class={`h-2 w-2 rounded-full ${shellStatus.dotClass} ${shellStatus.pulse ? "animate-pulse" : ""}`}
+              aria-hidden="true"
+            ></span>
+            {shellStatus.label}
+          </span>
         </div>
+        {#if shellMode !== "debug"}
+          <div class="mt-0.5 text-xs text-slate-400" data-testid="pod-session-line">
+            {podSessionLine(
+              shellMode,
+              shellTargetContainer ??
+                (shellTargetPod ? pickMainContainer(shellTargetPod) : undefined),
+            )}
+          </div>
+        {/if}
       {/if}
     </div>
-    <div class="flex items-center gap-2">
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label={collapsed ? "Expand shell" : "Minimize shell"}
-        onclick={toggleCollapse}
+    <!-- Three different icons (they were "-", "□", "▢" and looked alike), each with a hint. -->
+    <div class="flex shrink-0 items-center gap-1">
+      <span
+        class="inline-flex"
+        use:hint={{ text: collapsed ? "Expand" : "Minimize", placement: "bottom" }}
       >
-        {collapsed ? "▢" : "-"}
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label={maximized ? "Restore shell size" : "Maximize shell"}
-        onclick={toggleMaximize}
-      >
-        {maximized ? "❐" : "□"}
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Close Shell"
-        disabled={shellBusy}
-        onclick={handleClose}
-      >
-        ✕
-      </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={collapsed ? "Expand shell" : "Minimize shell"}
+          onclick={toggleCollapse}
+        >
+          {#if collapsed}
+            <ChevronUp class="h-4 w-4" />
+          {:else}
+            <Minus class="h-4 w-4" />
+          {/if}
+        </Button>
+      </span>
+      {#if !collapsed}
+        <span
+          class="inline-flex"
+          use:hint={{ text: maximized ? "Restore size" : "Full screen", placement: "bottom" }}
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={maximized ? "Restore shell size" : "Maximize shell"}
+            onclick={toggleMaximize}
+          >
+            {#if maximized}
+              <Minimize2 class="h-4 w-4" />
+            {:else}
+              <Maximize2 class="h-4 w-4" />
+            {/if}
+          </Button>
+        </span>
+      {/if}
+      <span class="inline-flex" use:hint={{ text: "Close", placement: "bottom" }}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Close Shell"
+          disabled={shellBusy}
+          onclick={handleClose}
+        >
+          <X class="h-4 w-4" />
+        </Button>
+      </span>
     </div>
   </header>
 
-  {#if collapsed}
-    <div class="px-4 py-2 text-xs text-muted-foreground">
-      {isDebugDescribeSession()
-        ? "Describe minimized. Expand to inspect output."
-        : "Terminal minimized. Expand to continue."}
-    </div>
-  {:else}
+  {#if !collapsed}
     {#if isDebugDescribeSession()}
       <div class="border-b border-slate-800 bg-slate-900/70 px-4 py-3 text-xs text-slate-300">
         <div class="grid gap-1 sm:grid-cols-2">

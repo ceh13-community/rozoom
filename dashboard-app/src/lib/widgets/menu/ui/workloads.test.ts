@@ -104,15 +104,18 @@ describe("workloads menu", () => {
   }, 30000);
 
   it("adds standalone navigation hint tooltip on left-menu links", async () => {
-    const { getByRole } = render(WorkloadsMenu, {
+    const { getByRole, findByRole, queryByRole } = render(WorkloadsMenu, {
       props: { searchParams: {}, collapsed: false },
     });
 
     await fireEvent.click(getByRole("button", { name: "Workloads" }));
     const podsLink = getByRole("link", { name: "Pods" });
-    expect(podsLink).toHaveAttribute(
-      "title",
-      expect.stringContaining("Opens as a standalone page."),
-    );
+    // An in-app hint, not a native title that WebKitGTK keeps after the click.
+    expect(podsLink).not.toHaveAttribute("title");
+    await fireEvent.pointerEnter(podsLink);
+    const hint = await findByRole("tooltip", {}, { timeout: 2000 });
+    expect(hint).toHaveTextContent("Opens as a standalone page.");
+    await fireEvent.pointerDown(podsLink);
+    expect(queryByRole("tooltip")).not.toBeInTheDocument();
   });
 });
