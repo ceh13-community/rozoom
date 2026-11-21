@@ -20,9 +20,11 @@
 
   interface Props {
     clusterId: string;
+    /** Selects a namespace on the cluster page before a jump to a list. */
+    onSelectNamespace?: (namespace: string) => void;
   }
 
-  const { clusterId }: Props = $props();
+  const { clusterId, onSelectNamespace }: Props = $props();
 
   let graph = $state<DependencyGraph | null>(null);
   let selectedNode = $state<GraphNode | null>(null);
@@ -215,6 +217,7 @@
       return;
     }
     params.set("workload", workload);
+    if (node.namespace) onSelectNamespace?.(node.namespace);
     await goto(`?${params.toString()}`, { keepFocus: false });
     await revealListFilteredTo(node.name);
   }
