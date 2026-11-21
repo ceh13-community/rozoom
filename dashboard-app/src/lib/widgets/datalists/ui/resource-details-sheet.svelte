@@ -17,6 +17,13 @@
   import Search from "@lucide/svelte/icons/search";
   import Trash from "@lucide/svelte/icons/trash";
   import { tick } from "svelte";
+  import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
+  import {
+    mapWorkloadPods,
+    parseTopPods,
+    workloadPodsSelector,
+    type WorkloadDetailsPod,
+  } from "./common/workload-details-model";
   import type { Writable } from "svelte/store";
   import DetailsHeaderActions from "./common/details-header-actions.svelte";
   import DetailsMetadataGrid from "./common/details-metadata-grid.svelte";
@@ -112,6 +119,75 @@
 
   function closeDetails() {
     isOpen.set(false);
+  }
+
+  // The Pods block reads the cluster: a StatefulSet, ReplicaSet or CronJob object does not
+  // list its pods. Loaded when the panel opens and again when the object changes.
+  let clusterPods = $state<WorkloadDetailsPod[] | null>(null);
+  let clusterPodsError = $state<string | null>(null);
+  let clusterPodsLoading = $state(false);
+  // Plain, not $state: the effect below reads and writes it.
+  let clusterPodsKey: string | null = null;
+  let clusterPodsController: AbortController | null = null;
+
+  async function loadClusterPods(item: ResourceItem, selector: string, key: string) {
+    clusterPodsController?.abort();
+    const controller = new AbortController();
+    clusterPodsController = controller;
+    const namespace = item.metadata?.namespace ?? "default";
+    try {
+      const [pods, top] = await Promise.all([
+        kubectlRawArgsFront(["get", "pods", "-n", namespace, "-l", selector, "-o", "json"], {
+          clusterId,
+          signal: controller.signal,
+        }),
+        kubectlRawArgsFront(["top", "pods", "-n", namespace, "-l", selector, "--no-headers"], {
+          clusterId,
+          signal: controller.signal,
+        }).catch(() => null),
+      ]);
+      if (controller.signal.aborted || clusterPodsKey !== key) return;
+      if (pods.code !== 0) throw new Error(pods.errors || "Failed to load pods.");
+      clusterPods = mapWorkloadPods(
+        pods.output || "{}",
+        namespace,
+        top?.code === 0 ? parseTopPods(top.output) : undefined,
+      );
+      clusterPodsError = null;
+    } catch (error) {
+      if (controller.signal.aborted || clusterPodsKey !== key) return;
+      clusterPodsError = error instanceof Error ? error.message : "Failed to load pods.";
+    } finally {
+      if (clusterPodsKey === key) clusterPodsLoading = false;
+    }
+  }
+
+  $effect(() => {
+    const item = $selectedItem;
+    const open = $isOpen;
+    const selector = open && !isJobDetails() ? workloadPodsSelector(item) : null;
+    if (!item || !selector) {
+      clusterPodsKey = null;
+      clusterPods = null;
+      clusterPodsError = null;
+      clusterPodsLoading = false;
+      clusterPodsController?.abort();
+      return;
+    }
+    const key = `${item.metadata?.namespace ?? ""}/${item.metadata?.name ?? ""}@${(item.metadata as { resourceVersion?: string } | undefined)?.resourceVersion ?? ""}|${selector}`;
+    if (key === clusterPodsKey) return;
+    const sameObject = clusterPodsKey?.split("@")[0] === key.split("@")[0];
+    clusterPodsKey = key;
+    if (!sameObject) {
+      clusterPods = null;
+      clusterPodsError = null;
+      clusterPodsLoading = true;
+    }
+    void loadClusterPods(item, selector, key);
+  });
+
+  function getDetailsPods(): WorkloadDetailsPod[] {
+    return clusterPods ?? getPodsFromStatus();
   }
 
   async function runAction(action?: (item: ResourceItem) => void) {
@@ -813,6 +889,32 @@
       <div class="text-xs text-muted-foreground">
         Namespace: {$selectedItem?.metadata?.namespace ?? "default"}
       </div>
+      <!-- One order in every workload panel: Explain, Traffic chain, Properties, Pods, Events. -->
+      <DetailsExplainState
+        sourceState={runtimeSourceState}
+        profileLabel={runtimeProfileLabel}
+        lastUpdatedLabel={runtimeLastUpdatedLabel}
+        detail={runtimeDetail}
+        reason={runtimeReason}
+        requestPath={runtimeRequestPath}
+        describeCommand={getDescribeCommand()}
+        syncError={runtimeSyncError}
+      />
+      {#if isStatefulSetDetails() || isReplicaSetDetails() || isJobDetails() || isCronJobDetails()}
+        <ResourceTrafficChain
+          {clusterId}
+          resourceKind={isStatefulSetDetails()
+            ? "StatefulSet"
+            : isReplicaSetDetails()
+              ? "ReplicaSet"
+              : isJobDetails()
+                ? "Job"
+                : "CronJob"}
+          resourceName={$selectedItem?.metadata?.name ?? ""}
+          resourceNamespace={$selectedItem?.metadata?.namespace ?? "default"}
+          raw={$selectedItem as unknown as Record<string, unknown>}
+        />
+      {/if}
       <h3 class="my-4 font-bold">Properties</h3>
       <DetailsMetadataGrid
         contextKey={`${$selectedItem?.metadata?.namespace ?? "default"}/${$selectedItem?.metadata?.name ?? "-"}`}
@@ -1088,21 +1190,6 @@
           </div>
         {/if}
       </div>
-      {#if isStatefulSetDetails() || isReplicaSetDetails() || isJobDetails() || isCronJobDetails()}
-        <ResourceTrafficChain
-          {clusterId}
-          resourceKind={isStatefulSetDetails()
-            ? "StatefulSet"
-            : isReplicaSetDetails()
-              ? "ReplicaSet"
-              : isJobDetails()
-                ? "Job"
-                : "CronJob"}
-          resourceName={$selectedItem?.metadata?.name ?? ""}
-          resourceNamespace={$selectedItem?.metadata?.namespace ?? "default"}
-          raw={$selectedItem as unknown as Record<string, unknown>}
-        />
-      {/if}
 
       {#if !isCronJobDetails() && !isJobDetails() && !isReplicaSetDetails() && !isStatefulSetDetails() && !isNodeDetails()}
         <h3 class="my-4 font-bold">Spec</h3>
@@ -1138,10 +1225,18 @@
       {:else if !isJobDetails()}
         <h3 class="my-4 font-bold">Pods</h3>
         <div class="space-y-1 text-sm">
-          {#if getPodsFromStatus().length === 0}
-            <div class="rounded border p-3 text-muted-foreground">No pods found.</div>
+          {#if clusterPodsError}
+            <div class="rounded border p-3 text-rose-600 dark:text-rose-400">
+              {clusterPodsError}
+            </div>
+          {:else if clusterPodsLoading && clusterPods === null}
+            <div class="rounded border p-3 text-muted-foreground">Loading pods...</div>
+          {:else if getDetailsPods().length === 0}
+            <div class="rounded border p-3 text-muted-foreground">
+              {isCronJobDetails() ? "No running jobs, so no pods." : "No pods found."}
+            </div>
           {:else}
-            {#each getPodsFromStatus() as pod}
+            {#each getDetailsPods() as pod (pod.name)}
               <div
                 class="grid grid-cols-1 gap-2 rounded border p-2 sm:grid-cols-[2fr_2fr_1fr_1fr_1fr_1fr_1fr]"
               >
@@ -1164,16 +1259,6 @@
           {/if}
         </div>
       {/if}
-      <DetailsExplainState
-        sourceState={runtimeSourceState}
-        profileLabel={runtimeProfileLabel}
-        lastUpdatedLabel={runtimeLastUpdatedLabel}
-        detail={runtimeDetail}
-        reason={runtimeReason}
-        requestPath={runtimeRequestPath}
-        describeCommand={getDescribeCommand()}
-        syncError={runtimeSyncError}
-      />
 
       <h3 class="my-4 font-bold">Events</h3>
       <DetailsEventsList

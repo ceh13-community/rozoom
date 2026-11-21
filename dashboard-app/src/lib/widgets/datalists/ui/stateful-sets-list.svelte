@@ -1,11 +1,12 @@
 <script lang="ts">
   import { registerUnsavedWork } from "$shared/lib/unsaved-work";
+  import { pickLiveItem } from "./common/workload-details-model";
   import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import ScaleDialog from "$shared/ui/scale-dialog.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, untrack } from "svelte";
   import { BaseDirectory, writeTextFile } from "@tauri-apps/plugin-fs";
   import Clock3 from "@lucide/svelte/icons/clock-3";
   import GitCompareArrows from "@lucide/svelte/icons/git-compare-arrows";
@@ -63,7 +64,7 @@
   import WorkloadEventsSheet from "./common/workload-events-sheet.svelte";
   import { loadWorkloadEvents, type WorkloadEvent } from "./common/workload-events";
   import { buildRolloutCommandArgs, loadRolloutCommandOutput, type RolloutCommandMode } from "./common/workload-rollout";
-  import { writable } from "svelte/store";
+  import { get, writable } from "svelte/store";
   import {
     findStatefulSetItem,
     getFilteredStatefulSets,
@@ -325,6 +326,13 @@
     });
   });
   const selectedItem = writable<StatefulSetItem | null>(null);
+
+  // The open details follow the list: status, ready counts and conditions change while the
+  // panel is open, and a copy from the moment it opened contradicted the Pods block.
+  $effect(() => {
+    const next = pickLiveItem(untrack(() => get(selectedItem)), statefulSetsSnapshot);
+    if (next) selectedItem.set(next);
+  });
   const isSheetOpen = writable(false);
   let watcherEnabled = $state(DEFAULT_WATCHER_SETTINGS.enabled);
   let watcherRefreshSeconds = $state(DEFAULT_WATCHER_SETTINGS.refreshSeconds);

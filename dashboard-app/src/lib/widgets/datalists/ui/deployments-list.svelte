@@ -1,12 +1,13 @@
 <script lang="ts">
   import { registerUnsavedWork } from "$shared/lib/unsaved-work";
+  import { pickLiveItem } from "./common/workload-details-model";
   import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
   import DetailsSheetPortal from "$shared/ui/details-sheet-portal.svelte";
   import { hasOpenOverlay } from "$shared/lib/keyboard-manager";
-  import { createRawSnippet, onDestroy, onMount, tick } from "svelte";
+  import { createRawSnippet, onDestroy, onMount, tick, untrack } from "svelte";
   import { writable } from "svelte/store";
   import type { ColumnDef } from "@tanstack/table-core";
   import { path } from "@tauri-apps/api";
@@ -243,6 +244,15 @@
   let selectedItem = $state<SelectedDeployment>(null);
   let isOpen = $state(false);
   let deploymentsSnapshot = $state<DeploymentItem[]>([]);
+
+  // The open details follow the list: status, ready counts and conditions change while the
+  // panel is open, and a copy from the moment it opened (Pending while starting) stayed
+  // while the Pods block already showed the pods ready.
+  $effect(() => {
+    const current = untrack(() => selectedItem);
+    const next = pickLiveItem<DeploymentItem>(current, deploymentsSnapshot);
+    if (next && current) selectedItem = { ...next, uuid: current.uuid };
+  });
   let watcherEnabled = $state(DEFAULT_WATCHER_SETTINGS.enabled);
   let watcherRefreshSeconds = $state(DEFAULT_WATCHER_SETTINGS.refreshSeconds);
   let watcherError = $state<string | null>(null);
