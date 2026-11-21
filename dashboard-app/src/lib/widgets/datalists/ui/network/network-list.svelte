@@ -32,9 +32,10 @@
   import SectionRuntimeStatus from "../common/section-runtime-status.svelte";
   import WorkloadSelectionBar from "../common/workload-selection-bar.svelte";
   import NetworkDetailsSheet from "./network-details-sheet.svelte";
-  import NetworkWorkbenchPanel, {
-    type NetworkWorkbenchOpenRequest,
-  } from "./network-workbench-panel.svelte";
+  import PortForwardPanel, {
+    type PortForwardPanelRequest,
+  } from "../common/port-forward-panel.svelte";
+  import { servicePortForwardTarget } from "../common/model/port-forward-target";
   import {
     createNetworkListRows,
     filterNetworkListRows,
@@ -72,7 +73,7 @@
   let actionNotification = $state<ActionNotification>(null);
 
   let runtimeRefreshInFlight = $state(false);
-  let workbenchRequest = $state<NetworkWorkbenchOpenRequest>(null);
+  let workbenchRequest = $state<PortForwardPanelRequest>(null);
   let workbenchRequestToken = 0;
 
   const workloadKey = $derived((data.workloadKey ?? "services") as NetworkWorkloadKey);
@@ -102,7 +103,7 @@
     }),
   );
   const workbenchBoundary = $derived.by(
-    (): SectionWorkbenchBoundaryState<NetworkWorkbenchOpenRequest> => ({
+    (): SectionWorkbenchBoundaryState<PortForwardPanelRequest> => ({
       request: workbenchRequest,
       token: workbenchRequestToken,
     }),
@@ -161,11 +162,12 @@
 
   function openServiceWorkbench(row: NetworkListRow) {
     if (!canOpenWeb) return;
+    const raw = rowsByUid.get(row.uid);
+    if (!raw) return;
     workbenchRequestToken += 1;
     workbenchRequest = {
       token: workbenchRequestToken,
-      kind: "service-port-forward",
-      rowUid: row.uid,
+      target: servicePortForwardTarget(raw),
     };
   }
 
@@ -474,9 +476,8 @@
     }}
   />
 
-  <NetworkWorkbenchPanel
+  <PortForwardPanel
     clusterId={data.slug}
-    {rowsByUid}
     request={workbenchBoundary.request}
     onMessage={(message) => {
       actionNotification = notifySuccess(message);

@@ -8,7 +8,6 @@
   } from "$shared/model/cluster-connectivity";
   import { toast } from "svelte-sonner";
   import { writable } from "svelte/store";
-  import { goto } from "$app/navigation";
   import { resolvePageClusterName, type PageData } from "$entities/cluster";
   import type { PodItem } from "$shared/model/clusters";
   import { openPodAttachModal, openPodShellModal } from "$features/shell";
@@ -17,13 +16,10 @@
     runDebugDescribe,
     startPodNetworkDebugSession,
   } from "$features/resource-debug-runtime";
-  import { startPortForward, usedLocalPorts } from "$shared/api/port-forward";
-  import {
-    defaultLocalPort,
-    portForwardLocalUrl,
-    requestPortForwardStartMode,
-  } from "$shared/lib/port-forward-start-mode";
-  import { popOutPortForwardPreview } from "$shared/lib/port-forward-preview";
+  import PortForwardPanel, {
+    type PortForwardPanelRequest,
+  } from "../common/port-forward-panel.svelte";
+  import { podPortForwardTarget } from "../common/model/port-forward-target";
   import {
     destroyPodsSync,
     initPodsSync,
@@ -295,6 +291,9 @@
     return buildMetricsRecommendationText(metricsSourceChecks ?? undefined, "pods");
   });
   const podMetricsSourcesHref = $derived(buildMetricsSourcesHref(data.slug));
+
+  let portForwardRequest = $state<PortForwardPanelRequest>(null);
+  let portForwardRequestToken = 0;
 
   function showActionSuccess(message: string) {
     toast.success(message);
@@ -716,51 +715,14 @@
     await navigator.clipboard.writeText(value);
   }
 
-  async function handlePortForward(pod: Partial<PodItem>) {
-    const containers = (pod.spec as unknown as Record<string, unknown>)?.containers as
-      | Array<{ ports?: Array<{ containerPort: number }> }>
-      | undefined;
-    const firstPort = containers?.[0]?.ports?.[0]?.containerPort;
-    if (!firstPort) {
-      toast.error("No container ports defined for this pod.");
-      return;
-    }
-    const mode = requestPortForwardStartMode(firstPort);
-    if (!mode) return;
-    const name = pod.metadata?.name ?? "unknown";
-    const namespace = pod.metadata?.namespace ?? "default";
-    const uniqueKey = `pod/${namespace}/${name}:${firstPort}`;
-    const localPort = defaultLocalPort(firstPort, usedLocalPorts());
-    const result = await startPortForward({
-      namespace,
-      resource: `pod/${name}`,
-      remotePort: firstPort,
-      localPort,
-      clusterId: data.slug,
-      uniqueKey,
-    });
-    if (result.success) {
-      const url = portForwardLocalUrl(localPort, firstPort);
-      // No page change on its own: the toast says what started and offers the list.
-      toast.success(`Port-forward started: ${url} -> ${name}:${firstPort}`, {
-        description: "Running forwards are listed in Network > Port Forwarding.",
-        // Long enough to reach the button.
-        duration: 10_000,
-        action: {
-          label: "Open port-forwards",
-          onClick: () => {
-            void goto(
-              `/dashboard/clusters/${encodeURIComponent(data.slug)}?workload=portforwarding`,
-            );
-          },
-        },
-      });
-      if (mode === "start-and-open") {
-        void popOutPortForwardPreview(url);
-      }
-    } else {
-      toast.error(result.error ?? "Failed to start port-forward.");
-    }
+  // Same dialog and panel as Services: pick a declared container port or type one (a pod
+  // without containerPort can be forwarded too), then Copy URL / Open Web / Stop in place.
+  function handlePortForward(pod: Partial<PodItem>) {
+    portForwardRequestToken += 1;
+    portForwardRequest = {
+      token: portForwardRequestToken,
+      target: podPortForwardTarget(pod as Record<string, unknown>),
+    };
   }
 
   async function copyDescribeCommand(pod: Partial<PodItem>) {
@@ -1344,7 +1306,7 @@
     onPortForward={(row) => {
       const pod = getPodByUid(row.uid);
       if (!pod) return;
-      void handlePortForward(pod);
+      handlePortForward(pod);
     }}
     onEvict={(row) => {
       const pod = getPodByUid(row.uid);
@@ -1425,6 +1387,13 @@
     onDelete={(pod) => {
       void deletePods([pod]);
     }}
+  />
+
+  <PortForwardPanel
+    clusterId={data.slug}
+    request={portForwardRequest}
+    onMessage={showActionSuccess}
+    onError={showActionError}
   />
 
   <PodMetricsBoundary

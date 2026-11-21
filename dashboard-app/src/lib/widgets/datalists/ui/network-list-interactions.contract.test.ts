@@ -29,7 +29,7 @@ describe("network list interactions contract", () => {
     expect(source).toContain("onRunDebugDescribe");
     expect(source).toContain("openDebugDescribe(");
     expect(source).toContain("<NetworkDetailsSheet");
-    expect(source).toContain("<NetworkWorkbenchPanel");
-    expect(source).toContain('kind: "service-port-forward"');
+    expect(source).toContain("<PortForwardPanel");
+    expect(source).toContain("target: servicePortForwardTarget(raw)");
   });
 });
