@@ -10,6 +10,7 @@
   import { Layers3, List, Server } from "$shared/ui/icons";
   import TableChecklistDropdown from "../table-checklist-dropdown.svelte";
   import TableToolbarShell from "../table-toolbar-shell.svelte";
+  import GroupsToggleButton from "../groups-toggle-button.svelte";
   import WatcherToolbarControls from "../watcher-toolbar-controls.svelte";
   import PodActionsMenu from "./pod-actions-menu.svelte";
   import PodSelectionCheckbox from "./pod-selection-checkbox.svelte";
@@ -562,11 +563,13 @@
         {onWatcherRefreshSecondsChange}
         {onResetWatcherSettings}
       />
-      {#if isGroupedView && getGroupedRows().length > 0}
-        <Button variant="outline" size="sm" onclick={toggleAllGroups}>
-          {getToggleAllGroupsLabel()}
-        </Button>
-      {/if}
+      <!-- Always laid out, hidden in the flat view: the toolbar keeps its width and does
+           not wrap onto a new row when a grouped view is chosen. -->
+      <GroupsToggleButton
+        visible={isGroupedView && getGroupedRows().length > 0}
+        label={getToggleAllGroupsLabel()}
+        onclick={toggleAllGroups}
+      />
     {/snippet}
   </TableToolbarShell>
 

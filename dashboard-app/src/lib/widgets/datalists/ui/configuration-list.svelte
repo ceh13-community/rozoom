@@ -142,6 +142,7 @@
   import Bug from "@lucide/svelte/icons/bug";
   import { createMutationReconcile } from "./common/workload-mutation-reconcile";
   import TableToolbarShell from "./table-toolbar-shell.svelte";
+  import GroupsToggleButton from "./groups-toggle-button.svelte";
   import WatcherToolbarControls from "./watcher-toolbar-controls.svelte";
   import {
     announceWorkbenchTabClosed,
@@ -5217,11 +5218,12 @@ spec:
         onWatcherRefreshSecondsChange={setWatcherRefresh}
         onResetWatcherSettings={resetWatcherSettings}
       />
-      {#if hasGroupedRows}
-        <Button variant="outline" size="sm" onclick={toggleAllGroups}>
-          {getGroupCollapseToggleLabel(collapsedGroups, groupKeys)}
-        </Button>
-      {/if}
+      <!-- Always laid out, hidden in the flat view (see GroupsToggleButton). -->
+      <GroupsToggleButton
+        visible={hasGroupedRows}
+        label={getGroupCollapseToggleLabel(collapsedGroups, groupKeys)}
+        onclick={toggleAllGroups}
+      />
     {/snippet}
   </TableToolbarShell>
 
