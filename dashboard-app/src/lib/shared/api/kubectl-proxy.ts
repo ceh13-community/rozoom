@@ -435,7 +435,7 @@ export async function kubectlRawFront(
 
   {
     const splitForNotify = args.trim().split(/\s+/);
-    if (options?.notify || isUserFacingCommand(splitForNotify)) {
+    if (!options?.housekeeping && (options?.notify || isUserFacingCommand(splitForNotify))) {
       emitCliNotification({
         tool: "kubectl",
         args: splitForNotify,
@@ -532,7 +532,7 @@ export async function kubectlRawArgsFront(
       });
     }
 
-    if (options?.notify || isUserFacingCommand(args)) {
+    if (!options?.housekeeping && (options?.notify || isUserFacingCommand(args))) {
       emitCliNotification({
         tool: "kubectl",
         args: [...args],
@@ -553,7 +553,7 @@ export async function kubectlRawArgsFront(
   // background pollers stay invisible to the metric. Fire-and-forget; the
   // tracker no-ops without telemetry consent. Spec: state/wau-c-spec.md §4.
   const trackedClusterId = options?.clusterId;
-  if (trackedClusterId && isMutatingKubectlCommand(args)) {
+  if (trackedClusterId && !options.housekeeping && isMutatingKubectlCommand(args)) {
     request
       .then((result) => {
         if (result.code === 0) {

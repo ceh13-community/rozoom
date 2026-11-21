@@ -65,34 +65,113 @@ export function buildDebugPodLabelArgs(podName: string, namespace: string, owner
   ];
 }
 
-/** Deletes this installation's debug pods in a namespace that belong to an earlier run. */
-export function buildOrphanCleanupArgs(namespace: string, ownerId: string) {
+/** This installation's debug pods in a namespace, as `name<TAB>creationTimestamp` lines. */
+export function buildOwnedDebugPodsListArgs(namespace: string, ownerId: string) {
   return [
-    "delete",
+    "get",
     "pods",
     "-n",
     namespace,
     "-l",
-    `${DEBUG_OWNER_LABEL}=${ownerId},${DEBUG_SESSION_LABEL}!=${NODE_DEBUG_RUN_ID}`,
-    "--ignore-not-found",
-    "--wait=false",
+    `${DEBUG_OWNER_LABEL}=${ownerId}`,
+    "-o",
+    'jsonpath={range .items[*]}{.metadata.name}{"\\t"}{.metadata.creationTimestamp}{"\\n"}{end}',
   ];
+}
+
+/** When this process started. A pod created later may be the open shell of a second copy. */
+const PROCESS_STARTED_AT = Date.now();
+// Server and local clocks differ: only pods clearly older than the start are removed.
+const CLOCK_MARGIN_MS = 10_000;
+
+/** Pods of the listing created before `startedAtMs`: no shell of this process uses them. */
+export function pickOrphanNodeDebugPods(listing: string, startedAtMs: number) {
+  const pods = listing
+    .split("\n")
+    .map((line) => line.trim().split(/\s+/))
+    .filter(([name = ""]) => name.length > 0)
+    .map(([name = "", created = ""]) => ({ name, createdAt: Date.parse(created) }));
+  const orphans = pods
+    .filter(
+      (pod) => Number.isFinite(pod.createdAt) && pod.createdAt < startedAtMs - CLOCK_MARGIN_MS,
+    )
+    .map((pod) => pod.name);
+  return { orphans, kept: pods.length - orphans.length };
+}
+
+// Clusters where this installation has created a node debug pod that may still exist.
+// Only those are checked on connect, so everyone else runs no kubectl for this at all.
+const CLUSTERS_WITH_DEBUG_PODS_KEY = "rozoom:node-debug-clusters";
+
+function readClustersWithDebugPods(store: Pick<Storage, "getItem"> | undefined): string[] {
+  try {
+    const parsed: unknown = JSON.parse(store?.getItem(CLUSTERS_WITH_DEBUG_PODS_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeClustersWithDebugPods(store: Pick<Storage, "setItem"> | undefined, ids: string[]) {
+  store?.setItem(CLUSTERS_WITH_DEBUG_PODS_KEY, JSON.stringify(ids));
+}
+
+/** Called when a node debug pod was created: the next connect checks this cluster. */
+export function markNodeDebugPodCreated(
+  clusterId: string,
+  storage?: Pick<Storage, "getItem" | "setItem">,
+) {
+  const store = storage ?? browserStorage();
+  const ids = readClustersWithDebugPods(store);
+  if (!ids.includes(clusterId)) writeClustersWithDebugPods(store, [...ids, clusterId]);
 }
 
 const cleanedClusters = new Set<string>();
 
 /**
  * Removes node debug pods an earlier run of this app left behind (it was closed or
- * killed with a node shell open). Runs once per cluster per run, when the app connects.
+ * killed with a node shell open). Runs once per cluster per run, when the app connects,
+ * and only for a cluster where this installation created such a pod. Housekeeping: no
+ * CLI notification, no telemetry. The cluster is forgotten once none of its pods is left.
  */
-export async function cleanupOrphanNodeDebugPods(clusterId: string) {
+export async function cleanupOrphanNodeDebugPods(
+  clusterId: string,
+  storage?: Pick<Storage, "getItem" | "setItem">,
+  processStartedAt = PROCESS_STARTED_AT,
+) {
   const id = clusterId.trim();
   if (!id || cleanedClusters.has(id)) return;
   cleanedClusters.add(id);
-  const ownerId = getDebugOwnerId();
+  const store = storage ?? browserStorage();
+  if (!readClustersWithDebugPods(store).includes(id)) return;
+
+  const ownerId = getDebugOwnerId(store);
+  const options = { clusterId: id, housekeeping: true };
+  let complete = true;
+  let kept = 0;
   for (const namespace of nodeDebugNamespaces()) {
-    await kubectlRawArgsFront(buildOrphanCleanupArgs(namespace, ownerId), { clusterId: id }).catch(
-      () => undefined,
+    const listed = await kubectlRawArgsFront(
+      buildOwnedDebugPodsListArgs(namespace, ownerId),
+      options,
+    ).catch(() => null);
+    if (listed?.code !== 0) {
+      complete = false;
+      continue;
+    }
+    const found = pickOrphanNodeDebugPods(listed.output, processStartedAt);
+    kept += found.kept;
+    for (const name of found.orphans) {
+      const deleted = await kubectlRawArgsFront(
+        buildPodDebugCleanupArgs(name, namespace),
+        options,
+      ).catch(() => null);
+      if (deleted?.code !== 0) complete = false;
+    }
+  }
+  if (complete && kept === 0) {
+    writeClustersWithDebugPods(
+      store,
+      readClustersWithDebugPods(store).filter((clusterId) => clusterId !== id),
     );
   }
 }
@@ -281,8 +360,10 @@ export async function startNodeDebugSession(
   }
 
   // Right away: if the app dies from here on, the next connect finds and removes the pod.
+  markNodeDebugPodCreated(clusterId);
   await kubectlRawArgsFront(buildDebugPodLabelArgs(podName, namespace, getDebugOwnerId()), {
     clusterId,
+    housekeeping: true,
   }).catch(() => undefined);
 
   const ready = await kubectlRawArgsFront(buildPodDebugWaitArgs(podName, namespace), {

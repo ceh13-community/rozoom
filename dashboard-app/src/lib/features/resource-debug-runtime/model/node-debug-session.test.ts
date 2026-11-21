@@ -14,6 +14,7 @@ import {
   cleanupOrphanNodeDebugPods,
   describeNodeDebugFailure,
   getDebugOwnerId,
+  markNodeDebugPodCreated,
   parseNodeDebugPodName,
   pickUnnamedNodeDebugPods,
   resetNodeDebugCleanupForTests,
@@ -198,29 +199,94 @@ describe("node debug session", () => {
   });
 });
 
+function memoryStorage() {
+  const store = new Map<string, string>();
+  return {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => void store.set(key, value),
+  };
+}
+
 describe("debug pods left by an earlier run", () => {
+  const startedAt = Date.parse("2026-11-21T22:00:00Z");
+  const OLD = "2026-11-21T20:00:00Z";
+  const NEW = "2026-11-21T22:05:00Z";
+
   beforeEach(() => {
     kubectlRawArgsFront.mockReset().mockResolvedValue(OK);
     resetNodeDebugCleanupForTests();
   });
 
-  it("deletes this installation's pods of other runs in default and kube-system, once per cluster", async () => {
-    await cleanupOrphanNodeDebugPods("c1");
-    await cleanupOrphanNodeDebugPods("c1");
-    const selector = `${DEBUG_OWNER_LABEL}=${getDebugOwnerId()},${DEBUG_SESSION_LABEL}!=${NODE_DEBUG_RUN_ID}`;
-    expect(kubectlRawArgsFront.mock.calls.map(([args]) => args as string[])).toEqual([
-      ["delete", "pods", "-n", "default", "-l", selector, "--ignore-not-found", "--wait=false"],
-      ["delete", "pods", "-n", "kube-system", "-l", selector, "--ignore-not-found", "--wait=false"],
+  it("runs no kubectl at all where this installation never created a node debug pod", async () => {
+    await cleanupOrphanNodeDebugPods("c1", memoryStorage(), startedAt);
+    expect(kubectlRawArgsFront).not.toHaveBeenCalled();
+  });
+
+  it("deletes only pods older than this process, as housekeeping, once per cluster", async () => {
+    const storage = memoryStorage();
+    markNodeDebugPodCreated("c1", storage);
+    kubectlRawArgsFront.mockImplementation((args: string[]) =>
+      Promise.resolve(
+        args[0] === "get" && args[3] === "default"
+          ? {
+              output: `node-debugger-minikube-old\t${OLD}\nnode-debugger-minikube-live\t${NEW}\n`,
+              errors: "",
+              code: 0,
+            }
+          : OK,
+      ),
+    );
+    await cleanupOrphanNodeDebugPods("c1", storage, startedAt);
+    await cleanupOrphanNodeDebugPods("c1", storage, startedAt);
+    const calls = kubectlRawArgsFront.mock.calls.map(([args]) => (args as string[]).slice(0, 4));
+    expect(calls).toEqual([
+      ["get", "pods", "-n", "default"],
+      ["delete", "pod", "node-debugger-minikube-old", "--namespace"],
+      ["get", "pods", "-n", "kube-system"],
     ]);
-    expect(kubectlRawArgsFront.mock.calls[0][1]).toEqual({ clusterId: "c1" });
+    expect(kubectlRawArgsFront.mock.calls[0][0]).toContain(
+      `${DEBUG_OWNER_LABEL}=${getDebugOwnerId(storage)}`,
+    );
+    for (const [, options] of kubectlRawArgsFront.mock.calls) {
+      expect(options).toEqual({ clusterId: "c1", housekeeping: true });
+    }
+    // A newer pod (another copy's open shell) is still there: the cluster stays marked.
+    resetNodeDebugCleanupForTests();
+    kubectlRawArgsFront.mockClear();
+    await cleanupOrphanNodeDebugPods("c1", storage, startedAt);
+    expect(kubectlRawArgsFront).toHaveBeenCalled();
+  });
+
+  it("forgets the cluster once none of its debug pods is left", async () => {
+    const storage = memoryStorage();
+    markNodeDebugPodCreated("c1", storage);
+    kubectlRawArgsFront.mockImplementation((args: string[]) =>
+      Promise.resolve(
+        args[0] === "get" && args[3] === "default"
+          ? { output: `node-debugger-minikube-old\t${OLD}\n`, errors: "", code: 0 }
+          : OK,
+      ),
+    );
+    await cleanupOrphanNodeDebugPods("c1", storage, startedAt);
+    resetNodeDebugCleanupForTests();
+    kubectlRawArgsFront.mockClear();
+    await cleanupOrphanNodeDebugPods("c1", storage, startedAt);
+    expect(kubectlRawArgsFront).not.toHaveBeenCalled();
+  });
+
+  it("keeps the cluster marked when kubectl is refused", async () => {
+    const storage = memoryStorage();
+    markNodeDebugPodCreated("c1", storage);
+    kubectlRawArgsFront.mockResolvedValue({ output: "", errors: "Forbidden", code: 1 });
+    await cleanupOrphanNodeDebugPods("c1", storage, startedAt);
+    resetNodeDebugCleanupForTests();
+    kubectlRawArgsFront.mockClear();
+    await cleanupOrphanNodeDebugPods("c1", storage, startedAt);
+    expect(kubectlRawArgsFront).toHaveBeenCalled();
   });
 
   it("keeps one owner id per installation", () => {
-    const store = new Map<string, string>();
-    const storage = {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => void store.set(key, value),
-    };
+    const storage = memoryStorage();
     const first = getDebugOwnerId(storage);
     expect(first).toMatch(/^[\w-]{8,63}$/);
     expect(getDebugOwnerId(storage)).toBe(first);
