@@ -5,6 +5,7 @@
   import ResourceLogsSheet from "../common/resource-logs-sheet.svelte";
   import ResourceYamlSheet from "../common/resource-yaml-sheet.svelte";
   import PortForwardBrowserTab from "../common/port-forward-browser-tab.svelte";
+  import { previousLogsAvailability } from "./model/previous-logs";
 
   type LogBookmark = {
     id: string;
@@ -71,6 +72,8 @@
     yamlOpen: Writable<boolean>;
     eventsOpen: Writable<boolean>;
     isVerticallyCollapsed?: boolean;
+    /** False with one pane: there is nothing to give the space to, so no button. */
+    canVerticalCollapse?: boolean;
     onToggleVerticalCollapse: () => void;
     logsJumpToLine: number | null;
     activeLogsTabId: string | null;
@@ -85,11 +88,9 @@
       tabId: string,
       patch: Partial<Extract<PaneTab, { kind: "yaml" }>>,
     ) => void;
-    refreshLogsTab: (tabId: string) => Promise<void>;
     saveYamlTab: (tabId: string) => Promise<void>;
-    scheduleLogsPolling: (tabId: string) => void;
-    startFollowStreamForTab: (tabId: string) => Promise<void>;
-    stopLogsRuntime: (tabId: string) => void;
+    /** Runs the stream, polling or one read the tab's settings ask for. */
+    restartLogsTab: (tabId: string) => void;
     onLogsJumpHandled: () => void;
     portForwardActions?: {
       copyUrl: (tabId: string) => void;
@@ -107,6 +108,7 @@
     yamlOpen,
     eventsOpen,
     isVerticallyCollapsed = false,
+    canVerticalCollapse = false,
     onToggleVerticalCollapse,
     logsJumpToLine,
     activeLogsTabId,
@@ -115,14 +117,17 @@
     openYamlForPod,
     updateLogsTab,
     updateYamlTab,
-    refreshLogsTab,
     saveYamlTab,
-    scheduleLogsPolling,
-    startFollowStreamForTab,
-    stopLogsRuntime,
+    restartLogsTab,
     onLogsJumpHandled,
     portForwardActions,
   }: Props = $props();
+
+  const previousLogs = $derived(
+    paneTab.kind === "logs"
+      ? previousLogsAvailability(getPodForUid(paneTab.podUid), paneTab.logsSelectedContainer)
+      : null,
+  );
 </script>
 
 {#if paneTab.kind === "logs"}
@@ -141,40 +146,37 @@
     selectedContainer={paneTab.logsSelectedContainer}
     containerOptions={paneTab.logsContainerOptions}
     bookmarks={paneTab.bookmarks}
-    canVerticalCollapse={true}
+    canVerticalCollapse={canVerticalCollapse || isVerticallyCollapsed}
     {isVerticallyCollapsed}
     {onToggleVerticalCollapse}
+    previousAvailable={previousLogs?.available ?? true}
+    previousHint={previousLogs?.hint ?? ""}
     onToggleLive={() => {
-      const nextLive = !paneTab.logsLive;
-      updateLogsTab(paneTab.id, { logsLive: nextLive });
-      if (!nextLive) {
-        stopLogsRuntime(paneTab.id);
-        return;
-      }
-      if (paneTab.logsMode === "stream-f") {
-        void startFollowStreamForTab(paneTab.id);
-        return;
-      }
-      scheduleLogsPolling(paneTab.id);
+      updateLogsTab(paneTab.id, { logsLive: !paneTab.logsLive });
+      restartLogsTab(paneTab.id);
     }}
     onSetMode={(mode) => {
+      if (mode === paneTab.logsMode) return;
       updateLogsTab(paneTab.id, { logsMode: mode });
-      if (mode === "stream-f" && paneTab.logsLive) {
-        void startFollowStreamForTab(paneTab.id);
-      }
+      restartLogsTab(paneTab.id);
     }}
     onTogglePrevious={() => {
       updateLogsTab(paneTab.id, {
         logsPrevious: !paneTab.logsPrevious,
       });
-      void refreshLogsTab(paneTab.id);
+      restartLogsTab(paneTab.id);
     }}
     onSelectContainer={(container) => {
-      updateLogsTab(paneTab.id, { logsSelectedContainer: container });
-      void refreshLogsTab(paneTab.id);
+      // A container without an earlier instance cannot keep Previous on.
+      const keepPrevious =
+        paneTab.logsPrevious &&
+        previousLogsAvailability(getPodForUid(paneTab.podUid), container).available;
+      updateLogsTab(paneTab.id, { logsSelectedContainer: container, logsPrevious: keepPrevious });
+      restartLogsTab(paneTab.id);
     }}
     onRefresh={() => {
-      void refreshLogsTab(paneTab.id);
+      // A fresh stream or read; a one-shot read mixed into a running stream duplicated lines.
+      restartLogsTab(paneTab.id);
     }}
     onAddBookmark={(line) => {
       updateLogsTab(paneTab.id, {
@@ -212,7 +214,7 @@
     driftDetected={paneTab.driftDetected}
     driftMessage={paneTab.driftMessage}
     externalDiffLines={getYamlCompareDiffLines(paneTab.id)}
-    canVerticalCollapse={true}
+    canVerticalCollapse={canVerticalCollapse || isVerticallyCollapsed}
     {isVerticallyCollapsed}
     {onToggleVerticalCollapse}
     onYamlChange={(value) => {
@@ -250,7 +252,7 @@
     loading={paneTab.eventsLoading}
     error={paneTab.eventsError}
     focusedEventIndex={paneTab.focusedEventIndex}
-    canVerticalCollapse={true}
+    canVerticalCollapse={canVerticalCollapse || isVerticallyCollapsed}
     {isVerticallyCollapsed}
     {onToggleVerticalCollapse}
   />

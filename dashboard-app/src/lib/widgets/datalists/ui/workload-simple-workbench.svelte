@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import { onMount } from "svelte";
   import { writable } from "svelte/store";
   import { orderPinnedTabs } from "$features/pods-workbench";
@@ -449,18 +450,13 @@
     lastLoadedStorageKey = scopedStorageKey;
   });
 
-  $effect(() => {
-    const normalizedVisibility = normalizeWorkbenchVisibilityForDataMode(dataProfileId, {
-      workbenchCollapsed,
-      collapsedPaneIndexes,
-    });
-    if (normalizedVisibility.workbenchCollapsed !== workbenchCollapsed) {
-      workbenchCollapsed = normalizedVisibility.workbenchCollapsed;
-    }
-    if (!arraysEqual(normalizedVisibility.collapsedPaneIndexes, collapsedPaneIndexes)) {
-      collapsedPaneIndexes = normalizedVisibility.collapsedPaneIndexes;
-    }
-  });
+  expandWorkbenchOnRealtimeSwitch(
+    () => dataProfileId,
+    () => {
+      workbenchCollapsed = false;
+      collapsedPaneIndexes = [];
+    },
+  );
 
   $effect(() => {
     workbenchLayout;
@@ -559,7 +555,7 @@
                     selectedContainer={logs.selectedContainer}
                     containerOptions={logs.containerOptions}
                     bookmarks={logs.bookmarks}
-                    canVerticalCollapse={getPaneCount() > 1}
+                    canVerticalCollapse={getPaneCount() - collapsedPaneIndexes.length > 1}
                     isVerticallyCollapsed={isPaneCollapsed(paneIndex)}
                     onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
                     onToggleLive={onToggleLogsLive}
@@ -583,7 +579,7 @@
                     saving={yaml.saving}
                     hasChanges={yaml.yamlText !== yaml.originalYaml}
                     error={yaml.error}
-                    canVerticalCollapse={getPaneCount() > 1}
+                    canVerticalCollapse={getPaneCount() - collapsedPaneIndexes.length > 1}
                     isVerticallyCollapsed={isPaneCollapsed(paneIndex)}
                     onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
                     {onYamlChange}

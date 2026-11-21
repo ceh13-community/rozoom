@@ -1,5 +1,6 @@
 <script lang="ts">
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
+  import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
   import { onDestroy, onMount } from "svelte";
   import { BaseDirectory, writeTextFile } from "@tauri-apps/plugin-fs";
@@ -1856,11 +1857,13 @@
     }
   });
 
-  $effect(() => {
-    if ($dashboardDataProfile.id !== "realtime") return;
-    if (workbenchCollapsed) workbenchCollapsed = false;
-    if (collapsedPaneIndexes.length > 0) collapsedPaneIndexes = [];
-  });
+  expandWorkbenchOnRealtimeSwitch(
+    () => $dashboardDataProfile?.id,
+    () => {
+      workbenchCollapsed = false;
+      collapsedPaneIndexes = [];
+    },
+  );
 
   $effect(() => {
     if (!workbenchStateRestored) return;
@@ -2216,7 +2219,7 @@
                       selectedContainer={tab?.logsSelectedContainer ?? "all-containers"}
                       containerOptions={tab?.logsContainerOptions ?? ["all-containers"]}
                       bookmarks={tab?.bookmarks ?? []}
-                      canVerticalCollapse={getPaneCount() > 1}
+                      canVerticalCollapse={getPaneCount() - collapsedPaneIndexes.length > 1}
                       isVerticallyCollapsed={isPaneCollapsed(paneIndex)}
                       onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
                       onToggleLive={() => {
@@ -2280,7 +2283,7 @@
                       hasChanges={(tab?.yamlText ?? "") !== (tab?.yamlOriginalText ?? "")}
                       externalDiffLines={tab ? getYamlCompareDiffLines(tab.id) : []}
                       error={tab?.yamlError ?? null}
-                      canVerticalCollapse={getPaneCount() > 1}
+                      canVerticalCollapse={getPaneCount() - collapsedPaneIndexes.length > 1}
                       isVerticallyCollapsed={isPaneCollapsed(paneIndex)}
                       onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
                       onYamlChange={(value) => {

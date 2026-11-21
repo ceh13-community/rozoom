@@ -1,5 +1,6 @@
 <script lang="ts">
   import { provideListFreshness } from "./common/list-freshness-context.svelte";
+  import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import { onDestroy, onMount, tick, untrack } from "svelte";
   import { path } from "@tauri-apps/api";
   import { openExternalUrl } from "$shared/api/in-app-browser";
@@ -148,7 +149,6 @@
   import Bug from "@lucide/svelte/icons/bug";
   import { createMutationReconcile } from "./common/workload-mutation-reconcile";
   import TableToolbarShell from "./table-toolbar-shell.svelte";
-  import GroupsToggleButton from "./groups-toggle-button.svelte";
   import WatcherToolbarControls from "./watcher-toolbar-controls.svelte";
   import {
     announceWorkbenchTabClosed,
@@ -4594,11 +4594,13 @@ spec:
     loadSavedViewsForScope();
   });
 
-  $effect(() => {
-    if ($dashboardDataProfile.id !== "realtime") return;
-    if (workbenchCollapsed) workbenchCollapsed = false;
-    if (collapsedPaneIndexes.length > 0) collapsedPaneIndexes = [];
-  });
+  expandWorkbenchOnRealtimeSwitch(
+    () => $dashboardDataProfile?.id,
+    () => {
+      workbenchCollapsed = false;
+      collapsedPaneIndexes = [];
+    },
+  );
 
   $effect(() => {
     if (!workbenchStateRestored) return;
@@ -4869,7 +4871,7 @@ spec:
                             error={paneYamlTab?.yamlError ?? null}
                             driftDetected={paneYamlTab?.yamlDriftDetected ?? false}
                             driftMessage={paneYamlTab?.yamlDriftMessage ?? null}
-                            canVerticalCollapse={getPaneCount() > 1}
+                            canVerticalCollapse={getPaneCount() - collapsedPaneIndexes.length > 1}
                             isVerticallyCollapsed={isPaneCollapsed(paneIndex)}
                             onToggleVerticalCollapse={() => togglePaneCollapsed(paneIndex)}
                             onYamlChange={(value) => {
@@ -5194,12 +5196,6 @@ spec:
         onToggleWatcher={toggleWatcher}
         onWatcherRefreshSecondsChange={setWatcherRefresh}
         onResetWatcherSettings={resetWatcherSettings}
-      />
-      <!-- Always laid out, hidden in the flat view (see GroupsToggleButton). -->
-      <GroupsToggleButton
-        visible={hasGroupedRows}
-        label={getGroupCollapseToggleLabel(collapsedGroups, groupKeys)}
-        onclick={toggleAllGroups}
       />
     {/snippet}
   </TableToolbarShell>
@@ -5771,6 +5767,19 @@ spec:
             </Table.TableRow>
           {/if}
         {:else}
+          <!-- In the table, not the toolbar (see the Pods list): the toolbar keeps its size. -->
+          <Table.TableRow>
+            <Table.TableCell colspan={2 + visibleDataColumnCount} class="py-1 text-right">
+              <button
+                type="button"
+                class="rounded-sm text-xs font-medium text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                data-testid="groups-toggle"
+                onclick={toggleAllGroups}
+              >
+                {getGroupCollapseToggleLabel(collapsedGroups, groupKeys)}
+              </button>
+            </Table.TableCell>
+          </Table.TableRow>
           {#each groupedRows as [group] (`namespace:${group}`)}
             <Table.TableRow class="bg-muted/40">
               <Table.TableCell

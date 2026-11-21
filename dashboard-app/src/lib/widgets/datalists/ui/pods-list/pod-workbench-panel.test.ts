@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { setDashboardDataProfile } from "$shared/lib/dashboard-data-profile.svelte";
 import PodWorkbenchPanel from "./pod-workbench-panel.svelte";
 import { getPodsWorkbenchStateKey } from "./workbench-session";
+import { kubectlRawArgsFront, kubectlStreamArgsFront } from "$shared/api/kubectl-proxy";
 
 const toast = vi.hoisted(() => vi.fn());
 vi.mock("svelte-sonner", () => ({ toast }));
@@ -276,5 +277,74 @@ describe("PodWorkbenchPanel", () => {
 
     await waitFor(() => expect(view.getByText("Pod logs: prod/api-0")).toBeInTheDocument());
     expect(view.getAllByRole("button", { name: "Close api-0 tab" })).toHaveLength(1);
+  });
+
+  it("a one-shot read that returns late does not overwrite the running stream", async () => {
+    const rawMock = vi.mocked(kubectlRawArgsFront);
+    const streamMock = vi.mocked(kubectlStreamArgsFront);
+    const defaultRaw = rawMock.getMockImplementation();
+    let releasePrevious: (value: { output: string; errors: string; code: number }) => void = () =>
+      undefined;
+    rawMock.mockImplementation(async (args: string[]) => {
+      if (args.includes("--previous")) {
+        // The Previous read hangs until the stream is already running.
+        return new Promise((resolve) => {
+          releasePrevious = resolve;
+        });
+      }
+      return { output: "", errors: "", code: 0 };
+    });
+    let streamHandlers: { onStdoutData?: (chunk: string) => void } = {};
+    streamMock.mockImplementation(async (_args, _options, handlers) => {
+      streamHandlers = handlers ?? {};
+      return { child: {}, stop: async () => undefined } as never;
+    });
+
+    const { getByTestId, queryByText, findByText } = render(PodWorkbenchPanel, {
+      props: {
+        clusterId: "cluster-1",
+        podsByUid: new Map([
+          [
+            "uid-1",
+            {
+              metadata: { uid: "uid-1", name: "api-0", namespace: "prod" },
+              spec: { containers: [{ name: "api" }] },
+              status: {
+                phase: "Running",
+                containerStatuses: [
+                  {
+                    name: "api",
+                    ready: true,
+                    restartCount: 1,
+                    state: { running: { startedAt: "2026-11-21T10:00:00Z" } },
+                    lastState: { terminated: { exitCode: 1, message: "", reason: "Error" } },
+                  },
+                ],
+              },
+            } as unknown as import("$shared/model/clusters").PodItem,
+          ],
+        ]),
+        metricsByKey: new Map(),
+        metricsError: null,
+        request: { token: 1, kind: "logs", podUid: "uid-1", logsPrevious: true },
+      },
+    });
+
+    // Previous is on and its read is in flight; turning it off starts the live stream.
+    await waitFor(() => expect(getByTestId("logs-previous-toggle")).toHaveTextContent("On"));
+    await fireEvent.click(getByTestId("logs-previous-toggle"));
+    await waitFor(() => expect(streamHandlers.onStdoutData).toBeTypeOf("function"));
+    streamHandlers.onStdoutData?.("2026-11-21T10:00:01Z live-1\n2026-11-21T10:00:02Z live-2\n");
+    await findByText(/live-2/);
+
+    releasePrevious({ output: "2026-11-21T09:00:00Z old-instance\n", errors: "", code: 0 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(queryByText(/old-instance/)).not.toBeInTheDocument();
+    expect(queryByText(/live-1/)).toBeInTheDocument();
+
+    if (defaultRaw) rawMock.mockImplementation(defaultRaw);
+    streamMock.mockImplementation(
+      async () => ({ child: {}, stop: async () => undefined }) as never,
+    );
   });
 });
