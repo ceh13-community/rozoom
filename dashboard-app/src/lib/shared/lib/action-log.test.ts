@@ -91,6 +91,37 @@ describe("values of flags the log does not know", () => {
     expect(text).not.toContain("hunter2");
   });
 
+  it("does not log a flag value that starts with a dash", () => {
+    const text = summarizeKubectlMutation([
+      "create",
+      "secret",
+      "generic",
+      "db",
+      "--docker-password",
+      "-s3cret",
+      "-n",
+      "shop",
+    ]).text;
+    expect(text).toBe("create secret generic db -n shop --docker-password");
+    expect(text).not.toContain("s3cret");
+  });
+
+  it("logs nothing after --, only that a command followed", () => {
+    const text = summarizeKubectlMutation([
+      "debug",
+      "node/minikube",
+      "-n",
+      "default",
+      "--image=busybox",
+      "--",
+      "sh",
+      "-c",
+      "echo TOKEN=s3cret > /host/tmp/x",
+    ]).text;
+    expect(text).toBe("debug node minikube -n default --image -- ...");
+    expect(text).not.toContain("s3cret");
+  });
+
   it("does not take a flag value for a kind or a name", () => {
     expect(summarizeKubectlMutation(["delete", "--cascade", "orphan", "deploy", "web"]).text).toBe(
       "delete deployment web --cascade=orphan",

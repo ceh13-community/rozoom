@@ -121,15 +121,21 @@ export function summarizeKubectlMutation(args: readonly string[]): KubectlMutati
 
   for (; index < args.length; index += 1) {
     const arg = args[index] ?? "";
+    // Everything after "--" is a command for the container (`debug ... -- sh -c ...`):
+    // only its presence is logged.
+    if (arg === "--") {
+      flags.push("-- ...");
+      break;
+    }
     if (arg.startsWith("-")) {
       const equals = arg.indexOf("=");
       const flag = equals === -1 ? arg : arg.slice(0, equals);
       let value: string | null = equals === -1 ? null : arg.slice(equals + 1);
-      const hasNext = index + 1 < args.length;
-      const next = hasNext ? (args[index + 1] ?? "") : "";
-      if (value === null && !BOOLEAN_FLAGS.has(flag) && hasNext && !next.startsWith("-")) {
+      // The next argument is the value of any flag that is not a known boolean, whatever
+      // it starts with: `--password -s3cret` must not log `-s3cret` as a flag.
+      if (value === null && !BOOLEAN_FLAGS.has(flag) && index + 1 < args.length) {
         index += 1;
-        value = next;
+        value = args[index] ?? "";
       }
       if (flag === "-n" || flag === "--namespace") {
         namespace = value;
