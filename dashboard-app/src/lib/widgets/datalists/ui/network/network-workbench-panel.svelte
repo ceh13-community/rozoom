@@ -1,41 +1,43 @@
 <script lang="ts">
   import { popOutPortForwardPreview, withRefreshNonce } from "$shared/lib/port-forward-preview";
+  import { requestPortForwardStartMode } from "$shared/lib/port-forward-start-mode";
   import { confirmAction } from "$shared/lib/confirm-action";
   import { isTauriAvailable } from "$shared/lib/tauri-runtime";
   import {
     activePortForwards,
     startPortForward,
     stopPortForward,
-    usedLocalPorts,
+    type PortForwardProcess,
   } from "$shared/api/port-forward";
+  import PortForwardBrowserTab from "../common/port-forward-browser-tab.svelte";
   import WorkbenchPanelSurface from "$shared/ui/workbench-panel-surface.svelte";
-  import PortForwardBrowserTab from "./port-forward-browser-tab.svelte";
-  import PortForwardDialog, { type PortForwardChoice } from "./port-forward-dialog.svelte";
   import {
-    portForwardKey,
-    portForwardResource,
-    type PortForwardTarget,
-  } from "./model/port-forward-target";
+    getRandomLocalPort,
+    requestLocalPort,
+    resolveServicePortForwardTarget,
+  } from "./model/service-port-forward";
 
-  // One port-forward flow for Services and Pods: the dialog picks the ports, then the panel
-  // shows the forward with Copy URL, Open Web, Open external, Stop and Refresh.
-  export type PortForwardPanelRequest = { token: number; target: PortForwardTarget } | null;
+  export type NetworkWorkbenchOpenRequest =
+    | {
+        token: number;
+        kind: "service-port-forward";
+        rowUid: string;
+      }
+    | null;
 
   interface Props {
     clusterId: string;
-    request: PortForwardPanelRequest;
+    rowsByUid: Map<string, Record<string, unknown>>;
+    request: NetworkWorkbenchOpenRequest;
     onMessage: (message: string) => void;
     onError: (message: string) => void;
   }
 
-  let { clusterId, request, onMessage, onError }: Props = $props();
+  let { clusterId, rowsByUid, request, onMessage, onError }: Props = $props();
 
-  let pendingTarget = $state<PortForwardTarget | null>(null);
-  let dialogOpen = $state(false);
-  let dialogUsedPorts = $state<ReadonlySet<number>>(new Set());
   let currentKey = $state<string | null>(null);
   let currentUrl = $state("about:blank");
-  let currentTitle = $state("Port-forward");
+  let currentTitle = $state("Service web preview");
   let currentMessage = $state<string | null>(null);
   let currentLoading = $state(false);
   let currentStopping = $state(false);
@@ -51,8 +53,8 @@
     open = false;
   }
 
-  function targetLabel(target: PortForwardTarget) {
-    return `${target.namespace}/${target.name}`;
+  function buildUrl(scheme: "http" | "https", localPort: number) {
+    return `${scheme}://127.0.0.1:${localPort}`;
   }
 
   async function stopCurrentForward() {
@@ -69,11 +71,12 @@
     try {
       await stopPortForward(currentKey);
       currentMessage = "Port-forward stopped.";
-      onMessage("Stopped port-forward.");
+      onMessage("Stopped service port-forward.");
       currentKey = null;
       closePanel();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to stop port-forward.";
+      const message =
+        error instanceof Error ? error.message : "Failed to stop service port-forward.";
       currentMessage = message;
       onError(message);
     } finally {
@@ -82,36 +85,45 @@
     }
   }
 
-  function askForPorts(target: PortForwardTarget) {
+  async function openServicePortForward(rowUid: string) {
     if (!isTauriAvailable()) {
-      const message = "Port-forward is available only in the desktop app.";
+      const message = "Service web tooling is available only in the desktop runtime.";
       currentLoading = false;
       currentMessage = message;
       open = true;
       onError(message);
       return;
     }
-    pendingTarget = target;
-    dialogUsedPorts = usedLocalPorts();
-    dialogOpen = true;
-  }
+    const raw = rowsByUid.get(rowUid);
+    if (!raw) return;
+    const metadata = (raw.metadata ?? {}) as { name?: string; namespace?: string };
+    const name = metadata.name ?? "unknown";
+    const namespace = metadata.namespace ?? "default";
+    const { remotePort, scheme } = resolveServicePortForwardTarget(raw);
+    const startMode = requestPortForwardStartMode(remotePort);
+    if (!startMode) return;
 
-  async function startForward(target: PortForwardTarget, choice: PortForwardChoice) {
-    const { remotePort, localPort, scheme, openWeb } = choice;
-    const uniqueKey = portForwardKey(clusterId, target, localPort, remotePort);
-    const url = `${scheme}://127.0.0.1:${localPort}`;
+    const localPort = requestLocalPort(remotePort);
+    if (!localPort) {
+      onError("Invalid local port. Use integer 1-65535.");
+      return;
+    }
+
+    const resource = `svc/${name}`;
+    const uniqueKey = `${clusterId}:${namespace}:${resource}:${localPort}:${remotePort}`;
+    const url = buildUrl(scheme, localPort);
 
     currentKey = uniqueKey;
     currentUrl = url;
-    currentTitle = `Web ${target.name}`;
+    currentTitle = `Web ${name}`;
     currentMessage = "Starting port-forward...";
     currentLoading = true;
     currentStopping = false;
     open = true;
 
     const started = await startPortForward({
-      namespace: target.namespace,
-      resource: portForwardResource(target),
+      namespace,
+      resource,
       remotePort,
       localPort,
       clusterId,
@@ -127,14 +139,18 @@
 
     currentLoading = false;
     currentMessage = `Forwarding ${localPort}:${remotePort}`;
-    onMessage(`Port-forward ready for ${targetLabel(target)}.`);
-    if (openWeb) void popOutPortForwardPreview(url);
+    onMessage(`Service web preview ready for ${namespace}/${name}.`);
+    if (startMode === "start-and-open") {
+      void popOutPortForwardPreview(url);
+    }
   }
 
   $effect(() => {
     if (!request || request.token === lastHandledToken) return;
     lastHandledToken = request.token;
-    askForPorts(request.target);
+    if (request.kind === "service-port-forward") {
+      void openServicePortForward(request.rowUid);
+    }
   });
 
   $effect(() => {
@@ -144,33 +160,14 @@
   });
 </script>
 
-<PortForwardDialog
-  open={dialogOpen}
-  target={pendingTarget}
-  usedLocalPorts={dialogUsedPorts}
-  onCancel={() => {
-    dialogOpen = false;
-    pendingTarget = null;
-  }}
-  onConfirm={(choice) => {
-    const target = pendingTarget;
-    dialogOpen = false;
-    pendingTarget = null;
-    if (target) void startForward(target, choice);
-  }}
-/>
-
 {#if open}
   <button
     type="button"
     class="fixed inset-0 z-[140] bg-black/20"
-    aria-label="Close port-forward panel"
+    aria-label="Close network workbench"
     onclick={closePanel}
   ></button>
-  <aside
-    class="fixed inset-y-0 right-0 z-[150] w-full border-l bg-background shadow-lg sm:max-w-[56rem]"
-    data-testid="port-forward-panel"
-  >
+  <aside class="fixed inset-y-0 right-0 z-[150] w-full border-l bg-background shadow-lg sm:max-w-[56rem]">
     <div class="flex h-full min-h-0 flex-col">
       <PortForwardBrowserTab
         title={currentTitle}
@@ -183,7 +180,7 @@
         onCopyUrl={() => {
           if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) return;
           void navigator.clipboard.writeText(currentUrl);
-          onMessage("Copied the port-forward URL.");
+          onMessage("Copied service preview URL.");
         }}
         onOpenPreview={() => {
           void popOutPortForwardPreview(currentUrl);
@@ -198,7 +195,7 @@
         stopLabel="Stopping..."
       />
       <WorkbenchPanelSurface>
-        Running forwards are also listed in Network &gt; Port Forwarding.
+        Service-oriented web tooling runs in this separate boundary so the base network table stays cheap.
       </WorkbenchPanelSurface>
     </div>
   </aside>

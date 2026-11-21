@@ -4,6 +4,7 @@
   import PodEventsSheet from "./pod-events-sheet.svelte";
   import ResourceLogsSheet from "../common/resource-logs-sheet.svelte";
   import ResourceYamlSheet from "../common/resource-yaml-sheet.svelte";
+  import PortForwardBrowserTab from "../common/port-forward-browser-tab.svelte";
 
   type LogBookmark = {
     id: string;
@@ -51,6 +52,16 @@
         eventsLoading: boolean;
         eventsError: string | null;
         focusedEventIndex: number | null;
+      }
+    | {
+        kind: "port-forward";
+        id: string;
+        podRef: string;
+        podUid: string;
+        url: string;
+        message: string | null;
+        loading: boolean;
+        stopping: boolean;
       };
 
   interface Props {
@@ -80,6 +91,13 @@
     startFollowStreamForTab: (tabId: string) => Promise<void>;
     stopLogsRuntime: (tabId: string) => void;
     onLogsJumpHandled: () => void;
+    portForwardActions?: {
+      copyUrl: (tabId: string) => void;
+      openWeb: (tabId: string) => void;
+      openExternal: (tabId: string) => void;
+      refresh: (tabId: string) => void;
+      stop: (tabId: string) => void;
+    };
   }
 
   let {
@@ -103,6 +121,7 @@
     startFollowStreamForTab,
     stopLogsRuntime,
     onLogsJumpHandled,
+    portForwardActions,
   }: Props = $props();
 </script>
 
@@ -206,6 +225,21 @@
     onSave={() => {
       void saveYamlTab(paneTab.id);
     }}
+  />
+{:else if paneTab.kind === "port-forward"}
+  <!-- Same panel as a Service port-forward tab: Copy URL, Open Web, Open external, Stop. -->
+  <PortForwardBrowserTab
+    title={`Web ${paneTab.podRef}`}
+    url={paneTab.url}
+    loading={paneTab.loading}
+    message={paneTab.message}
+    onRefresh={() => portForwardActions?.refresh(paneTab.id)}
+    onCopyUrl={() => portForwardActions?.copyUrl(paneTab.id)}
+    onOpenPreview={() => portForwardActions?.openWeb(paneTab.id)}
+    onOpenExternal={() => portForwardActions?.openExternal(paneTab.id)}
+    onStop={() => portForwardActions?.stop(paneTab.id)}
+    stopBusy={paneTab.stopping}
+    stopLabel="Stopping..."
   />
 {:else}
   <PodEventsSheet
