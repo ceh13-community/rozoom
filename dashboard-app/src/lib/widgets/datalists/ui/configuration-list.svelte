@@ -142,7 +142,6 @@
   import Bug from "@lucide/svelte/icons/bug";
   import { createMutationReconcile } from "./common/workload-mutation-reconcile";
   import TableToolbarShell from "./table-toolbar-shell.svelte";
-  import GroupsToggleButton from "./groups-toggle-button.svelte";
   import WatcherToolbarControls from "./watcher-toolbar-controls.svelte";
   import {
     announceWorkbenchTabClosed,
@@ -5218,12 +5217,6 @@ spec:
         onWatcherRefreshSecondsChange={setWatcherRefresh}
         onResetWatcherSettings={resetWatcherSettings}
       />
-      <!-- Always laid out, hidden in the flat view (see GroupsToggleButton). -->
-      <GroupsToggleButton
-        visible={hasGroupedRows}
-        label={getGroupCollapseToggleLabel(collapsedGroups, groupKeys)}
-        onclick={toggleAllGroups}
-      />
     {/snippet}
   </TableToolbarShell>
 
@@ -5794,6 +5787,19 @@ spec:
             </Table.TableRow>
           {/if}
         {:else}
+          <!-- In the table, not the toolbar (see the Pods list): the toolbar keeps its size. -->
+          <Table.TableRow>
+            <Table.TableCell colspan={2 + visibleDataColumnCount} class="py-1 text-right">
+              <button
+                type="button"
+                class="text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
+                data-testid="groups-toggle"
+                onclick={toggleAllGroups}
+              >
+                {getGroupCollapseToggleLabel(collapsedGroups, groupKeys)}
+              </button>
+            </Table.TableCell>
+          </Table.TableRow>
           {#each groupedRows as [group] (`namespace:${group}`)}
             <Table.TableRow class="bg-muted/40">
               <Table.TableCell
