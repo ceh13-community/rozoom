@@ -207,6 +207,7 @@ fn main() {
             install_kind::linux_package_kind
         ])
         .on_menu_event(|app, event| support_logs::handle_menu_event(app, event))
+        .on_page_load(|webview, _payload| support_logs::drop_menu_from_preview(webview))
         .setup(move |app| {
             // Native menu survives a dead renderer: the only path to the logs
             // after a hard crash (spec update-2-crash-log-path.md, path B).

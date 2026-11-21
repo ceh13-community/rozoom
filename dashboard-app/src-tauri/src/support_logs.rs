@@ -145,6 +145,30 @@ pub fn install_help_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     Ok(())
 }
 
+/// Label prefix of the in-app preview windows (shared/api/in-app-browser.ts): pages of
+/// port-forwards and links opened inside the app.
+pub const IN_APP_WINDOW_PREFIX: &str = "inapp-";
+
+/// Whether a window shows the app's Help menu. New windows inherit the app-wide menu on
+/// Linux and Windows, so a port-forward page got a Help bar whose items act on the main
+/// window, not on the page shown.
+pub fn keeps_app_menu(label: &str) -> bool {
+    !label.starts_with(IN_APP_WINDOW_PREFIX)
+}
+
+/// Page-load hook: drops the inherited Help menu from in-app preview windows. Runs on
+/// every load; after the first one the window has no menu left and this does nothing.
+pub fn drop_menu_from_preview<R: Runtime>(webview: &tauri::Webview<R>) {
+    if keeps_app_menu(webview.label()) {
+        return;
+    }
+    // macOS has one app-wide menu bar and nothing to remove per window.
+    #[cfg(not(target_os = "macos"))]
+    if let Err(e) = webview.window().remove_menu() {
+        log::warn!("Menu not removed from {}: {e}", webview.label());
+    }
+}
+
 #[cfg(not(target_os = "macos"))]
 fn about_metadata<R: Runtime>(app: &AppHandle<R>) -> tauri::menu::AboutMetadata<'static> {
     tauri::menu::AboutMetadata {
@@ -199,7 +223,7 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
 
 #[cfg(test)]
 mod tests {
-    use super::{help_action, tail_lines, HelpAction};
+    use super::{help_action, keeps_app_menu, tail_lines, HelpAction};
 
     #[test]
     fn every_help_item_has_an_action() {
@@ -226,6 +250,12 @@ mod tests {
             Some(HelpAction::OpenLogsFolder)
         );
         assert_eq!(help_action("something-else"), None);
+    }
+
+    #[test]
+    fn only_the_main_windows_keep_the_help_menu() {
+        assert!(keeps_app_menu("main"));
+        assert!(!keeps_app_menu("inapp-1795283022620-k3x9qa"));
     }
 
     #[test]
