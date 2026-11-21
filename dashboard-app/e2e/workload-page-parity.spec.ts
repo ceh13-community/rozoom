@@ -119,7 +119,9 @@ test.describe("workload page parity", () => {
     const page = await context.newPage();
     await page.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=nodesstatus`);
 
-    await expect(page.getByText(/^(Cached|Stale cache) ·/i).first()).toBeVisible();
+    // The browser harness never connects a watch: a cached list must not claim Live.
+    await expect(page.getByTestId("list-freshness").first()).toBeVisible();
+    await expect(page.getByTestId("list-freshness").first()).not.toContainText("Live");
     await expect(page.getByText("worker-a")).toBeVisible();
     await page.getByLabel("Open actions for worker-a").first().click();
     await page.getByRole("menuitem", { name: "Edit YAML", exact: true }).click();

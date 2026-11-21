@@ -166,7 +166,7 @@ test("pods: nothing claims a live watcher or an empty cluster, and Retry brings 
   const banner = page.getByTestId("cluster-unreachable-banner");
   await expect(banner).toBeVisible();
   await expect(banner).toContainText("did not answer, so the list is not updated.");
-  await expect(page.getByText("Paused: cluster unreachable")).toBeVisible();
+  await expect(page.getByTestId("list-freshness")).toContainText("Paused");
   await expect(page.getByText("Watcher: Active")).toHaveCount(0);
   await expect(page.getByText("No pods found for the current filter.")).toHaveCount(0);
   await expect(page.getByText(/^Updating/)).toHaveCount(0);

@@ -49,7 +49,12 @@ test.describe("workloads chaos cache fallback", () => {
 
     const page = await context.newPage();
     await page.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=${WORKLOAD}`);
-    await expect(page.getByText(/^(Cached|Stale cache) ·/i).first()).toBeVisible();
+    const freshness = page.getByTestId("list-freshness").first();
+    await expect(freshness).toBeVisible();
+    // The refresh failed and the rows come from the cache: no watch is connected,
+    // so the list says Reconnecting with the time of the cached data, never Live.
+    await expect(freshness).toContainText("Reconnecting");
+    await expect(freshness).not.toContainText("Live");
     await expect(page.getByText(/cached-fallback-config/i)).toBeVisible();
   });
 });

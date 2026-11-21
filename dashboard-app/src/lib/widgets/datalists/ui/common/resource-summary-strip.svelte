@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ListFreshness from "./list-freshness.svelte";
+
   type SummaryItem = {
     label: string;
     value: string | number;
@@ -24,6 +26,8 @@
       {item.label}: <span class={`font-medium ${item.valueClass ?? ""}`}>{item.value}</span>
     </div>
   {/each}
+  <!-- The list's one freshness indicator, from the list that renders this strip. -->
+  <ListFreshness />
   {#if trailingItem}
     <div class={`ml-auto text-xs ${getToneClass(trailingItem)}`}>
       {trailingItem.label}: <span class={`font-medium ${trailingItem.valueClass ?? ""}`}>{trailingItem.value}</span>

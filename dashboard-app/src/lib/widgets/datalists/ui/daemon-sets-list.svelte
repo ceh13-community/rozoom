@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
   import DetailsSheetPortal from "$shared/ui/details-sheet-portal.svelte";
@@ -2536,6 +2537,27 @@
     destroyDaemonSetsSync(data.slug);
     resetDaemonSetsSyncStatus(data.slug);
   });
+
+  // One freshness indicator for the page, shown in the summary strip; the toolbar's
+  // watcher controls read the sync mode from here.
+  const listStreamLive = watchStreamLive("daemonset", () => data?.slug);
+  provideListFreshness({
+    get state() {
+      return daemonSetsRuntimeSourceState;
+    },
+    get mode() {
+      return watcherPolicy.mode;
+    },
+    get updatedAt() {
+      return lastWatcherSuccessAt;
+    },
+    get streamLive() {
+      return listStreamLive.current;
+    },
+    get watcherEnabled() {
+      return watcherEnabled;
+    },
+  });
 </script>
 
 <svelte:window onkeydown={handleWindowKeydown} />
@@ -3254,12 +3276,7 @@
 {/if}
 
 <ResourceSummaryStrip
-  items={[
-    { label: "Cluster", value: resolvePageClusterName(data), tone: "foreground" },
-    { label: "Namespace", value: daemonSetsNamespaceSummary },
-    { label: "Daemon Sets", value: rows.length },
-    { label: "Sync", value: daemonSetsRuntimeSourceState },
-  ]}
+  items={[{ label: "Daemon Sets", value: rows.length }]}
   trailingItem={{
     label: "View",
     value: daemonSetsSummaryView,

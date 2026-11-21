@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { provideListFreshness, watchStreamLive } from "../common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "../common/realtime-expand.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
   import { onDestroy, onMount } from "svelte";
@@ -1356,6 +1357,27 @@
       isDeleting: (uid) => deletingNodeIds.has(uid),
     }),
   );
+
+  // One freshness indicator for the page, shown in the summary strip; the toolbar's
+  // watcher controls read the sync mode from here.
+  const listStreamLive = watchStreamLive("node", () => data?.slug);
+  provideListFreshness({
+    get state() {
+      return nodesRuntimeSourceState;
+    },
+    get mode() {
+      return watcherEnabled ? nodesResourceSyncPolicy.mode : "manual";
+    },
+    get updatedAt() {
+      return $clusterHealth.lastUpdatedAt;
+    },
+    get streamLive() {
+      return listStreamLive.current;
+    },
+    get watcherEnabled() {
+      return watcherEnabled;
+    },
+  });
 </script>
 
 {#if allNodeData.length}
@@ -1621,13 +1643,7 @@
     </div>
   {/if}
 
-  <ResourceSummaryStrip
-    items={[
-      { label: "Cluster", value: resolvePageClusterName(data), tone: "foreground" },
-      { label: "Nodes", value: allNodeData.length },
-      { label: "Sync", value: nodesRuntimeSourceState },
-    ]}
-  />
+  <ResourceSummaryStrip items={[{ label: "Nodes", value: allNodeData.length }]} />
 
   <div class="mb-4">
     <SectionRuntimeStatus

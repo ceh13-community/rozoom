@@ -117,8 +117,6 @@
       <div class="mt-2 text-xs text-muted-foreground">{reason}</div>
     {/if}
   </div>
-{:else}
-  <div class="flex items-center gap-2 px-1 py-1">
-    <Badge class={sourceTone(sourceState)}>{sourceLabel(sourceState)}</Badge>
-  </div>
 {/if}
+<!-- Without diagnostics the state shows once, in the list's summary strip (or the page
+     header on pages without one): no separate row with a Live badge. -->

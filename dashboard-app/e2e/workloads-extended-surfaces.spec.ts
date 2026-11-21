@@ -98,7 +98,9 @@ for (const scenario of cases) {
     const page = await context.newPage();
     await page.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=${scenario.workload}`);
 
-    await expect(page.getByText(/^(Cached|Stale cache) ·/i).first()).toBeVisible();
+    // The browser harness never connects a watch: a cached list must not claim Live.
+    await expect(page.getByTestId("list-freshness").first()).toBeVisible();
+    await expect(page.getByTestId("list-freshness").first()).not.toContainText("Live");
     await expect(page.getByText(scenario.rowName, { exact: true })).toBeVisible({
       timeout: 15_000,
     });

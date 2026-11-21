@@ -74,7 +74,8 @@ describe("cluster page workspace VSO contract", () => {
       'setPaneCluster("pane-3", (event.currentTarget as HTMLSelectElement).value)',
     );
     expect(source).toContain("clusterId={pane.clusterId || cluster}");
-    expect(source).toContain("syncBadgeTone(pane.workload, pane.clusterId || cluster)");
+    // Each pane's list shows its own freshness; the pane header does not repeat it.
+    expect(source).not.toContain("Sync: {syncBadgeText(");
   });
 
   it("resets non-pinned pages to single-pane only on external navigation", () => {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
   import DetailsSheetPortal from "$shared/ui/details-sheet-portal.svelte";
@@ -3080,6 +3081,27 @@
     destroyDeploymentsSync(data.slug);
     resetDeploymentsSyncStatus(data.slug);
   });
+
+  // One freshness indicator for the page, shown in the summary strip; the toolbar's
+  // watcher controls read the sync mode from here.
+  const listStreamLive = watchStreamLive("deployment", () => data?.slug);
+  provideListFreshness({
+    get state() {
+      return deploymentsRuntimeSourceState;
+    },
+    get mode() {
+      return watcherPolicy.mode;
+    },
+    get updatedAt() {
+      return lastWatcherSuccessAt;
+    },
+    get streamLive() {
+      return listStreamLive.current;
+    },
+    get watcherEnabled() {
+      return watcherEnabled;
+    },
+  });
 </script>
 
 <svelte:window onkeydown={handleWindowKeydown} />
@@ -3829,12 +3851,7 @@
     </WorkloadSelectionBar>
   {/if}
   <ResourceSummaryStrip
-    items={[
-      { label: "Cluster", value: resolvePageClusterName(data), tone: "foreground" },
-      { label: "Namespace", value: deploymentsNamespaceSummary },
-      { label: "Deployments", value: rows.length },
-      { label: "Sync", value: deploymentsRuntimeSourceState },
-    ]}
+    items={[{ label: "Deployments", value: rows.length }]}
     trailingItem={{
       label: "View",
       value: deploymentsSummaryView,
