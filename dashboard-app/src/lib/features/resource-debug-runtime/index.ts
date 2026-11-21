@@ -27,5 +27,6 @@ export {
   NODE_DEBUG_IMAGE,
   parseNodeDebugPodName,
   startNodeDebugSession,
+  cleanupOrphanNodeDebugPods,
 } from "./model/node-debug-session";
 export type { NodeDebugSessionTarget } from "./model/node-debug-session";

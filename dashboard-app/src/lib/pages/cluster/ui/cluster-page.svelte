@@ -37,6 +37,7 @@
     findClusterByUuid,
   } from "$features/cluster-manager/";
   import { openShellModal, shellModalState } from "$features/shell";
+  import { cleanupOrphanNodeDebugPods } from "$features/resource-debug-runtime";
   // import { useWorkloads } from "$features/workloads-management";
   import {
     EMPTY_NAMESPACE_SELECTION,
@@ -769,6 +770,9 @@
       Sentry.captureException("Cluster not found");
       return;
     }
+
+    // Node shell pods an earlier run left behind (the app was closed or killed).
+    void cleanupOrphanNodeDebugPods(cluster);
 
     // WAU-C Core Action #1: user viewed cluster state. Fire-and-forget; the
     // tracker no-ops unless telemetry is initialised and consented.

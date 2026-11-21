@@ -1141,10 +1141,19 @@
   async function openNodeShell(nodeName: string) {
     if (!data?.slug || nodeShellStarting) return;
     nodeShellStarting = nodeName;
-    actionNotification = notifyInfo(`Starting a debug pod on node ${nodeName}...`);
     try {
-      await startNodeDebugSession({ clusterId: data.slug, nodeName });
-      actionNotification = notifySuccess(`Shell on node ${nodeName} is open.`);
+      const session = await startNodeDebugSession(
+        { clusterId: data.slug, nodeName },
+        {
+          confirm: confirmAction,
+          onProgress: (message) => {
+            actionNotification = notifyInfo(message);
+          },
+        },
+      );
+      actionNotification = session
+        ? notifySuccess(`Shell on node ${nodeName} is open.`)
+        : notifyInfo(`Shell on node ${nodeName} was not started.`);
     } catch (error) {
       actionNotification = notifyError(
         error instanceof Error ? error.message : `Failed to open a shell on node ${nodeName}.`,
