@@ -44,6 +44,7 @@
     type JobsTableViewMode,
   } from "./jobs-list/data-table.svelte";
   import {
+    applyResumeArgs,
     createStreamChunkMerger,
     resumeSinceArg,
   } from "./common/log-stream-merge";
@@ -873,9 +874,8 @@
     // A fresh stream repeats the --tail the first load showed, so its first chunk
     // replaces the text. A reconnect resumes with --since and appends without the
     // overlap, keeping the text above and the reader's place.
-    const resume = Boolean(options.resume && tab.logsText);
-    const mergeChunk = createStreamChunkMerger({ resume });
-    const sinceArg = resume ? resumeSinceArg(tab.logsUpdatedAt) : null;
+    const sinceArg = options.resume ? resumeSinceArg(tab.logsText, tab.logsUpdatedAt) : null;
+    const mergeChunk = createStreamChunkMerger({ resume: sinceArg !== null });
     await stopStreamForTab(tabId, false);
     updateLogsTab(tabId, (current) => ({ ...current, logsLoading: true, logsError: null }));
     const args = [
@@ -891,7 +891,7 @@
       "-f",
     ];
     if (tab.logsPrevious) args.push("--previous");
-    if (sinceArg) args.push(sinceArg);
+    applyResumeArgs(args, sinceArg);
     if (tab.logsSelectedContainer !== "all-containers") args.push("-c", tab.logsSelectedContainer);
     try {
       const process = await openStreamWithOptionalFallback(() =>

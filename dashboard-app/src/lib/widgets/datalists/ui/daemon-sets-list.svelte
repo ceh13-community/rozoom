@@ -57,6 +57,7 @@
   import * as Alert from "$shared/ui/alert";
   import { getTimeDifference, type DaemonSetItem } from "$shared";
   import {
+    applyResumeArgs,
     createStreamChunkMerger,
     resumeSinceArg,
   } from "./common/log-stream-merge";
@@ -933,9 +934,8 @@
     // A fresh stream repeats the --tail the first load showed, so its first chunk
     // replaces the text. A reconnect resumes with --since and appends without the
     // overlap, keeping the text above and the reader's place.
-    const resume = Boolean(options.resume && tab.logsText);
-    const mergeChunk = createStreamChunkMerger({ resume });
-    const sinceArg = resume ? resumeSinceArg(tab.logsUpdatedAt) : null;
+    const sinceArg = options.resume ? resumeSinceArg(tab.logsText, tab.logsUpdatedAt) : null;
+    const mergeChunk = createStreamChunkMerger({ resume: sinceArg !== null });
     await stopStreamForTab(tabId, false);
     updateLogsTab(tabId, (current) => ({ ...current, logsLoading: true, logsError: null }));
     const args = [
@@ -944,13 +944,14 @@
       "--namespace",
       tab.target.namespace,
       "--all-containers=true",
+      "--timestamps=true",
       "--tail=500",
       // No request timeout flag here: it bounds the whole request, so a follow stream
       // was cut every 8 s and reconnected.
       "--follow",
     ];
     if (tab.logsPrevious) args.push("--previous");
-    if (sinceArg) args.push(sinceArg);
+    applyResumeArgs(args, sinceArg);
     if (tab.logsSelectedContainer !== "__all__") {
       args.push("-c", tab.logsSelectedContainer);
     }
@@ -1481,6 +1482,7 @@
       "--namespace",
       tab.target.namespace,
       "--all-containers=true",
+      "--timestamps=true",
       "--tail=500",
       "--request-timeout=8s",
     ];

@@ -52,12 +52,17 @@ describe("workload logs defaults", () => {
       expect(source).toContain('logsMode: "stream-f",');
       expect(source).not.toContain('logsMode: "poll",');
       // Every stream chunk goes through the merger, which trims to LOG_TEXT_MAX_CHARS.
-      expect(source).toContain("const mergeChunk = createStreamChunkMerger({ resume });");
+      expect(source).toContain(
+        "const mergeChunk = createStreamChunkMerger({ resume: sinceArg !== null });",
+      );
       expect(source).toContain("logsText: mergeChunk(current.logsText, chunk),");
       expect(source).not.toMatch(/logsText: `\$\{current\.logsText\}\$\{chunk\}`/);
       // A reconnect resumes with --since instead of replacing the text.
       expect(source).toContain("void startFollowStreamForTab(tabId, { resume: true });");
-      expect(source).toContain("if (sinceArg) args.push(sinceArg);");
+      expect(source).toContain("applyResumeArgs(args, sinceArg);");
+      expect(source).toContain(
+        "options.resume ? resumeSinceArg(tab.logsText, tab.logsUpdatedAt) : null",
+      );
       // A follow stream must not carry a request timeout: it cuts the stream.
       const streamStart = source.indexOf("async function startFollowStreamForTab(");
       const streamBody = source.slice(streamStart, source.indexOf("onStdoutData", streamStart));
