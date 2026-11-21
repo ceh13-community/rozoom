@@ -10,13 +10,13 @@ The release build fails if the section for the released version is missing.
 
 ## [0.26.5] - 2026-11-21
 
-Cluster lists update live again. In the desktop app the Kubernetes watch never
+Cluster lists now update live. In the desktop app the Kubernetes watch never
 worked, so lists fell back to a kubectl watch whose events all went to Pods:
 Services, Deployments and other lists jumped, showed Stale while the data was
 current, and Pods switched CPU and Memory to Loading every 30 seconds. Pod and
 workload changes such as Terminating, Pending or a new Ready count now show up
-within two seconds. Workload logs open as a live stream, keep the line you are
-reading in place, and continue after a dropped connection without reloading or
+as they happen. Workload logs open as a live stream, keep the line you are
+reading in place, and continue after a short dropped connection without
 repeating lines. On Linux (.deb, .rpm) download the new package from the
 release page and install it the way you installed this one. We recommend this
 update.
@@ -46,8 +46,8 @@ update.
   break longer than five minutes starts a fresh stream.
 - DaemonSet logs no longer reconnect every 8 seconds, and they show timestamps
   like the other workload logs.
-- Workload log text is capped at about one million characters, so a noisy pod
-  cannot freeze the window.
+- Workload log text is capped at about one million characters, which keeps
+  memory bounded.
 - Each API request has its own cancel signal, so long sessions do not pile up
   listeners.
 
