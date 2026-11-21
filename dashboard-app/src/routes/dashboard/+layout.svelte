@@ -18,6 +18,12 @@
   import { probeRoute } from "$shared/lib/main-pane-state";
   import { keepScrollInRange } from "$shared/lib/scroll-position";
   import { stopAllBackgroundPollers } from "$shared/lib/background-pollers";
+  import { confirmAction } from "$shared/lib/confirm-action";
+  import {
+    describeUnsavedWork,
+    listUnsavedWork,
+    navigationLeavesList,
+  } from "$shared/lib/unsaved-work";
   import { initNetworkRecoveryListener } from "$shared/lib/network-recovery";
   import { startFleetHeartbeat } from "$features/check-health/api/fleet-heartbeat";
   import {
@@ -115,7 +121,30 @@
     }
   });
 
-  beforeNavigate(() => {
+  // Set while the navigation the user agreed to (leaving unsaved YAML) runs again.
+  let leaveApproved = false;
+
+  beforeNavigate((navigation) => {
+    if (leaveApproved) {
+      leaveApproved = false;
+    } else if (
+      !navigation.willUnload &&
+      navigation.to &&
+      navigationLeavesList(navigation.from?.url, navigation.to.url)
+    ) {
+      const unsaved = listUnsavedWork();
+      if (unsaved.length > 0) {
+        // The question is asynchronous: cancel now, go on if the user agrees.
+        navigation.cancel();
+        const target = navigation.to.url;
+        void confirmAction(describeUnsavedWork(unsaved), "Unsaved changes").then((confirmed) => {
+          if (!confirmed) return;
+          leaveApproved = true;
+          void goto(target);
+        });
+        return;
+      }
+    }
     stopAllBackgroundPollers();
   });
 

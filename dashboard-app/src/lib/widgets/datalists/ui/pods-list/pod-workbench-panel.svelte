@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { registerUnsavedWork } from "$shared/lib/unsaved-work";
   import { expandWorkbenchOnRealtimeSwitch } from "../common/realtime-expand.svelte";
   import { onDestroy, onMount, tick, untrack } from "svelte";
   import { writable } from "svelte/store";
@@ -47,6 +48,7 @@
   } from "./workbench-session";
   import {
     announceWorkbenchTabClosed,
+    confirmDiscardYamlEdits,
     confirmWorkbenchTabClose,
     hasUnsavedYaml,
     isSameClosedTab,
@@ -980,7 +982,12 @@
 
   async function openYamlForPod(pod: Partial<PodItem>) {
     const tabId = getTabId("yaml", pod);
-    if (!yamlTabs.some((tab) => tab.id === tabId)) {
+    const existing = yamlTabs.find((tab) => tab.id === tabId);
+    // A tab with unsaved edits is only shown again: loading the YAML would drop the edits.
+    const keepEdits = hasUnsavedYaml(
+      existing ? { yamlText: existing.yamlText, yamlOriginalText: existing.originalYamlText } : null,
+    );
+    if (!existing) {
       yamlTabs = [
         ...yamlTabs,
         {
@@ -1008,6 +1015,11 @@
         pod.metadata?.uid ??
         `${pod.metadata?.namespace ?? "default"}/${pod.metadata?.name ?? "unknown"}`,
     });
+    if (keepEdits) return;
+    await loadPodYaml(tabId, pod);
+  }
+
+  async function loadPodYaml(tabId: string, pod: Partial<PodItem>) {
     try {
       const yaml = await readPodYaml(pod);
       updateYamlTab(tabId, {
@@ -1023,6 +1035,19 @@
       });
       onError(error instanceof Error ? error.message : "Failed to load pod YAML.");
     }
+  }
+
+  /** Refresh and Reload from cluster: the YAML again, after asking when the tab has edits. */
+  async function reloadYamlTab(tabId: string, pod: Partial<PodItem>) {
+    const tab = yamlTabs.find((item) => item.id === tabId);
+    if (!tab) return;
+    const confirmed = await confirmDiscardYamlEdits({
+      yamlText: tab.yamlText,
+      yamlOriginalText: tab.originalYamlText,
+    });
+    if (!confirmed) return;
+    updateYamlTab(tabId, { yamlLoading: true, yamlError: null });
+    await loadPodYaml(tabId, pod);
   }
 
   async function openEventsForPod(pod: Partial<PodItem>) {
@@ -1363,6 +1388,17 @@
       stopLogsRuntime(tabId);
     }
   });
+
+  // Leaving the page or the workload drops these tabs: the layout asks first.
+  $effect(() =>
+    registerUnsavedWork(() =>
+      yamlTabs
+        .filter((tab) =>
+          hasUnsavedYaml({ yamlText: tab.yamlText, yamlOriginalText: tab.originalYamlText }),
+        )
+        .map((tab) => `YAML ${tab.podRef}`),
+    ),
+  );
 </script>
 
 {#if hasWorkbenchTabs}
@@ -1474,6 +1510,7 @@
                     {getYamlCompareDiffLines}
                     {getPodForUid}
                     {openYamlForPod}
+                    {reloadYamlTab}
                     {updateLogsTab}
                     {updateYamlTab}
                     {saveYamlTab}
@@ -1528,6 +1565,7 @@
                       {getYamlCompareDiffLines}
                       {getPodForUid}
                       {openYamlForPod}
+                      {reloadYamlTab}
                       {updateLogsTab}
                       {updateYamlTab}
                         {saveYamlTab}

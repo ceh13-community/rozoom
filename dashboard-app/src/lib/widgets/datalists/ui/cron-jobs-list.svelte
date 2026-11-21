@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { registerUnsavedWork } from "$shared/lib/unsaved-work";
   import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
@@ -91,6 +92,7 @@
   import { subscribeUntracked } from "$shared/lib/subscribe-untracked";
   import {
     announceWorkbenchTabClosed,
+    confirmDiscardYamlEdits,
     confirmWorkbenchTabClose,
     hasUnsavedYaml,
     isSameClosedTab,
@@ -1088,6 +1090,7 @@
   async function refreshYamlForTab(tabId: string) {
     const tab = getYamlTab(tabId);
     if (!tab || !data?.slug) return;
+    if (!(await confirmDiscardYamlEdits(tab))) return;
     await detailsActions.runLatest(`yaml:${tabId}`, async ({ signal, isLatest }) => {
       updateYamlTab(tabId, (current) => ({ ...current, yamlLoading: true, yamlError: null }));
       try {
@@ -1162,6 +1165,8 @@
     if (!name) return;
     const tabId = `yaml:${namespace}/${name}`;
     const existing = getYamlTab(tabId);
+    // A tab with unsaved edits is only shown again: loading the YAML would drop the edits.
+    const keepEdits = hasUnsavedYaml(existing);
     if (!existing) {
       yamlTabs = [
         ...yamlTabs,
@@ -1175,12 +1180,13 @@
           yamlOriginalText: "",
         },
       ];
-    } else {
+    } else if (!keepEdits) {
       updateYamlTab(tabId, (current) => ({ ...current, target: { name, namespace }, yamlLoading: true, yamlError: null }));
     }
     upsertWorkbenchTab({ id: tabId, kind: "yaml", title: `YAML ${name}`, subtitle: namespace });
     workbenchCollapsed = false;
     workbenchFullscreen = false;
+    if (keepEdits) return;
     await refreshYamlForTab(tabId);
   }
 
@@ -1967,6 +1973,13 @@
 
   // Row actions reveal the workbench and focus it, as in Pods.
   const workbenchReveal = createWorkbenchReveal();
+
+  // Leaving the page or the workload drops these tabs: the layout asks first.
+  $effect(() =>
+    registerUnsavedWork(() =>
+      yamlTabs.filter((tab) => hasUnsavedYaml(tab)).map((tab) => `YAML ${tab.target.name}`),
+    ),
+  );
 </script>
 
 <div class="grid w-full grid-cols-1 overflow-visible">

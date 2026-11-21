@@ -80,6 +80,7 @@
     getYamlCompareDiffLines: (tabId: string) => number[];
     getPodForUid: (podUid: string) => Partial<PodItem> | null;
     openYamlForPod: (pod: Partial<PodItem>) => Promise<void>;
+    reloadYamlTab: (tabId: string, pod: Partial<PodItem>) => Promise<void>;
     updateLogsTab: (
       tabId: string,
       patch: Partial<Extract<PaneTab, { kind: "logs" }>>,
@@ -115,6 +116,7 @@
     getYamlCompareDiffLines,
     getPodForUid,
     openYamlForPod,
+    reloadYamlTab,
     updateLogsTab,
     updateYamlTab,
     saveYamlTab,
@@ -222,7 +224,11 @@
     }}
     onRefresh={() => {
       const pod = getPodForUid(paneTab.podUid);
-      if (pod) void openYamlForPod(pod);
+      if (pod) void reloadYamlTab(paneTab.id, pod);
+    }}
+    onReloadFromCluster={() => {
+      const pod = getPodForUid(paneTab.podUid);
+      if (pod) void reloadYamlTab(paneTab.id, pod);
     }}
     onSave={() => {
       void saveYamlTab(paneTab.id);

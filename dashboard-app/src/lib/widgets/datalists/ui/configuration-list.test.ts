@@ -13,6 +13,10 @@ vi.mock("$shared/api/kubectl-proxy", () => ({
     .mockResolvedValue({ code: 0, output: "apiVersion: v1\nkind: ConfigMap\n", errors: "" }),
 }));
 
+vi.mock("$shared/ui/yaml-editor.svelte", async () => ({
+  default: (await import("../../../../test/mocks/yaml-editor-stub.svelte")).default,
+}));
+
 vi.mock("$features/shell", () => ({
   openShellModal: vi.fn(),
 }));
@@ -869,6 +873,41 @@ describe("configuration-list", () => {
       expect(queryByText("YAML first")).not.toBeInTheDocument();
     });
     expect(confirmSpy).not.toHaveBeenCalled();
+  });
+
+  it("asks before Refresh replaces edited YAML, and replaces it once the user agrees", async () => {
+    const { getByText, getByRole, getByLabelText } = render(ConfigurationList, {
+      props: {
+        data: {
+          title: "ConfigMaps - Cluster: minikube",
+          slug: "minikube",
+          uuid: "cluster-a",
+          workload: "configmaps",
+          sort_field: null,
+          workloadKey: "configmaps",
+          items: [{ metadata: { name: "first", namespace: "default" }, data: { "a.json": "{}" } }],
+        },
+      },
+    });
+    await fireEvent.click(getByText("first"));
+    await fireEvent.click(getByRole("button", { name: "Edit ConfigMap YAML" }));
+    const editor = () => getByLabelText("YAML editor") as HTMLTextAreaElement;
+    await waitFor(() => expect(editor().value).toContain("kind: ConfigMap"));
+    await fireEvent.input(editor(), { target: { value: "my edit" } });
+
+    vi.mocked(kubectlProxy.kubectlRawArgsFront).mockResolvedValue({
+      code: 0,
+      output: "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: fresh\n",
+      errors: "",
+    });
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    await fireEvent.click(getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(confirmSpy).toHaveBeenCalledTimes(1));
+    expect(editor().value).toBe("my edit");
+
+    confirmSpy.mockReturnValue(true);
+    await fireEvent.click(getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(editor().value).toContain("name: fresh"));
   });
 
   it("keeps tabs from hidden panes open without a dialog when the layout shrinks", async () => {

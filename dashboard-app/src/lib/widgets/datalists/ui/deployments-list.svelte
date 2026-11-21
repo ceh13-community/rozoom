@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { registerUnsavedWork } from "$shared/lib/unsaved-work";
   import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
@@ -119,6 +120,7 @@
   import WorkloadSelectionBar from "./common/workload-selection-bar.svelte";
   import {
     announceWorkbenchTabClosed,
+    confirmDiscardYamlEdits,
     confirmWorkbenchTabClose,
     hasUnsavedYaml,
     isSameClosedTab,
@@ -1196,6 +1198,8 @@
     if (!name) return;
     const nextTabId = `yaml:${namespace}/${name}`;
     const existing = getYamlTab(nextTabId);
+    // A tab with unsaved edits is only shown again: loading the YAML would drop the edits.
+    const keepEdits = hasUnsavedYaml(existing);
     if (!existing) {
       yamlTabs = [
         ...yamlTabs,
@@ -1212,7 +1216,7 @@
           yamlDriftClusterYaml: "",
         },
       ];
-    } else {
+    } else if (!keepEdits) {
       updateYamlTab(nextTabId, (tab) => ({
         ...tab,
         target: { name, namespace },
@@ -1228,6 +1232,12 @@
     });
     workbenchCollapsed = false;
     workbenchFullscreen = false;
+    if (keepEdits) return;
+    await loadDeploymentYaml(nextTabId, name, namespace);
+  }
+
+  async function loadDeploymentYaml(nextTabId: string, name: string, namespace: string) {
+    if (!data?.slug) return;
     try {
       const response = await kubectlRawArgsFront(
         ["get", "deployment", name, "--namespace", namespace, "-o", "yaml"],
@@ -1753,11 +1763,13 @@
     } as unknown as DeploymentItem;
   }
 
-  function refreshYamlForTab(tabId: string) {
+  /** Refresh and Reload from cluster: the YAML again, after asking when the tab has edits. */
+  async function refreshYamlForTab(tabId: string) {
     const tab = getYamlTab(tabId);
     if (!tab) return;
-    const deployment = findDeploymentByTarget(tab.target);
-    if (deployment) void openYamlForDeployment(deployment);
+    if (!(await confirmDiscardYamlEdits(tab))) return;
+    updateYamlTab(tabId, (current) => ({ ...current, yamlLoading: true, yamlError: null }));
+    await loadDeploymentYaml(tabId, tab.target.name, tab.target.namespace);
   }
 
   function stopWatcherTimer() {
@@ -3109,6 +3121,13 @@
 
   // Row actions reveal the workbench and focus it, as in Pods.
   const workbenchReveal = createWorkbenchReveal();
+
+  // Leaving the page or the workload drops these tabs: the layout asks first.
+  $effect(() =>
+    registerUnsavedWork(() =>
+      yamlTabs.filter((tab) => hasUnsavedYaml(tab)).map((tab) => `YAML ${tab.target.name}`),
+    ),
+  );
 </script>
 
 <svelte:window onkeydown={handleWindowKeydown} />
@@ -3341,7 +3360,7 @@
                   }}
                   onRefresh={() => {
                     if (!currentYamlTab) return;
-                    refreshYamlForTab(currentYamlTab.id);
+                    void refreshYamlForTab(currentYamlTab.id);
                   }}
                   onSave={() => {
                     if (!currentYamlTab) return;
@@ -3349,7 +3368,7 @@
                   }}
                   onReloadFromCluster={() => {
                     if (!currentYamlTab) return;
-                    refreshYamlForTab(currentYamlTab.id);
+                    void refreshYamlForTab(currentYamlTab.id);
                   }}
                   onRebaseEdits={() => {
                     if (!currentYamlTab) return;
@@ -3425,13 +3444,13 @@
                               updateYamlTab(paneYamlTab.id, (tab) => ({ ...tab, yamlText: value }));
                             }}
                             onRefresh={() => {
-                              refreshYamlForTab(paneYamlTab.id);
+                              void refreshYamlForTab(paneYamlTab.id);
                             }}
                             onSave={() => {
                               void saveDeploymentYaml(paneYamlTab.id);
                             }}
                             onReloadFromCluster={() => {
-                              refreshYamlForTab(paneYamlTab.id);
+                              void refreshYamlForTab(paneYamlTab.id);
                             }}
                             onRebaseEdits={() => {
                               rebaseDeploymentYamlEdits(paneYamlTab.id);
@@ -3693,13 +3712,13 @@
                                 }));
                               }}
                               onRefresh={() => {
-                                refreshYamlForTab(paneYamlTab.id);
+                                void refreshYamlForTab(paneYamlTab.id);
                               }}
                               onSave={() => {
                                 void saveDeploymentYaml(paneYamlTab.id);
                               }}
                               onReloadFromCluster={() => {
-                                refreshYamlForTab(paneYamlTab.id);
+                                void refreshYamlForTab(paneYamlTab.id);
                               }}
                               onRebaseEdits={() => {
                                 rebaseDeploymentYamlEdits(paneYamlTab.id);

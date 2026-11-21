@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { registerUnsavedWork } from "$shared/lib/unsaved-work";
   import { goto } from "$app/navigation";
   import { revealListFilteredTo } from "$shared/lib/jump-reveal";
   import IngressUrlCell from "./configuration-list/ingress-url-cell.svelte";
@@ -164,6 +165,7 @@
   import WatcherToolbarControls from "./watcher-toolbar-controls.svelte";
   import {
     announceWorkbenchTabClosed,
+    confirmDiscardYamlEdits,
     confirmWorkbenchTabClose,
     hasUnsavedYaml,
     isSameClosedTab,
@@ -3298,6 +3300,7 @@
     if (!clusterId) return;
     const tab = getYamlTab(tabId);
     if (!tab) return;
+    if (!(await confirmDiscardYamlEdits(tab))) return;
     updateYamlTab(tabId, (current) => ({
       ...current,
       yamlLoading: true,
@@ -3340,6 +3343,8 @@
   ) {
     const nextTabId = toYamlTabId(target);
     const existing = getYamlTab(nextTabId);
+    // A tab with unsaved edits is only shown again: loading the YAML would drop the edits.
+    const keepEdits = hasUnsavedYaml(existing);
     if (!existing) {
       yamlTabs = [
         ...yamlTabs,
@@ -3389,6 +3394,7 @@
     workbenchCollapsed = false;
     workbenchFullscreen = false;
     await tick();
+    if (keepEdits) return;
     await loadYamlForTab(nextTabId);
   }
 
@@ -4766,6 +4772,13 @@ spec:
 
   // Row actions reveal the workbench and focus it, as in Pods.
   const workbenchReveal = createWorkbenchReveal();
+
+  // Leaving the page or the workload drops these tabs: the layout asks first.
+  $effect(() =>
+    registerUnsavedWork(() =>
+      yamlTabs.filter((tab) => hasUnsavedYaml(tab)).map((tab) => `YAML ${tab.target.name}`),
+    ),
+  );
 </script>
 
 <div class="space-y-4">
