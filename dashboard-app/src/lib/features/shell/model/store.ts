@@ -100,6 +100,8 @@ export function openPodDebugShellModal(
       namespace: string;
     };
     sessionLabel?: string;
+    /** Shown once the session is ready. */
+    notice?: string;
   },
 ) {
   if (!clusterId) return;
@@ -113,6 +115,7 @@ export function openPodDebugShellModal(
       podSessionMode: "exec",
       cleanupPod: options.cleanupPod,
       sessionLabel: options.sessionLabel,
+      notice: options.notice,
       sessionKind: "pod-debug",
     },
   ]);

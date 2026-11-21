@@ -15,7 +15,7 @@
   import type { NodeItem } from "$shared/model/clusters";
   import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
   import { buildKubectlDescribeCommand } from "$features/workloads-management";
-  import { runDebugDescribe } from "$features/resource-debug-runtime";
+  import { runDebugDescribe, startNodeDebugSession } from "$features/resource-debug-runtime";
   import { confirmAction } from "$shared/lib/confirm-action";
   import { getTimeDifference } from "$shared";
   import * as Alert from "$shared/ui/alert";
@@ -255,6 +255,7 @@
   import {
     notifySuccess,
     notifyError,
+    notifyInfo,
     type ActionNotification,
   } from "$shared/lib/action-notification";
   let actionNotification = $state<ActionNotification>(null);
@@ -1132,6 +1133,27 @@
     }
   }
 
+  let nodeShellStarting = $state<string | null>(null);
+
+  // Shell on a node, as `kubectl debug node/<name>` gives it: a debug pod on that node
+  // with the host's namespaces and its file system at /host, deleted when the shell
+  // window closes. It replaces a stub that only said "via SSH soon".
+  async function openNodeShell(nodeName: string) {
+    if (!data?.slug || nodeShellStarting) return;
+    nodeShellStarting = nodeName;
+    actionNotification = notifyInfo(`Starting a debug pod on node ${nodeName}...`);
+    try {
+      await startNodeDebugSession({ clusterId: data.slug, nodeName });
+      actionNotification = notifySuccess(`Shell on node ${nodeName} is open.`);
+    } catch (error) {
+      actionNotification = notifyError(
+        error instanceof Error ? error.message : `Failed to open a shell on node ${nodeName}.`,
+      );
+    } finally {
+      nodeShellStarting = null;
+    }
+  }
+
   async function openNodeYamlEditor(row: NodesStatusesData) {
     const node = findNodeByRow(row);
     if (!node?.metadata?.name) return;
@@ -1327,10 +1349,7 @@
         if (node) openSheet(node, "events");
       },
       onShell: (row) => {
-        actionNotification = null;
-        actionNotification = notifySuccess(
-          `Shell for node ${row.name} will be connected via SSH soon.`,
-        );
+        void openNodeShell(row.name);
       },
       onToggleCordon: (row) => {
         void handleToggleCordon(row);
@@ -1584,10 +1603,7 @@
           onShell={() => {
             const selected = selectedNodes[0];
             if (!selected) return;
-            actionNotification = null;
-            actionNotification = notifySuccess(
-              `Shell for node ${selected.name} will be connected via SSH soon.`,
-            );
+            void openNodeShell(selected.name);
           }}
           onToggleCordon={() => {
             void handleToggleCordonNodes(selectedNodes);
@@ -1703,10 +1719,7 @@
     onShell={() => {
       const node = $selectedNode;
       if (!node?.metadata?.name) return;
-      actionNotification = null;
-      actionNotification = notifySuccess(
-        `Shell for node ${node.metadata.name} will be connected via SSH soon.`,
-      );
+      void openNodeShell(node.metadata.name);
     }}
     onEditYaml={() => {
       const node = $selectedNode;
