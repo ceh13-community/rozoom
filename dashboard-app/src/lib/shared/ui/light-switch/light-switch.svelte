@@ -31,7 +31,13 @@
 
 <!-- In-app hint: a native title kept the old theme name after the click. -->
 <span class="block" use:hint={`Theme: ${APP_THEME_LABELS[currentTheme]}`}>
-  <Button onclick={cycleTheme} variant="ghost" class="w-full p-2 justify-start">
+  <!-- The label is hidden in the collapsed sidebar: the button needs its own name. -->
+  <Button
+    onclick={cycleTheme}
+    variant="ghost"
+    class="w-full p-2 justify-start"
+    aria-label={`Theme: ${APP_THEME_LABELS[currentTheme]}`}
+  >
     {#if currentTheme === "light"}
       <Sun class="h-4 w-4" />
     {:else if currentTheme === "dark"}

@@ -77,4 +77,14 @@ describe("hint", () => {
     button.blur();
     expect(bubble()).toBeNull();
   });
+
+  it("adds no description that repeats the control's name", () => {
+    const button = document.createElement("button");
+    button.setAttribute("aria-label", "Settings");
+    document.body.appendChild(button);
+    const action = hint(button, "Settings");
+    expect(button).not.toHaveAttribute("aria-describedby");
+    action.update("Settings of this cluster");
+    expect(button).toHaveAccessibleDescription("Settings of this cluster");
+  });
 });

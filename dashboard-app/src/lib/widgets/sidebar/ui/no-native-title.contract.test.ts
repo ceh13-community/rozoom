@@ -18,4 +18,12 @@ describe("sidebar and menu use in-app hints", () => {
     const source = readFileSync(resolve(__dirname, file), "utf8");
     expect(source).not.toMatch(/\stitle=/);
   });
+
+  it("names the theme button, whose label is hidden in the collapsed sidebar", () => {
+    const source = readFileSync(
+      resolve(__dirname, "../../../shared/ui/light-switch/light-switch.svelte"),
+      "utf8",
+    );
+    expect(source).toContain("aria-label={`Theme: ${APP_THEME_LABELS[currentTheme]}`}");
+  });
 });

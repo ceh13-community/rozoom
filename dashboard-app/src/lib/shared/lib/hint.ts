@@ -37,10 +37,17 @@ export function hint(node: HTMLElement, initial: HintOptions) {
   document.body.appendChild(description);
   const target = describedTarget(node);
   const previousDescribedBy = target.getAttribute("aria-describedby");
-  target.setAttribute(
-    "aria-describedby",
-    [previousDescribedBy, description.id].filter(Boolean).join(" "),
-  );
+
+  // A description equal to the control's name ("Settings" on a button named Settings)
+  // would be read twice: point at it only when it adds something.
+  function syncDescribedBy() {
+    const name = (target.getAttribute("aria-label") ?? target.textContent ?? "").trim();
+    const ids = [previousDescribedBy, text.trim() === name ? null : description.id];
+    const value = ids.filter(Boolean).join(" ");
+    if (value) target.setAttribute("aria-describedby", value);
+    else target.removeAttribute("aria-describedby");
+  }
+  syncDescribedBy();
 
   function place() {
     if (!bubble) return;
@@ -95,6 +102,7 @@ export function hint(node: HTMLElement, initial: HintOptions) {
     update(next: HintOptions) {
       ({ text, placement } = normalize(next));
       description.textContent = text;
+      syncDescribedBy();
       if (bubble) bubble.textContent = text;
     },
     destroy() {
