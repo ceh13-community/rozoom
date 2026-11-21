@@ -11,6 +11,14 @@ describe("collapse/expand groups toggle", () => {
   it.each([
     ["pods-list/data-table.svelte", "getToggleAllGroupsLabel()"],
     ["configuration-list.svelte", "getGroupCollapseToggleLabel(collapsedGroups, groupKeys)"],
+    ...[
+      "deployments-list",
+      "daemon-sets-list",
+      "stateful-sets-list",
+      "replica-sets-list",
+      "jobs-list",
+      "cron-jobs-list",
+    ].map((list) => [`${list}/data-table.svelte`, "getGroupCollapseToggleLabel("]),
   ])("%s keeps the toggle out of the toolbar", (file, label) => {
     const source = read(file);
     const toolbar = source.slice(
@@ -21,5 +29,9 @@ describe("collapse/expand groups toggle", () => {
     expect(toolbar).not.toContain("toggleAllGroups");
     expect(source).toContain('data-testid="groups-toggle"');
     expect(source).toContain(label);
+    // Keyboard users see where focus is on the plain text button.
+    const testId = source.indexOf('data-testid="groups-toggle"');
+    const buttonTag = source.slice(source.lastIndexOf("<button", testId), testId);
+    expect(buttonTag).toContain("focus-visible:ring-2");
   });
 });

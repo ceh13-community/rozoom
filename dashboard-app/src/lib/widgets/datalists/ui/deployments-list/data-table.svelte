@@ -401,14 +401,6 @@
       {onWatcherRefreshSecondsChange}
       {onResetWatcherSettings}
     />
-    {#if hasGroupedRows()}
-      <Button variant="outline" size="sm" onclick={() => toggleAllGroups()}>
-        {getGroupCollapseToggleLabel(
-          collapsedGroups,
-          getVisibleGroupKeys().map((groupKey) => getGroupId(groupKey)),
-        )}
-      </Button>
-    {/if}
   {/snippet}
 </TableToolbarShell>
 
@@ -475,6 +467,24 @@
           {/if}
         {/if}
       {:else}
+        <!-- In the table, not the toolbar (see the Pods list): the toolbar keeps its size. -->
+        {#if hasGroupedRows()}
+          <Table.Row>
+            <Table.Cell colspan={columns.length} class="py-1 text-right">
+              <button
+                type="button"
+                class="rounded-sm text-xs font-medium text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                data-testid="groups-toggle"
+                onclick={toggleAllGroups}
+              >
+                {getGroupCollapseToggleLabel(
+                  collapsedGroups,
+                  getVisibleGroupKeys().map((groupKey) => getGroupId(groupKey)),
+                )}
+              </button>
+            </Table.Cell>
+          </Table.Row>
+        {/if}
         {#each getGroupedRows() as [groupKey, rows] (getGroupId(groupKey))}
           <Table.Row class="bg-muted/40">
             <Table.Cell colspan={columns.length} class="sticky-table-group-header">

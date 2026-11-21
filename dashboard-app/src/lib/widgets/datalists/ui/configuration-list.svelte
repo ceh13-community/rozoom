@@ -5792,7 +5792,7 @@ spec:
             <Table.TableCell colspan={2 + visibleDataColumnCount} class="py-1 text-right">
               <button
                 type="button"
-                class="text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
+                class="rounded-sm text-xs font-medium text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 data-testid="groups-toggle"
                 onclick={toggleAllGroups}
               >
