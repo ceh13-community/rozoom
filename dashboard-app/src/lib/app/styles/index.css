@@ -78,15 +78,13 @@
     @apply border-border;
   }
 
+  /* The system font, named only generically. On Linux every family in the stack that is
+     not installed costs a font lookup at each new text size: with "Source Sans 3" (no
+     longer loaded) and the Apple and Windows names in front, each Text size step froze
+     the page for about a second. system-ui resolves to the same font as the old stack on
+     Linux, macOS and Windows. */
   body {
-    font-family:
-      "Source Sans 3",
-      ui-sans-serif,
-      system-ui,
-      -apple-system,
-      BlinkMacSystemFont,
-      "Segoe UI",
-      sans-serif;
+    font-family: system-ui, sans-serif;
     font-weight: 450;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
