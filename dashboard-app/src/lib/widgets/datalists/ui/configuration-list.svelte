@@ -1,4 +1,11 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
+  import { revealListFilteredTo } from "$shared/lib/jump-reveal";
+  import IngressUrlCell from "./configuration-list/ingress-url-cell.svelte";
+  import {
+    summarizeIngress,
+    type IngressRuleRow,
+  } from "./configuration-list/model/ingress-summary";
   import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
@@ -77,7 +84,11 @@
   import { KUBECTL_COMMANDS } from "$shared/config/kubectl-commands";
   import type { WorkloadType } from "$shared/model/workloads";
   import { kubectlJson, kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
-  import { getSelectedNamespaceList, selectedNamespace } from "$features/namespace-management";
+  import {
+    getSelectedNamespaceList,
+    selectedNamespace,
+    setSelectedNamespace,
+  } from "$features/namespace-management";
   import {
     buildResourceRelationGraph,
     decodeWorkbenchRouteState,
@@ -202,7 +213,11 @@
     | "externalIP"
     | "selector"
     | "endpoints"
+    | "ingressClass"
+    | "hosts"
     | "loadBalancers"
+    | "ingressPorts"
+    | "url"
     | "policyTypes"
     | "storageClass"
     | "size"
@@ -272,7 +287,12 @@
     externalIP: string;
     selector: string;
     endpoints: string;
+    ingressClass: string;
+    hosts: string;
     loadBalancers: string;
+    ingressPorts: string;
+    url: string;
+    ingressRules: IngressRuleRow[];
     policyTypes: string;
     storageClass: string;
     size: string;
@@ -569,7 +589,11 @@
     externalIP: boolean;
     selector: boolean;
     endpoints: boolean;
+    ingressClass: boolean;
+    hosts: boolean;
     loadBalancers: boolean;
+    ingressPorts: boolean;
+    url: boolean;
     policyTypes: boolean;
     storageClass: boolean;
     size: boolean;
@@ -621,7 +645,11 @@
         externalIP: false,
         selector: false,
         endpoints: false,
+        ingressClass: false,
+        hosts: false,
         loadBalancers: false,
+        ingressPorts: false,
+        url: false,
         policyTypes: false,
         storageClass: false,
         size: false,
@@ -686,7 +714,11 @@
       externalIP: workloadKey === "services",
       selector: workloadKey === "services" || workloadKey === "replicationcontrollers",
       endpoints: workloadKey === "endpoints" || workloadKey === "endpointslices",
+      ingressClass: workloadKey === "ingresses",
+      hosts: workloadKey === "ingresses",
       loadBalancers: workloadKey === "ingresses",
+      ingressPorts: workloadKey === "ingresses",
+      url: workloadKey === "ingresses",
       policyTypes: workloadKey === "networkpolicies",
       storageClass:
         workloadKey === "persistentvolumeclaims" ||
@@ -733,10 +765,8 @@
       globalDefault: false,
       serviceType: false,
       clusterIP: false,
-      ports:
-        workloadKey === "services" ||
-        workloadKey === "ingresses" ||
-        workloadKey === "endpointslices",
+      // Ingresses show kubectl's Ports (ingressPorts); the rule count stays for the filter.
+      ports: workloadKey === "services" || workloadKey === "endpointslices",
       phase: false,
       storage: false,
       claim: workloadKey === "persistentvolumes" || workloadKey === "volumesnapshotcontents",
@@ -1135,6 +1165,12 @@
           : "-";
     const loadBalancers =
       workloadKey === "ingresses" ? serviceLoadBalancerIngress.join(", ") || "-" : "-";
+    const ingress = workloadKey === "ingresses" ? summarizeIngress(item) : null;
+    const ingressClass = ingress?.className ?? "-";
+    const hosts = ingress ? ingress.hosts.join(", ") : "-";
+    const ingressPorts = ingress?.ports ?? "-";
+    const url = ingress?.url ?? "";
+    const ingressRules = ingress?.rules ?? [];
     const policyTypes =
       workloadKey === "networkpolicies"
         ? asArray(spec.policyTypes)
@@ -1242,7 +1278,12 @@
               .join(", ") || "-"
           : selector,
       endpoints,
+      ingressClass,
+      hosts,
       loadBalancers,
+      ingressPorts,
+      url,
+      ingressRules,
       policyTypes,
       storageClass:
         workloadKey === "persistentvolumeclaims"
@@ -1762,7 +1803,11 @@
       ...(columnsVisible.externalIP ? ["externalIP"] : []),
       ...(columnsVisible.selector ? ["selector"] : []),
       ...(columnsVisible.endpoints ? ["endpoints"] : []),
+      ...(columnsVisible.ingressClass ? ["ingressClass"] : []),
+      ...(columnsVisible.hosts ? ["hosts"] : []),
       ...(columnsVisible.loadBalancers ? ["loadBalancers"] : []),
+      ...(columnsVisible.ingressPorts ? ["ingressPorts"] : []),
+      ...(columnsVisible.url ? ["url"] : []),
       ...(columnsVisible.policyTypes ? ["policyTypes"] : []),
       ...(columnsVisible.storageClass ? ["storageClass"] : []),
       ...(columnsVisible.size ? ["size"] : []),
@@ -1813,7 +1858,11 @@
         ...(columnsVisible.externalIP ? [row.externalIP] : []),
         ...(columnsVisible.selector ? [row.selector] : []),
         ...(columnsVisible.endpoints ? [row.endpoints] : []),
+        ...(columnsVisible.ingressClass ? [row.ingressClass] : []),
+        ...(columnsVisible.hosts ? [row.hosts] : []),
         ...(columnsVisible.loadBalancers ? [row.loadBalancers] : []),
+        ...(columnsVisible.ingressPorts ? [row.ingressPorts] : []),
+        ...(columnsVisible.url ? [row.url] : []),
         ...(columnsVisible.policyTypes ? [row.policyTypes] : []),
         ...(columnsVisible.storageClass ? [row.storageClass] : []),
         ...(columnsVisible.size ? [row.size] : []),
@@ -1955,7 +2004,11 @@
       Number(columnsVisible.externalIP) +
       Number(columnsVisible.selector) +
       Number(columnsVisible.endpoints) +
+      Number(columnsVisible.ingressClass) +
+      Number(columnsVisible.hosts) +
       Number(columnsVisible.loadBalancers) +
+      Number(columnsVisible.ingressPorts) +
+      Number(columnsVisible.url) +
       Number(columnsVisible.policyTypes) +
       Number(columnsVisible.storageClass) +
       Number(columnsVisible.size) +
@@ -3519,6 +3572,15 @@
     await openExternalUrl(url);
   }
 
+  /** Rules in an Ingress's details lead to the Service: its namespace, filtered to it. */
+  async function openServiceFromIngress(service: string, namespace: string) {
+    setSelectedNamespace(data.slug, namespace);
+    const params = new URLSearchParams(window.location.search);
+    params.set("workload", "services");
+    await goto(`?${params.toString()}`, { keepFocus: false });
+    await revealListFilteredTo(service);
+  }
+
   async function openPortForwardTabInAppWindow(tabId: string) {
     const tab = getPortForwardTab(tabId);
     if (!tab) return;
@@ -4160,12 +4222,17 @@ spec:
       entries.push({ id: "ports", label: "Ports", checked: columnsVisible.ports });
     }
     if (workloadKey === "ingresses") {
-      entries.push({ id: "ports", label: "Rules", checked: columnsVisible.ports });
+      // The columns of `kubectl get ingress`, plus the address to open.
+      entries.push({ id: "ingressClass", label: "Class", checked: columnsVisible.ingressClass });
+      entries.push({ id: "hosts", label: "Hosts", checked: columnsVisible.hosts });
       entries.push({
         id: "loadBalancers",
-        label: "LoadBalancers",
+        label: "Address",
         checked: columnsVisible.loadBalancers,
       });
+      entries.push({ id: "ingressPorts", label: "Ports", checked: columnsVisible.ingressPorts });
+      entries.push({ id: "url", label: "URL", checked: columnsVisible.url });
+      entries.push({ id: "ports", label: "Rules", checked: columnsVisible.ports });
     }
     if (workloadKey === "endpoints" || workloadKey === "endpointslices") {
       entries.push({ id: "endpoints", label: "Endpoints", checked: columnsVisible.endpoints });
@@ -4304,7 +4371,11 @@ spec:
       externalIP: false,
       selector: false,
       endpoints: false,
+      ingressClass: false,
+      hosts: false,
       loadBalancers: false,
+      ingressPorts: false,
+      url: false,
       policyTypes: false,
       storageClass: false,
       size: false,
@@ -5390,13 +5461,33 @@ spec:
               <SortingButton truncate label="Endpoints" onclick={() => toggleSort("endpoints")} />
             </Table.TableHead>
           {/if}
+          {#if columnsVisible.ingressClass}
+            <Table.TableHead class="w-[130px]">
+              <SortingButton truncate label="Class" onclick={() => toggleSort("ingressClass")} />
+            </Table.TableHead>
+          {/if}
+          {#if columnsVisible.hosts}
+            <Table.TableHead class="w-[220px]">
+              <SortingButton truncate label="Hosts" onclick={() => toggleSort("hosts")} />
+            </Table.TableHead>
+          {/if}
           {#if columnsVisible.loadBalancers}
             <Table.TableHead class="w-[220px]">
               <SortingButton
                 truncate
-                label="LoadBalancers"
+                label={workloadKey === "ingresses" ? "Address" : "LoadBalancers"}
                 onclick={() => toggleSort("loadBalancers")}
               />
+            </Table.TableHead>
+          {/if}
+          {#if columnsVisible.ingressPorts}
+            <Table.TableHead class="w-[100px]">
+              <SortingButton truncate label="Ports" onclick={() => toggleSort("ingressPorts")} />
+            </Table.TableHead>
+          {/if}
+          {#if columnsVisible.url}
+            <Table.TableHead class="w-[280px]">
+              <SortingButton truncate label="URL" onclick={() => toggleSort("url")} />
             </Table.TableHead>
           {/if}
           {#if columnsVisible.policyTypes}
@@ -5707,8 +5798,26 @@ spec:
               {#if columnsVisible.endpoints}
                 <Table.TableCell>{row.endpoints}</Table.TableCell>
               {/if}
+              {#if columnsVisible.ingressClass}
+                <Table.TableCell class="truncate">{row.ingressClass}</Table.TableCell>
+              {/if}
+              {#if columnsVisible.hosts}
+                <Table.TableCell class="truncate" title={row.hosts}>{row.hosts}</Table.TableCell>
+              {/if}
               {#if columnsVisible.loadBalancers}
                 <Table.TableCell class="truncate">{row.loadBalancers}</Table.TableCell>
+              {/if}
+              {#if columnsVisible.ingressPorts}
+                <Table.TableCell>{row.ingressPorts}</Table.TableCell>
+              {/if}
+              {#if columnsVisible.url}
+                <Table.TableCell>
+                  <IngressUrlCell
+                    url={row.url}
+                    onOpen={openUrlInExternalBrowser}
+                    onCopy={(value) => copyTextToClipboard(value, `Copied ${value}`)}
+                  />
+                </Table.TableCell>
               {/if}
               {#if columnsVisible.policyTypes}
                 <Table.TableCell>{row.policyTypes}</Table.TableCell>
@@ -5972,8 +6081,27 @@ spec:
                   {#if columnsVisible.endpoints}
                     <Table.TableCell>{row.endpoints}</Table.TableCell>
                   {/if}
+                  {#if columnsVisible.ingressClass}
+                    <Table.TableCell class="truncate">{row.ingressClass}</Table.TableCell>
+                  {/if}
+                  {#if columnsVisible.hosts}
+                    <Table.TableCell class="truncate" title={row.hosts}>{row.hosts}</Table.TableCell
+                    >
+                  {/if}
                   {#if columnsVisible.loadBalancers}
                     <Table.TableCell class="truncate">{row.loadBalancers}</Table.TableCell>
+                  {/if}
+                  {#if columnsVisible.ingressPorts}
+                    <Table.TableCell>{row.ingressPorts}</Table.TableCell>
+                  {/if}
+                  {#if columnsVisible.url}
+                    <Table.TableCell>
+                      <IngressUrlCell
+                        url={row.url}
+                        onOpen={openUrlInExternalBrowser}
+                        onCopy={(value) => copyTextToClipboard(value, `Copied ${value}`)}
+                      />
+                    </Table.TableCell>
                   {/if}
                   {#if columnsVisible.policyTypes}
                     <Table.TableCell>{row.policyTypes}</Table.TableCell>
@@ -6250,8 +6378,11 @@ spec:
               : []),
             ...(workloadKey === "ingresses"
               ? [
-                  { label: "LoadBalancers", value: detailRow.loadBalancers },
-                  { label: "Rules", value: String(detailRow.ports) },
+                  { label: "Class", value: detailRow.ingressClass },
+                  { label: "Hosts", value: detailRow.hosts },
+                  { label: "Address", value: detailRow.loadBalancers },
+                  { label: "Ports", value: detailRow.ingressPorts },
+                  { label: "URL", value: detailRow.url || "-" },
                 ]
               : []),
             ...(workloadKey === "networkpolicies"
@@ -6381,6 +6512,32 @@ spec:
           {/if}
         </div>
 
+        {#if workloadKey === "ingresses" && detailRow.ingressRules.length > 0}
+          {@const ingressNamespace = detailRow.namespace}
+          <h3 class="my-4 font-bold">Rules</h3>
+          <div class="rounded border bg-muted/10 p-2 text-xs" data-testid="ingress-rules">
+            {#each detailRow.ingressRules as rule, index (index)}
+              <div class="flex flex-wrap items-center gap-1 py-0.5 font-mono">
+                <span>{rule.host}{rule.path}</span>
+                <span class="text-muted-foreground">-&gt;</span>
+                {#if rule.service}
+                  <button
+                    type="button"
+                    class="text-sky-600 hover:underline dark:text-sky-400"
+                    onclick={() => {
+                      detailsOpen = false;
+                      void openServiceFromIngress(rule.service, ingressNamespace);
+                    }}
+                  >
+                    {rule.service}{rule.port ? `:${rule.port}` : ""}
+                  </button>
+                {:else}
+                  <span class="text-muted-foreground">(not a Service)</span>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        {/if}
         {#if getRbacRelationLines(detailRow).length > 0}
           <h3 class="my-4 font-bold">RBAC Relations</h3>
           <div class="rounded border bg-muted/10 p-2 text-xs">

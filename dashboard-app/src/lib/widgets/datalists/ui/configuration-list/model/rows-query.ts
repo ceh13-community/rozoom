@@ -37,7 +37,11 @@ type ConfigurationLikeRow = {
   externalIP: string;
   selector: string;
   endpoints: string;
+  ingressClass: string;
+  hosts: string;
   loadBalancers: string;
+  ingressPorts: string;
+  url: string;
   policyTypes: string;
   storageClass: string;
   size: string;
@@ -108,6 +112,10 @@ function getSortValue(row: ConfigurationLikeRow, sortBy: string): SortableValue 
   if (sortBy === "selector") return sortableText(row.selector);
   if (sortBy === "endpoints") return sortableText(row.endpoints);
   if (sortBy === "loadBalancers") return sortableText(row.loadBalancers);
+  if (sortBy === "ingressClass") return sortableText(row.ingressClass);
+  if (sortBy === "hosts") return sortableText(row.hosts);
+  if (sortBy === "ingressPorts") return sortableText(row.ingressPorts);
+  if (sortBy === "url") return sortableText(row.url);
   if (sortBy === "policyTypes") return sortableText(row.policyTypes);
   if (sortBy === "storageClass") return sortableText(row.storageClass);
   if (sortBy === "size") return sortableText(row.size);
@@ -154,7 +162,7 @@ function compareRows(
 }
 
 function toSearchText(row: ConfigurationLikeRow) {
-  return `${row.name} ${row.namespace} ${row.details} ${row.type} ${row.value} ${row.resourceVersion} ${row.labels} ${row.handler} ${row.holder} ${row.webhooks} ${row.status} ${row.minAvailable} ${row.maxUnavailable} ${row.currentHealthy} ${row.desiredHealthy} ${row.metrics} ${row.minPods} ${row.maxPods} ${row.replicas} ${row.bindings} ${row.resource} ${row.group} ${row.version} ${row.scope} ${row.kind} ${row.controller} ${row.apiGroup} ${row.externalIP} ${row.selector} ${row.endpoints} ${row.loadBalancers} ${row.policyTypes} ${row.storageClass} ${row.size} ${row.pods} ${row.capacity} ${row.serviceType} ${row.clusterIP} ${row.phase} ${row.storage} ${row.claim} ${row.provisioner} ${row.reclaimPolicy} ${row.driftDetected ? "drift" : ""}`;
+  return `${row.name} ${row.namespace} ${row.details} ${row.type} ${row.value} ${row.resourceVersion} ${row.labels} ${row.handler} ${row.holder} ${row.webhooks} ${row.status} ${row.minAvailable} ${row.maxUnavailable} ${row.currentHealthy} ${row.desiredHealthy} ${row.metrics} ${row.minPods} ${row.maxPods} ${row.replicas} ${row.bindings} ${row.resource} ${row.group} ${row.version} ${row.scope} ${row.kind} ${row.controller} ${row.apiGroup} ${row.externalIP} ${row.selector} ${row.endpoints} ${row.ingressClass} ${row.hosts} ${row.loadBalancers} ${row.url} ${row.policyTypes} ${row.storageClass} ${row.size} ${row.pods} ${row.capacity} ${row.serviceType} ${row.clusterIP} ${row.phase} ${row.storage} ${row.claim} ${row.provisioner} ${row.reclaimPolicy} ${row.driftDetected ? "drift" : ""}`;
 }
 
 export function computeConfigurationRows<T extends ConfigurationLikeRow>(
