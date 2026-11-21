@@ -28,6 +28,12 @@
   import { openExternalUrl } from "$shared/api/in-app-browser";
   import { confirmAction } from "$shared/lib/confirm-action";
   import { buildPodLogsArgs } from "./pod-actions";
+  import {
+    applyResumeArgs,
+    createStreamChunkMerger,
+    resumeSinceArg,
+  } from "../common/log-stream-merge";
+  import { previousLogsAvailability } from "./model/previous-logs";
   import type { PodMetricsValue } from "./model/pod-row-adapter";
   import { dashboardDataProfile } from "$shared/lib/dashboard-data-profile.svelte";
   import {
@@ -167,6 +173,8 @@
   let logsLiveTimers = new Map<string, ReturnType<typeof setTimeout>>();
   let logsStreamProcesses = new Map<string, KubectlStreamProcess>();
   let logsStreamReconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // Bumped on every stop and start, so callbacks of a stopped stream are ignored.
+  let logsStreamTokens = new Map<string, number>();
 
   const orderedWorkbenchTabs = $derived.by(() => orderPinnedTabs(workbenchTabs, pinnedTabIds));
   const activeWorkbenchTab = $derived.by(
@@ -550,6 +558,7 @@
   }
 
   function stopLogsRuntime(tabId: string) {
+    logsStreamTokens.set(tabId, (logsStreamTokens.get(tabId) ?? 0) + 1);
     const timer = logsLiveTimers.get(tabId);
     if (timer) {
       clearTimeout(timer);
@@ -567,19 +576,52 @@
     }
   }
 
+  // Previous logs are a finished file: read once, never followed.
+  function shouldKeepStreaming(tabId: string) {
+    const tab = logsTabs.find((entry) => entry.id === tabId);
+    return Boolean(tab && tab.logsLive && tab.logsMode === "stream-f" && !tab.logsPrevious);
+  }
+
   function scheduleStreamReconnect(tabId: string) {
     const previous = logsStreamReconnectTimers.get(tabId);
     if (previous) clearTimeout(previous);
+    if (!shouldKeepStreaming(tabId)) return;
     const timer = setTimeout(() => {
       logsStreamReconnectTimers.delete(tabId);
-      const tab = logsTabs.find((entry) => entry.id === tabId);
-      if (!tab || !tab.logsLive || tab.logsMode !== "stream-f") return;
+      if (!shouldKeepStreaming(tabId)) return;
       updateLogsTab(tabId, {
         logsError: "Stream disconnected. Reconnecting...",
       });
-      void startFollowStreamForTab(tabId);
+      void startFollowStreamForTab(tabId, { resume: true });
     }, logsStreamReconnectMs);
     logsStreamReconnectTimers.set(tabId, timer);
+  }
+
+  /**
+   * Runs what the tab asks for after a change of mode, Live, Previous or container:
+   * a stream, polling, or one read. Without this, a running stream kept writing the
+   * old container's lines over the new ones.
+   */
+  function restartLogsTab(tabId: string) {
+    stopLogsRuntime(tabId);
+    if (shouldKeepStreaming(tabId)) {
+      void startFollowStreamForTab(tabId);
+      return;
+    }
+    void refreshLogsTab(tabId).then(() => {
+      const tab = logsTabs.find((entry) => entry.id === tabId);
+      if (tab?.logsLive && tab.logsMode === "poll" && !tab.logsPrevious) {
+        scheduleLogsPolling(tabId);
+      }
+    });
+  }
+
+  function isLogsRuntimeActive(tabId: string) {
+    return (
+      logsStreamProcesses.has(tabId) ||
+      logsStreamReconnectTimers.has(tabId) ||
+      logsLiveTimers.has(tabId)
+    );
   }
 
   function updateLogsTab(tabId: string, patch: Partial<LogsTabState>) {
@@ -734,64 +776,80 @@
     logsLiveTimers.set(tabId, timer);
   }
 
-  async function startFollowStreamForTab(tabId: string) {
+  async function startFollowStreamForTab(tabId: string, options: { resume?: boolean } = {}) {
     const tab = logsTabs.find((entry) => entry.id === tabId);
     const parsed = parseWorkbenchTabId(tabId);
-    if (!tab || !parsed) return;
+    if (!tab || !parsed || !shouldKeepStreaming(tabId)) return;
     stopLogsRuntime(tabId);
+    const token = logsStreamTokens.get(tabId) ?? 0;
+    const isCurrent = () => logsStreamTokens.get(tabId) === token;
 
-    updateLogsTab(tabId, {
-      logsLoading: true,
-      logsError: null,
-    });
-
+    // Same as the workload logs: a fresh stream starts with the last 400 lines and its
+    // first chunk replaces the text. A reconnect resumes with --since and appends
+    // without the overlap, so the text above and the reader's place stay.
+    const sinceArg = options.resume ? resumeSinceArg(tab.logsText, tab.logsUpdatedAt) : null;
+    const mergeChunk = createStreamChunkMerger({ resume: sinceArg !== null });
     const args = buildPodLogsArgs({
       name: parsed.name,
       namespace: parsed.namespace,
       container: tab.logsSelectedContainer || undefined,
-      previous: tab.logsPrevious,
+      previous: false,
       follow: true,
     });
     if (!args) return;
+    applyResumeArgs(args, sinceArg);
+    updateLogsTab(tabId, { logsLoading: true, logsError: null });
 
     try {
-      let buffer = "";
       const process = await kubectlStreamArgsFront(
         args,
         { clusterId },
         {
           onStdoutData: (chunk: string) => {
-            buffer += chunk;
+            if (!isCurrent() || !chunk) return;
+            const current = logsTabs.find((entry) => entry.id === tabId);
+            if (!current) return;
             updateLogsTab(tabId, {
-              logsText: buffer,
+              logsText: mergeChunk(current.logsText, chunk),
               logsLoading: false,
+              logsError: null,
               logsUpdatedAt: Date.now(),
             });
           },
+          onStderrData: (chunk: string) => {
+            if (!isCurrent()) return;
+            const message = chunk.trim();
+            if (!message) return;
+            updateLogsTab(tabId, { logsLoading: false, logsError: message });
+          },
           onClose: () => {
+            if (!isCurrent()) return;
             logsStreamProcesses.delete(tabId);
             scheduleStreamReconnect(tabId);
           },
           onError: (error) => {
+            if (!isCurrent()) return;
             updateLogsTab(tabId, {
               logsLoading: false,
               logsError: error instanceof Error ? error.message : "Failed to stream logs.",
             });
+            scheduleStreamReconnect(tabId);
           },
         },
       );
+      if (!isCurrent()) {
+        await process.stop().catch(() => undefined);
+        return;
+      }
       logsStreamProcesses.set(tabId, process);
-      updateLogsTab(tabId, {
-        logsMode: "stream-f",
-        logsLive: true,
-        logsLoading: false,
-      });
+      updateLogsTab(tabId, { logsLoading: false });
     } catch (error) {
+      if (!isCurrent()) return;
       updateLogsTab(tabId, {
         logsLoading: false,
         logsError: error instanceof Error ? error.message : "Failed to start log stream.",
       });
-      onError(error instanceof Error ? error.message : "Failed to start log stream.");
+      scheduleStreamReconnect(tabId);
     }
   }
 
@@ -833,9 +891,18 @@
     }
   }
 
+  // Logs open live as a stream (kubectl logs -f) from every entry point; Poll is a manual
+  // choice in the tab. Previous only when asked for and the container has an earlier
+  // instance, otherwise the tab would open on a kubectl error.
   async function openLogsForPod(pod: Partial<PodItem>, options?: { previous?: boolean }) {
     const tabId = getTabId("logs", pod);
-    if (!logsTabs.some((tab) => tab.id === tabId)) {
+    const existing = logsTabs.find((tab) => tab.id === tabId) ?? null;
+    const container = existing?.logsSelectedContainer ?? pod.spec?.containers?.[0]?.name ?? "";
+    const previous =
+      typeof options?.previous === "boolean"
+        ? options.previous && previousLogsAvailability(pod, container).available
+        : (existing?.logsPrevious ?? false);
+    if (!existing) {
       logsTabs = [
         ...logsTabs,
         {
@@ -846,21 +913,19 @@
             `${pod.metadata?.namespace ?? "default"}/${pod.metadata?.name ?? "unknown"}`,
           logsText: "",
           logsError: null,
-          logsLoading: false,
-          logsLive: false,
-          logsMode: "poll",
+          logsLoading: true,
+          logsLive: true,
+          logsMode: "stream-f",
           logsUpdatedAt: null,
-          logsPrevious: options?.previous ?? false,
+          logsPrevious: previous,
           logsContainerOptions:
             pod.spec?.containers?.map((container) => container.name).filter(Boolean) ?? [],
-          logsSelectedContainer: pod.spec?.containers?.[0]?.name ?? "",
+          logsSelectedContainer: container,
           bookmarks: [],
         },
       ];
-    } else if (typeof options?.previous === "boolean") {
-      updateLogsTab(tabId, {
-        logsPrevious: options.previous,
-      });
+    } else if (existing.logsPrevious !== previous) {
+      updateLogsTab(tabId, { logsPrevious: previous });
     }
     upsertWorkbenchTab({
       id: tabId,
@@ -872,7 +937,9 @@
         `${pod.metadata?.namespace ?? "default"}/${pod.metadata?.name ?? "unknown"}`,
     });
     await tick();
-    await refreshLogsTab(tabId);
+    // A tab that already streams keeps its stream and the reader's place.
+    if (existing && existing.logsPrevious === previous && isLogsRuntimeActive(tabId)) return;
+    restartLogsTab(tabId);
   }
 
   async function openYamlForPod(pod: Partial<PodItem>) {
@@ -1204,7 +1271,7 @@
 
     const opened =
       request.kind === "logs"
-        ? openLogsForPod(pod, { previous: request.logsPrevious })
+        ? openLogsForPod(pod, { previous: request.logsPrevious ?? false })
         : request.kind === "yaml"
           ? openYamlForPod(pod)
           : request.kind === "events"
@@ -1373,9 +1440,7 @@
                     {updateYamlTab}
                     {refreshLogsTab}
                     {saveYamlTab}
-                    {scheduleLogsPolling}
-                    {startFollowStreamForTab}
-                    {stopLogsRuntime}
+                    {restartLogsTab}
                     {portForwardActions}
                     onLogsJumpHandled={() => {
                       if (
@@ -1429,9 +1494,7 @@
                       {updateYamlTab}
                       {refreshLogsTab}
                       {saveYamlTab}
-                      {scheduleLogsPolling}
-                      {startFollowStreamForTab}
-                      {stopLogsRuntime}
+                      {restartLogsTab}
                     {portForwardActions}
                       onLogsJumpHandled={() => {
                         if (
