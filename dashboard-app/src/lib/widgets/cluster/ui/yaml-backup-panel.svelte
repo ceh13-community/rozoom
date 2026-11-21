@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { confirmAction } from "$shared/lib/confirm-action";
   import { onMount } from "svelte";
   import { Button } from "$shared/ui/button";
   import LoadingDots from "$shared/ui/loading-dots.svelte";
@@ -56,12 +57,13 @@
 
   async function handleExport() {
     if (includeSecrets) {
-      const ok = window.confirm(
+      const ok = await confirmAction(
         "Secrets will be exported in plaintext (base64 is not encryption) and written " +
           "to your Downloads folder.\n\n" +
           "Make sure the destination is not synced to a public drive, email, or shared " +
           "workspace. Delete the backup when no longer needed.\n\n" +
           "Continue?",
+        "Export secrets",
       );
       if (!ok) return;
     }

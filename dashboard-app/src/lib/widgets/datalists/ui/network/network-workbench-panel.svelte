@@ -1,6 +1,5 @@
 <script lang="ts">
   import { popOutPortForwardPreview, withRefreshNonce } from "$shared/lib/port-forward-preview";
-  import { requestPortForwardStartMode } from "$shared/lib/port-forward-start-mode";
   import { confirmAction } from "$shared/lib/confirm-action";
   import { isTauriAvailable } from "$shared/lib/tauri-runtime";
   import {
@@ -100,8 +99,7 @@
     const name = metadata.name ?? "unknown";
     const namespace = metadata.namespace ?? "default";
     const { remotePort, scheme } = resolveServicePortForwardTarget(raw);
-    const startMode = requestPortForwardStartMode(remotePort);
-    if (!startMode) return;
+    const startMode = "start-and-open" as const;
 
     const localPort = requestLocalPort(remotePort);
     if (!localPort) {

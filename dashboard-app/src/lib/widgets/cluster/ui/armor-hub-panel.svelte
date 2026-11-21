@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { confirmAction } from "$shared/lib/confirm-action";
   import {
     armorHubReports,
     armorHubState,
@@ -483,7 +484,11 @@
   }
 
   async function deletePolicy(item: PolicyItem) {
-    if (!confirm(`Delete ${item.kind}/${item.name}? This removes enforcement immediately.`)) return;
+    const confirmed = await confirmAction(
+      `Delete ${item.kind}/${item.name}? This removes enforcement immediately.`,
+      "Delete policy",
+    );
+    if (!confirmed) return;
     const args = item.namespace
       ? ["delete", item.kind.toLowerCase(), item.name, "-n", item.namespace]
       : ["delete", item.kind.toLowerCase(), item.name];
@@ -499,9 +504,10 @@
   async function doUninstall() {
     if (!kubearmorProvider?.releaseName || !kubearmorProvider.namespace) return;
     if (
-      !confirm(
+      !(await confirmAction(
         `Uninstall KubeArmor release '${kubearmorProvider.releaseName}' from namespace '${kubearmorProvider.namespace}'? All enforcement stops immediately.`,
-      )
+        "Uninstall KubeArmor",
+      ))
     )
       return;
     uninstalling = true;

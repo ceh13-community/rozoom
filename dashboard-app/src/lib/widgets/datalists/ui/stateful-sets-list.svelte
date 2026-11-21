@@ -1,6 +1,7 @@
 <script lang="ts">
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
+  import ScaleDialog from "$shared/ui/scale-dialog.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
   import { onDestroy, onMount } from "svelte";
   import { BaseDirectory, writeTextFile } from "@tauri-apps/plugin-fs";
@@ -1439,15 +1440,17 @@
     }
   }
 
+  let scaleTarget = $state<{ items: StatefulSetItem[]; currentReplicas: number } | null>(null);
+
   async function scaleStatefulSets(items: StatefulSetItem[], replicas?: number) {
     if (!data?.slug || items.length === 0) return;
     let desiredReplicas = replicas;
     if (desiredReplicas === undefined) {
       if (items.length !== 1) return;
       const current = typeof items[0].spec?.replicas === "number" ? items[0].spec?.replicas : 1;
-      const requested = requestReplicaCount(current);
-      if (requested === null) return;
-      desiredReplicas = requested;
+      // The in-app dialog shared with Deployments; it calls back with the count.
+      scaleTarget = { items, currentReplicas: current };
+      return;
     }
 
     clearActionFeedback();
@@ -1483,17 +1486,6 @@
     }
   }
 
-  function requestReplicaCount(currentReplicas: number) {
-    if (typeof window === "undefined") return null;
-    const raw = window.prompt("Enter desired replica count (0 or greater):", String(currentReplicas));
-    if (raw === null) return null;
-    const trimmed = raw.trim();
-    if (!/^\d+$/.test(trimmed)) {
-      actionNotification = notifyError("Replica count must be a non-negative integer.");
-      return null;
-    }
-    return Number.parseInt(trimmed, 10);
-  }
 
   async function deleteStatefulSets(items: StatefulSetItem[]) {
     if (!data?.slug || items.length === 0) return;
@@ -2682,3 +2674,21 @@
     void deleteStatefulSets([item as unknown as StatefulSetItem]);
   }}
 />
+
+{#if scaleTarget}
+  <ScaleDialog
+    open={true}
+    resourceKind="StatefulSet"
+    resourceName={scaleTarget.items[0]?.metadata?.name ?? ""}
+    namespace={scaleTarget.items[0]?.metadata?.namespace ?? "default"}
+    currentReplicas={scaleTarget.currentReplicas}
+    onConfirm={(replicas) => {
+      const items = scaleTarget?.items ?? [];
+      scaleTarget = null;
+      void scaleStatefulSets(items, replicas);
+    }}
+    onCancel={() => {
+      scaleTarget = null;
+    }}
+  />
+{/if}
