@@ -90,7 +90,9 @@ test.describe("workloads rapid toggle", () => {
     for (let i = 0; i < 16; i += 1) {
       const workload = WORKLOADS[i % WORKLOADS.length]!;
       await page.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=${workload}`);
+      // The browser harness never connects a watch: a cached list must not claim Live.
       await expect(page.getByTestId("list-freshness").first()).toBeVisible();
+      await expect(page.getByTestId("list-freshness").first()).not.toContainText("Live");
     }
     await expect(page.getByText(/rapid-/i)).toBeVisible();
   });

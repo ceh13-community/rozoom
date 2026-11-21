@@ -56,7 +56,9 @@ test.describe("workloads multi-namespace spike", () => {
     const page = await context.newPage();
     await page.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=${WORKLOAD}`);
     // The indicator mounts with the list, after the 3000-row snapshot is processed.
+    // The browser harness never connects a watch: a cached list must not claim Live.
     await expect(page.getByTestId("list-freshness")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("list-freshness")).not.toContainText("Live");
     await expect(page.locator("tbody tr").nth(1)).toBeVisible({ timeout: 15_000 });
     const renderedRows = await page.locator("tbody tr").count();
     expect(renderedRows).toBeGreaterThan(10);

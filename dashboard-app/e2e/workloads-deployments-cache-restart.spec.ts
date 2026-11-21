@@ -66,13 +66,16 @@ test.describe("workloads deployments cache restart", () => {
 
     const page = await context.newPage();
     await page.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=deployments`);
+    // The browser harness never connects a watch: a cached list must not claim Live.
     await expect(page.getByTestId("list-freshness").first()).toBeVisible();
+    await expect(page.getByTestId("list-freshness").first()).not.toContainText("Live");
     await expect(page.getByText(/cached-deployment/i)).toBeVisible();
     await page.close();
 
     const reopened = await context.newPage();
     await reopened.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=deployments`);
     await expect(reopened.getByTestId("list-freshness").first()).toBeVisible();
+    await expect(reopened.getByTestId("list-freshness").first()).not.toContainText("Live");
     await expect(reopened.getByText(/cached-deployment/i)).toBeVisible();
   });
 });

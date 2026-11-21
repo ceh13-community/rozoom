@@ -56,13 +56,16 @@ test.describe("workloads configmaps cache restart", () => {
 
     const page = await context.newPage();
     await page.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=${WORKLOAD}`);
+    // The browser harness never connects a watch: a cached list must not claim Live.
     await expect(page.getByTestId("list-freshness")).toBeVisible();
+    await expect(page.getByTestId("list-freshness")).not.toContainText("Live");
     await expect(page.getByText(/cached-config/i)).toBeVisible();
     await page.close();
 
     const reopened = await context.newPage();
     await reopened.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=${WORKLOAD}`);
     await expect(reopened.getByTestId("list-freshness")).toBeVisible();
+    await expect(reopened.getByTestId("list-freshness")).not.toContainText("Live");
     await expect(reopened.getByText(/cached-config/i)).toBeVisible();
   });
 });

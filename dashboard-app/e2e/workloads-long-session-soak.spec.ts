@@ -108,7 +108,11 @@ test.describe("workloads long session soak", () => {
     for (let i = 0; i < 18; i += 1) {
       const workload = WORKLOADS[i % WORKLOADS.length]!;
       await page.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=${workload}`);
-      await expect(page.getByTestId("list-freshness").first()).toBeVisible();
+      const freshness = page.getByTestId("list-freshness").first();
+      await expect(freshness).toBeVisible();
+      // No watch connects in the browser harness: the list waits for one or polls,
+      // and never claims Live.
+      await expect(freshness).toHaveText(/^● (Reconnecting|Updated|Stale)\b/);
     }
   });
 });
