@@ -25,6 +25,8 @@ describe("cluster page sync-status contract", () => {
     expect(source).toContain(
       "const shouldShowHeaderSyncBadge = $derived($listFreshnessOwners === 0);",
     );
+    // Same for the route cache banner ("Cached · just now · Ready").
+    expect(source).toContain("!clusterDisconnected && $listFreshnessOwners === 0}");
     expect(source).toContain("effectiveWorkspaceLayout === 1");
     expect(source).toContain("const headerSyncStatus = $derived.by(() => {");
     expect(source).toContain("const headerSyncStatusText = $derived.by(() => {");

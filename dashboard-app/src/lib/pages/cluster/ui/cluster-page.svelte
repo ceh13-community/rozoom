@@ -2097,7 +2097,8 @@
           </div>
         {/if}
 
-        {#if workloadCacheBanner && hasEffectiveWorkloadData && !clusterDisconnected}
+        <!-- A list with its own freshness indicator says this already. -->
+        {#if workloadCacheBanner && hasEffectiveWorkloadData && !clusterDisconnected && $listFreshnessOwners === 0}
           <div
             class="mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300"
           >
