@@ -6,11 +6,7 @@ import { describe, expect, it } from "vitest";
 // put it over the text in the tab: unsaved edits were gone without a question. Every
 // open path now checks the tab first and only shows it again when it has edits.
 const OPEN_PATHS: Array<[file: string, opener: string, load: string]> = [
-  [
-    "deployments-list.svelte",
-    "async function openYamlForDeployment(",
-    "await kubectlRawArgsFront(",
-  ],
+  ["deployments-list.svelte", "async function openYamlForDeployment(", "await loadDeploymentYaml("],
   ["daemon-sets-list.svelte", "async function openYamlForDaemonSet(", "await refreshYamlForTab("],
   [
     "stateful-sets-list.svelte",
@@ -26,7 +22,7 @@ const OPEN_PATHS: Array<[file: string, opener: string, load: string]> = [
     "await refreshYamlForTab(",
   ],
   ["configuration-list.svelte", "async function openYamlTarget(", "await loadYamlForTab("],
-  ["pods-list/pod-workbench-panel.svelte", "async function openYamlForPod(", "await readPodYaml("],
+  ["pods-list/pod-workbench-panel.svelte", "async function openYamlForPod(", "await loadPodYaml("],
 ];
 
 describe("opening Edit YAML again keeps unsaved edits", () => {

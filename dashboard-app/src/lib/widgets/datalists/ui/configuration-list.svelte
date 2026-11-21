@@ -165,6 +165,7 @@
   import WatcherToolbarControls from "./watcher-toolbar-controls.svelte";
   import {
     announceWorkbenchTabClosed,
+    confirmDiscardYamlEdits,
     confirmWorkbenchTabClose,
     hasUnsavedYaml,
     isSameClosedTab,
@@ -3299,6 +3300,7 @@
     if (!clusterId) return;
     const tab = getYamlTab(tabId);
     if (!tab) return;
+    if (!(await confirmDiscardYamlEdits(tab))) return;
     updateYamlTab(tabId, (current) => ({
       ...current,
       yamlLoading: true,

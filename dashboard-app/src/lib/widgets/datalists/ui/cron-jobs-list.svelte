@@ -92,6 +92,7 @@
   import { subscribeUntracked } from "$shared/lib/subscribe-untracked";
   import {
     announceWorkbenchTabClosed,
+    confirmDiscardYamlEdits,
     confirmWorkbenchTabClose,
     hasUnsavedYaml,
     isSameClosedTab,
@@ -1089,6 +1090,7 @@
   async function refreshYamlForTab(tabId: string) {
     const tab = getYamlTab(tabId);
     if (!tab || !data?.slug) return;
+    if (!(await confirmDiscardYamlEdits(tab))) return;
     await detailsActions.runLatest(`yaml:${tabId}`, async ({ signal, isLatest }) => {
       updateYamlTab(tabId, (current) => ({ ...current, yamlLoading: true, yamlError: null }));
       try {

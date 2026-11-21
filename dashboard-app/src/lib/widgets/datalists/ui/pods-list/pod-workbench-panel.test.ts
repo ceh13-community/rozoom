@@ -25,6 +25,10 @@ vi.mock("$shared/api/kubectl-proxy", () => ({
   })),
 }));
 
+vi.mock("$shared/ui/yaml-editor.svelte", async () => ({
+  default: (await import("../../../../../test/mocks/yaml-editor-stub.svelte")).default,
+}));
+
 vi.mock("$features/pod-details", () => ({
   loadPodEvents: vi.fn(async () => [
     {
@@ -277,6 +281,46 @@ describe("PodWorkbenchPanel", () => {
 
     await waitFor(() => expect(view.getByText("Pod logs: prod/api-0")).toBeInTheDocument());
     expect(view.getAllByRole("button", { name: "Close api-0 tab" })).toHaveLength(1);
+  });
+
+  it("asks before Refresh or Reload from cluster replaces edited YAML", async () => {
+    const pod = {
+      metadata: { uid: "uid-1", name: "api-0", namespace: "prod" },
+      spec: { containers: [{ name: "api" }] },
+    } as unknown as import("$shared/model/clusters").PodItem;
+    const view = render(PodWorkbenchPanel, {
+      props: {
+        clusterId: "cluster-1",
+        podsByUid: new Map([["uid-1", pod]]),
+        metricsByKey: new Map(),
+        metricsError: null,
+        request: { token: 1, kind: "yaml" as const, podUid: "uid-1" },
+      },
+    });
+    const editor = () => view.getByLabelText("YAML editor") as HTMLTextAreaElement;
+    await waitFor(() => expect(editor().value).toContain("name: api-0"));
+    await fireEvent.input(editor(), { target: { value: "my edit" } });
+
+    const rawMock = vi.mocked(kubectlRawArgsFront);
+    const defaultRaw = rawMock.getMockImplementation();
+    rawMock.mockImplementation(async (args: string[]) =>
+      args.includes("yaml")
+        ? { output: "apiVersion: v1\nkind: Pod\nmetadata:\n  name: fresh\n", errors: "", code: 0 }
+        : { output: "", errors: "", code: 0 },
+    );
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    try {
+      await fireEvent.click(view.getByRole("button", { name: "Refresh" }));
+      await waitFor(() => expect(confirmSpy).toHaveBeenCalledTimes(1));
+      expect(confirmSpy.mock.calls[0][0]).toContain("Discard your edits");
+      expect(editor().value).toBe("my edit");
+
+      confirmSpy.mockReturnValue(true);
+      await fireEvent.click(view.getByRole("button", { name: "Refresh" }));
+      await waitFor(() => expect(editor().value).toContain("name: fresh"));
+    } finally {
+      if (defaultRaw) rawMock.mockImplementation(defaultRaw);
+    }
   });
 
   it("a one-shot read that returns late does not overwrite the running stream", async () => {

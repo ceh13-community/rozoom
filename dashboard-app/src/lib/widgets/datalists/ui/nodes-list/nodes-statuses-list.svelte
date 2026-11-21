@@ -68,6 +68,7 @@
   import WorkloadSelectionBar from "../common/workload-selection-bar.svelte";
   import {
     announceWorkbenchTabClosed,
+    confirmDiscardYamlEdits,
     confirmWorkbenchTabClose,
     hasUnsavedYaml,
     isSameClosedTab,
@@ -1019,6 +1020,7 @@
     if (!data?.slug) return;
     const tab = getYamlTab(tabId);
     if (!tab) return;
+    if (!(await confirmDiscardYamlEdits(tab))) return;
 
     updateYamlTab(tabId, (current) => ({ ...current, yamlLoading: true, yamlError: null }));
 

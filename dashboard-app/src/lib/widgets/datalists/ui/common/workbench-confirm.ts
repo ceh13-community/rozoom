@@ -41,6 +41,20 @@ export function hasUnsavedYaml(
   return (tab.yamlText ?? "") !== (tab.yamlOriginalText ?? "");
 }
 
+/**
+ * Refresh or Reload from cluster on a YAML tab replaces its text. With unsaved edits that
+ * loses work, so the user is asked first; a clean tab reloads at once.
+ */
+export async function confirmDiscardYamlEdits(
+  tab: { yamlText?: string | null; yamlOriginalText?: string | null } | null | undefined,
+) {
+  if (!hasUnsavedYaml(tab)) return true;
+  return confirmAction(
+    "Discard your edits and load the YAML from the cluster?\nUnsaved changes will be lost.",
+    "Discard edits?",
+  );
+}
+
 export async function confirmWorkbenchTabClose(target: WorkbenchTabCloseTarget) {
   if (!workbenchTabCloseNeedsConfirm(target)) return true;
   const kindLabel = normalizeKindLabel(target.kind);

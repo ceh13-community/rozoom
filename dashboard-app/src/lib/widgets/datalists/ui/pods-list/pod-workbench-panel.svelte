@@ -48,6 +48,7 @@
   } from "./workbench-session";
   import {
     announceWorkbenchTabClosed,
+    confirmDiscardYamlEdits,
     confirmWorkbenchTabClose,
     hasUnsavedYaml,
     isSameClosedTab,
@@ -1015,6 +1016,10 @@
         `${pod.metadata?.namespace ?? "default"}/${pod.metadata?.name ?? "unknown"}`,
     });
     if (keepEdits) return;
+    await loadPodYaml(tabId, pod);
+  }
+
+  async function loadPodYaml(tabId: string, pod: Partial<PodItem>) {
     try {
       const yaml = await readPodYaml(pod);
       updateYamlTab(tabId, {
@@ -1030,6 +1035,19 @@
       });
       onError(error instanceof Error ? error.message : "Failed to load pod YAML.");
     }
+  }
+
+  /** Refresh and Reload from cluster: the YAML again, after asking when the tab has edits. */
+  async function reloadYamlTab(tabId: string, pod: Partial<PodItem>) {
+    const tab = yamlTabs.find((item) => item.id === tabId);
+    if (!tab) return;
+    const confirmed = await confirmDiscardYamlEdits({
+      yamlText: tab.yamlText,
+      yamlOriginalText: tab.originalYamlText,
+    });
+    if (!confirmed) return;
+    updateYamlTab(tabId, { yamlLoading: true, yamlError: null });
+    await loadPodYaml(tabId, pod);
   }
 
   async function openEventsForPod(pod: Partial<PodItem>) {
@@ -1492,6 +1510,7 @@
                     {getYamlCompareDiffLines}
                     {getPodForUid}
                     {openYamlForPod}
+                    {reloadYamlTab}
                     {updateLogsTab}
                     {updateYamlTab}
                     {saveYamlTab}
@@ -1546,6 +1565,7 @@
                       {getYamlCompareDiffLines}
                       {getPodForUid}
                       {openYamlForPod}
+                      {reloadYamlTab}
                       {updateLogsTab}
                       {updateYamlTab}
                         {saveYamlTab}
