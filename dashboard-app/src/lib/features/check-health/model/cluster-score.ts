@@ -160,6 +160,12 @@ const isUsable = (report: { status?: unknown } | null | undefined) =>
 const isFlagged = (item: { status?: unknown }) =>
   item.status === "warning" || item.status === "critical";
 
+type ResourcesHygieneWorkloads = NonNullable<ClusterHealthChecks["resourcesHygiene"]>["workloads"];
+
+// Synthetic fleet and fixture reports carry summary and items only; the workload list is
+// optional there, and a report without it names nothing.
+const listWorkloads = (report: { workloads?: ResourcesHygieneWorkloads }) => report.workloads ?? [];
+
 // Per-container items repeat the same pod or workload; each object is named once.
 const createRisk = (risk: Omit<ClusterRiskItem, "penalty"> & { penalty: number }) => ({
   ...risk,
@@ -220,7 +226,7 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
           penalty: clamp(missingSeverity, 4, 15),
           // Items also list containers that only lack a CPU limit (optional), so an ok
           // workload would be named; the per-workload status is the verdict.
-          references: resources.workloads
+          references: listWorkloads(resources)
             .filter(isFlagged)
             .map((item) => `${item.namespace}/${item.workloadType}/${item.workload}`),
         }),

@@ -266,6 +266,22 @@ describe("cluster score rule list", () => {
     expect(refs("rbac-overprivileged")).toEqual([]);
   });
 
+  // The synthetic fleet builds its reports from a summary and an empty item list only.
+  it("tolerates a resources report that has no workload list", () => {
+    const checks = baseChecks();
+    checks.resourcesHygiene = report({
+      status: "warning",
+      summary: summary(0, 1),
+      items: [],
+      updatedAt: 0,
+    });
+
+    const rules = byId(checks);
+
+    expect(rules["resources-missing"].status).toBe("fail");
+    expect(rules["resources-missing"].risk?.references).toEqual([]);
+  });
+
   it("passes a rule only when its check produced a clean report", () => {
     const rules = byId(passingChecks());
     expect(Object.values(rules).filter((rule) => rule.status !== "pass")).toEqual([]);
