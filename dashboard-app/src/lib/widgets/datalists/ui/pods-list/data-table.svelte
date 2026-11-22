@@ -607,7 +607,7 @@
 
   <div class="grid w-full grid-cols-1 overflow-visible">
     <div
-      class="pods-k9s-table max-h-[70vh] overflow-auto rounded-lg border border-border/60 bg-background/40"
+      class="pods-k9s-table max-h-[calc(100dvh-8.5rem)] overflow-auto rounded-lg border border-border/60 bg-background/40"
       onscroll={handleTableScroll}
     >
       <div

@@ -154,6 +154,7 @@
       <Button
         variant="ghost"
         size="icon"
+        class="h-6 w-6"
         aria-label={`Open actions for ${name}`}
         onclick={(event) => event.stopPropagation()}
       >

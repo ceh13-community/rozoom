@@ -115,7 +115,7 @@
   }
 
   .sticky-table-cell {
-    @apply sticky top-0 z-10 h-10 bg-background text-muted-foreground;
+    @apply sticky top-0 z-10 h-8 bg-background text-muted-foreground;
   }
 
   .sticky-table-group-header {

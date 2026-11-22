@@ -85,6 +85,7 @@
     <Button
       variant="ghost"
       size="icon"
+      class="h-6 w-6"
       aria-label={`Open actions for ${name}`}
       title={namespace ? `Actions: ${namespace}/${name}` : `Actions: ${name}`}
       disabled={disabled || isBusy}
