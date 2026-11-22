@@ -1,7 +1,8 @@
-import { writable } from "svelte/store";
+import { get, writable } from "svelte/store";
 import {
   detectAvailableClis,
   detectCloudConfigs,
+  detectOsToolPresence,
   detectOsTools,
   type DetectedCli,
   type DetectedCloudConfig,
@@ -42,5 +43,19 @@ export async function loadDetectedClis(): Promise<void> {
     detectedCloudConfigs.set([]);
   } finally {
     isCliDetectionLoading.set(false);
+  }
+}
+
+/**
+ * Which cloud CLIs are installed, for Cloud Import, before the person runs the full scan:
+ * `which` only, the CLIs themselves are not run. A full scan already done is kept.
+ */
+export async function loadCloudCliPresence(tools: readonly string[]): Promise<void> {
+  if (get(detectedOsTools).length > 0) return;
+  try {
+    const found = await detectOsToolPresence(tools);
+    if (get(detectedOsTools).length === 0) detectedOsTools.set(found);
+  } catch {
+    // Detection is best-effort: without it no installed CLI is offered.
   }
 }

@@ -18,11 +18,13 @@ vi.mock("$features/cluster-manager/api/cloud-import", () => ({
   listCloudClustersAllScopes: vi.fn(async () => ({ clusters: [], errors: [] })),
   importCloudCluster: vi.fn(),
   getSupportedCloudProviders: () => [],
+  getUnbundledCloudTools: () => [],
   getAvailableCloudProviders: () => [],
   getProviderTool: () => null,
 }));
 vi.mock("$features/cluster-finder/model/cli-store", () => ({
   detectedCloudConfigs: readable([]),
+  loadCloudCliPresence: vi.fn(async () => undefined),
   detectedOsTools: readable([]),
 }));
 vi.mock("$features/cluster-finder", () => ({

@@ -28,6 +28,7 @@
     listCloudClustersAllScopes,
     importCloudCluster,
     getAvailableCloudProviders,
+    getUnbundledCloudTools,
     getProviderTool,
     type CloudCluster,
     type CloudScope,
@@ -40,6 +41,7 @@
   import {
     detectedCloudConfigs,
     detectedOsTools,
+    loadCloudCliPresence,
   } from "$features/cluster-finder/model/cli-store";
   import {
     getLocalScanConsent,
@@ -363,6 +365,13 @@
   // Cloud import runs the provider's CLI: bundled in the full build, installed on the
   // machine for slim. Without any of them the method is not offered at all.
   const availableCloudProviders = $derived(getAvailableCloudProviders($detectedOsTools));
+  // A cloud CLI the build does not bundle counts once it is found on the PATH (`which`
+  // only; the CLI itself is not run until the person lists clusters).
+  $effect(() => {
+    const tools = getUnbundledCloudTools();
+    if (tools.length > 0) void loadCloudCliPresence(tools);
+  });
+
   // Start on a provider this build can run.
   $effect(() => {
     const first = availableCloudProviders[0];

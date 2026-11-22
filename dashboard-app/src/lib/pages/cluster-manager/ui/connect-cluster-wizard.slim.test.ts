@@ -26,6 +26,7 @@ vi.mock("$features/cluster-manager/api/cloud-import", () => ({
   listCloudClustersAllScopes: vi.fn(async () => ({ clusters: [], errors: [] })),
   importCloudCluster: vi.fn(),
   getSupportedCloudProviders: () => ["AWS EKS", "GKE"],
+  getUnbundledCloudTools: () => [],
   getAvailableCloudProviders: (tools: Array<{ tool: string; available: boolean }>) =>
     [
       ["AWS EKS", "aws"],
@@ -38,6 +39,7 @@ vi.mock("$features/cluster-manager/api/cloud-import", () => ({
 }));
 vi.mock("$features/cluster-finder/model/cli-store", () => ({
   detectedCloudConfigs: readable([]),
+  loadCloudCliPresence: vi.fn(async () => undefined),
   get detectedOsTools() {
     return readable(osTools.value);
   },

@@ -316,6 +316,13 @@ export function getAvailableCloudProviders(
     .map(([provider]) => provider);
 }
 
+/** Cloud CLIs this build does not bundle: Cloud Import can run them only if installed. */
+export function getUnbundledCloudTools(): string[] {
+  return [...new Set(Object.values(PROVIDERS).map((config) => config.tool))].filter(
+    (tool) => !isToolBundled(tool),
+  );
+}
+
 /** Tool the provider's import flow needs (bundled or PATH). */
 export function getProviderTool(provider: string): string | null {
   return provider in PROVIDERS ? PROVIDERS[provider].tool : null;
