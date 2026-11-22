@@ -1,10 +1,11 @@
 <script lang="ts">
   import { registerUnsavedWork } from "$shared/lib/unsaved-work";
+  import { isLiveItemGone, pickLiveItem } from "./common/workload-details-model";
   import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import ScaleDialog from "$shared/ui/scale-dialog.svelte";
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, untrack } from "svelte";
   import { BaseDirectory, writeTextFile } from "@tauri-apps/plugin-fs";
   import GitCompareArrows from "@lucide/svelte/icons/git-compare-arrows";
   import Target from "@lucide/svelte/icons/target";
@@ -56,7 +57,7 @@
   import ResourceLogsSheet from "./common/resource-logs-sheet.svelte";
   import ResourceYamlSheet from "./common/resource-yaml-sheet.svelte";
   import ResourceDetailsSheet from "./resource-details-sheet.svelte";
-  import { writable } from "svelte/store";
+  import { get, writable } from "svelte/store";
   import {
     findReplicaSetItem,
     getFilteredReplicaSets,
@@ -295,6 +296,21 @@
     });
   });
   const selectedItem = writable<ReplicaSetItem | null>(null);
+
+  // The open details follow the list: status, ready counts and conditions change while the
+  // panel is open, and a copy from the moment it opened contradicted the Pods block.
+  $effect(() => {
+    const current = untrack(() => get(selectedItem));
+    // Deleted while the panel was open: close it instead of showing what is gone.
+    if (isLiveItemGone(current, replicaSetsSnapshot)) {
+      untrack(() => {
+        isSheetOpen.set(false);
+      });
+      return;
+    }
+    const next = pickLiveItem(current, replicaSetsSnapshot);
+    if (next) selectedItem.set(next);
+  });
   const isSheetOpen = writable(false);
   let watcherEnabled = $state(DEFAULT_WATCHER_SETTINGS.enabled);
   let watcherRefreshSeconds = $state(DEFAULT_WATCHER_SETTINGS.refreshSeconds);
@@ -2312,6 +2328,7 @@
 </div>
 <ResourceDetailsSheet
   clusterId={data.slug}
+  podMetricsRefreshSeconds={watcherPolicy.refreshSeconds}
   title="Replica Set"
   selectedItem={selectedItem}
   isOpen={isSheetOpen}

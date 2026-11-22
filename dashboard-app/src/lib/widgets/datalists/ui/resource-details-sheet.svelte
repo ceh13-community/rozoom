@@ -16,7 +16,15 @@
   import ScrollText from "@lucide/svelte/icons/scroll-text";
   import Search from "@lucide/svelte/icons/search";
   import Trash from "@lucide/svelte/icons/trash";
-  import { tick } from "svelte";
+  import { tick, untrack } from "svelte";
+  import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
+  import {
+    createTrailingThrottle,
+    mapWorkloadPods,
+    parseTopPods,
+    workloadPodsSelector,
+    type WorkloadDetailsPod,
+  } from "./common/workload-details-model";
   import type { Writable } from "svelte/store";
   import DetailsHeaderActions from "./common/details-header-actions.svelte";
   import DetailsMetadataGrid from "./common/details-metadata-grid.svelte";
@@ -42,6 +50,8 @@
   type ResourceMetadata = NonNullable<ResourceItem["metadata"]>;
 
   interface ResourceDetailsSheetProps<TItem> {
+    /** How often CPU and memory of the Pods block refresh: the list's sync interval. */
+    podMetricsRefreshSeconds?: number;
     clusterId: string;
     title: string;
     selectedItem: Writable<TItem | null>;
@@ -105,6 +115,7 @@
     runtimeReason = null,
     runtimeRequestPath = null,
     runtimeSyncError = null,
+    podMetricsRefreshSeconds = 30,
     events = [],
     eventsLoading = false,
     eventsError = null,
@@ -112,6 +123,127 @@
 
   function closeDetails() {
     isOpen.set(false);
+  }
+
+  // The Pods block reads the cluster: a StatefulSet, ReplicaSet or CronJob object does not
+  // list its pods. They load when the panel opens, then at most every 5 s while the object
+  // changes (a rollout changes it several times a second), always once more after the last
+  // change. CPU and memory come from `kubectl top` on the list's sync interval.
+  const PODS_RELOAD_MIN_MS = 5_000;
+  let clusterPods = $state<WorkloadDetailsPod[] | null>(null);
+  let clusterPodsTop = $state<Map<string, { cpu: string; memory: string }>>(new Map());
+  let clusterPodsError = $state<string | null>(null);
+  let clusterPodsLoading = $state(false);
+  // Plain, not $state: the effects below read and write them.
+  let clusterPodsObject: string | null = null;
+  let clusterPodsVersion: string | null = null;
+  let clusterPodsTarget: { namespace: string; selector: string; object: string } | null = null;
+  let clusterPodsController: AbortController | null = null;
+  let clusterPodsTopTimer: ReturnType<typeof setInterval> | null = null;
+  const clusterPodsReload = createTrailingThrottle(() => {
+    void loadClusterPods();
+  }, PODS_RELOAD_MIN_MS);
+
+  async function loadClusterPods() {
+    const target = clusterPodsTarget;
+    if (!target) return;
+    clusterPodsController?.abort();
+    const controller = new AbortController();
+    clusterPodsController = controller;
+    try {
+      const pods = await kubectlRawArgsFront(
+        ["get", "pods", "-n", target.namespace, "-l", target.selector, "-o", "json"],
+        { clusterId, signal: controller.signal },
+      );
+      if (controller.signal.aborted || clusterPodsObject !== target.object) return;
+      if (pods.code !== 0) throw new Error(pods.errors || "Failed to load pods.");
+      clusterPods = mapWorkloadPods(pods.output || "{}", target.namespace);
+      clusterPodsError = null;
+      // A pod going away does not change the workload: reload (throttled) until it is gone.
+      if (clusterPods.some((pod) => pod.status === "Terminating")) clusterPodsReload.call();
+    } catch (error) {
+      if (controller.signal.aborted || clusterPodsObject !== target.object) return;
+      clusterPodsError = error instanceof Error ? error.message : "Failed to load pods.";
+    } finally {
+      if (clusterPodsObject === target.object) clusterPodsLoading = false;
+    }
+  }
+
+  async function loadClusterPodsTop() {
+    const target = clusterPodsTarget;
+    if (!target) return;
+    const top = await kubectlRawArgsFront(
+      ["top", "pods", "-n", target.namespace, "-l", target.selector, "--no-headers"],
+      { clusterId },
+    ).catch(() => null);
+    if (clusterPodsObject !== target.object || top?.code !== 0) return;
+    clusterPodsTop = parseTopPods(top.output);
+  }
+
+  function stopClusterPods() {
+    clusterPodsReload.cancel();
+    clusterPodsController?.abort();
+    clusterPodsController = null;
+    if (clusterPodsTopTimer) clearInterval(clusterPodsTopTimer);
+    clusterPodsTopTimer = null;
+  }
+
+  $effect(() => {
+    const item = $selectedItem;
+    const open = $isOpen;
+    const selector = open && !isJobDetails() ? workloadPodsSelector(item) : null;
+    untrack(() => {
+      if (!item || !selector) {
+        stopClusterPods();
+        clusterPodsObject = null;
+        clusterPodsTarget = null;
+        clusterPods = null;
+        clusterPodsTop = new Map();
+        clusterPodsError = null;
+        clusterPodsLoading = false;
+        return;
+      }
+      const namespace = item.metadata?.namespace ?? "default";
+      const object = `${namespace}/${item.metadata?.name ?? ""}|${selector}`;
+      const version =
+        (item.metadata as { resourceVersion?: string } | undefined)?.resourceVersion ?? "";
+      clusterPodsTarget = { namespace, selector, object };
+      if (object !== clusterPodsObject) {
+        stopClusterPods();
+        clusterPodsObject = object;
+        clusterPodsVersion = version;
+        clusterPods = null;
+        clusterPodsTop = new Map();
+        clusterPodsError = null;
+        clusterPodsLoading = true;
+        clusterPodsReload.markRan();
+        void loadClusterPods();
+        void loadClusterPodsTop();
+        clusterPodsTopTimer = setInterval(
+          () => {
+            void loadClusterPodsTop();
+          },
+          Math.max(5, podMetricsRefreshSeconds) * 1000,
+        );
+        return;
+      }
+      if (version !== clusterPodsVersion) {
+        clusterPodsVersion = version;
+        clusterPodsReload.call();
+      }
+    });
+  });
+
+  // Leaving the page: stop the pending reload, the request in flight and the metrics timer.
+  $effect(() => stopClusterPods);
+
+  function getDetailsPods(): WorkloadDetailsPod[] {
+    const pods = clusterPods ?? getPodsFromStatus();
+    if (clusterPodsTop.size === 0) return pods;
+    return pods.map((pod) => {
+      const top = clusterPodsTop.get(pod.name);
+      return top ? { ...pod, cpu: top.cpu, memory: top.memory } : pod;
+    });
   }
 
   async function runAction(action?: (item: ResourceItem) => void) {
@@ -813,6 +945,32 @@
       <div class="text-xs text-muted-foreground">
         Namespace: {$selectedItem?.metadata?.namespace ?? "default"}
       </div>
+      <!-- One order in every workload panel: Explain, Traffic chain, Properties, Pods, Events. -->
+      <DetailsExplainState
+        sourceState={runtimeSourceState}
+        profileLabel={runtimeProfileLabel}
+        lastUpdatedLabel={runtimeLastUpdatedLabel}
+        detail={runtimeDetail}
+        reason={runtimeReason}
+        requestPath={runtimeRequestPath}
+        describeCommand={getDescribeCommand()}
+        syncError={runtimeSyncError}
+      />
+      {#if isStatefulSetDetails() || isReplicaSetDetails() || isJobDetails() || isCronJobDetails()}
+        <ResourceTrafficChain
+          {clusterId}
+          resourceKind={isStatefulSetDetails()
+            ? "StatefulSet"
+            : isReplicaSetDetails()
+              ? "ReplicaSet"
+              : isJobDetails()
+                ? "Job"
+                : "CronJob"}
+          resourceName={$selectedItem?.metadata?.name ?? ""}
+          resourceNamespace={$selectedItem?.metadata?.namespace ?? "default"}
+          raw={$selectedItem as unknown as Record<string, unknown>}
+        />
+      {/if}
       <h3 class="my-4 font-bold">Properties</h3>
       <DetailsMetadataGrid
         contextKey={`${$selectedItem?.metadata?.namespace ?? "default"}/${$selectedItem?.metadata?.name ?? "-"}`}
@@ -1088,21 +1246,6 @@
           </div>
         {/if}
       </div>
-      {#if isStatefulSetDetails() || isReplicaSetDetails() || isJobDetails() || isCronJobDetails()}
-        <ResourceTrafficChain
-          {clusterId}
-          resourceKind={isStatefulSetDetails()
-            ? "StatefulSet"
-            : isReplicaSetDetails()
-              ? "ReplicaSet"
-              : isJobDetails()
-                ? "Job"
-                : "CronJob"}
-          resourceName={$selectedItem?.metadata?.name ?? ""}
-          resourceNamespace={$selectedItem?.metadata?.namespace ?? "default"}
-          raw={$selectedItem as unknown as Record<string, unknown>}
-        />
-      {/if}
 
       {#if !isCronJobDetails() && !isJobDetails() && !isReplicaSetDetails() && !isStatefulSetDetails() && !isNodeDetails()}
         <h3 class="my-4 font-bold">Spec</h3>
@@ -1138,10 +1281,18 @@
       {:else if !isJobDetails()}
         <h3 class="my-4 font-bold">Pods</h3>
         <div class="space-y-1 text-sm">
-          {#if getPodsFromStatus().length === 0}
-            <div class="rounded border p-3 text-muted-foreground">No pods found.</div>
+          {#if clusterPodsError}
+            <div class="rounded border p-3 text-rose-600 dark:text-rose-400">
+              {clusterPodsError}
+            </div>
+          {:else if clusterPodsLoading && clusterPods === null}
+            <div class="rounded border p-3 text-muted-foreground">Loading pods...</div>
+          {:else if getDetailsPods().length === 0}
+            <div class="rounded border p-3 text-muted-foreground">
+              {isCronJobDetails() ? "No running jobs, so no pods." : "No pods found."}
+            </div>
           {:else}
-            {#each getPodsFromStatus() as pod}
+            {#each getDetailsPods() as pod (pod.name)}
               <div
                 class="grid grid-cols-1 gap-2 rounded border p-2 sm:grid-cols-[2fr_2fr_1fr_1fr_1fr_1fr_1fr]"
               >
@@ -1164,16 +1315,6 @@
           {/if}
         </div>
       {/if}
-      <DetailsExplainState
-        sourceState={runtimeSourceState}
-        profileLabel={runtimeProfileLabel}
-        lastUpdatedLabel={runtimeLastUpdatedLabel}
-        detail={runtimeDetail}
-        reason={runtimeReason}
-        requestPath={runtimeRequestPath}
-        describeCommand={getDescribeCommand()}
-        syncError={runtimeSyncError}
-      />
 
       <h3 class="my-4 font-bold">Events</h3>
       <DetailsEventsList

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { registerUnsavedWork } from "$shared/lib/unsaved-work";
+  import { isLiveItemGone, pickLiveItem } from "./common/workload-details-model";
   import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
@@ -7,10 +8,10 @@
   import DetailsSheetPortal from "$shared/ui/details-sheet-portal.svelte";
   import { hasOpenOverlay } from "$shared/lib/keyboard-manager";
   import { trackCoreAction } from "$shared/analytics/wau-c";
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, untrack } from "svelte";
   import { path } from "@tauri-apps/api";
   import { BaseDirectory, mkdir, remove, writeTextFile } from "@tauri-apps/plugin-fs";
-  import { writable } from "svelte/store";
+  import { get, writable } from "svelte/store";
   import type { ColumnDef } from "@tanstack/table-core";
   import { resolvePageClusterName, type PageData } from "$entities/cluster";
   import { selectedNamespace } from "$features/namespace-management";
@@ -80,6 +81,7 @@
   import DetailsMetadataGrid from "./common/details-metadata-grid.svelte";
   import ResourceTrafficChain from "./common/resource-traffic-chain.svelte";
   import DetailsEventsList from "./common/details-events-list.svelte";
+  import DetailsExplainState from "./common/details-explain-state.svelte";
   import {
     buildRolloutCommandArgs,
     loadRolloutCommandOutput,
@@ -214,6 +216,21 @@
 
   let daemonSetsSnapshot = $state<DaemonSetItem[]>([]);
   const selectedItem = writable<DaemonSetItem | null>(null);
+
+  // The open details follow the list: status, ready counts and conditions change while the
+  // panel is open, and a copy from the moment it opened contradicted the Pods block.
+  $effect(() => {
+    const current = untrack(() => get(selectedItem));
+    // Deleted while the panel was open: close it instead of showing what is gone.
+    if (isLiveItemGone(current, daemonSetsSnapshot)) {
+      untrack(() => {
+        isSheetOpen.set(false);
+      });
+      return;
+    }
+    const next = pickLiveItem(current, daemonSetsSnapshot);
+    if (next) selectedItem.set(next);
+  });
   const isSheetOpen = writable(false);
   const workbenchOpen = writable(true);
 
@@ -3483,6 +3500,23 @@
       <div class="text-xs text-muted-foreground">
         Namespace: {$selectedItem.metadata?.namespace ?? "default"}
       </div>
+      <!-- One order in every workload panel: Explain, Traffic chain, Properties, Pods, Events. -->
+      <DetailsExplainState
+        sourceState={daemonSetsRuntimeSourceState}
+        profileLabel={daemonSetsRuntimeProfileLabel}
+        lastUpdatedLabel={daemonSetsRuntimeLastUpdatedLabel}
+        detail={daemonSetsRuntimeDetail}
+        reason={daemonSetsRuntimeReason}
+        requestPath={watcherPolicy.mode === "stream"
+          ? "kubectl watch stream for daemon sets"
+          : `poll every ${watcherPolicy.refreshSeconds}s`}
+        describeCommand={buildKubectlDescribeCommand({
+          resource: "daemonsets",
+          name: $selectedItem.metadata?.name ?? "",
+          namespace: $selectedItem.metadata?.namespace ?? "default",
+        })}
+        syncError={watcherError}
+      />
       <ResourceTrafficChain
         clusterId={data.slug}
         resourceKind="DaemonSet"

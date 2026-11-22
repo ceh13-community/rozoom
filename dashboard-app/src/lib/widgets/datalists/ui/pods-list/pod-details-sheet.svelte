@@ -382,6 +382,17 @@
           resourceType="pod"
         />
       {/if}
+      <!-- One order in every workload panel: Explain, Traffic chain, Properties, then the rest. -->
+      <DetailsExplainState
+        sourceState={runtimeSourceState}
+        profileLabel={runtimeProfileLabel}
+        lastUpdatedLabel={runtimeLastUpdatedLabel}
+        detail={runtimeDetail}
+        reason={runtimeReason}
+        requestPath={runtimeRequestPath}
+        describeCommand={getDescribeCommand()}
+        syncError={runtimeSyncError}
+      />
       <ResourceTrafficChain
         {clusterId}
         resourceKind="Pod"
@@ -423,17 +434,6 @@
           {metricsError}
         </div>
       {/if}
-
-      <DetailsExplainState
-        sourceState={runtimeSourceState}
-        profileLabel={runtimeProfileLabel}
-        lastUpdatedLabel={runtimeLastUpdatedLabel}
-        detail={runtimeDetail}
-        reason={runtimeReason}
-        requestPath={runtimeRequestPath}
-        describeCommand={getDescribeCommand()}
-        syncError={runtimeSyncError}
-      />
 
       <h3 class="my-4 font-bold">Containers</h3>
       {#if getContainerRows().length === 0}

@@ -1,12 +1,17 @@
 <script lang="ts">
   import { registerUnsavedWork } from "$shared/lib/unsaved-work";
+  import {
+    createTrailingThrottle,
+    isLiveItemGone,
+    pickLiveItem,
+  } from "./common/workload-details-model";
   import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
   import DetailsSheetPortal from "$shared/ui/details-sheet-portal.svelte";
   import { hasOpenOverlay } from "$shared/lib/keyboard-manager";
-  import { createRawSnippet, onDestroy, onMount, tick } from "svelte";
+  import { createRawSnippet, onDestroy, onMount, tick, untrack } from "svelte";
   import { writable } from "svelte/store";
   import type { ColumnDef } from "@tanstack/table-core";
   import { path } from "@tauri-apps/api";
@@ -243,6 +248,22 @@
   let selectedItem = $state<SelectedDeployment>(null);
   let isOpen = $state(false);
   let deploymentsSnapshot = $state<DeploymentItem[]>([]);
+
+  // The open details follow the list: status, ready counts and conditions change while the
+  // panel is open, and a copy from the moment it opened (Pending while starting) stayed
+  // while the Pods block already showed the pods ready.
+  $effect(() => {
+    const current = untrack(() => selectedItem);
+    // Deleted while the panel was open: close it instead of showing what is gone.
+    if (isLiveItemGone<DeploymentItem>(current, deploymentsSnapshot)) {
+      untrack(() => {
+        isOpen = false;
+      });
+      return;
+    }
+    const next = pickLiveItem<DeploymentItem>(current, deploymentsSnapshot);
+    if (next && current) selectedItem = { ...next, uuid: current.uuid };
+  });
   let watcherEnabled = $state(DEFAULT_WATCHER_SETTINGS.enabled);
   let watcherRefreshSeconds = $state(DEFAULT_WATCHER_SETTINGS.refreshSeconds);
   let watcherError = $state<string | null>(null);
@@ -2559,14 +2580,15 @@
     });
   }
 
-  async function loadDetailsData() {
+  async function loadDetailsData(options: { quiet?: boolean } = {}) {
     if (!data?.slug || !selectedItem) return;
     const currentSelected = selectedItem;
     const name = currentSelected.metadata?.name;
     const namespace = currentSelected.metadata?.namespace ?? "default";
     if (!name) return;
     await detailsActions.runLatest("details", async ({ signal, isLatest }) => {
-      detailsLoading = true;
+      // A reload while the panel is open keeps what it shows until the new data is in.
+      if (!options.quiet) detailsLoading = true;
       detailsError = null;
       try {
         const selector = (currentSelected.spec?.selector?.matchLabels ?? {}) as Record<
@@ -2630,11 +2652,16 @@
 
         const parsedPods = JSON.parse(podsResponse.output) as {
           items?: Array<{
-            metadata?: { name?: string; namespace?: string };
+            metadata?: { name?: string; namespace?: string; deletionTimestamp?: string };
             spec?: { nodeName?: string };
             status?: { phase?: string; containerStatuses?: Array<{ ready?: boolean }> };
           }>;
         };
+        // A pod going away does not change the Deployment: keep reloading (throttled) until
+        // the pods being deleted are gone from the list.
+        if ((parsedPods.items ?? []).some((item) => item.metadata?.deletionTimestamp)) {
+          detailsReload.call();
+        }
         detailsPods = (parsedPods.items ?? []).map((item) => {
           const statuses = item.status?.containerStatuses ?? [];
           const ready = statuses.filter((status) => status.ready).length;
@@ -2649,7 +2676,9 @@
             ready: `${ready} / ${total}`,
             cpu: top?.cpu ?? "-",
             memory: top?.memory ?? "-",
-            status: item.status?.phase ?? "Unknown",
+            status: item.metadata?.deletionTimestamp
+              ? "Terminating"
+              : (item.status?.phase ?? "Unknown"),
           };
         });
 
@@ -2902,12 +2931,43 @@
     };
   });
 
+  // Pods, events and revisions load when the panel opens, then follow the object while it
+  // changes (a rollout changes it several times a second): at most every 5 s, plus once
+  // after the last change.
+  let detailsKeyRequested: string | null = null;
+  let detailsVersionRequested: string | null = null;
+  const detailsReload = createTrailingThrottle(() => {
+    void loadDetailsData({ quiet: true });
+  }, 5_000);
+
   $effect(() => {
-    if (!isOpen || !selectedItem) return;
-    const key = toActiveDetailsKey();
-    if (!key) return;
-    if (detailsKeyLoaded === key) return;
-    void loadDetailsData();
+    const open = isOpen;
+    const key = open ? toActiveDetailsKey() : null;
+    const version =
+      (selectedItem?.metadata as { resourceVersion?: string } | undefined)?.resourceVersion ?? "";
+    untrack(() => {
+      if (!key) {
+        detailsReload.cancel();
+        detailsKeyRequested = null;
+        return;
+      }
+      if (key !== detailsKeyRequested) {
+        detailsReload.cancel();
+        detailsReload.markRan();
+        detailsKeyRequested = key;
+        detailsVersionRequested = version;
+        void loadDetailsData();
+        return;
+      }
+      if (version !== detailsVersionRequested) {
+        detailsVersionRequested = version;
+        detailsReload.call();
+      }
+    });
+  });
+
+  $effect(() => () => {
+    detailsReload.cancel();
   });
 
   $effect(() => {
