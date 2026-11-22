@@ -314,8 +314,13 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
     }
   }
 
+  // Snapshots restored from disk may predate the item list; read the report loosely.
   const imageFreshness = (checks as Record<string, unknown>).imageFreshness as
-    | { status?: string; summary?: { latestTagCount?: number } }
+    | {
+        status?: string;
+        summary?: { latestTagCount?: number };
+        items?: Array<{ namespace?: string; pod?: string }>;
+      }
     | undefined;
   if (imageFreshness?.summary && (imageFreshness.summary.latestTagCount ?? 0) > 0) {
     const latestCount = imageFreshness.summary.latestTagCount ?? 0;
@@ -328,7 +333,9 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
         reason: "Mutable tags make rollbacks unpredictable and break image caching.",
         fix: "Pin images to immutable digests or semver tags.",
         penalty: clamp(latestCount * 2, 4, 12),
-        references: [],
+        references: (imageFreshness.items ?? [])
+          .filter((item) => item.pod)
+          .map((item) => `${item.namespace ?? ""}/${item.pod}`),
       }),
     );
   }

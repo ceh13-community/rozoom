@@ -107,6 +107,7 @@ const failingChecks = (): ClusterHealthChecks => {
   (checks as Record<string, unknown>).imageFreshness = {
     status: "warning",
     summary: { totalContainers: 2, latestTagCount: 1, noDigestCount: 2 },
+    items: [{ namespace: "lint", pod: "app-1", container: "app", image: "nginx:latest" }],
     updatedAt: 0,
   };
   checks.probesHealth = report({
@@ -261,8 +262,8 @@ describe("cluster score rule list", () => {
     expect(refs("ingress-no-tls")).toEqual(["lint/plain"]);
     expect(refs("hpa-no-requests")).toEqual(["lint/deployment/app"]);
     expect(refs("vpa-hpa-conflict")).toEqual(["lint/app"]);
-    // These checks count objects without naming them.
-    expect(refs("image-latest")).toEqual([]);
+    expect(refs("image-latest")).toEqual(["lint/app-1"]);
+    // This check counts bindings without naming them.
     expect(refs("rbac-overprivileged")).toEqual([]);
   });
 
