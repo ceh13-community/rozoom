@@ -19,6 +19,22 @@ describe("overview scores", () => {
     expect(overview.slice(details, posture)).toContain("Reliability and security posture");
   });
 
+  // Closed, the expander still says "Unsafe": the status word is in its summary, the number
+  // opens on request.
+  it("shows the posture status word in the closed summary, without the number", () => {
+    const details = overview.indexOf('data-testid="overview-posture-details"');
+    const summary = overview.slice(
+      overview.indexOf("<summary", details),
+      overview.indexOf("</summary>", details),
+    );
+    expect(summary).toContain('data-testid="overview-posture-status"');
+    expect(summary).toContain("{postureSummary.statusLabel}");
+    expect(summary).not.toMatch(/score\b[^(]*\}/);
+    expect(overview).toContain(
+      "const postureSummary = $derived(buildClusterScore(clusterHealth));",
+    );
+  });
+
   it("names the second score for what it measures", () => {
     expect(scoreCard).toContain("Reliability and security");
     expect(scoreCard).not.toMatch(/^\s*Cluster score\s*$/m);
