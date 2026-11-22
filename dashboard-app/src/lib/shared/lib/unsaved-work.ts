@@ -5,6 +5,8 @@
  * before such a navigation.
  */
 
+import { confirmAction } from "./confirm-action";
+
 /** Returns a label per unsaved item (for example "YAML web"), empty when nothing is unsaved. */
 export type UnsavedWorkProvider = () => string[];
 
@@ -46,7 +48,36 @@ export function describeUnsavedWork(items: string[]) {
   return `Leave this page?\n\n${shown.join("\n")}${more > 0 ? `\nand ${more} more` : ""}\n\nUnsaved changes will be lost.`;
 }
 
-/** Forgets all providers (tests). */
+// Set when the user already agreed to leave: the layout lets the next navigation through
+// without asking again.
+let leaveApproved = false;
+
+export function approveNextLeave() {
+  leaveApproved = true;
+}
+
+/** True once after `approveNextLeave`: the navigation the user agreed to. */
+export function consumeLeaveApproval() {
+  const approved = leaveApproved;
+  leaveApproved = false;
+  return approved;
+}
+
+/**
+ * For an action that changes state and then leaves the page (a jump that sets the
+ * namespace first): asks before anything changes. True to go on; the navigation that
+ * follows is not asked again.
+ */
+export async function confirmLeaveWithUnsavedWork(): Promise<boolean> {
+  const unsaved = listUnsavedWork();
+  if (unsaved.length === 0) return true;
+  const confirmed = await confirmAction(describeUnsavedWork(unsaved), "Unsaved changes");
+  if (confirmed) approveNextLeave();
+  return confirmed;
+}
+
+/** Forgets all providers and any approval (tests). */
 export function resetUnsavedWorkForTests() {
   providers.clear();
+  leaveApproved = false;
 }
