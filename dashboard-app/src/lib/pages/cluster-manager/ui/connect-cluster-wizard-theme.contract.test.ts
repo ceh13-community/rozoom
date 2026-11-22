@@ -9,6 +9,8 @@ const source = readFileSync(resolve(__dirname, "connect-cluster-wizard.svelte"),
 describe("connect cluster form fields", () => {
   it("follow the app theme", () => {
     expect(source).not.toContain("bg-slate-900/50");
+    // The preview, test and Vault panels were fixed dark boxes too.
+    expect(source).not.toMatch(/\bbg-slate-(900|950)\//);
     expect(source).not.toContain("placeholder:text-slate-600");
     expect(source).not.toMatch(/<h3 class="[^"]*text-slate-200/);
     expect(source).toContain("border border-input bg-background text-foreground");

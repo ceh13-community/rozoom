@@ -1174,7 +1174,7 @@
           </div>
         </div>
         <p class="text-xs text-slate-500">
-          Requires <code class="bg-slate-700 px-1 rounded">{oidcPreset.execCommand}</code> | Scopes: {oidcPreset.defaultScopes.join(
+          Requires <code class="bg-muted px-1 rounded">{oidcPreset.execCommand}</code> | Scopes: {oidcPreset.defaultScopes.join(
             ", ",
           )}
         </p>
@@ -1389,11 +1389,11 @@
         </div>
         {#if vaultAddress.trim() && vaultSecretPath.trim()}
           {@const payload = getVaultPayload()}
-          <div class="rounded border border-slate-700 bg-slate-900/60 p-2 text-xs font-mono">
-            <p class="text-slate-500 mb-1">API call to retrieve credentials:</p>
-            <p class="text-indigo-300">{payload.method} {payload.url}</p>
+          <div class="rounded border border-border bg-muted/40 p-2 text-xs font-mono">
+            <p class="text-muted-foreground mb-1">API call to retrieve credentials:</p>
+            <p class="text-indigo-700 dark:text-indigo-300">{payload.method} {payload.url}</p>
             {#each Object.entries(payload.headers) as [k, v] (k)}
-              <p class="text-slate-500">{k}: {k.includes("Token") ? "***" : v}</p>
+              <p class="text-muted-foreground">{k}: {k.includes("Token") ? "***" : v}</p>
             {/each}
           </div>
         {/if}
@@ -1701,10 +1701,10 @@
 
     <!-- ────────── Shared preview + test strip ────────── -->
     {#if previewSupported}
-      <div class="rounded border border-slate-700 bg-slate-900/40 p-2 space-y-2">
+      <div class="rounded border border-border bg-muted/40 p-2 space-y-2">
         <div class="flex flex-wrap items-center gap-2">
           <button
-            class="text-xs px-2 py-1 rounded border border-slate-600 text-slate-300 hover:border-slate-400 transition flex items-center gap-1"
+            class="text-xs px-2 py-1 rounded border border-input text-foreground hover:border-ring transition flex items-center gap-1"
             onclick={() => (showPreview = !showPreview)}
             disabled={!previewYaml}
             title={previewYaml ? "Preview YAML" : "Fill required fields first"}
@@ -1758,9 +1758,9 @@
           {/if}
         </div>
         {#if showPreview && previewYaml}
-          <div class="rounded border border-slate-700 bg-slate-950/60 p-2">
+          <div class="rounded border border-border bg-muted/40 p-2">
             <div class="flex items-center justify-between mb-1">
-              <span class="text-xs text-slate-500">
+              <span class="text-xs text-muted-foreground">
                 Generated kubeconfig (secrets redacted)
               </span>
               <button
@@ -1771,7 +1771,7 @@
               </button>
             </div>
             <pre
-              class="text-xs font-mono text-emerald-300/80 whitespace-pre-wrap overflow-x-auto max-h-56">{maskPreview(
+              class="text-xs font-mono text-emerald-700 dark:text-emerald-300/80 whitespace-pre-wrap overflow-x-auto max-h-56">{maskPreview(
                 previewYaml,
               )}</pre>
           </div>
