@@ -1478,7 +1478,9 @@
     {#snippet body()}
       {#if !workbenchCollapsed && activeWorkbenchTab}
         <div class={workbenchFullscreen ? "min-h-0 flex-1" : "h-[min(70dvh,760px)] min-h-[430px]"}>
-          <div class="grid h-full gap-2 p-2">
+          <!-- Metrics row at its own height, the panes take the rest: two auto rows in a
+               full-height grid split the spare height and left an empty band under metrics. -->
+          <div class="grid h-full grid-rows-[auto_minmax(0,1fr)] gap-2 p-2">
             {#if getPodForUid(activeWorkbenchTab.podUid)?.metadata?.name}
               {@const activePod = getPodForUid(activeWorkbenchTab.podUid)}
               <ResourceMetricsBadge

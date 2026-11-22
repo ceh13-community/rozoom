@@ -474,42 +474,43 @@
   });
 </script>
 
-<div class="rounded border border-border bg-muted/30 p-3">
-  <div class="mb-2 flex items-center justify-between">
-    <h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Traffic Chain</h4>
-    {#if resolved && !loading}
-      <button
-        type="button"
-        class="rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
-        onclick={() => { resolved = false; void resolveChain(); }}
-      >
-        Refresh
-      </button>
+<!-- Shown only when the resource has related resources: an empty card is just a gap. -->
+{#if chain.length > 0}
+  <div class="rounded border border-border bg-muted/30 p-3">
+    <div class="mb-2 flex items-center justify-between">
+      <h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Traffic Chain</h4>
+      {#if resolved && !loading}
+        <button
+          type="button"
+          class="rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+          onclick={() => { resolved = false; void resolveChain(); }}
+        >
+          Refresh
+        </button>
+      {/if}
+    </div>
+
+    {#if loading}
+      <div class="text-xs text-muted-foreground">Resolving traffic chain<LoadingDots /></div>
+    {:else}
+      <div class="flex flex-wrap items-center gap-1.5">
+        {#each buildDisplayNodes() as node, i}
+          {#if i > 0}
+            <ArrowRight class="h-3 w-3 shrink-0 text-muted-foreground" />
+          {/if}
+          <div class={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] ${kindColors[node.kind] ?? "bg-muted text-foreground border-border"}`}>
+            <span class="font-bold">{kindAbbr[node.kind] ?? node.kind}</span>
+            <span class="truncate max-w-[140px]" title={node.name}>{node.name}</span>
+            {#if node.status === "healthy"}
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+            {:else if node.status === "warning"}
+              <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+            {:else if node.status === "error"}
+              <span class="h-1.5 w-1.5 rounded-full bg-rose-400"></span>
+            {/if}
+          </div>
+        {/each}
+      </div>
     {/if}
   </div>
-
-  {#if loading}
-    <div class="text-xs text-muted-foreground">Resolving traffic chain<LoadingDots /></div>
-  {:else if chain.length === 0}
-    <div class="text-xs text-muted-foreground">No related resources found.</div>
-  {:else}
-    <div class="flex flex-wrap items-center gap-1.5">
-      {#each buildDisplayNodes() as node, i}
-        {#if i > 0}
-          <ArrowRight class="h-3 w-3 shrink-0 text-muted-foreground" />
-        {/if}
-        <div class={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] ${kindColors[node.kind] ?? "bg-muted text-foreground border-border"}`}>
-          <span class="font-bold">{kindAbbr[node.kind] ?? node.kind}</span>
-          <span class="truncate max-w-[140px]" title={node.name}>{node.name}</span>
-          {#if node.status === "healthy"}
-            <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-          {:else if node.status === "warning"}
-            <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
-          {:else if node.status === "error"}
-            <span class="h-1.5 w-1.5 rounded-full bg-rose-400"></span>
-          {/if}
-        </div>
-      {/each}
-    </div>
-  {/if}
-</div>
+{/if}
