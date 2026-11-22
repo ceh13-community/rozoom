@@ -3580,9 +3580,10 @@
 
   /** Rules in an Ingress's details lead to the Service: its namespace, filtered to it. */
   async function openServiceFromIngress(service: string, namespace: string) {
-    // Ask about unsaved YAML before the namespace changes: a cancelled jump must leave the
-    // Ingresses list as it was.
+    // Ask about unsaved YAML before anything changes: a cancelled jump leaves the Ingresses
+    // list, its namespace, its filter and the open details as they were.
     if (!(await confirmLeaveWithUnsavedWork())) return;
+    detailsOpen = false;
     setSelectedNamespace(data.slug, namespace);
     const params = new URLSearchParams(window.location.search);
     params.set("workload", "services");
@@ -6541,7 +6542,6 @@ spec:
                     type="button"
                     class="text-sky-600 hover:underline dark:text-sky-400"
                     onclick={() => {
-                      detailsOpen = false;
                       void openServiceFromIngress(rule.service, ingressNamespace);
                     }}
                   >
