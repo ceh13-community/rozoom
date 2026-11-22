@@ -415,8 +415,8 @@
     {/if}
 
     {#if loading}
-      <!-- Top of the panel, not the middle of a height that is not there yet. The card is
-           dark in every theme, so the text keeps the card's light colour. -->
+      <!-- Top of the panel, not the middle of a height that is not there yet. The card follows
+           the app theme, so the text takes the theme's foreground colour. -->
       <LoadingState label="Scanning cluster resources" class="py-3 !text-foreground" />
     {:else if graph}
       <!-- Summary -->
