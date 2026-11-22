@@ -64,7 +64,7 @@
     if (!isOpen) onCancel();
   }}
 >
-  <Dialog.Content side="bottom" class="sm:max-w-md sm:rounded-t-xl">
+  <Dialog.Content side="bottom" class="sm:mx-auto sm:max-w-md sm:rounded-t-xl">
     <Dialog.Header>
       <Dialog.Title>Scale {resourceKind}</Dialog.Title>
       <Dialog.Description>
