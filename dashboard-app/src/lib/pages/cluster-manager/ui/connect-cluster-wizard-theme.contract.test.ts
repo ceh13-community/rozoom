@@ -27,8 +27,17 @@ describe("connect cluster form fields", () => {
     expect(source).toContain("border border-input bg-background text-foreground");
   });
 
-  // White 12px text on emerald-600 is 3.77:1 in both themes; emerald-700 is 5.48:1.
-  it("solid emerald buttons are dark enough for white text", () => {
-    expect(source).not.toMatch(/\bbg-emerald-(?:400|500|600)\b[^"]*\btext-white\b/);
+  // White 12px text needs 4.5:1: emerald-600 gives 3.77 and indigo-500 4.47, emerald-700
+  // 5.48 and indigo-600 6.29. Checked per line (class lists here are one line), whatever the
+  // order of the classes.
+  it("white text sits on fills dark enough for it", () => {
+    const OK_AT_600 = new Set(["indigo", "blue", "violet", "purple", "slate", "gray", "zinc"]);
+    const light = source
+      .split("\n")
+      .filter((line) => /(?<![\w:-])text-white\b/.test(line))
+      .flatMap((line) => [...line.matchAll(/(?<![\w:-])bg-([a-z]+)-(\d+)\b/g)])
+      .filter(([, hue, shade]) => Number(shade) < (OK_AT_600.has(hue) ? 600 : 700))
+      .map((m) => m[0]);
+    expect(light).toEqual([]);
   });
 });
