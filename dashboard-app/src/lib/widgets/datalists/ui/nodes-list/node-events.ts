@@ -25,6 +25,7 @@ export function parseNodeEventsOutput(output: string): NodeEvent[] {
       reportingController?: string;
       source?: { component?: string; host?: string };
       count?: string | number;
+      series?: { count?: number };
     }>;
   };
 
@@ -34,7 +35,7 @@ export function parseNodeEventsOutput(output: string): NodeEvent[] {
     message: event.message ?? "-",
     lastTimestamp: event.lastTimestamp || event.eventTime || event.firstTimestamp || "-",
     source: event.reportingController || event.source?.component || event.source?.host || undefined,
-    count: event.count,
+    count: event.count ?? event.series?.count,
   }));
 }
 

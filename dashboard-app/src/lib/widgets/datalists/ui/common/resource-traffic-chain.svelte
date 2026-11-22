@@ -474,8 +474,12 @@
   });
 </script>
 
-<!-- Shown only when the resource has related resources: an empty card is just a gap. -->
-{#if chain.length > 0}
+<!-- Shown only when the resource has related resources: an empty card is just a gap. While
+     the first lookup runs, one thin line holds the place so the content below does not jump
+     twice. -->
+{#if chain.length === 0 && loading && !resolved}
+  <div class="mb-2 text-xs text-muted-foreground">Resolving traffic chain<LoadingDots /></div>
+{:else if chain.length > 0}
   <div class="rounded border border-border bg-muted/30 p-3">
     <div class="mb-2 flex items-center justify-between">
       <h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Traffic Chain</h4>

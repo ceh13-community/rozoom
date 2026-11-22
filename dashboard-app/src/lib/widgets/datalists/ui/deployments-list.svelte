@@ -2663,6 +2663,7 @@
               eventTime?: string;
               firstTimestamp?: string;
               count?: number;
+              series?: { count?: number };
             }>;
           };
           detailsEvents = (parsedEvents.items ?? []).map((item) => ({
@@ -2670,7 +2671,7 @@
             reason: item.reason ?? "-",
             message: item.message ?? "-",
             lastTimestamp: item.lastTimestamp || item.eventTime || item.firstTimestamp || "-",
-            count: item.count,
+            count: item.count ?? item.series?.count,
           }));
         } else {
           detailsEvents = [];

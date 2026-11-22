@@ -46,6 +46,7 @@ export async function loadPodEvents(clusterId: string, pod: Partial<PodItem>) {
       reason?: string;
       message?: string;
       count?: number;
+      series?: { count?: number };
       lastTimestamp?: string;
       eventTime?: string;
       firstTimestamp?: string;
@@ -57,7 +58,8 @@ export async function loadPodEvents(clusterId: string, pod: Partial<PodItem>) {
     reason: item.reason || "-",
     type: item.type || "-",
     message: item.message || "-",
-    count: item.count ?? 1,
+    // events.k8s.io events count repeats in series.count, core events in count.
+    count: item.count ?? item.series?.count ?? 1,
     lastTimestamp: item.lastTimestamp || item.eventTime || item.firstTimestamp || "-",
     source: item.source?.component || item.source?.host || "-",
   }));

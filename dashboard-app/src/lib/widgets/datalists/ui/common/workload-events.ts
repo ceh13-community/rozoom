@@ -39,6 +39,7 @@ export function parseWorkloadEventsOutput(output: string): WorkloadEvent[] {
       reportingController?: string;
       source?: { component?: string; host?: string };
       count?: string | number;
+      series?: { count?: number };
     }>;
   };
 
@@ -48,7 +49,8 @@ export function parseWorkloadEventsOutput(output: string): WorkloadEvent[] {
     message: event.message ?? "-",
     lastTimestamp: event.lastTimestamp || event.eventTime || event.firstTimestamp || "-",
     source: event.reportingController || event.source?.component || event.source?.host || undefined,
-    count: event.count,
+    // events.k8s.io events count repeats in series.count, core events in count.
+    count: event.count ?? event.series?.count,
   }));
 }
 

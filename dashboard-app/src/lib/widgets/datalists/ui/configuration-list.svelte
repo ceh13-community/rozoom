@@ -2990,7 +2990,7 @@
               item.lastTimestamp ?? item.eventTime ?? item.firstTimestamp ?? "",
             ),
             source: String(source.component ?? source.host ?? ""),
-            count: Number(item.count ?? 1),
+            count: Number(item.count ?? asRecord(item.series).count ?? 1),
           };
         });
       } catch (error) {
