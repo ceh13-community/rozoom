@@ -2004,22 +2004,6 @@
     }
   }
 
-  function getDetailsHeaderNode() {
-    if (detailsPods.length > 0 && detailsPods[0]?.node) return detailsPods[0].node;
-    const templateSpec = $selectedItem?.spec?.template?.spec as
-      | { nodeName?: string; nodeSelector?: Record<string, string> }
-      | undefined;
-    const nodeSelector = Object.entries(templateSpec?.nodeSelector ?? {})
-      .map(([key, value]) => `${key}=${value}`)
-      .join(",");
-    return templateSpec?.nodeName || nodeSelector || "-";
-  }
-
-  function getDetailsHeaderPodIp() {
-    const firstPodIp = detailsPods.find((pod) => pod.podIp && pod.podIp !== "-")?.podIp;
-    return firstPodIp ?? "-";
-  }
-
   function isDaemonSetSelected(id: string) {
     return selectedDaemonSetIds.has(id);
   }
@@ -3495,10 +3479,9 @@
       />
     </div>
     <div class="flex-1 overflow-y-auto p-4">
+      <!-- Pods run on many nodes: the node of each pod is in the Pods block below. -->
       <div class="text-xs text-muted-foreground">
-        Namespace: {$selectedItem.metadata?.namespace ?? "default"} · Node: {getDetailsHeaderNode()}
-        · Pod IP:
-        {getDetailsHeaderPodIp()}
+        Namespace: {$selectedItem.metadata?.namespace ?? "default"}
       </div>
       <ResourceTrafficChain
         clusterId={data.slug}
@@ -3553,7 +3536,7 @@
                 <div class="text-muted-foreground">No images found.</div>
               {:else}
                 {#each getImages() as image}
-                  <div class="break-all">{image}</div>
+                  <div class="break-all font-mono">{image}</div>
                 {/each}
               {/if}
             </div>
