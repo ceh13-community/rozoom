@@ -41,9 +41,16 @@ const checks = {
 // A count-only check next to a check that fails without naming anything.
 const countOnlyChecks = {
   ...checks,
-  imageFreshness: {
+  rbacOverview: {
     status: "warning",
-    summary: { totalContainers: 2, latestTagCount: 1, noDigestCount: 2 },
+    summary: {
+      status: "warning",
+      message: "",
+      totalBindings: 3,
+      clusterAdminBindings: 1,
+      overprivilegedCount: 1,
+      updatedAt: 0,
+    },
     updatedAt: 0,
   },
   hpaStatus: {
@@ -83,7 +90,7 @@ describe("cluster score rule list", () => {
   it("explains a missing object list only for count-only checks", () => {
     render(ClusterScore, { props: { checks: countOnlyChecks } });
     expect(
-      within(row("image-latest")).getByText("This check reports a count, not names."),
+      within(row("rbac-overprivileged")).getByText("This check reports a count, not names."),
     ).toBeTruthy();
     expect(within(row("hpa-health")).getByText("Objects not listed.")).toBeTruthy();
   });

@@ -47,7 +47,7 @@
   };
   const REFERENCE_LIMIT = 20;
   // Checks that return a count only; every other check names its objects.
-  const COUNT_ONLY_RULES = new Set(["image-latest", "rbac-overprivileged"]);
+  const COUNT_ONLY_RULES = new Set(["rbac-overprivileged"]);
 
   const ruleCounts = $derived.by(() => {
     const counts = { fail: 0, pass: 0, "not-checked": 0 };
