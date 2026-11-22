@@ -21,6 +21,7 @@
   import {
     createTrailingThrottle,
     mapWorkloadPods,
+    shouldReloadForTerminating,
     parseTopPods,
     workloadPodsSelector,
     type WorkloadDetailsPod,
@@ -137,6 +138,8 @@
   // Plain, not $state: the effects below read and write them.
   let clusterPodsObject: string | null = null;
   let clusterPodsVersion: string | null = null;
+  // When the object last changed: terminating pods reload the panel only for a while after.
+  let clusterPodsChangedAt = 0;
   let clusterPodsTarget: { namespace: string; selector: string; object: string } | null = null;
   let clusterPodsController: AbortController | null = null;
   let clusterPodsTopTimer: ReturnType<typeof setInterval> | null = null;
@@ -160,7 +163,14 @@
       clusterPods = mapWorkloadPods(pods.output || "{}", target.namespace);
       clusterPodsError = null;
       // A pod going away does not change the workload: reload (throttled) until it is gone.
-      if (clusterPods.some((pod) => pod.status === "Terminating")) clusterPodsReload.call();
+      if (
+        shouldReloadForTerminating(
+          clusterPods.some((pod) => pod.status === "Terminating"),
+          clusterPodsChangedAt,
+        )
+      ) {
+        clusterPodsReload.call();
+      }
     } catch (error) {
       if (controller.signal.aborted || clusterPodsObject !== target.object) return;
       clusterPodsError = error instanceof Error ? error.message : "Failed to load pods.";
@@ -212,6 +222,7 @@
         stopClusterPods();
         clusterPodsObject = object;
         clusterPodsVersion = version;
+        clusterPodsChangedAt = Date.now();
         clusterPods = null;
         clusterPodsTop = new Map();
         clusterPodsError = null;
@@ -229,6 +240,7 @@
       }
       if (version !== clusterPodsVersion) {
         clusterPodsVersion = version;
+        clusterPodsChangedAt = Date.now();
         clusterPodsReload.call();
       }
     });

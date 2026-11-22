@@ -170,3 +170,18 @@ export function mapWorkloadPods(
     };
   });
 }
+
+/** How long pods still being deleted keep the panel reloading after the object last changed. */
+export const TERMINATING_RELOAD_WINDOW_MS = 120_000;
+
+/**
+ * Whether terminating pods should trigger another reload: only within two minutes of the
+ * object's last change, so a pod stuck in Terminating does not reload the panel forever.
+ */
+export function shouldReloadForTerminating(
+  hasTerminating: boolean,
+  lastObjectChangeAt: number,
+  now = Date.now(),
+) {
+  return hasTerminating && now - lastObjectChangeAt < TERMINATING_RELOAD_WINDOW_MS;
+}

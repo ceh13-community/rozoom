@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createTrailingThrottle,
   isLiveItemGone,
+  shouldReloadForTerminating,
   mapWorkloadPods,
   parseTopPods,
   pickLiveItem,
@@ -137,5 +138,15 @@ describe("createTrailingThrottle", () => {
     expect(run).toHaveBeenCalledTimes(1);
     throttle.call();
     expect(run).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("shouldReloadForTerminating", () => {
+  it("reloads for terminating pods only within two minutes of the last object change", () => {
+    const changedAt = 1_000_000;
+    expect(shouldReloadForTerminating(true, changedAt, changedAt + 5_000)).toBe(true);
+    expect(shouldReloadForTerminating(true, changedAt, changedAt + 119_000)).toBe(true);
+    expect(shouldReloadForTerminating(true, changedAt, changedAt + 121_000)).toBe(false);
+    expect(shouldReloadForTerminating(false, changedAt, changedAt + 5_000)).toBe(false);
   });
 });
