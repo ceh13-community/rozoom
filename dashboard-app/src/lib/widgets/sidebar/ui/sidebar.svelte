@@ -339,8 +339,10 @@
           Runtime {diagnosticsEnabled ? "on" : "off"}
         </span>
       </button>
-      <!-- One label and icon for both states; aria-pressed and the highlight carry on/off.
-           Off is the plain rail colour, not dimmed: it is a choice, not a disabled control. -->
+      <!-- The state reads in words like its neighbours (Linter on, Runtime off), not by colour
+           alone; the collapsed rail has no words, so a dot on the icon marks on. Off is the
+           plain rail colour, not dimmed: it is a choice, not a disabled control. The name
+           stays fixed and aria-pressed carries the state. -->
       <button
         class={cn(
           "rail-toggle flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium",
@@ -351,10 +353,21 @@
         onclick={toggleCliNotifications}
         aria-pressed={cliNotificationsEnabled}
         aria-label="Show kubectl commands"
-        use:hint={"Show kubectl commands"}
+        use:hint={`Show kubectl commands: ${cliNotificationsEnabled ? "on" : "off"}`}
       >
-        <Terminal class="h-4 w-4" />
-        <span class={cn(sidebarOpen ? "block" : "hidden")}>Show kubectl commands</span>
+        <span class="relative inline-flex shrink-0">
+          <Terminal class="h-4 w-4" />
+          {#if cliNotificationsEnabled && !sidebarOpen}
+            <span
+              data-testid="kubectl-commands-on-dot"
+              class="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-slate-900"
+              aria-hidden="true"
+            ></span>
+          {/if}
+        </span>
+        <span class={cn(sidebarOpen ? "block" : "hidden")}>
+          Show kubectl commands {cliNotificationsEnabled ? "on" : "off"}
+        </span>
       </button>
     </nav>
     <div
