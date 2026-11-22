@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { describeListError } from "$shared/lib/list-error";
   import { toKubeEvent, type KubeEventJson } from "$shared/lib/kube-events";
   import { confirmLeaveWithUnsavedWork, registerUnsavedWork } from "$shared/lib/unsaved-work";
   import { goto } from "$app/navigation";
@@ -3119,6 +3120,9 @@
           : "--all-namespaces";
       const resolved = command.includes("${ns}") ? command.replace("${ns}", namespaceArg) : command;
       const response = await kubectlJson<{ items?: GenericItem[] }>(resolved, { clusterId });
+      // kubectlJson returns kubectl's error text instead of throwing: Forbidden must show as
+      // an error, not as an empty list.
+      if (typeof response === "string") throw new Error(describeListError(response, tableTitle));
       const payload =
         response && typeof response === "object" ? (response as { items?: GenericItem[] }) : {};
       const items = Array.isArray(payload.items) ? payload.items : [];

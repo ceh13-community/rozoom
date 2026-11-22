@@ -1,5 +1,7 @@
 import type { WorkloadOverview, WorkloadsType } from "$shared/model/workloads";
 import { kubectlJson, kubectlRawFront } from "$shared/api/kubectl-proxy";
+import { getResourceSchema } from "$entities/workload";
+import { describeListError } from "$shared/lib/list-error";
 import { KUBECTL_COMMANDS } from "$shared/config/kubectl-commands";
 import type { KubectlOptions } from "$shared/model/kubectl";
 import type { WorkloadData, WorkloadType } from "$shared/model/workloads";
@@ -667,7 +669,9 @@ class WorkloadsFetcher {
       const response = await kubectlJson<WorkloadData>(command, options);
 
       if (typeof response !== "object") {
-        throw new Error(response);
+        // kubectl's error text: Forbidden reads as no access, not as an empty list.
+        const title = getResourceSchema(workloadType)?.title ?? workloadType;
+        throw new ListLoadError(describeListError(response, title));
       }
 
       let items: WorkloadData["items"] = response.items;
@@ -685,6 +689,7 @@ class WorkloadsFetcher {
 
       return items;
     } catch (error) {
+      if (error instanceof ListLoadError) throw error;
       throw new Error(`Failed to fetch ${workloadType}: ${error}`);
     }
   }
@@ -1001,3 +1006,6 @@ export function __getWorkloadsFetcherMemoryCacheStatsForTests() {
     bytes,
   };
 }
+
+/** A list kubectl refused or failed to load, already described for the user. */
+class ListLoadError extends Error {}
