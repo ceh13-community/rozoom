@@ -1,11 +1,15 @@
 // What a list says when kubectl refuses to list its resources.
 
-/** The kubectl message without the app's "[ERROR] [time]:" prefix and "Error from server". */
+/**
+ * The kubectl message without the app's "[ERROR] [time]:" prefix, "Error from server" and
+ * the user name: an AWS role ARN or an OIDC email in `User "..."` ends up on screenshots.
+ */
 function kubectlMessage(text: string) {
   return text
     .replace(/^\[ERROR\] \[[^\]]*\]:\s*/, "")
     .replace(/^Error from server \([^)]*\):\s*/, "")
     .split("\n")[0]
+    .replace(/\bUser "(?:[^"\\]|\\.)*"\s*/g, "")
     .trim();
 }
 
