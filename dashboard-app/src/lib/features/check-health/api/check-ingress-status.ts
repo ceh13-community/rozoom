@@ -66,7 +66,9 @@ export async function checkIngressStatus(
     status = "unknown";
     message = "Ingress data unavailable.";
   } else if (total === 0) {
-    status = "unknown";
+    // Read fine and found none: nothing can lack TLS. "unknown" here made the posture score
+    // treat the check as never run and ask for it again on every Overview.
+    status = "ok";
     message = "No ingresses found.";
   } else if (withoutTls > 0) {
     status = "warning";

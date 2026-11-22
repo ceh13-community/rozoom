@@ -11,6 +11,7 @@ import {
   missingPostureChecks,
   POSTURE_CHECK_FIELDS,
   POSTURE_CHECK_MAX_AGE_MS,
+  takeDuePostureChecks,
 } from "./posture-checks";
 import type { ClusterHealthChecks } from "./types";
 
@@ -44,6 +45,44 @@ describe("missingPostureChecks", () => {
       rbacOverview: fresh,
     });
     expect(missingPostureChecks(check, NOW)).toEqual(["hpaStatus", "vpaStatus", "ingressStatus"]);
+  });
+});
+
+// Each open of an Overview mounts a new component; RBAC without rights stays "unknown".
+describe("takeDuePostureChecks", () => {
+  // Every report recent at `at`, except RBAC, which could not read the cluster.
+  const unreadableAt = (at: number) =>
+    withReports({
+      hpaStatus: { status: "ok", updatedAt: at },
+      vpaStatus: { status: "ok", updatedAt: at },
+      ingressStatus: { status: "ok", updatedAt: at },
+      rbacOverview: { status: "unknown", updatedAt: at },
+    });
+
+  it("asks once per max age, however often the Overview opens", () => {
+    const gate = new Map<string, number>();
+    const ask = (at: number) => takeDuePostureChecks("c1", unreadableAt(at), at, gate);
+    expect(ask(NOW)).toEqual(["rbacOverview"]);
+    expect(ask(NOW + 1_000)).toEqual([]);
+    expect(ask(NOW + POSTURE_CHECK_MAX_AGE_MS - 1)).toEqual([]);
+    expect(ask(NOW + POSTURE_CHECK_MAX_AGE_MS)).toEqual(["rbacOverview"]);
+  });
+
+  it("gates each cluster and each check on its own", () => {
+    const gate = new Map<string, number>();
+    expect(takeDuePostureChecks("c1", unreadableAt(NOW), NOW, gate)).toEqual(["rbacOverview"]);
+    expect(takeDuePostureChecks("c2", unreadableAt(NOW), NOW, gate)).toEqual(["rbacOverview"]);
+    expect(takeDuePostureChecks("c1", null, NOW + 1_000, gate)).toEqual([
+      "hpaStatus",
+      "vpaStatus",
+      "ingressStatus",
+    ]);
+  });
+
+  it("uses one gate across callers by default", () => {
+    const check = unreadableAt(Date.now());
+    expect(takeDuePostureChecks("shared", check)).toEqual(["rbacOverview"]);
+    expect(takeDuePostureChecks("shared", check)).toEqual([]);
   });
 });
 

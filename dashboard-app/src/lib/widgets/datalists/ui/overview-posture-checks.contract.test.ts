@@ -15,10 +15,12 @@ describe("overview posture checks", () => {
     expect(overview.slice(diagnostics, posture)).toContain("void diagnostics");
   });
 
-  it("asks only for missing or stale reports, at most once per max age", () => {
+  // A gate inside the component reset on every open of the Overview, so a check that could
+  // not read the cluster ran again, and logged again, each time.
+  it("asks only for due reports through the module-level gate", () => {
     const body = overview.slice(overview.indexOf("async function loadMissingPostureChecks"));
-    expect(body).toContain("missingPostureChecks(clusterHealth)");
-    expect(body).toContain("Date.now() - requestedAt < POSTURE_CHECK_MAX_AGE_MS");
-    expect(body).toContain("loadPostureChecks(clusterId, missing)");
+    expect(body).toContain("takeDuePostureChecks(clusterId, clusterHealth)");
+    expect(body).toContain("loadPostureChecks(clusterId, due)");
+    expect(overview).not.toMatch(/new (Svelte)?Map<string, number>\(\)/);
   });
 });

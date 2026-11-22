@@ -57,17 +57,19 @@ describe("checkIngressStatus", () => {
     expect(result.summary.withoutTls).toBe(1);
   });
 
-  it("returns unknown when no ingresses found", async () => {
+  // kubectl prints "No resources found" to stderr with exit 0 when there are none.
+  it("returns ok with total 0 when the cluster has no ingresses", async () => {
     mockedKubectl.mockResolvedValue({
       output: "",
-      errors: "",
+      errors: "No resources found",
       code: 0,
     });
 
     const result = await checkIngressStatus(clusterId, { force: true });
 
-    expect(result.status).toBe("unknown");
+    expect(result.status).toBe("ok");
     expect(result.summary.total).toBe(0);
+    expect(result.summary.withoutTls).toBe(0);
   });
 
   it("returns unknown on kubectl error", async () => {
