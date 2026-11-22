@@ -22,6 +22,12 @@ import {
 
 export const NAVIGATE_DELAY_MS = 3_000;
 export const RESTORE_DELAY_MS = 1_000;
+/**
+ * A page still drawing loading skeletons has no content yet and reads as blank. When a
+ * blank pane is still animating, it is measured once more after this delay and only that
+ * second reading is written, marked settle=retry.
+ */
+export const SETTLE_RETRY_MS = 5_000;
 /** Shorter absences are ordinary window switching and not worth a line. */
 export const MIN_AWAY_MS = 30_000;
 
@@ -57,7 +63,7 @@ export function createMainPaneProbe({
   let cancelPending: (() => void) | null = null;
   let awaySince: number | null = null;
 
-  function probeLater(trigger: ProbeTrigger, delayMs: number) {
+  function probeLater(trigger: ProbeTrigger, delayMs: number, isRetry = false) {
     cancelPending?.();
     cancelPending = schedule(() => {
       cancelPending = null;
@@ -65,8 +71,13 @@ export function createMainPaneProbe({
       if (!main) return;
       try {
         const state = describe(main);
+        const blank = looksBlank(state);
+        if (blank && state.animations > 0 && !isRetry) {
+          probeLater(trigger, SETTLE_RETRY_MS, true);
+          return;
+        }
         void Promise.resolve(
-          write(formatMainPaneLine(state, getRoute(), trigger), looksBlank(state)),
+          write(formatMainPaneLine(state, getRoute(), trigger, isRetry), blank),
         ).catch(() => undefined);
       } catch {
         // A diagnostic must never break the page it describes.
