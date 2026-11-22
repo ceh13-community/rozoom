@@ -12,6 +12,7 @@ import {
   MIN_AWAY_MS,
   NAVIGATE_DELAY_MS,
   RESTORE_DELAY_MS,
+  SETTLE_RETRY_MS,
 } from "./main-pane-probe";
 import {
   describeLayer,
@@ -147,7 +148,10 @@ describe("formatMainPaneLine", () => {
 });
 
 describe("createMainPaneProbe", () => {
-  function setup(main: HTMLElement | null = document.createElement("main")) {
+  function setup(
+    main: HTMLElement | null = document.createElement("main"),
+    readings: MainPaneState[] = [],
+  ) {
     let clock = 0;
     const pending: Array<{ callback: () => void; delayMs: number; cancelled: boolean }> = [];
     const write = vi.fn();
@@ -163,7 +167,7 @@ describe("createMainPaneProbe", () => {
           entry.cancelled = true;
         };
       },
-      describe: () => healthy,
+      describe: () => readings.shift() ?? healthy,
     });
     const flush = () => {
       for (const entry of pending.splice(0)) if (!entry.cancelled) entry.callback();
@@ -218,6 +222,41 @@ describe("createMainPaneProbe", () => {
     flush();
     expect(write).toHaveBeenCalledTimes(1);
     expect(write.mock.calls[0][0]).toContain("trigger=focus");
+  });
+
+  // Global Triage three seconds after navigation: skeletons only, hits=0 animations=7.
+  const loading: MainPaneState = { ...healthy, text: 0, hits: 0, animations: 7 };
+
+  it("measures a blank pane that is still animating once more before writing", () => {
+    const { probe, write, pending, flush } = setup(undefined, [loading]);
+    probe.navigated();
+    flush();
+    expect(write).not.toHaveBeenCalled();
+    expect(pending.at(-1)?.delayMs).toBe(SETTLE_RETRY_MS);
+    flush();
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(write.mock.calls[0][0]).toContain("trigger=navigate settle=retry ");
+    expect(write.mock.calls[0][1]).toBe(false);
+  });
+
+  it("writes the warn line when the pane is still blank on the second look", () => {
+    const { probe, write, flush } = setup(undefined, [loading, loading]);
+    probe.navigated();
+    flush();
+    flush();
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(write.mock.calls[0][0]).toContain("settle=retry");
+    expect(write.mock.calls[0][0]).toContain("animations=7");
+    expect(write.mock.calls[0][1]).toBe(true);
+  });
+
+  it("writes a blank pane without animations at once", () => {
+    const { probe, write, flush } = setup(undefined, [{ ...loading, animations: 0 }]);
+    probe.navigated();
+    flush();
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(write.mock.calls[0][0]).not.toContain("settle=");
+    expect(write.mock.calls[0][1]).toBe(true);
   });
 
   it("does nothing without a main pane", () => {

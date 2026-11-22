@@ -220,6 +220,22 @@ describe("installGlobalErrorLogging", () => {
     expect(lines[0]).toMatch(/^\[js:unhandledrejection\] Error: watcher failed/);
   });
 
+  // The HTTP plugin's cancel of a request whose resource is gone; see isFinishedRequestCancel.
+  it("skips the HTTP plugin cancel of a finished request, and only that", () => {
+    const { lines, logger } = makeLogger();
+    uninstall = installGlobalErrorLogging(window, logger);
+    const reject = (reason: unknown) => {
+      const event = new Event("unhandledrejection") as PromiseRejectionEvent;
+      Object.defineProperty(event, "reason", { value: reason });
+      window.dispatchEvent(event);
+    };
+    reject("The resource id 2639456669 is invalid.");
+    expect(lines).toEqual([]);
+    reject("The resource id 12 is invalid because the window closed");
+    reject(new Error("The resource id 12 is invalid."));
+    expect(lines).toHaveLength(2);
+  });
+
   it("ignores resource load errors (an <img> that 404s is not a JS error)", () => {
     const { lines, logger } = makeLogger();
     uninstall = installGlobalErrorLogging(window, logger);

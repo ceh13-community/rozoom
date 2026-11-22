@@ -329,9 +329,11 @@ export function formatMainPaneLine(
   state: MainPaneState,
   route: string,
   trigger: ProbeTrigger,
+  isRetry = false,
 ): string {
   return [
     `[main-pane] trigger=${trigger}`,
+    ...(isRetry ? ["settle=retry"] : []),
     `route=${route}`,
     `visibility=${state.visibility}`,
     `focus=${state.focused ? 1 : 0}`,

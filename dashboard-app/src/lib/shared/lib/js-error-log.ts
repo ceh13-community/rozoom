@@ -176,6 +176,19 @@ export function reportJsError(source: JsErrorSource, error: unknown, where?: str
   jsErrorLog.report(source, error, where);
 }
 
+/**
+ * The HTTP plugin cancels a request whenever its abort signal fires, also after the
+ * response headers arrived, when the request resource is already gone; that cancel
+ * rejects with this message and nothing handles it. Leaving a page aborts its open
+ * watches, so page changes wrote such ERROR lines, which read like failures next to the
+ * [main-pane] lines and are none: the body stream is dropped by its own abort listener.
+ */
+const FINISHED_REQUEST_CANCEL = /^The resource id \d+ is invalid\.?$/;
+
+export function isFinishedRequestCancel(reason: unknown): boolean {
+  return typeof reason === "string" && FINISHED_REQUEST_CANCEL.test(reason);
+}
+
 /** Wires window "error" and "unhandledrejection" to the logger. Returns the uninstaller. */
 export function installGlobalErrorLogging(
   target: Window = window,
@@ -192,7 +205,9 @@ export function installGlobalErrorLogging(
     logger.report("window.error", `${event.message || "unknown error"}${position}`);
   };
   const onRejection = (event: Event) => {
-    logger.report("unhandledrejection", (event as PromiseRejectionEvent).reason);
+    const reason: unknown = (event as PromiseRejectionEvent).reason;
+    if (isFinishedRequestCancel(reason)) return;
+    logger.report("unhandledrejection", reason);
   };
   target.addEventListener("error", onError);
   target.addEventListener("unhandledrejection", onRejection);
