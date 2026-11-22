@@ -82,7 +82,8 @@ test.describe("overview shell non-blocking", () => {
     const page = await context.newPage();
     await page.goto(`/dashboard/clusters/${CLUSTER_ID}?workload=overview`);
 
-    // Runtime status shows in compact mode (default) - verify source badge is visible
-    await expect(page.getByText("Cached").first()).toBeVisible();
+    // The overview renders from the cached snapshot while the refresh is still pending: the
+    // Pods card shows the cached count. (The "Cached" banner shows only for stale data.)
+    await expect(page.getByRole("button", { name: /^Pods\s+3\b/ }).first()).toBeVisible();
   });
 });

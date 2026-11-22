@@ -141,7 +141,8 @@ test.describe("dashboard card to overview transition", () => {
     await page.getByText(CLUSTER_NAME).first().click();
 
     await expect(page).toHaveURL(`/dashboard/clusters/${CLUSTER_ID}?workload=overview`);
-    // Runtime status shows in compact mode (default) - verify source badge is visible
-    await expect(page.getByText("Cached").first()).toBeVisible();
+    // The overview renders from the cached snapshot while the refresh is still pending: the
+    // Pods card shows the cached count. (The "Cached" banner shows only for stale data.)
+    await expect(page.getByRole("button", { name: /^Pods\s+3\b/ }).first()).toBeVisible();
   });
 });
