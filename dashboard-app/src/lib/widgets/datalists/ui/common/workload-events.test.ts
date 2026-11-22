@@ -39,4 +39,17 @@ describe("workload-events helpers", () => {
       },
     ]);
   });
+
+  it("counts repeats of events.k8s.io events from series.count", () => {
+    const events = parseWorkloadEventsOutput(
+      JSON.stringify({
+        items: [
+          { type: "Warning", reason: "BackOff", message: "m", series: { count: 12 } },
+          { type: "Normal", reason: "Pulled", message: "m", count: 3, series: { count: 9 } },
+          { type: "Normal", reason: "Started", message: "m" },
+        ],
+      }),
+    );
+    expect(events.map((event) => event.count)).toEqual([12, 3, undefined]);
+  });
 });

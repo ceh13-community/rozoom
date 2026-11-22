@@ -1,5 +1,6 @@
 import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
 import type { PodItem } from "$shared/model/clusters";
+import { parseKubeEvents } from "$shared/lib/kube-events";
 
 export type PodEvent = {
   reason: string;
@@ -40,25 +41,12 @@ export async function loadPodEvents(clusterId: string, pod: Partial<PodItem>) {
     throw new Error(response.errors || "Failed to load pod events.");
   }
 
-  const parsed = JSON.parse(response.output) as {
-    items?: Array<{
-      type?: string;
-      reason?: string;
-      message?: string;
-      count?: number;
-      lastTimestamp?: string;
-      eventTime?: string;
-      firstTimestamp?: string;
-      source?: { component?: string; host?: string };
-    }>;
-  };
-
-  return (parsed.items ?? []).map((item) => ({
-    reason: item.reason || "-",
-    type: item.type || "-",
-    message: item.message || "-",
-    count: item.count ?? 1,
-    lastTimestamp: item.lastTimestamp || item.eventTime || item.firstTimestamp || "-",
-    source: item.source?.component || item.source?.host || "-",
+  return parseKubeEvents(response.output).map((event) => ({
+    reason: event.reason,
+    type: event.type,
+    message: event.message,
+    count: event.count ?? 1,
+    lastTimestamp: event.lastTimestamp,
+    source: event.source ?? "-",
   }));
 }

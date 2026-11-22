@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { parseKubeEvents } from "$shared/lib/kube-events";
   import { registerUnsavedWork } from "$shared/lib/unsaved-work";
   import {
     createTrailingThrottle,
@@ -2683,24 +2684,7 @@
         });
 
         if (!eventsResponse.errors && eventsResponse.code === 0 && eventsResponse.output) {
-          const parsedEvents = JSON.parse(eventsResponse.output) as {
-            items?: Array<{
-              type?: string;
-              reason?: string;
-              message?: string;
-              lastTimestamp?: string;
-              eventTime?: string;
-              firstTimestamp?: string;
-              count?: number;
-            }>;
-          };
-          detailsEvents = (parsedEvents.items ?? []).map((item) => ({
-            type: item.type ?? "-",
-            reason: item.reason ?? "-",
-            message: item.message ?? "-",
-            lastTimestamp: item.lastTimestamp || item.eventTime || item.firstTimestamp || "-",
-            count: item.count,
-          }));
+          detailsEvents = parseKubeEvents(eventsResponse.output);
         } else {
           detailsEvents = [];
         }

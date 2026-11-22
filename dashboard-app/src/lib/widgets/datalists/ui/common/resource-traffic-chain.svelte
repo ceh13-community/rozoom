@@ -108,6 +108,9 @@
   async function resolveChain() {
     if (resolved || loading) return;
     loading = true;
+    // The resource this lookup is for: if the panel moves to another one meanwhile, the
+    // result is dropped and the lookup runs again for the new resource.
+    const startedFor = currentKey();
     const links: ChainLink[] = [];
 
     try {
@@ -304,10 +307,20 @@
     } catch {
       // Silently handle errors
     } finally {
-      chain = links;
       loading = false;
-      resolved = true;
+      if (startedFor === currentKey()) {
+        chain = links;
+        resolved = true;
+      } else {
+        chain = [];
+        resolved = false;
+        void resolveChain();
+      }
     }
+  }
+
+  function currentKey() {
+    return `${resourceKind}/${resourceNamespace}/${resourceName}`;
   }
 
   function matchesSelector(item: unknown, selector: Record<string, string>): boolean {
@@ -462,7 +475,7 @@
   // Use untrack to avoid reactive loop: read props, write state
   let lastKey = "";
   $effect(() => {
-    const key = `${resourceKind}/${resourceNamespace}/${resourceName}`;
+    const key = currentKey();
     if (key === lastKey) return;
     lastKey = key;
     // Use queueMicrotask to break out of the reactive tracking context
@@ -474,8 +487,12 @@
   });
 </script>
 
-<!-- Shown only when the resource has related resources: an empty card is just a gap. -->
-{#if chain.length > 0}
+<!-- Shown only when the resource has related resources: an empty card is just a gap. While
+     the first lookup runs, one thin line holds the place so the content below does not jump
+     twice. -->
+{#if chain.length === 0 && loading && !resolved}
+  <div class="mb-2 text-xs text-muted-foreground">Resolving traffic chain<LoadingDots /></div>
+{:else if chain.length > 0}
   <div class="rounded border border-border bg-muted/30 p-3">
     <div class="mb-2 flex items-center justify-between">
       <h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Traffic Chain</h4>
