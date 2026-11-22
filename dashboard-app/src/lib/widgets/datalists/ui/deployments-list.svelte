@@ -4,6 +4,7 @@
   import {
     createTrailingThrottle,
     isLiveItemGone,
+    shouldReloadForTerminating,
     pickLiveItem,
   } from "./common/workload-details-model";
   import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
@@ -2660,7 +2661,12 @@
         };
         // A pod going away does not change the Deployment: keep reloading (throttled) until
         // the pods being deleted are gone from the list.
-        if ((parsedPods.items ?? []).some((item) => item.metadata?.deletionTimestamp)) {
+        if (
+          shouldReloadForTerminating(
+            (parsedPods.items ?? []).some((item) => item.metadata?.deletionTimestamp),
+            detailsObjectChangedAt,
+          )
+        ) {
           detailsReload.call();
         }
         detailsPods = (parsedPods.items ?? []).map((item) => {
@@ -2920,6 +2926,8 @@
   // after the last change.
   let detailsKeyRequested: string | null = null;
   let detailsVersionRequested: string | null = null;
+  // When the object last changed: terminating pods reload the panel only for a while after.
+  let detailsObjectChangedAt = 0;
   const detailsReload = createTrailingThrottle(() => {
     void loadDetailsData({ quiet: true });
   }, 5_000);
@@ -2940,11 +2948,13 @@
         detailsReload.markRan();
         detailsKeyRequested = key;
         detailsVersionRequested = version;
+        detailsObjectChangedAt = Date.now();
         void loadDetailsData();
         return;
       }
       if (version !== detailsVersionRequested) {
         detailsVersionRequested = version;
+        detailsObjectChangedAt = Date.now();
         detailsReload.call();
       }
     });
