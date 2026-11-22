@@ -19,6 +19,32 @@ describe("triage scorers", () => {
     expect(result.reason).toContain("restarts");
   });
 
+  // Triage showed "Running" for a pod in CrashLoopBackOff: the phase stays Running.
+  it("shows a crashing pod's waiting reason, not its phase", () => {
+    const crashing = triageScorers.pods(
+      {
+        metadata: { name: "api", namespace: "shop" },
+        status: {
+          phase: "Running",
+          containerStatuses: [
+            { restartCount: 200, state: { waiting: { reason: "CrashLoopBackOff" } } },
+          ],
+        },
+      },
+      { entry: {} as never, items: [] },
+    );
+    expect(crashing.status).toBe("CrashLoopBackOff");
+
+    const deleting = triageScorers.pods(
+      {
+        metadata: { name: "api", namespace: "shop", deletionTimestamp: "2026-11-22T06:00:00Z" },
+        status: { phase: "Running", containerStatuses: [{ restartCount: 0 }] },
+      },
+      { entry: {} as never, items: [] },
+    );
+    expect(deleting.status).toBe("Terminating");
+  });
+
   it("scores services without ports as problematic", () => {
     const result = triageScorers.services(
       {
