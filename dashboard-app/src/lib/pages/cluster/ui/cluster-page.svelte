@@ -280,7 +280,8 @@
   });
 
   const isLoading = $derived(workloads.isLoading);
-  const errorMessage = $derived(namespacesError || workloads.error);
+  // namespacesError is a store: read its value, or the store object itself is always truthy.
+  const errorMessage = $derived($namespacesError || workloads.error);
   const isClusterHealthView = $derived(CLUSTER_HEALTH_WORKLOADS.includes(routeWorkloadType));
   const isRouteManagedPodsView = $derived(routeWorkloadType === "pods");
   const workloadCacheBanner = $derived.by(() => {
@@ -2158,10 +2159,10 @@
               <Skeleton class="h-4 w-full my-2" />
             </div>
           {/if}
-        {:else if $errorMessage && !hasEffectiveWorkloadData}
+        {:else if errorMessage && !hasEffectiveWorkloadData}
           <Alert.Root variant="destructive" class="cluster-page__error">
             <Alert.Title>Error</Alert.Title>
-            <Alert.Description>{$errorMessage}</Alert.Description>
+            <Alert.Description>{errorMessage}</Alert.Description>
           </Alert.Root>
         {:else if hasEffectiveWorkloadData}
           {#if showConnectivityWaitBanner}
