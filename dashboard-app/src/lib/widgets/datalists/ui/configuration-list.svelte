@@ -5294,7 +5294,7 @@ spec:
   </TableToolbarShell>
 
   <TableSurface
-    maxHeightClass={viewMode === "flat" ? "max-h-[70vh]" : ""}
+    maxHeightClass={viewMode === "flat" ? "max-h-[calc(100dvh-8.5rem)]" : ""}
     onScroll={handleTableScroll}
     bind:ref={tableScrollHost}
   >

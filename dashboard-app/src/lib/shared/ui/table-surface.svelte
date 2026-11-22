@@ -7,7 +7,8 @@
   }
 
   let {
-    maxHeightClass = "max-h-[70vh]",
+    // The window under the sticky cluster header (about 8.5rem): 15+ rows at 1200x650.
+    maxHeightClass = "max-h-[calc(100dvh-8.5rem)]",
     surfaceClass = "rounded-lg border border-border/60 bg-background/40",
     onScroll,
     ref = $bindable(null),

@@ -41,7 +41,8 @@ describe("workload table toolbar parity", () => {
       }
 
       if (file === "pods-list/data-table.svelte") {
-        expect(source).toContain("max-h-[70vh]");
+        // The table fills the window under the sticky cluster header: 15+ rows at 1200x650.
+        expect(source).toContain("max-h-[calc(100dvh-8.5rem)]");
         expect(source).toContain("rounded-lg border border-border/60 bg-background/40");
         expect(source).toContain("No pods found for the current filter.");
         expect(source).toContain("Show live usage");

@@ -65,10 +65,11 @@
 </script>
 
 <DropdownMenu.Root bind:open>
-  <DropdownMenu.Trigger bind:ref={triggerRef}>
+  <DropdownMenu.Trigger bind:ref={triggerRef} class="flex">
     <Button
       variant="ghost"
       size="icon"
+      class="h-6 w-6"
       aria-label={`Open actions for ${name}`}
       title={`Actions: ${namespace}/${name}`}
       disabled={disabled || isBusy}
