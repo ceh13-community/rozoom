@@ -881,7 +881,7 @@
       >
         <span>{success}</span>
         <button
-          class="text-emerald-700 dark:text-emerald-400 hover:text-white text-xs"
+          class="text-emerald-700 dark:text-emerald-400 hover:text-foreground text-xs"
           onclick={() => (success = null)}>x</button
         >
       </div>
@@ -891,7 +891,7 @@
         class="text-xs text-rose-500 bg-rose-500/10 border border-rose-500/30 rounded px-3 py-2 flex justify-between items-center"
       >
         <span>{error}</span>
-        <button class="text-rose-700 dark:text-rose-400 hover:text-white text-xs" onclick={() => (error = null)}
+        <button class="text-rose-700 dark:text-rose-400 hover:text-foreground text-xs" onclick={() => (error = null)}
           >x</button
         >
       </div>
@@ -960,7 +960,7 @@
                   <div class="flex items-center gap-2 min-w-0">
                     <span class="text-foreground font-medium truncate">{cluster.contextName}</span>
                     <span
-                      class="text-xs px-1.5 py-0.5 rounded bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
+                      class="text-xs px-1.5 py-0.5 rounded bg-emerald-500/10 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
                       >{cluster.provider}</span
                     >
                     {#if cluster.server}
@@ -1056,7 +1056,7 @@
                 />
                 <span class="text-foreground font-medium truncate">{cluster.name}</span>
                 <span class="text-xs text-muted-foreground">{cluster.region}</span>
-                <span class="text-xs px-1.5 py-0.5 rounded bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
+                <span class="text-xs px-1.5 py-0.5 rounded bg-indigo-500/10 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
                   >{cluster.provider}</span
                 >
                 {#if cluster.scope}
@@ -1155,7 +1155,7 @@
             <button
               class="text-xs px-2.5 py-1 rounded border transition {oidcProvider === p.provider
                 ? 'border-indigo-500 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300'
-                : 'border-slate-600 text-muted-foreground hover:border-slate-400'}"
+                : 'border-input text-muted-foreground hover:border-slate-400'}"
               onclick={() => (oidcProvider = p.provider)}>{p.label}</button
             >
           {/each}
@@ -1626,7 +1626,7 @@
               class="text-xs px-2.5 py-1 rounded border transition flex items-center gap-1.5 {execKind ===
               p.kind
                 ? 'border-indigo-500 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300'
-                : 'border-slate-600 text-muted-foreground hover:border-slate-400'}"
+                : 'border-input text-muted-foreground hover:border-slate-400'}"
               onclick={() => (execKind = p.kind)}
             >
               {p.label}
@@ -1811,7 +1811,7 @@
                 Generated kubeconfig (secrets redacted)
               </span>
               <button
-                class="text-xs px-1.5 py-0.5 rounded border border-slate-600 text-muted-foreground hover:text-white transition"
+                class="text-xs px-1.5 py-0.5 rounded border border-input text-muted-foreground hover:text-foreground transition"
                 onclick={copyPreview}
               >
                 {previewCopied ? "Copied" : "Copy raw"}

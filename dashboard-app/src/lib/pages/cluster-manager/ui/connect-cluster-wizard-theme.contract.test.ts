@@ -18,6 +18,27 @@ describe("connect cluster form fields", () => {
     expect(hover).toEqual([]);
   });
 
+  // Dark tints (provider badges) and dark borders (inactive OIDC and exec pills) read as dark
+  // patches on the light theme without a dark: pair.
+  it("pair dark backgrounds and borders with dark:", () => {
+    const dark = [
+      ...source.matchAll(
+        /(?<![\w:-])(?:bg-[a-z]+-(?:800|900|950)(?:\/\d+)?|border-slate-(?:600|700|800))\b/g,
+      ),
+    ].map((m) => m[0]);
+    expect(dark).toEqual([]);
+  });
+
+  // White text on hover and light placeholders vanish on a light background.
+  it("pair white hovers and light placeholders with dark:", () => {
+    const light = [
+      ...source.matchAll(
+        /(?<![\w:-])(?:(?:group-)?hover:text-white|placeholder:text-[a-z]+-(?:200|300|400))\b/g,
+      ),
+    ].map((m) => m[0]);
+    expect(light).toEqual([]);
+  });
+
   it("follow the app theme", () => {
     expect(source).not.toContain("bg-slate-900/50");
     // The preview, test and Vault panels were fixed dark boxes too.
