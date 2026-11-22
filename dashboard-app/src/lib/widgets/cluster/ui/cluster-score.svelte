@@ -128,7 +128,7 @@
       <div>
         <div class="flex items-center gap-2 text-xs font-semibold text-foreground">
           <Gauge class="h-4 w-4 text-muted-foreground" />
-          Cluster score
+          Reliability and security
         </div>
         <div class="mt-1 text-2xl font-semibold">
           {#if scoreSummary.score === null}

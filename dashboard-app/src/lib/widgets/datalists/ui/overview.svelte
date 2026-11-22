@@ -1859,9 +1859,23 @@
           Cluster unreachable — this score reflects the last successful check, not live state.
         </div>
       {/if}
-      <div class="grid items-start gap-4 lg:grid-cols-2">
+      <!-- One headline score: Health. The second one measures reliability and security
+           posture; side by side ("64 / 100 Unhealthy" next to "0 / 100 Unsafe") they read as
+           a contradiction, so it opens on request under a name that says what it measures. -->
+      <div class="grid items-start gap-3">
         <ClusterHealthScore checks={clusterHealth} />
-        <ClusterScore checks={clusterHealth} />
+        <details
+          class="rounded-lg border border-border bg-card px-3 py-2 text-xs"
+          data-testid="overview-posture-details"
+        >
+          <summary class="cursor-pointer text-xs font-semibold text-foreground">
+            Reliability and security posture
+            <span class="font-normal text-muted-foreground">(expand for the score)</span>
+          </summary>
+          <div class="mt-2">
+            <ClusterScore checks={clusterHealth} />
+          </div>
+        </details>
       </div>
     {/if}
   </div>
