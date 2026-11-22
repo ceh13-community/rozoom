@@ -286,7 +286,10 @@
     scrollToLine(alert.firstLine);
   }
 
-  const ESCAPE_OWNERS = '[role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"]';
+  // Where Esc already means something: typing, the editor (its search, completion and lint
+  // tooltips close on Esc), open menus and dialogs. Same list as the workbench.
+  const ESCAPE_OWNERS =
+    'input, textarea, select, [contenteditable="true"], .cm-editor, [role="combobox"], [role="listbox"], [role="menu"], [role="dialog"], [role="alertdialog"]';
 
   function toggleFullscreen() {
     isFullscreen = !isFullscreen;
@@ -295,8 +298,8 @@
   // Esc leaves full screen, and only that. The list behind the panel (Deployments,
   // DaemonSets) closes the active tab on Esc from its own window listener, added before
   // this one: listening in the capture phase runs first, and preventDefault tells the list,
-  // the workbench and the overlay stack that the key is used. Esc in an open menu or
-  // dialog stays theirs.
+  // the workbench and the overlay stack that the key is used. Esc in a field, the editor,
+  // an open menu or a dialog stays theirs.
   function handleWindowKeydown(event: KeyboardEvent) {
     if (event.key !== "Escape" || !isFullscreen || event.defaultPrevented) return;
     const target = event.target instanceof Element ? event.target : null;

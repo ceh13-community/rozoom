@@ -90,6 +90,41 @@ describe("Esc on a logs or YAML panel shown full screen, in the Deployments list
     },
   );
 
+  // The editor closes its search (Ctrl+F), completion and lint tooltips on Esc; a field
+  // keeps Esc too. The panel must not take that key in the capture phase.
+  it.each([
+    ["logs", ResourceLogsSheet, logsProps],
+    ["YAML", ResourceYamlSheet, yamlProps],
+  ] as const)(
+    "%s: Esc with focus in the editor or a field stays full screen",
+    async (_, Sheet, props) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      render(Sheet as any, { props });
+      await fireEvent.click(screen.getByTitle("Open full screen"));
+      const panel = document.querySelector("[data-fullscreen-panel]") as Element;
+      const editor = document.createElement("div");
+      editor.className = "cm-editor";
+      editor.innerHTML =
+        '<div class="cm-content" tabindex="0">kind: Deployment</div><input aria-label="Find" />';
+      panel.appendChild(editor);
+
+      for (const target of [
+        editor.querySelector(".cm-content") as Element,
+        editor.querySelector("input") as Element,
+      ]) {
+        const event = new KeyboardEvent("keydown", {
+          key: "Escape",
+          bubbles: true,
+          cancelable: true,
+        });
+        target.dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(false);
+      }
+      await Promise.resolve();
+      expect(document.querySelector("[data-fullscreen-panel]")).not.toBeNull();
+    },
+  );
+
   it.each(["deployments-list.svelte", "daemon-sets-list.svelte"])(
     "%s skips an Esc that is already used",
     (file) => {
