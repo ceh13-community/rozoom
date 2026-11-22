@@ -8,10 +8,20 @@ set -euo pipefail
 tag="${1:?tag required}"
 sha="${2:?commit sha required}"
 
-if [ "$(gh release view "$tag" --json isDraft --jq .isDraft)" != "true" ]; then
-  echo "$tag is published; its target is left as is"
-  exit 0
-fi
+# Assigned first: a command substitution inside [ ] is not caught by set -e, so a failed
+# gh call read as "not a draft" and left the draft on the old commit.
+is_draft="$(gh release view "$tag" --json isDraft --jq .isDraft)"
+case "$is_draft" in
+  true) ;;
+  false)
+    echo "$tag is published; its target is left as is"
+    exit 0
+    ;;
+  *)
+    echo "::error::could not tell whether $tag is a draft (got '$is_draft')" >&2
+    exit 1
+    ;;
+esac
 
 current="$(gh release view "$tag" --json targetCommitish --jq .targetCommitish)"
 if [ "$current" = "$sha" ]; then

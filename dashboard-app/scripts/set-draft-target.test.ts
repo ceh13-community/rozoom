@@ -12,6 +12,10 @@ const FAKE_GH = `#!/usr/bin/env bash
 state="$FAKE_STATE"
 echo "$*" >> "$FAKE_LOG"
 draft=$(sed -n 1p "$state"); target=$(sed -n 2p "$state")
+if [ "$1 $2" = "release view" ] && [ -n "$FAKE_VIEW_FAILS" ]; then
+  echo "HTTP 502" >&2
+  exit 1
+fi
 if [ "$1 $2" = "release view" ]; then
   case "$*" in
     *isDraft*) echo "$draft" ;;
@@ -35,7 +39,7 @@ afterEach(() => {
   if (dir) rmSync(dir, { recursive: true, force: true });
 });
 
-function run(draft: boolean, target: string, sha: string) {
+function run(draft: boolean, target: string, sha: string, viewFails = false) {
   dir = mkdtempSync(path.join(tmpdir(), "draft-target-"));
   const bin = path.join(dir, "bin");
   execFileSync("mkdir", ["-p", bin]);
@@ -46,7 +50,13 @@ function run(draft: boolean, target: string, sha: string) {
   writeFileSync(state, `${draft}\n${target}\n`);
   writeFileSync(log, "");
   const output = execFileSync("bash", [SCRIPT, "app-v1.0.0", sha], {
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_STATE: state, FAKE_LOG: log },
+    env: {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH}`,
+      FAKE_STATE: state,
+      FAKE_LOG: log,
+      FAKE_VIEW_FAILS: viewFails ? "1" : "",
+    },
     encoding: "utf8",
   });
   const [, finalTarget] = readFileSync(state, "utf8").split("\n");
@@ -65,6 +75,13 @@ describe("set-draft-target.sh", () => {
     const result = run(false, "bbf5be31", "1b09934b");
     expect(result.finalTarget).toBe("bbf5be31");
     expect(result.calls).not.toContain("release edit");
+  });
+
+  // A failed gh call read as "not a draft": exit 0 and the draft stayed on the old commit.
+  it("fails when it cannot tell whether the release is a draft", () => {
+    expect(() => run(true, "bbf5be31", "1b09934b", true)).toThrow();
+    const [, finalTarget] = readFileSync(path.join(dir, "state"), "utf8").split("\n");
+    expect(finalTarget).toBe("bbf5be31");
   });
 
   it("does nothing when the draft already targets the commit", () => {
