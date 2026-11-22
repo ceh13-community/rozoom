@@ -301,6 +301,17 @@
     }
   }
 
+  // A new window opens over the page content, beside the sidebars: at the fixed 80 px it
+  // covered the cluster menu the person uses next to the shell. A saved position wins.
+  function besideSidebars() {
+    const sidebarsRight = Array.from(document.querySelectorAll("aside"))
+      .map((aside) => aside.getBoundingClientRect())
+      .filter((rect) => rect.width > 0 && rect.left < window.innerWidth / 2)
+      .reduce((right, rect) => Math.max(right, rect.right), 0);
+    const maxX = Math.max(0, window.innerWidth - expandedWidth - 16);
+    return { x: Math.min(Math.round(sidebarsRight) + 16, maxX), y: 80 };
+  }
+
   function restoreWindowState(clusterId: string) {
     if (typeof window === "undefined" || !clusterId) return false;
     const map = readWindowStateMap();
@@ -573,7 +584,7 @@
     collapsed = false;
     maximized = false;
     restoreBounds = null;
-    restoreWindowState(clusterId);
+    if (!restoreWindowState(clusterId)) position = besideSidebars();
     if (windowIndex > 0 && !maximized) {
       position = {
         x: Math.max(0, position.x + windowIndex * 24),

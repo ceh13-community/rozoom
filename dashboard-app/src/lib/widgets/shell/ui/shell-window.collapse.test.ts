@@ -40,6 +40,24 @@ describe("minimized pod shell", () => {
     expect(await screen.findByTestId("pod-session-line")).toBeInTheDocument();
   });
 
+  it("opens beside the sidebars, not over them", async () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+    const rail = document.createElement("aside");
+    const menu = document.createElement("aside");
+    rail.getBoundingClientRect = () => ({ left: 0, right: 40, width: 40 }) as DOMRect;
+    menu.getBoundingClientRect = () => ({ left: 40, right: 290, width: 250 }) as DOMRect;
+    document.body.append(rail, menu);
+    render(ShellWindow, {
+      props: {
+        windowState: { id: "s3", clusterId: "c-new", targetPod: pod, podSessionMode: "exec" },
+        windowIndex: 0,
+      },
+    });
+    expect(panel().style.left).toBe("306px");
+    rail.remove();
+    menu.remove();
+  });
+
   it("minimizes from full screen", async () => {
     render(ShellWindow, {
       props: {
