@@ -708,13 +708,13 @@
       >
         {tab.label}
         {#if tab.k === "nodes" && rows.length > 0}
-          <span class="ml-1 text-[10px] text-muted-foreground">({rows.length})</span>
+          <span class="ml-1 text-xs text-muted-foreground">({rows.length})</span>
         {/if}
         {#if tab.k === "conditions" && byCondition.length > 0}
-          <span class="ml-1 text-[10px] text-rose-400">({byCondition.length})</span>
+          <span class="ml-1 text-xs text-rose-400">({byCondition.length})</span>
         {/if}
         {#if tab.k === "taints" && taintedNodes.length > 0}
-          <span class="ml-1 text-[10px] text-muted-foreground">({taintedNodes.length})</span>
+          <span class="ml-1 text-xs text-muted-foreground">({taintedNodes.length})</span>
         {/if}
       </button>
     {/each}
@@ -779,7 +779,7 @@
       {#if byRole.length > 0}
         <div class="rounded border border-border p-3 space-y-1">
           <p class="text-xs font-semibold">By role</p>
-          <div class="flex flex-wrap gap-2 text-[11px]">
+          <div class="flex flex-wrap gap-2 text-xs">
             {#each byRole as [role, n]}
               <span class="rounded border border-border px-2 py-0.5 text-muted-foreground">
                 {role || "(none)"}:
@@ -803,12 +803,12 @@
                   <span class="font-mono">{n.name}</span>
                   <span class="text-muted-foreground">- {n.role}</span>
                   {#each n.humanized as h}
-                    <span class="text-[10px] text-amber-400">- {h.title}</span>
+                    <span class="text-xs text-amber-400">- {h.title}</span>
                   {/each}
                   <Button
                     size="sm"
                     variant="ghost"
-                    class="h-6 ml-auto text-[10px]"
+                    class="h-6 ml-auto text-xs"
                     onclick={() => copyDescribe(n)}
                   >
                     <Copy class="mr-1 h-3 w-3" /> describe
@@ -914,7 +914,7 @@
                       </Badge>
                       {#if n.flappingTypes.length > 0}
                         <span
-                          class="rounded bg-fuchsia-500/20 px-1 text-[9px] text-fuchsia-300"
+                          class="rounded bg-fuchsia-500/20 px-1 text-xs text-fuchsia-300"
                           title={`Flapping on: ${n.flappingTypes.join(", ")}`}
                         >
                           FLAPPING
@@ -947,7 +947,7 @@
                             {#snippet child({ props })}
                               <button
                                 {...props}
-                                class="inline-flex items-center gap-1 rounded bg-rose-500/20 px-1.5 py-0.5 text-[10px] text-rose-300 hover:underline"
+                                class="inline-flex items-center gap-1 rounded bg-rose-500/20 px-1.5 py-0.5 text-xs text-rose-300 hover:underline"
                               >
                                 <CircleAlert class="h-3 w-3" /> mem
                               </button>
@@ -963,10 +963,10 @@
                             )}
                             <p class="font-semibold">{h.title}</p>
                             <p class="text-muted-foreground">{h.hint}</p>
-                            {#if c?.message}<p class="text-[10px] text-slate-400">
+                            {#if c?.message}<p class="text-xs text-slate-400">
                                 Message: {c.message}
                               </p>{/if}
-                            {#if c?.lastTransitionTime}<p class="text-[10px] text-slate-400">
+                            {#if c?.lastTransitionTime}<p class="text-xs text-slate-400">
                                 Since: {formatDate(c.lastTransitionTime)}
                               </p>{/if}
                           </Popover.Content>
@@ -978,7 +978,7 @@
                             {#snippet child({ props })}
                               <button
                                 {...props}
-                                class="inline-flex items-center gap-1 rounded bg-rose-500/20 px-1.5 py-0.5 text-[10px] text-rose-300 hover:underline"
+                                class="inline-flex items-center gap-1 rounded bg-rose-500/20 px-1.5 py-0.5 text-xs text-rose-300 hover:underline"
                               >
                                 <CircleAlert class="h-3 w-3" /> disk
                               </button>
@@ -994,53 +994,51 @@
                             )}
                             <p class="font-semibold">{h.title}</p>
                             <p class="text-muted-foreground">{h.hint}</p>
-                            {#if c?.message}<p class="text-[10px] text-slate-400">
+                            {#if c?.message}<p class="text-xs text-slate-400">
                                 Message: {c.message}
                               </p>{/if}
-                            {#if c?.lastTransitionTime}<p class="text-[10px] text-slate-400">
+                            {#if c?.lastTransitionTime}<p class="text-xs text-slate-400">
                                 Since: {formatDate(c.lastTransitionTime)}
                               </p>{/if}
                           </Popover.Content>
                         </Popover.Root>
                       {/if}
                       {#if n.pidPressure === "True"}
-                        <span class="rounded bg-rose-500/20 px-1.5 py-0.5 text-[10px] text-rose-300"
+                        <span class="rounded bg-rose-500/20 px-1.5 py-0.5 text-xs text-rose-300"
                           >pid</span
                         >
                       {/if}
                       {#if n.networkUnavailable === "True"}
-                        <span class="rounded bg-rose-500/20 px-1.5 py-0.5 text-[10px] text-rose-300"
+                        <span class="rounded bg-rose-500/20 px-1.5 py-0.5 text-xs text-rose-300"
                           >net</span
                         >
                       {/if}
                       {#if n.memoryPressure !== "True" && n.diskPressure !== "True" && n.pidPressure !== "True" && n.networkUnavailable !== "True"}
-                        <span class="text-[10px] text-muted-foreground">none</span>
+                        <span class="text-xs text-muted-foreground">none</span>
                       {/if}
                     </div>
                   </td>
                   <td class="px-2 py-1">
                     <div class="flex flex-wrap gap-1">
                       {#if n.unschedulable}
-                        <span
-                          class="rounded bg-slate-500/30 px-1.5 py-0.5 text-[10px] text-slate-200"
-                        >
+                        <span class="rounded bg-slate-500/30 px-1.5 py-0.5 text-xs text-slate-200">
                           cordoned
                         </span>
                       {/if}
                       {#each n.taints as t (t.key + "/" + t.effect)}
                         <span
-                          class="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-300"
+                          class="rounded bg-amber-500/20 px-1.5 py-0.5 text-xs text-amber-300"
                           title={`${t.key}=${t.value}:${t.effect} - ${TAINT_EFFECTS[t.effect]?.hint ?? ""}`}
                         >
                           {t.effect}
                         </span>
                       {/each}
                       {#if !n.unschedulable && n.taints.length === 0}
-                        <span class="text-[10px] text-muted-foreground">-</span>
+                        <span class="text-xs text-muted-foreground">-</span>
                       {/if}
                     </div>
                   </td>
-                  <td class="px-2 py-1 text-[10px]">
+                  <td class="px-2 py-1 text-xs">
                     <div
                       title={`CPU ${n.capacity.cpu}, mem ${n.capacity.memory} (${formatK8sMemory(n.capacity.memory)}), storage ${n.capacity.storage} (${formatK8sMemory(n.capacity.storage)})`}
                     >
@@ -1050,7 +1048,7 @@
                       <div class="text-muted-foreground">{n.instanceType}</div>
                     {/if}
                   </td>
-                  <td class="px-2 py-1 text-[10px]">
+                  <td class="px-2 py-1 text-xs">
                     {#if n.kubeletVersion}
                       <div>{n.kubeletVersion}</div>
                     {/if}
@@ -1060,7 +1058,7 @@
                       </div>
                     {/if}
                   </td>
-                  <td class="px-2 py-1 text-[10px]" title={formatDate(n.creationTimestamp)}>
+                  <td class="px-2 py-1 text-xs" title={formatDate(n.creationTimestamp)}>
                     {n.age}
                   </td>
                   <td class="px-2 py-1">
@@ -1069,7 +1067,7 @@
                         <Button
                           size="sm"
                           variant="ghost"
-                          class="h-6 text-[10px]"
+                          class="h-6 text-xs"
                           onclick={() => copyUncordon(n)}
                         >
                           <Copy class="mr-1 h-3 w-3" /> uncordon
@@ -1078,7 +1076,7 @@
                         <Button
                           size="sm"
                           variant="ghost"
-                          class="h-6 text-[10px]"
+                          class="h-6 text-xs"
                           onclick={() => copyCordon(n)}
                         >
                           <Copy class="mr-1 h-3 w-3" /> cordon
@@ -1087,7 +1085,7 @@
                       <Button
                         size="sm"
                         variant="ghost"
-                        class="h-6 text-[10px]"
+                        class="h-6 text-xs"
                         onclick={() => copyDrain(n)}
                         title="Copy drain command (review flags before running!)"
                       >
@@ -1096,7 +1094,7 @@
                       <Button
                         size="sm"
                         variant="ghost"
-                        class="h-6 text-[10px]"
+                        class="h-6 text-xs"
                         onclick={() => copyDescribe(n)}
                       >
                         <Copy class="mr-1 h-3 w-3" /> describe
@@ -1104,7 +1102,7 @@
                       <Button
                         size="sm"
                         variant="ghost"
-                        class="h-6 text-[10px]"
+                        class="h-6 text-xs"
                         onclick={() => copyEvents(n)}
                       >
                         <Copy class="mr-1 h-3 w-3" /> events
@@ -1112,7 +1110,7 @@
                       <Button
                         size="sm"
                         variant="ghost"
-                        class="h-6 text-[10px]"
+                        class="h-6 text-xs"
                         onclick={() => copyPodsOnNode(n)}
                       >
                         <Copy class="mr-1 h-3 w-3" /> pods
@@ -1120,7 +1118,7 @@
                       <Button
                         size="sm"
                         variant="ghost"
-                        class="h-6 text-[10px]"
+                        class="h-6 text-xs"
                         onclick={() => copyTopNode(n)}
                       >
                         <Copy class="mr-1 h-3 w-3" /> top
@@ -1173,10 +1171,10 @@
               </div>
               <p class="text-xs text-foreground">{humanized.title}</p>
               <p class="text-xs text-muted-foreground">{humanized.hint}</p>
-              <ul class="text-[11px] space-y-0.5">
+              <ul class="text-xs space-y-0.5">
                 {#each group.nodes as n (n.name)}
                   <li class="flex items-center gap-2 flex-wrap">
-                    <Badge class="text-white {SEVERITY_BADGE_CLASS[n.severity]} text-[9px]">
+                    <Badge class="text-white {SEVERITY_BADGE_CLASS[n.severity]} text-xs">
                       {SEVERITY_LABEL[n.severity]}
                     </Badge>
                     <button class="font-mono hover:underline" onclick={() => jumpToNodes(n)}>
@@ -1186,7 +1184,7 @@
                     <Button
                       size="sm"
                       variant="ghost"
-                      class="h-5 ml-auto text-[9px]"
+                      class="h-5 ml-auto text-xs"
                       onclick={() => copyDescribe(n)}
                     >
                       <Copy class="mr-1 h-3 w-3" /> describe
@@ -1229,11 +1227,11 @@
               {#if n.taints.length > 0}
                 <ul class="space-y-0.5">
                   {#each n.taints as t (t.key + "/" + t.effect)}
-                    <li class="text-[11px]">
+                    <li class="text-xs">
                       <span class="font-mono">{t.key}{t.value ? "=" + t.value : ""}</span>
                       <span class="text-muted-foreground">:{t.effect}</span>
                       {#if TAINT_EFFECTS[t.effect]}
-                        <span class="text-[10px] text-muted-foreground">
+                        <span class="text-xs text-muted-foreground">
                           - {TAINT_EFFECTS[t.effect].hint}
                         </span>
                       {/if}
@@ -1246,7 +1244,7 @@
                   <Button
                     size="sm"
                     variant="ghost"
-                    class="h-6 text-[10px]"
+                    class="h-6 text-xs"
                     onclick={() => copyUncordon(n)}
                   >
                     <Copy class="mr-1 h-3 w-3" /> uncordon
@@ -1255,7 +1253,7 @@
                   <Button
                     size="sm"
                     variant="ghost"
-                    class="h-6 text-[10px]"
+                    class="h-6 text-xs"
                     onclick={() => copyCordon(n)}
                   >
                     <Copy class="mr-1 h-3 w-3" /> cordon
@@ -1264,7 +1262,7 @@
                 <Button
                   size="sm"
                   variant="ghost"
-                  class="h-6 text-[10px]"
+                  class="h-6 text-xs"
                   onclick={() => copyDescribe(n)}
                 >
                   <Copy class="mr-1 h-3 w-3" /> describe
@@ -1272,7 +1270,7 @@
                 <Button
                   size="sm"
                   variant="ghost"
-                  class="h-6 text-[10px]"
+                  class="h-6 text-xs"
                   onclick={() => copyPodsOnNode(n)}
                 >
                   <Copy class="mr-1 h-3 w-3" /> pods on node

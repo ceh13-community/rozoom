@@ -553,7 +553,7 @@
                 <Table.Cell title={forward.lastMessage ?? ""}>
                   {formatEventAge(forward.lastHeartbeatAt ?? forward.startedAt)}
                   {#if forward.lastError}
-                    <div class="max-w-[18rem] truncate text-[11px] text-destructive">{forward.lastError}</div>
+                    <div class="max-w-[18rem] truncate text-xs text-destructive">{forward.lastError}</div>
                   {/if}
                 </Table.Cell>
                 <Table.Cell>

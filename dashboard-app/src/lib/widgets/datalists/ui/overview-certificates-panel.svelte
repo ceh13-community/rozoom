@@ -48,7 +48,7 @@
   {/if}
   {#if controlPlaneDetected === false}
     <div
-      class="mb-3 rounded border border-sky-300/40 bg-sky-50/80 dark:border-sky-700/40 dark:bg-sky-950/30 px-3 py-1.5 text-[11px] text-sky-800 dark:text-sky-200"
+      class="mb-3 rounded border border-sky-300/40 bg-sky-50/80 dark:border-sky-700/40 dark:bg-sky-950/30 px-3 py-1.5 text-xs text-sky-800 dark:text-sky-200"
       role="status"
     >
       <span class="font-semibold">Managed control plane</span> — no kubeadm static pod found in
@@ -80,7 +80,7 @@
   <h4 class="mt-6 text-sm font-semibold">Kubelet rotation</h4>
   {#if hideRotationTable}
     <div
-      class="mt-2 rounded border border-sky-300/40 bg-sky-50/80 dark:border-sky-700/40 dark:bg-sky-950/30 px-3 py-2 text-[11px] text-sky-800 dark:text-sky-200"
+      class="mt-2 rounded border border-sky-300/40 bg-sky-50/80 dark:border-sky-700/40 dark:bg-sky-950/30 px-3 py-2 text-xs text-sky-800 dark:text-sky-200"
     >
       Kubelet rotation status isn't observable from this cluster. Rancher/RKE2, EKS, GKE, and AKS
       rotate kubelet certificates outside the standard Kubernetes CSR flow — there's nothing for

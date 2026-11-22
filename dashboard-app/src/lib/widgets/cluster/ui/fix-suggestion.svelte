@@ -31,7 +31,7 @@
     <Button
       size="sm"
       variant="outline"
-      class="text-[10px] h-5 px-1.5 text-amber-500 border-amber-500/30 hover:bg-amber-500/10"
+      class="text-xs h-5 px-1.5 text-amber-500 border-amber-500/30 hover:bg-amber-500/10"
       onclick={() => (showYaml = !showYaml)}
     >
       {showYaml ? "Hide" : label}
@@ -39,9 +39,9 @@
   </div>
 
   {#if showYaml}
-    <div class="mt-1.5 rounded border border-slate-600 bg-slate-900/80 p-2 text-[11px] font-mono relative">
+    <div class="mt-1.5 rounded border border-slate-600 bg-slate-900/80 p-2 text-xs font-mono relative">
       <button
-        class="absolute top-1 right-1 text-[9px] px-1.5 py-0.5 rounded border border-slate-600 text-slate-400 hover:text-white hover:border-slate-400 transition"
+        class="absolute top-1 right-1 text-xs px-1.5 py-0.5 rounded border border-slate-600 text-slate-400 hover:text-white hover:border-slate-400 transition"
         onclick={copyToClipboard}
       >{copied ? "Copied!" : "Copy"}</button>
       <pre class="whitespace-pre-wrap text-emerald-300/90 overflow-x-auto">{yaml}</pre>

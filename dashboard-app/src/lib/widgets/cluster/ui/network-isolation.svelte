@@ -87,7 +87,7 @@
       sideOffset={8}
     >
       <p>{detailText}</p>
-      <div class="mb-2 text-[11px] text-muted-foreground/90">
+      <div class="mb-2 text-xs text-muted-foreground/90">
         This summary reflects Kubernetes NetworkPolicy coverage and default-deny posture. It does
         not validate CNI-specific enforcement beyond what policy objects and observable signals
         expose.
@@ -138,7 +138,7 @@
                     -
                   {/if}
                   {#if item.recommendations.length}
-                    <div class="mt-2 text-[10px] text-muted-foreground whitespace-pre-wrap">
+                    <div class="mt-2 text-xs text-muted-foreground whitespace-pre-wrap">
                       {item.recommendations.join("\n\n")}
                     </div>
                   {/if}

@@ -614,7 +614,7 @@
       >
         {tab.label}
         {#if tab.k === "cronjobs" && rows.length > 0}
-          <span class="ml-1 text-[10px] text-muted-foreground">({rows.length})</span>
+          <span class="ml-1 text-xs text-muted-foreground">({rows.length})</span>
         {/if}
       </button>
     {/each}
@@ -668,12 +668,12 @@
           <p class="text-lg font-mono {counts.overdue > 0 ? 'text-amber-400' : ''}">
             {counts.overdue}
           </p>
-          <p class="text-[10px] text-muted-foreground mt-0.5">next run is past due</p>
+          <p class="text-xs text-muted-foreground mt-0.5">next run is past due</p>
         </div>
         <div class="rounded border border-border p-2.5 text-xs">
           <p class="text-muted-foreground mb-1">Active Jobs across all CronJobs</p>
           <p class="text-lg font-mono">{counts.active}</p>
-          <p class="text-[10px] text-muted-foreground mt-0.5">currently executing</p>
+          <p class="text-xs text-muted-foreground mt-0.5">currently executing</p>
         </div>
         <div class="rounded border border-border p-2.5 text-xs">
           <p class="text-muted-foreground mb-1">Auto-refresh</p>
@@ -699,7 +699,7 @@
                   <Button
                     size="sm"
                     variant="ghost"
-                    class="h-6 ml-auto text-[10px]"
+                    class="h-6 ml-auto text-xs"
                     onclick={() => copyLatestLogs(r)}
                     title="Copy kubectl logs for latest Job"
                   >
@@ -798,7 +798,7 @@
                     <div class="flex flex-col gap-0.5">
                       <Badge class="text-white {statusStyles[r.status]}">{r.status}</Badge>
                       {#if r.suspended}
-                        <Badge class="bg-slate-500 text-white text-[9px]">SUSPENDED</Badge>
+                        <Badge class="bg-slate-500 text-white text-xs">SUSPENDED</Badge>
                       {/if}
                     </div>
                   </td>
@@ -809,21 +809,21 @@
                       onclick={() => jumpToCronJob(r)}
                       title="Jump to CronJobs page"
                     >
-                      <p class="text-[10px] text-muted-foreground">{r.namespace}</p>
+                      <p class="text-xs text-muted-foreground">{r.namespace}</p>
                       <p class="font-mono">{r.name}</p>
                     </button>
                   </td>
                   <td class="px-2 py-1">
-                    <p class="font-mono text-[10px]">{r.schedule}</p>
-                    <p class="text-[10px] text-muted-foreground">
+                    <p class="font-mono text-xs">{r.schedule}</p>
+                    <p class="text-xs text-muted-foreground">
                       {r.scheduleSummary.humanReadable}
                     </p>
                   </td>
-                  <td class="px-2 py-1 text-[10px]" title={formatDate(r.lastScheduleTime)}>
+                  <td class="px-2 py-1 text-xs" title={formatDate(r.lastScheduleTime)}>
                     {r.lastScheduleRel}
                   </td>
                   <td
-                    class="px-2 py-1 text-[10px] {r.overdueLabel
+                    class="px-2 py-1 text-xs {r.overdueLabel
                       ? 'text-amber-400'
                       : 'text-muted-foreground'}"
                   >
@@ -842,17 +842,17 @@
                       <span class="text-muted-foreground">0</span>
                     {/if}
                   </td>
-                  <td class="px-2 py-1 text-[10px]">
+                  <td class="px-2 py-1 text-xs">
                     <span>{r.concurrencyPolicy}</span>
                     {#if r.startingDeadlineSeconds != null}
-                      <div class="text-[9px] text-muted-foreground">
+                      <div class="text-xs text-muted-foreground">
                         deadline: {r.startingDeadlineSeconds}s
                       </div>
                     {/if}
                   </td>
                   <td class="px-2 py-1">
                     {#if r.lastFive.length === 0}
-                      <span class="text-[10px] text-muted-foreground">-</span>
+                      <span class="text-xs text-muted-foreground">-</span>
                     {:else}
                       <div class="flex items-center gap-0.5">
                         {#each r.lastFive as run (run.name)}
@@ -876,7 +876,7 @@
                             {...props}
                             class="inline-flex items-center gap-1 hover:underline text-left"
                           >
-                            <span class="text-[10px]">{r.humanized.title}</span>
+                            <span class="text-xs">{r.humanized.title}</span>
                             <Info class="h-3 w-3 text-muted-foreground" />
                           </button>
                         {/snippet}
@@ -884,7 +884,7 @@
                       <Popover.Content class="w-[380px] p-3 text-xs space-y-1">
                         <p class="font-semibold text-foreground">{r.humanized.title}</p>
                         <p class="text-muted-foreground">{r.humanized.hint}</p>
-                        <p class="text-[10px] text-muted-foreground">
+                        <p class="text-xs text-muted-foreground">
                           Raw: <span class="font-mono">{r.reasonRaw}</span>
                         </p>
                       </Popover.Content>
@@ -895,7 +895,7 @@
                       <Button
                         size="sm"
                         variant="ghost"
-                        class="h-6 text-[10px]"
+                        class="h-6 text-xs"
                         onclick={() => copyTrigger(r)}
                         title="Copy kubectl create job --from=cronjob/... (manual run)"
                       >
@@ -905,7 +905,7 @@
                         <Button
                           size="sm"
                           variant="ghost"
-                          class="h-6 text-[10px]"
+                          class="h-6 text-xs"
                           onclick={() => copyUnsuspend(r)}
                           title="Copy kubectl patch to un-suspend"
                         >
@@ -915,7 +915,7 @@
                         <Button
                           size="sm"
                           variant="ghost"
-                          class="h-6 text-[10px]"
+                          class="h-6 text-xs"
                           onclick={() => copySuspend(r)}
                           title="Copy kubectl patch to suspend"
                         >
@@ -925,7 +925,7 @@
                       <Button
                         size="sm"
                         variant="ghost"
-                        class="h-6 text-[10px]"
+                        class="h-6 text-xs"
                         onclick={() => copyLatestLogs(r)}
                       >
                         <Copy class="mr-1 h-3 w-3" /> logs
@@ -933,7 +933,7 @@
                       <Button
                         size="sm"
                         variant="ghost"
-                        class="h-6 text-[10px]"
+                        class="h-6 text-xs"
                         onclick={() => copyDescribe(r)}
                       >
                         <Copy class="mr-1 h-3 w-3" /> describe
@@ -941,7 +941,7 @@
                       <Button
                         size="sm"
                         variant="ghost"
-                        class="h-6 text-[10px]"
+                        class="h-6 text-xs"
                         onclick={() => copyEvents(r)}
                       >
                         <Copy class="mr-1 h-3 w-3" /> events
@@ -978,30 +978,30 @@
             <div class="flex items-center gap-2 flex-wrap">
               <span class="font-semibold text-foreground">{group.title}</span>
               <Badge class="bg-secondary text-secondary-foreground">{group.rows.length}</Badge>
-              <span class="text-[10px] text-muted-foreground">category: {group.category}</span>
+              <span class="text-xs text-muted-foreground">category: {group.category}</span>
             </div>
             <p class="text-xs text-muted-foreground">{group.rows[0].humanized.hint}</p>
             <details class="mt-1">
-              <summary class="cursor-pointer text-[11px] text-muted-foreground">
+              <summary class="cursor-pointer text-xs text-muted-foreground">
                 Show {group.rows.length} CronJobs
               </summary>
-              <ul class="mt-1 space-y-0.5 text-[11px] max-h-60 overflow-y-auto">
+              <ul class="mt-1 space-y-0.5 text-xs max-h-60 overflow-y-auto">
                 {#each group.rows as r (r.namespace + "/" + r.name)}
                   <li class="flex items-center gap-2 flex-wrap">
-                    <Badge class="text-white {statusStyles[r.status]} text-[9px]">{r.status}</Badge>
+                    <Badge class="text-white {statusStyles[r.status]} text-xs">{r.status}</Badge>
                     <button class="font-mono hover:underline" onclick={() => jumpToCronJob(r)}>
                       {r.namespace}/{r.name}
                     </button>
-                    <span class="text-[10px] text-muted-foreground"
+                    <span class="text-xs text-muted-foreground"
                       >{r.scheduleSummary.humanReadable}</span
                     >
                     {#if r.overdueLabel}
-                      <span class="text-amber-400 text-[10px]">{r.overdueLabel}</span>
+                      <span class="text-amber-400 text-xs">{r.overdueLabel}</span>
                     {/if}
                     <Button
                       size="sm"
                       variant="ghost"
-                      class="h-5 ml-auto text-[9px]"
+                      class="h-5 ml-auto text-xs"
                       onclick={() => copyLatestLogs(r)}
                     >
                       <Copy class="mr-1 h-3 w-3" /> logs

@@ -67,7 +67,7 @@
           <PanelLeftOpen class="h-4 w-4" />
         </Button>
         <div
-          class="[writing-mode:vertical-rl] rotate-180 text-[11px] tracking-wide text-muted-foreground"
+          class="[writing-mode:vertical-rl] rotate-180 text-xs tracking-wide text-muted-foreground"
         >
           {collapsedLabel}
         </div>

@@ -441,7 +441,7 @@
         >
           {tab.label}
           {#if tab.k === "overview" && missingCount + unreachableCount > 0}
-            <span class="ml-1 text-[10px] text-rose-400">({missingCount + unreachableCount})</span>
+            <span class="ml-1 text-xs text-rose-400">({missingCount + unreachableCount})</span>
           {/if}
         </button>
       {/each}
@@ -527,7 +527,7 @@
               </li>
             {/each}
           </ul>
-          <p class="text-[10px] text-muted-foreground">
+          <p class="text-xs text-muted-foreground">
             Ran {new Date(preflight.ranAt).toLocaleString()}
           </p>
         </div>
@@ -611,14 +611,14 @@
                     {#if check.status !== "available" && detectIssueTags(check).length > 0}
                       <div class="mt-1 flex flex-wrap gap-1">
                         {#each detectIssueTags(check) as tag}
-                          <Badge variant="outline" class="text-[10px] leading-4">{tag}</Badge>
+                          <Badge variant="outline" class="text-xs leading-4">{tag}</Badge>
                         {/each}
                       </div>
                     {/if}
                     {#if humanized}
                       <p class="mt-1 text-xs font-medium text-amber-300">{humanized.title}</p>
                       {#if humanized.hint}
-                        <p class="text-[11px] text-muted-foreground">{humanized.hint}</p>
+                        <p class="text-xs text-muted-foreground">{humanized.hint}</p>
                       {/if}
                     {/if}
                   </Table.TableCell>
@@ -663,7 +663,7 @@
                         <Button
                           size="sm"
                           variant="ghost"
-                          class="h-6 text-[10px]"
+                          class="h-6 text-xs"
                           onclick={() =>
                             copyText(cliTestCommand[check.id], `${check.title} test command`)}
                           title="Copy kubectl commands to test this source"
@@ -675,7 +675,7 @@
                         <Button
                           size="sm"
                           variant="ghost"
-                          class="h-6 text-[10px]"
+                          class="h-6 text-xs"
                           onclick={() => copyText(humanized.fixCommand!, "fix command")}
                           title="Copy suggested fix command"
                         >
@@ -745,7 +745,7 @@
                   {#if d.testCommand}
                     <div class="mt-1 flex items-center gap-1">
                       <pre
-                        class="rounded bg-muted/30 px-1.5 py-0.5 text-[10px] font-mono overflow-x-auto">{d.testCommand}</pre>
+                        class="rounded bg-muted/30 px-1.5 py-0.5 text-xs font-mono overflow-x-auto">{d.testCommand}</pre>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -758,7 +758,7 @@
                     </div>
                   {/if}
                   {#if d.alertNames && d.alertNames.length > 0}
-                    <p class="text-[10px] text-muted-foreground mt-0.5">
+                    <p class="text-xs text-muted-foreground mt-0.5">
                       Affected alert rules:
                       {#each d.alertNames as an, i}
                         <span class="font-mono text-amber-300"
@@ -793,7 +793,7 @@
           </p>
           <div class="flex items-start gap-1">
             <pre
-              class="rounded bg-muted/30 px-1.5 py-1 text-[10px] font-mono overflow-x-auto flex-1">{`helm upgrade --install metrics-server metrics-server/metrics-server \\
+              class="rounded bg-muted/30 px-1.5 py-1 text-xs font-mono overflow-x-auto flex-1">{`helm upgrade --install metrics-server metrics-server/metrics-server \\
   --namespace kube-system \\
   --set args='{--kubelet-insecure-tls}'`}</pre>
             <Button
@@ -822,7 +822,7 @@
           </p>
           <div class="flex items-start gap-1">
             <pre
-              class="rounded bg-muted/30 px-1.5 py-1 text-[10px] font-mono overflow-x-auto flex-1">{`kubectl get clusterrolebinding | grep -E 'metrics-server|kube-state-metrics|node-exporter'
+              class="rounded bg-muted/30 px-1.5 py-1 text-xs font-mono overflow-x-auto flex-1">{`kubectl get clusterrolebinding | grep -E 'metrics-server|kube-state-metrics|node-exporter'
 kubectl auth can-i get nodes/metrics`}</pre>
             <Button
               size="sm"
@@ -848,7 +848,7 @@ kubectl auth can-i get nodes/metrics`}</pre>
           </p>
           <div class="flex items-start gap-1">
             <pre
-              class="rounded bg-muted/30 px-1.5 py-1 text-[10px] font-mono overflow-x-auto flex-1">{`kubectl get nodes -o wide
+              class="rounded bg-muted/30 px-1.5 py-1 text-xs font-mono overflow-x-auto flex-1">{`kubectl get nodes -o wide
 kubectl get ds -A -l app.kubernetes.io/name=node-exporter
 # Check which nodes have a pod:
 kubectl get pods -A -l app.kubernetes.io/name=node-exporter -o wide`}</pre>
@@ -878,7 +878,7 @@ kubectl get pods -A -l app.kubernetes.io/name=node-exporter -o wide`}</pre>
           </p>
           <div class="flex items-start gap-1">
             <pre
-              class="rounded bg-muted/30 px-1.5 py-1 text-[10px] font-mono overflow-x-auto flex-1">{`kubectl label namespace monitoring \\
+              class="rounded bg-muted/30 px-1.5 py-1 text-xs font-mono overflow-x-auto flex-1">{`kubectl label namespace monitoring \\
   pod-security.kubernetes.io/enforce=privileged --overwrite`}</pre>
             <Button
               size="sm"
@@ -900,7 +900,7 @@ kubectl get pods -A -l app.kubernetes.io/name=node-exporter -o wide`}</pre>
           <p class="text-sm font-semibold text-foreground">Test each source with kubectl</p>
           <div class="flex items-start gap-1">
             <pre
-              class="rounded bg-muted/30 px-1.5 py-1 text-[10px] font-mono overflow-x-auto flex-1">{`# metrics-server
+              class="rounded bg-muted/30 px-1.5 py-1 text-xs font-mono overflow-x-auto flex-1">{`# metrics-server
 kubectl top nodes
 kubectl top pods -A
 

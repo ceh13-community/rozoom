@@ -93,7 +93,7 @@
       </div>
 
       <div class="text-xs text-muted-foreground mb-1">{summaryText}</div>
-      <div class="text-[11px] text-muted-foreground/90 mb-3">{helperText}</div>
+      <div class="text-xs text-muted-foreground/90 mb-3">{helperText}</div>
 
       {#if warnings.length}
         <div class="mb-3 rounded-md border border-orange-400/40 bg-orange-400/10 p-2 text-xs">

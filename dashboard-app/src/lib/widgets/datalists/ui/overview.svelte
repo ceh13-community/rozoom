@@ -1786,11 +1786,11 @@
   </div>
   {#if $selectedNamespace && $selectedNamespace !== "all"}
     <div
-      class="mb-3 rounded border border-sky-300/40 bg-sky-50/80 dark:border-sky-700/40 dark:bg-sky-950/30 px-3 py-1.5 text-[11px] text-sky-800 dark:text-sky-200 flex items-center gap-2"
+      class="mb-3 rounded border border-sky-300/40 bg-sky-50/80 dark:border-sky-700/40 dark:bg-sky-950/30 px-3 py-1.5 text-xs text-sky-800 dark:text-sky-200 flex items-center gap-2"
       role="status"
     >
       <span class="font-semibold">Namespace filter:</span>
-      <code class="font-mono text-[11px] bg-sky-100 dark:bg-sky-900/50 rounded px-1.5 py-0.5"
+      <code class="font-mono text-xs bg-sky-100 dark:bg-sky-900/50 rounded px-1.5 py-0.5"
         >{$selectedNamespace}</code
       >
       <span class="text-sky-700/80 dark:text-sky-300/80">
@@ -1803,21 +1803,19 @@
     class="mb-3 flex flex-wrap items-center justify-end gap-2 text-xs text-gray-500 dark:text-gray-400"
   >
     {#if showingCachedOverview}
-      <span
-        class="rounded border border-amber-300/70 bg-amber-50 px-2 py-1 text-[11px] text-amber-800"
-      >
+      <span class="rounded border border-amber-300/70 bg-amber-50 px-2 py-1 text-xs text-amber-800">
         Cached · {formatRelativeTime(cachedOverviewAt) ?? "just now"} · Refreshing<LoadingDots />
       </span>
     {:else if overviewReachability.unreachable}
       <span
-        class="rounded border border-red-300/70 bg-red-50 px-2 py-1 text-[11px] text-red-800"
+        class="rounded border border-red-300/70 bg-red-50 px-2 py-1 text-xs text-red-800"
         data-testid="overview-unreachable-chip"
       >
         Unreachable · last known {liveUpdatedLabel ?? "—"}
       </span>
     {:else if overviewLastUpdatedAt}
       <span
-        class="rounded border border-emerald-300/70 bg-emerald-50 px-2 py-1 text-[11px] text-emerald-800"
+        class="rounded border border-emerald-300/70 bg-emerald-50 px-2 py-1 text-xs text-emerald-800"
       >
         Live · Updated {liveUpdatedLabel}
       </span>
@@ -1852,7 +1850,7 @@
     {:else}
       {#if overviewReachability.unreachable}
         <div
-          class="mb-2 rounded border border-amber-300/70 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-800"
+          class="mb-2 rounded border border-amber-300/70 bg-amber-50 px-3 py-1.5 text-xs text-amber-800"
           role="status"
           data-testid="overview-health-stale-notice"
         >
@@ -1884,7 +1882,7 @@
             <div class="mt-2 text-3xl font-semibold">{insight.quantity}</div>
           </div>
           <span
-            class={`rounded px-2 py-0.5 text-[11px] font-medium ${
+            class={`rounded px-2 py-0.5 text-xs font-medium ${
               insight.severity === "critical"
                 ? "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
                 : insight.severity === "warning"
@@ -1942,7 +1940,7 @@
               {card.title}
             </div>
             <span
-              class={`rounded px-2 py-0.5 text-[11px] font-medium ${
+              class={`rounded px-2 py-0.5 text-xs font-medium ${
                 card.severity === "critical"
                   ? "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
                   : card.severity === "warning"
@@ -2054,7 +2052,7 @@
                 <div class="flex items-center justify-between gap-2">
                   <div class="text-xs font-medium">{capability.title}</div>
                   <span
-                    class={`rounded px-2 py-0.5 text-[11px] font-medium ${
+                    class={`rounded px-2 py-0.5 text-xs font-medium ${
                       capability.status === "allowed"
                         ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
                         : capability.status === "denied"
@@ -2154,7 +2152,7 @@
           </div>
           {#if showingCachedOverview && cachedOverviewAt}
             <span
-              class="rounded border border-amber-300/70 bg-amber-50 px-2 py-1 text-[11px] text-amber-800"
+              class="rounded border border-amber-300/70 bg-amber-50 px-2 py-1 text-xs text-amber-800"
             >
               Stale · {formatRelativeTime(cachedOverviewAt) ?? "just now"}
             </span>
@@ -2185,7 +2183,7 @@
                   {/if}
                 </div>
                 <span
-                  class={`rounded px-2 py-0.5 text-[11px] font-medium ${
+                  class={`rounded px-2 py-0.5 text-xs font-medium ${
                     risk.severity === "critical"
                       ? "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
                       : "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
@@ -2216,13 +2214,13 @@
                 >
                   {risk.actionLabel}
                 </Button>
-                <code class="flex-1 min-w-0 rounded bg-muted px-2 py-1 text-[11px] truncate"
+                <code class="flex-1 min-w-0 rounded bg-muted px-2 py-1 text-xs truncate"
                   >{risk.command}</code
                 >
                 <Button
                   size="sm"
                   variant="ghost"
-                  class="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground shrink-0"
+                  class="h-7 px-2 text-xs text-muted-foreground hover:text-foreground shrink-0"
                   onclick={() => {
                     void copyToClipboard(risk.command, "Copied!");
                   }}
@@ -2253,7 +2251,7 @@
         <div class="flex items-center gap-2">
           {#if showingCachedOverview && cachedOverviewAt}
             <span
-              class="rounded border border-amber-300/70 bg-amber-50 px-2 py-1 text-[11px] text-amber-800"
+              class="rounded border border-amber-300/70 bg-amber-50 px-2 py-1 text-xs text-amber-800"
             >
               Stale baseline · {formatRelativeTime(cachedOverviewAt) ?? "just now"}
             </span>
@@ -2286,7 +2284,7 @@
                 <div class="mt-0.5 text-xs text-muted-foreground">{change.detail}</div>
               </div>
               <span
-                class={`rounded px-2 py-0.5 text-[11px] font-medium shrink-0 ${
+                class={`rounded px-2 py-0.5 text-xs font-medium shrink-0 ${
                   change.severity === "critical"
                     ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
                     : change.severity === "warning"
@@ -2326,7 +2324,7 @@
         <div class="flex items-center gap-2">
           {#if showingCachedOverview && cachedOverviewAt}
             <span
-              class="rounded border border-amber-300/70 bg-amber-50 px-2 py-1 text-[11px] text-amber-800"
+              class="rounded border border-amber-300/70 bg-amber-50 px-2 py-1 text-xs text-amber-800"
             >
               History from cache · {formatRelativeTime(cachedOverviewAt) ?? "just now"}
             </span>
@@ -2356,7 +2354,7 @@
           <div class="rounded border border-border/80 bg-background px-3 py-3">
             <div class="mb-2 flex items-center justify-between">
               <div class="text-sm font-medium">{series.title}</div>
-              <div class="text-[11px] text-muted-foreground">{series.points.length} samples</div>
+              <div class="text-xs text-muted-foreground">{series.points.length} samples</div>
             </div>
             {#if series.points.length > 0}
               <svg viewBox="0 0 100 32" class="h-10 w-full overflow-visible">
@@ -2368,10 +2366,10 @@
                   class="text-slate-400"
                 />
               </svg>
-              <div class="mt-1 text-[11px] text-muted-foreground">0 = healthy, 3 = critical</div>
+              <div class="mt-1 text-xs text-muted-foreground">0 = healthy, 3 = critical</div>
             {:else}
               <div
-                class="flex h-10 items-center justify-center rounded bg-muted/30 text-[11px] text-muted-foreground"
+                class="flex h-10 items-center justify-center rounded bg-muted/30 text-xs text-muted-foreground"
               >
                 Collecting data - chart appears after 2+ refresh cycles
               </div>
@@ -2404,7 +2402,7 @@
           >
             <div class="text-sm font-medium">{action.label}</div>
             <div class="mt-1 text-xs text-muted-foreground">{action.detail}</div>
-            <div class="mt-2 text-[11px] text-muted-foreground">
+            <div class="mt-2 text-xs text-muted-foreground">
               {action.mode === "copy"
                 ? action.target
                 : action.mode === "tab"
@@ -2432,7 +2430,7 @@
           <div class="flex items-center justify-between gap-2">
             <div class="text-xs font-medium">{check.title}</div>
             <span
-              class={`rounded px-2 py-0.5 text-[11px] font-medium ${
+              class={`rounded px-2 py-0.5 text-xs font-medium ${
                 check.severity === "critical"
                   ? "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
                   : check.severity === "warning"

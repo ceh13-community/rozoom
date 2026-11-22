@@ -242,14 +242,14 @@
             <input type="checkbox" bind:checked={includeSecrets} class="mt-0.5 accent-amber-500" />
             <span>
               <span class="font-medium">Include Secrets</span>
-              <span class="block text-[11px] text-muted-foreground">
+              <span class="block text-xs text-muted-foreground">
                 Off by default. Secrets are exported as plaintext YAML (base64 is not encryption).
               </span>
             </span>
           </label>
           {#if includeSecrets}
             <div
-              class="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-300"
+              class="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-300"
             >
               Secrets will be written to <code class="font-mono">~/Downloads</code> in plaintext. Do
               not sync this folder to a public drive or share the backup without encrypting it first.
@@ -292,7 +292,7 @@
             ></div>
           </div>
           {#if $yamlBackupProgress.errors.length > 0}
-            <div class="text-[11px] text-amber-600 dark:text-amber-400">
+            <div class="text-xs text-amber-600 dark:text-amber-400">
               {$yamlBackupProgress.errors.length} warning(s) - some resources may be inaccessible
             </div>
           {/if}
@@ -352,10 +352,10 @@
             </div>
             <div class="flex flex-wrap gap-1">
               {#each snapshot.metadata.namespaces.slice(0, 10) as ns}
-                <span class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">{ns}</span>
+                <span class="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">{ns}</span>
               {/each}
               {#if snapshot.metadata.namespaces.length > 10}
-                <span class="text-[10px] text-muted-foreground"
+                <span class="text-xs text-muted-foreground"
                   >+{snapshot.metadata.namespaces.length - 10} more</span
                 >
               {/if}
@@ -477,10 +477,10 @@
             {#if $yamlRestoreProgress.errors.length > 0}
               <div class="space-y-1">
                 {#each $yamlRestoreProgress.errors.slice(0, 5) as error}
-                  <div class="text-[11px] text-rose-600 dark:text-rose-400 break-all">{error}</div>
+                  <div class="text-xs text-rose-600 dark:text-rose-400 break-all">{error}</div>
                 {/each}
                 {#if $yamlRestoreProgress.errors.length > 5}
-                  <div class="text-[11px] text-muted-foreground">
+                  <div class="text-xs text-muted-foreground">
                     +{$yamlRestoreProgress.errors.length - 5} more errors
                   </div>
                 {/if}

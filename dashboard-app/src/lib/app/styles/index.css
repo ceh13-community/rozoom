@@ -83,7 +83,9 @@
      longer loaded) and the Apple and Windows names in front, each Text size step froze
      the page for about a second. system-ui resolves to the same font as the old stack on
      Linux, macOS and Windows. */
+  /* 14 px: the body size of the type scale (12 px is the floor, for labels and badges). */
   body {
+    font-size: 0.875rem;
     font-family: system-ui, sans-serif;
     font-weight: 450;
     line-height: 1.5;

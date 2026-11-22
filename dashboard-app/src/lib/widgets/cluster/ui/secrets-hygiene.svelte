@@ -118,7 +118,7 @@
                     -
                   {/if}
                   {#if item.recommendations.length}
-                    <div class="mt-2 text-[10px] text-muted-foreground whitespace-pre-wrap">
+                    <div class="mt-2 text-xs text-muted-foreground whitespace-pre-wrap">
                       {item.recommendations.join("\n\n")}
                     </div>
                   {/if}

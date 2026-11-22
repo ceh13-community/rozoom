@@ -493,7 +493,7 @@
   {#if alertSummaries.length > 0 || bookmarks.length > 0}
     <div class="flex flex-wrap items-center gap-2 border-b px-4 py-2">
       {#if alertSummaries.length > 0}
-        <div class="text-[11px] uppercase tracking-wide text-muted-foreground">Smart alerts</div>
+        <div class="text-xs uppercase tracking-wide text-muted-foreground">Smart alerts</div>
         {#each alertSummaries as alert}
           <button
             type="button"
@@ -508,7 +508,7 @@
         {/each}
       {/if}
       {#if bookmarks.length > 0}
-        <div class="text-[11px] uppercase tracking-wide text-muted-foreground">Bookmarks</div>
+        <div class="text-xs uppercase tracking-wide text-muted-foreground">Bookmarks</div>
         {#each bookmarks as bookmark}
           <div class="inline-flex items-center rounded border px-2 py-1 text-xs">
             <button

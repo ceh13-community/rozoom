@@ -74,7 +74,7 @@
       <button
         type="button"
         onclick={() => toggle("online")}
-        class="text-[11px] h-7 px-2 rounded-full border cursor-pointer transition {chipClass(
+        class="text-xs h-7 px-2 rounded-full border cursor-pointer transition {chipClass(
           activeFilter === 'online',
           'ok',
         )}"
@@ -87,7 +87,7 @@
         <button
           type="button"
           onclick={() => toggle("warning")}
-          class="text-[11px] h-7 px-2 rounded-full border cursor-pointer transition {chipClass(
+          class="text-xs h-7 px-2 rounded-full border cursor-pointer transition {chipClass(
             activeFilter === 'warning',
             'warn',
           )}"
@@ -101,7 +101,7 @@
         <button
           type="button"
           onclick={() => toggle("critical")}
-          class="text-[11px] h-7 px-2 rounded-full border cursor-pointer transition {chipClass(
+          class="text-xs h-7 px-2 rounded-full border cursor-pointer transition {chipClass(
             activeFilter === 'critical',
             'danger',
           )}"
@@ -115,7 +115,7 @@
         <button
           type="button"
           onclick={() => toggle("auth-error")}
-          class="text-[11px] h-7 px-2 rounded-full border cursor-pointer transition {chipClass(
+          class="text-xs h-7 px-2 rounded-full border cursor-pointer transition {chipClass(
             activeFilter === 'auth-error',
             'warn',
           )}"
@@ -129,7 +129,7 @@
         <button
           type="button"
           onclick={() => toggle("offline")}
-          class="text-[11px] h-7 px-2 rounded-full border cursor-pointer transition {chipClass(
+          class="text-xs h-7 px-2 rounded-full border cursor-pointer transition {chipClass(
             activeFilter === 'offline',
             'danger',
           )}"
@@ -143,7 +143,7 @@
         <button
           type="button"
           onclick={() => toggle("unknown")}
-          class="text-[11px] h-7 px-2 rounded-full border cursor-pointer transition {chipClass(
+          class="text-xs h-7 px-2 rounded-full border cursor-pointer transition {chipClass(
             activeFilter === 'unknown',
             'muted',
           )}"
@@ -155,7 +155,7 @@
     </div>
   </div>
   {#if activeFilter}
-    <div class="mt-2 text-[10px] text-slate-500">
+    <div class="mt-2 text-xs text-slate-500">
       Filtering managed clusters by <span class="font-semibold">{activeFilter}</span>.
       <button
         type="button"

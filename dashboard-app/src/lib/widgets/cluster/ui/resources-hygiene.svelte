@@ -72,7 +72,7 @@
       sideOffset={8}
     >
       <p>{detailText}</p>
-      <div class="mb-2 text-[11px] text-muted-foreground/90">
+      <div class="mb-2 text-xs text-muted-foreground/90">
         This summary evaluates requests and limits posture against Kubernetes resource-management
         best practices. It is workload guidance, not a built-in Kubernetes admission result.
       </div>

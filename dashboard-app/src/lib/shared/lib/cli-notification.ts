@@ -67,7 +67,7 @@ export function initCliNotifications() {
     toastFn(n.success ? "Command executed" : "Command failed", {
       description: displayCmd,
       descriptionClass:
-        "font-mono !text-[11px] !leading-relaxed !break-all !whitespace-pre-wrap !max-h-24 !overflow-y-auto",
+        "font-mono !text-xs !leading-relaxed !break-all !whitespace-pre-wrap !max-h-24 !overflow-y-auto",
       duration: 10_000,
       action: {
         label: "Copy",

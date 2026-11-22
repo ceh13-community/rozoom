@@ -40,11 +40,11 @@
       <h3 class="text-sm font-semibold flex items-center gap-2">
         Fleet Drift Detector
         {#if hasData}
-          <Badge class="text-white {totalDrifts > 0 ? 'bg-amber-600' : 'bg-emerald-600'} text-[11px]">
+          <Badge class="text-white {totalDrifts > 0 ? 'bg-amber-600' : 'bg-emerald-600'} text-xs">
             {state.alignmentPercent}% aligned
           </Badge>
           {#if totalDrifts > 0}
-            <span class="text-[11px] text-muted-foreground">
+            <span class="text-xs text-muted-foreground">
               {totalDrifts} drift{totalDrifts > 1 ? "s" : ""} across {clustersWithDrift.length}/{state.totalClusters} cluster{clustersWithDrift.length > 1 ? "s" : ""}
             </span>
           {/if}
@@ -73,7 +73,7 @@
                 {snapshot.clusterName}
               </td>
               <td class="py-1.5 pr-3">
-                <Badge class="text-white {snapshot.severity === 'critical' ? 'bg-rose-600' : 'bg-amber-600'} text-[10px]">
+                <Badge class="text-white {snapshot.severity === 'critical' ? 'bg-rose-600' : 'bg-amber-600'} text-xs">
                   {snapshot.driftCount}
                 </Badge>
               </td>
@@ -81,7 +81,7 @@
                 <div class="flex flex-wrap gap-1">
                   {#each snapshot.drifts.filter((d) => d.isDrifted) as drift (drift.dimension)}
                     <span
-                      class="rounded px-1.5 py-0.5 text-[10px] font-medium {sevColors[drift.dimensionSeverity]}"
+                      class="rounded px-1.5 py-0.5 text-xs font-medium {sevColors[drift.dimensionSeverity]}"
                       title="{drift.label}: {drift.clusterValue} (fleet: {drift.fleetMajority})"
                     >
                       {drift.label}

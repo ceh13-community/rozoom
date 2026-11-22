@@ -210,7 +210,7 @@
 
   .tag {
     font-family: "JetBrains Mono", monospace;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
     padding: 3px 10px;
     border-radius: 4px;
@@ -236,7 +236,7 @@
 
   .version {
     font-family: "JetBrains Mono", monospace;
-    font-size: 11px;
+    font-size: 12px;
     color: rgba(200, 220, 255, 0.55);
     margin-top: -2px;
   }

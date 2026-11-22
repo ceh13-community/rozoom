@@ -1597,7 +1597,7 @@
               </Button>
             </div>
             <span
-              class={`rounded border px-2 py-0.5 text-[11px] ${
+              class={`rounded border px-2 py-0.5 text-xs ${
                 workspaceLayoutMode === "pinned"
                   ? "border-green-600/40 text-green-700 dark:text-green-400"
                   : "border-amber-600/40 text-amber-700 dark:text-amber-400"
@@ -1647,18 +1647,18 @@
           </Button>
           <button
             type="button"
-            class="group inline-flex h-8 items-center gap-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2.5 text-[11px] text-indigo-300 shadow-sm shadow-indigo-500/10 transition-all hover:border-indigo-400/50 hover:bg-indigo-500/20 hover:text-indigo-200 hover:shadow-indigo-500/20 sm:h-9 sm:px-3"
+            class="group inline-flex h-8 items-center gap-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2.5 text-xs text-indigo-300 shadow-sm shadow-indigo-500/10 transition-all hover:border-indigo-400/50 hover:bg-indigo-500/20 hover:text-indigo-200 hover:shadow-indigo-500/20 sm:h-9 sm:px-3"
             title="Open command palette"
             onclick={() => {
               commandPaletteOpen = true;
             }}
           >
             <kbd
-              class="rounded border border-indigo-500/40 bg-indigo-950/60 px-1.5 py-0.5 font-mono text-[10px] text-indigo-300 group-hover:border-indigo-400/60 group-hover:bg-indigo-900/60"
+              class="rounded border border-indigo-500/40 bg-indigo-950/60 px-1.5 py-0.5 font-mono text-xs text-indigo-300 group-hover:border-indigo-400/60 group-hover:bg-indigo-900/60"
               >Ctrl</kbd
             >
             <kbd
-              class="rounded border border-indigo-500/40 bg-indigo-950/60 px-1.5 py-0.5 font-mono text-[10px] text-indigo-300 group-hover:border-indigo-400/60 group-hover:bg-indigo-900/60"
+              class="rounded border border-indigo-500/40 bg-indigo-950/60 px-1.5 py-0.5 font-mono text-xs text-indigo-300 group-hover:border-indigo-400/60 group-hover:bg-indigo-900/60"
               >K</kbd
             >
           </button>
@@ -1671,7 +1671,7 @@
               >
                 <span class="font-medium text-foreground">Runtime</span>
                 <Badge class={runtimeStateTone(clusterRuntimeState)}>{clusterRuntimeState}</Badge>
-                <span class="hidden text-[11px] text-muted-foreground xl:inline">
+                <span class="hidden text-xs text-muted-foreground xl:inline">
                   {clusterRuntimeBudgetSummary}
                 </span>
               </Popover.Trigger>
@@ -1698,7 +1698,7 @@
                     <Badge class={runtimeStateTone(clusterRuntimeState)}
                       >{clusterRuntimeState}</Badge
                     >
-                    <span class="text-[11px] text-muted-foreground">
+                    <span class="text-xs text-muted-foreground">
                       {#if clusterRuntimeOverride}
                         Override active
                       {:else}
@@ -1720,7 +1720,7 @@
                 title="Open request and debug inspector"
               >
                 <span class="font-medium text-foreground">Inspector</span>
-                <span class="hidden text-[11px] text-muted-foreground xl:inline">
+                <span class="hidden text-xs text-muted-foreground xl:inline">
                   {clusterRequestInspector.summary.degradedEvents} degraded
                 </span>
               </Popover.Trigger>
@@ -1899,13 +1899,13 @@
         </div>
       </div>
       <div
-        class="mb-2 flex flex-wrap items-center gap-3 rounded border border-border/70 bg-background/60 px-2 py-1 text-[11px] text-muted-foreground"
+        class="mb-2 flex flex-wrap items-center gap-3 rounded border border-border/70 bg-background/60 px-2 py-1 text-xs text-muted-foreground"
       >
         <span>nav_source: {lastNavigationSource}</span>
         <span>layout_mode: {workspaceLayoutMode}</span>
       </div>
       <div
-        class="mb-2 grid gap-1 rounded border border-border/70 bg-background/60 px-2 py-1 text-[11px] text-muted-foreground sm:grid-cols-3"
+        class="mb-2 grid gap-1 rounded border border-border/70 bg-background/60 px-2 py-1 text-xs text-muted-foreground sm:grid-cols-3"
       >
         <span>workload events: {workloadTelemetrySummary.sampleSize}</span>
         <span
@@ -1937,7 +1937,7 @@
         </span>
       </div>
       <div
-        class="mb-2 grid gap-1 rounded border border-border/70 bg-background/60 px-2 py-1 text-[11px] text-muted-foreground sm:grid-cols-4"
+        class="mb-2 grid gap-1 rounded border border-border/70 bg-background/60 px-2 py-1 text-xs text-muted-foreground sm:grid-cols-4"
       >
         <span>watcher events: {watcherTelemetrySummary.sampleSize}</span>
         <span
@@ -1954,13 +1954,13 @@
         </span>
       </div>
       <div
-        class="mb-2 overflow-auto rounded border border-border/70 bg-background/60 px-2 py-1 text-[11px]"
+        class="mb-2 overflow-auto rounded border border-border/70 bg-background/60 px-2 py-1 text-xs"
       >
         <div class="mb-1 font-semibold text-muted-foreground">Per-workload perf budget view</div>
         {#if workloadPerfRows.length === 0}
           <div class="text-muted-foreground">No workload telemetry yet</div>
         {:else}
-          <table class="min-w-full text-left text-[11px]">
+          <table class="min-w-full text-left text-xs">
             <thead class="text-muted-foreground">
               <tr>
                 <th class="pr-3">Workload</th>
@@ -1997,13 +1997,13 @@
         {/if}
       </div>
       <div
-        class="mb-2 overflow-auto rounded border border-border/70 bg-background/60 px-2 py-1 text-[11px]"
+        class="mb-2 overflow-auto rounded border border-border/70 bg-background/60 px-2 py-1 text-xs"
       >
         <div class="mb-1 font-semibold text-muted-foreground">Watcher health view</div>
         {#if watcherTelemetryRows.length === 0}
           <div class="text-muted-foreground">No watcher telemetry yet</div>
         {:else}
-          <table class="min-w-full text-left text-[11px]">
+          <table class="min-w-full text-left text-xs">
             <thead class="text-muted-foreground">
               <tr>
                 <th class="pr-3">Cluster</th>
@@ -2032,7 +2032,7 @@
         {/if}
       </div>
       <div
-        class="max-h-36 overflow-auto rounded border border-border/70 bg-background/70 p-2 text-[11px]"
+        class="max-h-36 overflow-auto rounded border border-border/70 bg-background/70 p-2 text-xs"
       >
         {#if debugLogs.length === 0}
           <div class="text-muted-foreground">No debug events yet</div>
@@ -2079,11 +2079,11 @@
               {/each}
             </select>
           </div>
-          <div class="mb-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+          <div class="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <label class="inline-flex items-center gap-1">
               <span>Cluster:</span>
               <select
-                class="h-6 rounded border border-border bg-background px-1.5 text-[11px] text-foreground"
+                class="h-6 rounded border border-border bg-background px-1.5 text-xs text-foreground"
                 value={cluster}
                 disabled={$isClustersConfigLoading || clusterSwitchInFlight}
                 onchange={(event) =>
@@ -2210,11 +2210,11 @@
               {/each}
             </select>
           </div>
-          <div class="mb-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+          <div class="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <label class="inline-flex items-center gap-1">
               <span>Cluster:</span>
               <select
-                class="h-6 rounded border border-border bg-background px-1.5 text-[11px] text-foreground"
+                class="h-6 rounded border border-border bg-background px-1.5 text-xs text-foreground"
                 value={pane.clusterId || cluster}
                 disabled={$isClustersConfigLoading}
                 onchange={(event) =>
@@ -2277,11 +2277,11 @@
               {/each}
             </select>
           </div>
-          <div class="mb-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+          <div class="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <label class="inline-flex items-center gap-1">
               <span>Cluster:</span>
               <select
-                class="h-6 rounded border border-border bg-background px-1.5 text-[11px] text-foreground"
+                class="h-6 rounded border border-border bg-background px-1.5 text-xs text-foreground"
                 value={pane.clusterId || cluster}
                 disabled={$isClustersConfigLoading}
                 onchange={(event) =>

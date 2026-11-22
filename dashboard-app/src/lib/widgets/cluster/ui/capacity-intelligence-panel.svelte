@@ -237,7 +237,7 @@
           </p>
         </div>
         <div class="flex items-center gap-2 shrink-0">
-          <span class="text-[11px] text-muted-foreground">
+          <span class="text-xs text-muted-foreground">
             Last scan: {relativeTime(lastScanAt)}
           </span>
           <Button
@@ -289,10 +289,10 @@
       <div class="flex items-center justify-between">
         <Card.Title class="text-sm">Bin Packing (scheduler view)</Card.Title>
         {#if binPacking}
-          <span class="text-[11px] text-muted-foreground">{binPacking.nodes.length} nodes</span>
+          <span class="text-xs text-muted-foreground">{binPacking.nodes.length} nodes</span>
         {/if}
       </div>
-      <p class="text-[11px] text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         How tightly pod requests fill each node's allocatable capacity.
         <a
           href="https://kubernetes.io/docs/concepts/scheduling-eviction/"
@@ -322,7 +322,7 @@
             >
               {binPacking.clusterScore}%
             </span>
-            <Badge variant="outline" class="text-[10px] {nodeBadgeClass(binPacking.clusterGrade)}">
+            <Badge variant="outline" class="text-xs {nodeBadgeClass(binPacking.clusterGrade)}">
               {binPacking.clusterGrade}
             </Badge>
           </div>
@@ -335,11 +335,11 @@
         <div class="grid gap-1.5">
           {#each binPacking.nodes.slice(0, BIN_NODE_LIMIT) as node (node.name)}
             <div class="flex items-center gap-2 rounded border border-border bg-background/50 p-2">
-              <Badge variant="outline" class="text-[10px] {nodeBadgeClass(node.grade)}">
+              <Badge variant="outline" class="text-xs {nodeBadgeClass(node.grade)}">
                 {node.grade}
               </Badge>
               <span class="font-mono text-xs">{node.name}</span>
-              <div class="ml-auto flex items-center gap-3 text-[11px]">
+              <div class="ml-auto flex items-center gap-3 text-xs">
                 <span class="text-muted-foreground">
                   CPU <span class="font-mono text-foreground">{node.cpuPackingPercent}%</span>
                 </span>
@@ -359,12 +359,12 @@
             </div>
           {/each}
           {#if binPacking.nodes.length > BIN_NODE_LIMIT}
-            <p class="text-[11px] text-muted-foreground">
+            <p class="text-xs text-muted-foreground">
               Showing {BIN_NODE_LIMIT} of {binPacking.nodes.length} nodes.
             </p>
           {/if}
         </div>
-        <p class="text-[11px] text-muted-foreground">
+        <p class="text-xs text-muted-foreground">
           <strong class="text-emerald-400">tight</strong> &ge; 80% packed.
           <strong class="text-amber-400">balanced</strong> &ge; 50%.
           <strong class="text-rose-400">sparse</strong> nodes waste their provisioning; consolidate with
@@ -382,12 +382,12 @@
       <div class="flex items-center justify-between">
         <Card.Title class="text-sm">Resource Efficiency</Card.Title>
         {#if heatmap}
-          <span class="text-[11px] text-muted-foreground">
+          <span class="text-xs text-muted-foreground">
             {heatmap.entries.length} workloads
           </span>
         {/if}
       </div>
-      <p class="text-[11px] text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         Per-workload <code>requests</code> versus live usage. Rolled up to Deployment / StatefulSet /
         DaemonSet so a single row is actionable (update one manifest).
       </p>
@@ -413,7 +413,7 @@
             {heatmap.summary.noRequestsCount} no-requests
           </span>
         </div>
-        <div class="flex flex-wrap gap-4 text-[11px] text-muted-foreground">
+        <div class="flex flex-wrap gap-4 text-xs text-muted-foreground">
           <span>
             Avg CPU efficiency
             <span class="font-mono text-foreground">{heatmap.summary.avgCpuEfficiency}%</span>
@@ -431,13 +431,13 @@
               <div
                 class="flex items-center gap-2 rounded border border-border bg-background/50 p-2 text-xs"
               >
-                <Badge variant="outline" class="text-[10px] {heatmapRowBadge(entry.grade)}">
+                <Badge variant="outline" class="text-xs {heatmapRowBadge(entry.grade)}">
                   {entry.grade}
                 </Badge>
                 <span class="font-mono">
                   {entry.workloadType}/{entry.namespace}/{entry.workload}
                 </span>
-                <span class="ml-auto text-[11px] text-muted-foreground">
+                <span class="ml-auto text-xs text-muted-foreground">
                   CPU <span class="font-mono text-foreground"
                     >{millicoresLabel(entry.cpuUsageMillicores)}/{millicoresLabel(
                       entry.cpuRequestMillicores,
@@ -463,13 +463,13 @@
               <div
                 class="flex items-center gap-2 rounded border border-border bg-background/50 p-2 text-xs"
               >
-                <Badge variant="outline" class="text-[10px] {heatmapRowBadge(entry.grade)}">
+                <Badge variant="outline" class="text-xs {heatmapRowBadge(entry.grade)}">
                   {entry.grade}
                 </Badge>
                 <span class="font-mono">
                   {entry.workloadType}/{entry.namespace}/{entry.workload}
                 </span>
-                <span class="ml-auto text-[11px] text-muted-foreground">
+                <span class="ml-auto text-xs text-muted-foreground">
                   CPU <span class="font-mono text-rose-300">{entry.cpuEfficiency}%</span>
                   · Mem <span class="font-mono text-rose-300">{entry.memoryEfficiency}%</span>
                 </span>
@@ -479,7 +479,7 @@
         {/if}
 
         {#if heatmap.summary.noRequestsCount > 0}
-          <p class="text-[11px] text-muted-foreground">
+          <p class="text-xs text-muted-foreground">
             {heatmap.summary.noRequestsCount} workloads have no CPU/memory requests at all - those pods
             get <code>BestEffort</code> QoS and are evicted first under node pressure. Add requests to
             give them a scheduling reservation.
@@ -495,12 +495,12 @@
       <div class="flex items-center justify-between">
         <Card.Title class="text-sm">Cost Estimate</Card.Title>
         {#if costReport}
-          <span class="text-[11px] text-muted-foreground">
+          <span class="text-xs text-muted-foreground">
             {costReport.entries.length} namespaces
           </span>
         {/if}
       </div>
-      <p class="text-[11px] text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         Ballpark monthly cost of what the scheduler has reserved (requests, not usage). Default
         pricing is a conservative on-demand approximation for US regions; override with your actual
         provider rate for accurate numbers. Committed-use or savings-plan discounts are not
@@ -510,7 +510,7 @@
     <Card.Content class="space-y-3">
       <!-- Pricing controls -->
       <div class="flex flex-wrap items-end gap-3 rounded border border-border bg-muted/20 p-2">
-        <label class="text-[11px] text-muted-foreground">
+        <label class="text-xs text-muted-foreground">
           CPU $/core/month
           <input
             type="number"
@@ -521,7 +521,7 @@
             class="ml-1 h-7 w-24 rounded border border-border bg-background px-2 text-sm"
           />
         </label>
-        <label class="text-[11px] text-muted-foreground">
+        <label class="text-xs text-muted-foreground">
           Memory $/GiB/month
           <input
             type="number"
@@ -567,7 +567,7 @@
                 class="flex flex-wrap items-center gap-2 rounded border border-border bg-background/50 p-2 text-xs"
               >
                 <span class="font-mono">{ns.namespace}</span>
-                <span class="ml-auto text-[11px] text-muted-foreground">
+                <span class="ml-auto text-xs text-muted-foreground">
                   Billed <span class="font-mono text-foreground"
                     >{moneyLabel(ns.totalCostMonthly)}</span
                   >

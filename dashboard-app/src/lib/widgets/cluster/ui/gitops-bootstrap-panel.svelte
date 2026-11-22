@@ -1103,9 +1103,9 @@
         }}
         title="ArgoCD - pull-based GitOps with a built-in web UI. Uses Application CRDs to sync Git repos to namespaces. Best for teams wanting a visual dashboard."
       >
-        ArgoCD {#if argoCDInstalled}<Badge class="ml-1 bg-emerald-600 text-white text-[9px]"
+        ArgoCD {#if argoCDInstalled}<Badge class="ml-1 bg-emerald-600 text-white text-xs"
             >{argoCDVersion ?? "ok"}</Badge
-          >{:else if argoCDInstalled === false}<span class="ml-1 text-[9px] text-muted-foreground"
+          >{:else if argoCDInstalled === false}<span class="ml-1 text-xs text-muted-foreground"
             >not found</span
           >{/if}
       </button>
@@ -1119,9 +1119,9 @@
         }}
         title="Flux CD - pull-based GitOps, CLI/CRD-first, no built-in UI. Uses GitRepository + Kustomization/HelmRelease CRDs. Best for teams that live in kubectl."
       >
-        Flux {#if fluxInstalled}<Badge class="ml-1 bg-emerald-600 text-white text-[9px]"
+        Flux {#if fluxInstalled}<Badge class="ml-1 bg-emerald-600 text-white text-xs"
             >{fluxVersion ?? "ok"}</Badge
-          >{:else if fluxInstalled === false}<span class="ml-1 text-[9px] text-muted-foreground"
+          >{:else if fluxInstalled === false}<span class="ml-1 text-xs text-muted-foreground"
             >not found</span
           >{/if}
       </button>
@@ -1176,7 +1176,7 @@
     <div class="space-y-2">
       <div class="grid grid-cols-[1fr_auto_120px_120px] gap-2 items-end">
         <div>
-          <label class="text-[10px] text-muted-foreground block mb-0.5" for="gitops-repo"
+          <label class="text-xs text-muted-foreground block mb-0.5" for="gitops-repo"
             >Git Repository URL</label
           >
           <input
@@ -1200,7 +1200,7 @@
           {#if testingRepo}<LoadingDots />{:else}Test access{/if}
         </Button>
         <div>
-          <label class="text-[10px] text-muted-foreground block mb-0.5" for="gitops-branch"
+          <label class="text-xs text-muted-foreground block mb-0.5" for="gitops-branch"
             >Branch</label
           >
           <input
@@ -1212,9 +1212,7 @@
           />
         </div>
         <div>
-          <label class="text-[10px] text-muted-foreground block mb-0.5" for="gitops-path"
-            >Path</label
-          >
+          <label class="text-xs text-muted-foreground block mb-0.5" for="gitops-path">Path</label>
           <input
             id="gitops-path"
             type="text"
@@ -1226,7 +1224,7 @@
       </div>
       {#if repoTestResult}
         <div
-          class={`rounded border px-2 py-1.5 text-[11px] ${
+          class={`rounded border px-2 py-1.5 text-xs ${
             repoTestResult.ok
               ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
               : "border-rose-500/40 bg-rose-500/10 text-rose-300"
@@ -1409,7 +1407,7 @@
                 <div class="flex flex-wrap items-center gap-2">
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-medium">{installStep.label}</div>
-                    <div class="text-[11px] text-muted-foreground">
+                    <div class="text-xs text-muted-foreground">
                       Deploys the {provider === "argocd" ? "ArgoCD" : "Flux"} controller into the
                       {provider === "argocd" ? "argocd" : "flux-system"} namespace via Helm, then waits
                       for readiness.
@@ -1425,13 +1423,13 @@
                     {stepButtonLabel(installStep.id)}
                   </Button>
                 </div>
-                <code class="mt-2 block text-[10px] text-muted-foreground font-mono"
+                <code class="mt-2 block text-xs text-muted-foreground font-mono"
                   >{installStep.command.join(" ")}</code
                 >
                 {#if stepOutput[installStep.id]}
                   <button
                     type="button"
-                    class="mt-1 text-[10px] text-sky-400 hover:underline"
+                    class="mt-1 text-xs text-sky-400 hover:underline"
                     onclick={() => {
                       stepExpanded = {
                         ...stepExpanded,
@@ -1443,7 +1441,7 @@
                   </button>
                   {#if stepExpanded[installStep.id]}
                     <pre
-                      class="mt-1 max-h-40 overflow-auto rounded bg-slate-950/70 p-2 text-[10px] font-mono text-slate-300 whitespace-pre-wrap">{stepOutput[
+                      class="mt-1 max-h-40 overflow-auto rounded bg-slate-950/70 p-2 text-xs font-mono text-slate-300 whitespace-pre-wrap">{stepOutput[
                         installStep.id
                       ]}</pre>
                   {/if}
@@ -1467,7 +1465,7 @@
             </div>
             <div class="min-w-0 flex-1 rounded border border-border bg-muted/30 p-3">
               <div class="text-sm font-medium">Point to your Git repo</div>
-              <div class="text-[11px] text-muted-foreground">
+              <div class="text-xs text-muted-foreground">
                 Enter your manifests repo URL and verify access. Public repos work out of the box;
                 private ones need a credentials Secret (configure in {provider === "argocd"
                   ? "ArgoCD Settings → Repositories"
@@ -1495,7 +1493,7 @@
               </div>
               {#if repoTestResult}
                 <div
-                  class={`mt-2 rounded border px-2 py-1.5 text-[11px] ${
+                  class={`mt-2 rounded border px-2 py-1.5 text-xs ${
                     repoTestResult.ok
                       ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
                       : "border-rose-500/40 bg-rose-500/10 text-rose-300"
@@ -1521,7 +1519,7 @@
               <div class="text-sm font-medium">
                 Create your first {provider === "argocd" ? "Application" : "Kustomization"}
               </div>
-              <div class="text-[11px] text-muted-foreground">
+              <div class="text-xs text-muted-foreground">
                 Opens a YAML draft pre-filled with the repo URL above. Edit branch/path in the
                 editor, then click Apply - changes show as a diff before execution.
               </div>
@@ -1573,13 +1571,13 @@
                     expandedMessageKey = expandedMessageKey === rowKey ? null : rowKey;
                   }}
                 >
-                  <Badge class="{syncBadgeClass(res.syncStatus)} text-[10px]">
+                  <Badge class="{syncBadgeClass(res.syncStatus)} text-xs">
                     {res.syncStatus}{hasMessage ? " ⓘ" : ""}
                   </Badge>
                 </button>
               </Table.Cell>
               <Table.Cell>
-                <Badge class="{healthBadgeClass(res.healthStatus)} text-[10px]">
+                <Badge class="{healthBadgeClass(res.healthStatus)} text-xs">
                   {res.healthStatus}
                 </Badge>
               </Table.Cell>
@@ -1623,7 +1621,7 @@
                 <Table.Cell colspan={7} class="bg-muted/30 text-xs">
                   <div class="flex items-start gap-2 px-2 py-2">
                     <span
-                      class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-bold"
+                      class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold"
                       >!</span
                     >
                     <pre class="whitespace-pre-wrap text-xs text-muted-foreground">{message}</pre>
@@ -1675,7 +1673,7 @@
     <div class="flex items-center justify-between border-b px-4 py-3">
       <div>
         <div class="text-sm font-semibold">Preview changes before apply</div>
-        <div class="text-[11px] text-muted-foreground">
+        <div class="text-xs text-muted-foreground">
           Output of <code>kubectl diff -f &lt;your-yaml&gt;</code> against the live cluster.
         </div>
       </div>
@@ -1694,11 +1692,11 @@
         </div>
         {#if diffPreview.diff}
           <pre
-            class="mt-2 whitespace-pre-wrap rounded bg-slate-950/70 p-3 text-[11px] font-mono text-slate-300">{diffPreview.diff}</pre>
+            class="mt-2 whitespace-pre-wrap rounded bg-slate-950/70 p-3 text-xs font-mono text-slate-300">{diffPreview.diff}</pre>
         {/if}
       {:else}
         <pre
-          class="whitespace-pre-wrap rounded bg-slate-950/70 p-3 text-[11px] font-mono text-slate-300">{diffPreview.diff}</pre>
+          class="whitespace-pre-wrap rounded bg-slate-950/70 p-3 text-xs font-mono text-slate-300">{diffPreview.diff}</pre>
       {/if}
     </div>
     <div class="flex items-center justify-end gap-2 border-t px-4 py-3">

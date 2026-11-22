@@ -204,7 +204,7 @@
 {:else if (lazyLoad && !manuallyActivated) || bootstrapInFlight}
   <button
     type="button"
-    class="inline-flex items-center gap-1 rounded-md border border-slate-400 bg-slate-700 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-slate-600 disabled:cursor-wait disabled:opacity-70"
+    class="inline-flex items-center gap-1 rounded-md border border-slate-400 bg-slate-700 px-2 py-0.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-600 disabled:cursor-wait disabled:opacity-70"
     onclick={(e) => {
       e.stopPropagation();
       handleManualLoad();

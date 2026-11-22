@@ -499,7 +499,7 @@
       {#if resolved && !loading}
         <button
           type="button"
-          class="rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+          class="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
           onclick={() => { resolved = false; void resolveChain(); }}
         >
           Refresh
@@ -515,7 +515,7 @@
           {#if i > 0}
             <ArrowRight class="h-3 w-3 shrink-0 text-muted-foreground" />
           {/if}
-          <div class={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] ${kindColors[node.kind] ?? "bg-muted text-foreground border-border"}`}>
+          <div class={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs ${kindColors[node.kind] ?? "bg-muted text-foreground border-border"}`}>
             <span class="font-bold">{kindAbbr[node.kind] ?? node.kind}</span>
             <span class="truncate max-w-[140px]" title={node.name}>{node.name}</span>
             {#if node.status === "healthy"}

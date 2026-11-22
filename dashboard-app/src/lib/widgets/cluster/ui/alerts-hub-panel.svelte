@@ -954,16 +954,16 @@
         >
           {tab.label}
           {#if tab.k === "alerts" && stateCounts.firing > 0}
-            <span class="ml-1 text-[10px] text-rose-400">({stateCounts.firing})</span>
+            <span class="ml-1 text-xs text-rose-400">({stateCounts.firing})</span>
           {/if}
           {#if tab.k === "silences" && silencedAlerts.length > 0}
-            <span class="ml-1 text-[10px] text-slate-400">({silencedAlerts.length})</span>
+            <span class="ml-1 text-xs text-slate-400">({silencedAlerts.length})</span>
           {/if}
           {#if tab.k === "rules" && rules.length > 0}
-            <span class="ml-1 text-[10px] text-muted-foreground">({rules.length})</span>
+            <span class="ml-1 text-xs text-muted-foreground">({rules.length})</span>
           {/if}
           {#if tab.k === "events" && events.length > 0}
-            <span class="ml-1 text-[10px] text-amber-400">({events.length})</span>
+            <span class="ml-1 text-xs text-amber-400">({events.length})</span>
           {/if}
         </button>
       {/each}
@@ -1175,7 +1175,7 @@
               </li>
             {/each}
           </ul>
-          <p class="text-[10px] text-muted-foreground">
+          <p class="text-xs text-muted-foreground">
             Ran {new Date(preflight.ranAt).toLocaleString()}
           </p>
         </div>
@@ -1213,7 +1213,7 @@
             </div>
           </div>
 
-          <p class="text-[10px] text-muted-foreground">Severity breakdown</p>
+          <p class="text-xs text-muted-foreground">Severity breakdown</p>
           <div class="flex h-2 w-full rounded overflow-hidden">
             {#each ["page", "warn", "info", "unknown"] as sev}
               {#if severityCounts[sev as AlertSeverity] > 0}
@@ -1225,7 +1225,7 @@
               {/if}
             {/each}
           </div>
-          <div class="flex flex-wrap gap-2 text-[10px]">
+          <div class="flex flex-wrap gap-2 text-xs">
             {#each ["page", "warn", "info", "unknown"] as sev}
               {#if severityCounts[sev as AlertSeverity] > 0}
                 <span class="flex items-center gap-1">
@@ -1348,7 +1348,7 @@
                   >
                   <Badge class="bg-secondary text-secondary-foreground">{group.items.length}</Badge>
                 </div>
-                <div class="flex items-center gap-2 text-[10px] text-muted-foreground">
+                <div class="flex items-center gap-2 text-xs text-muted-foreground">
                   {#if group.firing > 0}<span class="text-rose-400">{group.firing} firing</span
                     >{/if}
                   {#if group.pending > 0}<span class="text-amber-400">{group.pending} pending</span
@@ -1396,7 +1396,7 @@
                         </Table.TableCell>
                         <Table.TableCell>
                           <span
-                            class="inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-medium {stateClass[
+                            class="inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium {stateClass[
                               alert.state
                             ]}"
                           >
@@ -1469,7 +1469,7 @@
                             <Button
                               size="sm"
                               variant="ghost"
-                              class="h-6 text-[10px]"
+                              class="h-6 text-xs"
                               onclick={() => copyAlertAsMarkdown(alert)}
                             >
                               <Copy class="mr-1 h-3 w-3" /> Copy MD
@@ -1482,10 +1482,10 @@
                           <Table.TableCell colspan={9} class="bg-muted/20">
                             <div class="grid gap-3 md:grid-cols-2 p-2">
                               <div>
-                                <p class="text-[10px] font-semibold text-muted-foreground mb-1">
+                                <p class="text-xs font-semibold text-muted-foreground mb-1">
                                   Labels
                                 </p>
-                                <table class="w-full text-[11px]">
+                                <table class="w-full text-xs">
                                   <tbody>
                                     {#each Object.entries(alert.labels) as [k, v]}
                                       <tr class="border-b border-border/30">
@@ -1499,10 +1499,10 @@
                                 </table>
                               </div>
                               <div>
-                                <p class="text-[10px] font-semibold text-muted-foreground mb-1">
+                                <p class="text-xs font-semibold text-muted-foreground mb-1">
                                   Annotations
                                 </p>
-                                <table class="w-full text-[11px]">
+                                <table class="w-full text-xs">
                                   <tbody>
                                     {#each Object.entries(alert.annotations) as [k, v]}
                                       <tr class="border-b border-border/30">
@@ -1521,7 +1521,7 @@
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      class="mt-2 h-6 text-[10px]"
+                                      class="mt-2 h-6 text-xs"
                                       onclick={() => openInPrometheus(expr)}
                                     >
                                       <Copy class="mr-1 h-3 w-3" /> Copy Prometheus URL
@@ -1553,17 +1553,15 @@
           </div>
           <div class="grid gap-2 md:grid-cols-2">
             <div class="space-y-1">
-              <label for="s-alertname" class="text-[11px] text-muted-foreground">alertname</label>
+              <label for="s-alertname" class="text-xs text-muted-foreground">alertname</label>
               <Input id="s-alertname" bind:value={silenceDraft.alertname} />
             </div>
             <div class="space-y-1">
-              <label for="s-ns" class="text-[11px] text-muted-foreground"
-                >namespace (optional)</label
-              >
+              <label for="s-ns" class="text-xs text-muted-foreground">namespace (optional)</label>
               <Input id="s-ns" bind:value={silenceDraft.namespace} />
             </div>
             <div class="space-y-1">
-              <label for="s-dur" class="text-[11px] text-muted-foreground">Duration</label>
+              <label for="s-dur" class="text-xs text-muted-foreground">Duration</label>
               <select
                 id="s-dur"
                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
@@ -1578,12 +1576,11 @@
               </select>
             </div>
             <div class="space-y-1">
-              <label for="s-author" class="text-[11px] text-muted-foreground">Author</label>
+              <label for="s-author" class="text-xs text-muted-foreground">Author</label>
               <Input id="s-author" bind:value={silenceDraft.author} />
             </div>
             <div class="space-y-1 md:col-span-2">
-              <label for="s-comment" class="text-[11px] text-muted-foreground"
-                >Comment (required)</label
+              <label for="s-comment" class="text-xs text-muted-foreground">Comment (required)</label
               >
               <Input
                 id="s-comment"
@@ -1594,7 +1591,7 @@
           </div>
           <div class="space-y-2">
             <div class="flex items-center justify-between">
-              <p class="text-[11px] text-muted-foreground">Extra matchers (label=value pairs)</p>
+              <p class="text-xs text-muted-foreground">Extra matchers (label=value pairs)</p>
               <Button size="sm" variant="ghost" onclick={addMatcher}>+ Add matcher</Button>
             </div>
             {#each silenceDraft.extraMatchers as matcher, idx}
@@ -1615,7 +1612,7 @@
               <Copy class="mr-2 h-3 w-3" /> Copy curl for Alertmanager
             </Button>
           </div>
-          <p class="text-[10px] text-muted-foreground">
+          <p class="text-xs text-muted-foreground">
             "Apply silence" marks the alert silenced in this UI. For the real Alertmanager, copy the
             curl command and run it against your port-forwarded API.
           </p>
@@ -1652,15 +1649,14 @@
                     <td class="px-2 py-1 font-mono">{a.alertname}</td>
                     <td class="px-2 py-1">
                       <span
-                        class="rounded px-1 py-0.5 text-[10px] text-white {severityStyles[
-                          a.severity
-                        ]}">{a.severity}</span
+                        class="rounded px-1 py-0.5 text-xs text-white {severityStyles[a.severity]}"
+                        >{a.severity}</span
                       >
                     </td>
                     <td class="px-2 py-1">{a.namespace ?? "-"}</td>
                     <td class="px-2 py-1">{formatDate(a.since)}</td>
                     <td class="px-2 py-1">{formatDate(a.silenceEndsAt ?? null)}</td>
-                    <td class="px-2 py-1 font-mono text-[10px] text-muted-foreground"
+                    <td class="px-2 py-1 font-mono text-xs text-muted-foreground"
                       >{a.silenceId ?? "-"}</td
                     >
                   </tr>
@@ -1714,20 +1710,20 @@
                 <span class="font-semibold text-foreground font-mono">{r.name}</span>
                 {#if r.severity}
                   <span
-                    class="rounded px-1.5 py-0.5 text-[10px] text-white {severityStyles[
+                    class="rounded px-1.5 py-0.5 text-xs text-white {severityStyles[
                       r.severity as AlertSeverity
                     ] ?? 'bg-slate-500'}">{r.severity}</span
                   >
                 {/if}
-                <span class="text-[10px] text-muted-foreground"
+                <span class="text-xs text-muted-foreground"
                   >ns: {r.namespace} / group: {r.group}</span
                 >
                 {#if r.forPeriod}
-                  <span class="text-[10px] text-muted-foreground">for: {r.forPeriod}</span>
+                  <span class="text-xs text-muted-foreground">for: {r.forPeriod}</span>
                 {/if}
                 {#if lookupRunbook(r.name)}
                   <a
-                    class="text-[10px] text-primary hover:underline inline-flex items-center gap-1 ml-auto"
+                    class="text-xs text-primary hover:underline inline-flex items-center gap-1 ml-auto"
                     href={lookupRunbook(r.name)!}
                     target="_blank"
                     rel="noreferrer noopener"
@@ -1743,8 +1739,7 @@
                 <p class="text-muted-foreground">{r.description}</p>
               {/if}
               {#if r.expr}
-                <pre
-                  class="mt-1 rounded bg-muted/30 p-1.5 text-[10px] overflow-x-auto">{r.expr}</pre>
+                <pre class="mt-1 rounded bg-muted/30 p-1.5 text-xs overflow-x-auto">{r.expr}</pre>
               {/if}
             </div>
           {/each}
@@ -1803,9 +1798,9 @@
             <tbody>
               {#each filteredEvents.slice(0, 500) as e, i (e.namespace + "/" + e.name + "#" + i)}
                 <tr class="border-t border-border">
-                  <td class="px-2 py-1 text-[10px]">{formatDate(e.lastTimestamp)}</td>
+                  <td class="px-2 py-1 text-xs">{formatDate(e.lastTimestamp)}</td>
                   <td class="px-2 py-1 font-mono text-amber-400">{e.reason}</td>
-                  <td class="px-2 py-1 text-[10px]">
+                  <td class="px-2 py-1 text-xs">
                     <button
                       class="hover:underline"
                       onclick={() => jumpToResource(e.kind, e.objectName, e.namespace)}
@@ -1821,7 +1816,7 @@
             </tbody>
           </table>
           {#if filteredEvents.length > 500}
-            <p class="p-2 text-[10px] text-muted-foreground">
+            <p class="p-2 text-xs text-muted-foreground">
               Showing first 500 of {filteredEvents.length}.
             </p>
           {/if}

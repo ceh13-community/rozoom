@@ -310,7 +310,7 @@
                 class="data-mode-card rounded-lg border border-border/60 bg-background/70 px-3 py-2.5"
               >
                 <div
-                  class="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+                  class="mb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"
                 >
                   Data Mode
                 </div>
@@ -328,7 +328,7 @@
                     {/each}
                   </Select.Content>
                 </Select.Root>
-                <p class="mt-1.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+                <p class="mt-1.5 line-clamp-2 text-xs leading-snug text-muted-foreground">
                   {$dashboardDataProfile.description}
                 </p>
               </div>

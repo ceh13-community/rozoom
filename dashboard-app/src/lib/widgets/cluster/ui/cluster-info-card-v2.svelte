@@ -520,7 +520,7 @@
         </Button>
         {#if showInitialRefreshHint}
           <span
-            class="pointer-events-none absolute -right-16 top-1/2 -translate-y-1/2 rounded-full bg-amber-300 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-900 shadow-sm"
+            class="pointer-events-none absolute -right-16 top-1/2 -translate-y-1/2 rounded-full bg-amber-300 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.18em] text-slate-900 shadow-sm"
           >
             refresh me
           </span>
@@ -554,7 +554,7 @@
         {#if !disconnected || !effectiveLinter}
           <Badge
             class="text-white {displayClusterCardColor?.color ??
-              'bg-slate-500'} text-[11px] h-5 px-1.5 cursor-help"
+              'bg-slate-500'} text-xs h-5 px-1.5 cursor-help"
             title={displayClusterCardColor?.tooltip ?? ""}
           >
             {#if statusGlyph}<span class="mr-0.5" aria-hidden="true">{statusGlyph}</span>{/if}
@@ -619,7 +619,7 @@
           >
           <select
             id={`cluster-refresh-detailed-${cluster.uuid}`}
-            class="h-7 min-w-[3.75rem] appearance-none cursor-pointer rounded border border-slate-500 bg-slate-700 pl-2 pr-6 text-[11px] font-semibold text-white shadow-sm outline-none transition hover:border-slate-300 focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
+            class="h-7 min-w-[3.75rem] appearance-none cursor-pointer rounded border border-slate-500 bg-slate-700 pl-2 pr-6 text-xs font-semibold text-white shadow-sm outline-none transition hover:border-slate-300 focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
             bind:value={refreshInterval}
             onchange={(e) => {
               const v = (e.currentTarget as HTMLSelectElement).value;
@@ -633,7 +633,7 @@
             {/each}
           </select>
           <span
-            class="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-white/70"
+            class="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-white/70"
             aria-hidden="true">▾</span
           >
         </div>
@@ -657,7 +657,7 @@
           <Button
             size="sm"
             variant="outline"
-            class="h-6 px-2 text-[11px]"
+            class="h-6 px-2 text-xs"
             onclick={retryConnection}
             disabled={connectivity.checking}
           >
@@ -690,7 +690,7 @@
         <div class="flex items-center justify-between gap-2">
           <span class="font-medium truncate">{primaryAlert.title}</span>
           <Badge
-            class={`text-white text-[9px] h-4 px-1 shrink-0 ${primaryAlert.severity === "critical" ? "bg-rose-600" : primaryAlert.severity === "warning" ? "bg-amber-600" : "bg-sky-700"}`}
+            class={`text-white text-xs h-4 px-1 shrink-0 ${primaryAlert.severity === "critical" ? "bg-rose-600" : primaryAlert.severity === "warning" ? "bg-amber-600" : "bg-sky-700"}`}
           >
             {primaryAlert.severity === "critical"
               ? "Crit"
@@ -719,9 +719,7 @@
               <BlockIcon class="w-5 h-5 {iconColors[block.status]}" />
               <div class="text-[12px] font-semibold leading-tight">{block.label}</div>
               <Badge
-                class="text-white {statusColors[
-                  block.status
-                ]} text-[10px] h-5 px-1.5 whitespace-nowrap"
+                class="text-white {statusColors[block.status]} text-xs h-5 px-1.5 whitespace-nowrap"
               >
                 {block.status === "ok"
                   ? "OK"
@@ -731,8 +729,8 @@
                       ? "Crit"
                       : "-"}
               </Badge>
-              <div class="text-[11px] text-muted-foreground">{block.metrics}</div>
-              <div class="text-[10px] text-muted-foreground group-hover:text-foreground transition">
+              <div class="text-xs text-muted-foreground">{block.metrics}</div>
+              <div class="text-xs text-muted-foreground group-hover:text-foreground transition">
                 {block.detail}
               </div>
             {:else}
@@ -740,13 +738,13 @@
               <BlockIcon class="w-5 h-5 shrink-0 {iconColors[block.status]}" />
               <div class="flex-1 min-w-0">
                 <div class="text-[13px] font-semibold leading-tight">{block.label}</div>
-                <div class="text-[11px] text-muted-foreground truncate">{block.metrics}</div>
+                <div class="text-xs text-muted-foreground truncate">{block.metrics}</div>
               </div>
               <div class="text-right shrink-0">
                 <Badge
                   class="text-white {statusColors[
                     block.status
-                  ]} text-[10px] h-5 px-1.5 whitespace-nowrap"
+                  ]} text-xs h-5 px-1.5 whitespace-nowrap"
                 >
                   {block.status === "ok"
                     ? "OK"
@@ -757,7 +755,7 @@
                         : "-"}
                 </Badge>
                 <div
-                  class="text-[10px] text-muted-foreground mt-0.5 group-hover:text-foreground transition"
+                  class="text-xs text-muted-foreground mt-0.5 group-hover:text-foreground transition"
                 >
                   {block.detail}
                 </div>
@@ -773,7 +771,7 @@
       <div
         class="px-4 py-2 border-t border-slate-200/50 dark:border-slate-600/40 flex items-center {isHorizontal
           ? 'gap-4'
-          : 'justify-between'} text-[11px] text-muted-foreground"
+          : 'justify-between'} text-xs text-muted-foreground"
       >
         <button
           type="button"

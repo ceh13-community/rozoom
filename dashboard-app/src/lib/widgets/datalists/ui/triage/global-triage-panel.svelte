@@ -264,7 +264,7 @@
   {@const severity = severityFromScore(item.problemScore)}
   <Table.Row>
     <Table.Cell>
-      <Badge class="text-white {severityColor(severity)} text-[10px] h-5 px-1.5 tabular-nums">
+      <Badge class="text-white {severityColor(severity)} text-xs h-5 px-1.5 tabular-nums">
         {item.problemScore}
       </Badge>
     </Table.Cell>

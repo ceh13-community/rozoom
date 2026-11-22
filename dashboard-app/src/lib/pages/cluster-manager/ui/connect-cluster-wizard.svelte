@@ -800,13 +800,13 @@
 
 {#snippet tlsSkipControl(caData: string)}
   <div class="space-y-1">
-    <label class="flex items-center gap-2 text-[11px] text-slate-400">
+    <label class="flex items-center gap-2 text-xs text-slate-400">
       <input type="checkbox" bind:checked={skipTlsVerify} disabled={caData.trim().length > 0} />
       Skip TLS verification (insecure)
     </label>
     {#if skipTlsVerify && caData.trim().length === 0}
       <div
-        class="text-[10px] text-amber-800 dark:text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
+        class="text-xs text-amber-800 dark:text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
       >
         The server's identity will not be checked, so anyone on the network path can read or change
         this connection, including your credentials. Use this only when you accept that risk.
@@ -837,7 +837,7 @@
       >
         <span>{success}</span>
         <button
-          class="text-emerald-400 hover:text-white text-[10px]"
+          class="text-emerald-400 hover:text-white text-xs"
           onclick={() => (success = null)}>x</button
         >
       </div>
@@ -847,7 +847,7 @@
         class="text-xs text-rose-500 bg-rose-500/10 border border-rose-500/30 rounded px-3 py-2 flex justify-between items-center"
       >
         <span>{error}</span>
-        <button class="text-rose-400 hover:text-white text-[10px]" onclick={() => (error = null)}
+        <button class="text-rose-400 hover:text-white text-xs" onclick={() => (error = null)}
           >x</button
         >
       </div>
@@ -863,7 +863,7 @@
           <p class="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
             <Container size={14} /> Find local clusters
           </p>
-          <p class="text-[11px] text-slate-400 leading-relaxed flex items-start gap-1.5">
+          <p class="text-xs text-slate-400 leading-relaxed flex items-start gap-1.5">
             <ShieldCheck size={13} class="text-emerald-400 mt-0.5 shrink-0" />
             <span>{LOCAL_SCAN_PRIVACY_NOTE}</span>
           </p>
@@ -893,7 +893,7 @@
               <p class="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
                 <Container size={14} /> Local clusters {$isLocalScanning ? "..." : ""}
               </p>
-              <p class="text-[10px] text-slate-400 mt-0.5">
+              <p class="text-xs text-slate-400 mt-0.5">
                 minikube, kind, k3d, docker-desktop — one-click connect.
               </p>
             </div>
@@ -916,15 +916,15 @@
                   <div class="flex items-center gap-2 min-w-0">
                     <span class="text-slate-200 font-medium truncate">{cluster.contextName}</span>
                     <span
-                      class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/30 text-emerald-300"
+                      class="text-xs px-1.5 py-0.5 rounded bg-emerald-900/30 text-emerald-300"
                       >{cluster.provider}</span
                     >
                     {#if cluster.server}
-                      <span class="text-[10px] text-slate-500 truncate">{cluster.server}</span>
+                      <span class="text-xs text-slate-500 truncate">{cluster.server}</span>
                     {/if}
                   </div>
                   {#if isLocalConnected(cluster)}
-                    <span class="text-[10px] text-emerald-400 flex items-center gap-1">
+                    <span class="text-xs text-emerald-400 flex items-center gap-1">
                       <Check class="w-3 h-3" /> Connected
                     </span>
                   {:else}
@@ -948,7 +948,7 @@
               {/each}
             </div>
           {:else if $localScanned && !$isLocalScanning}
-            <p class="text-[10px] text-slate-500">
+            <p class="text-xs text-slate-500">
               No local clusters found. Start minikube/kind, or use a method below.
             </p>
           {/if}
@@ -966,7 +966,7 @@
             <p class="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
               <Cloud size={14} /> Auto-detected from local credentials
             </p>
-            <p class="text-[10px] text-slate-500 mt-0.5">
+            <p class="text-xs text-slate-500 mt-0.5">
               Scanning {[...new Set($detectedCloudConfigs.map((c) => c.provider))].join(", ")}
               {autoLoading ? "..." : ""}
             </p>
@@ -1010,12 +1010,12 @@
                   class="h-3.5 w-3.5 accent-indigo-500"
                 />
                 <span class="text-slate-200 font-medium truncate">{cluster.name}</span>
-                <span class="text-[10px] text-slate-500">{cluster.region}</span>
-                <span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-900/30 text-indigo-300"
+                <span class="text-xs text-slate-500">{cluster.region}</span>
+                <span class="text-xs px-1.5 py-0.5 rounded bg-indigo-900/30 text-indigo-300"
                   >{cluster.provider}</span
                 >
                 {#if cluster.scope}
-                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400"
+                  <span class="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-slate-400"
                     >{cluster.scope}</span
                   >
                 {/if}
@@ -1023,12 +1023,12 @@
             {/each}
           </div>
         {:else if autoScanned && !autoLoading}
-          <p class="text-[10px] text-slate-500">
+          <p class="text-xs text-slate-500">
             No clusters returned. Use a method below to add one manually.
           </p>
         {/if}
         {#if autoErrors.length > 0}
-          <details class="text-[10px] text-amber-400">
+          <details class="text-xs text-amber-400">
             <summary class="cursor-pointer">
               {autoErrors.length} scope(s) failed during scan
             </summary>
@@ -1060,9 +1060,9 @@
             >
               {option.label}
             </p>
-            <p class="text-[10px] text-slate-400 mt-0.5">{option.desc}</p>
+            <p class="text-xs text-slate-400 mt-0.5">{option.desc}</p>
             <span
-              class="text-[9px] mt-1 inline-block px-1.5 py-0.5 rounded-full cursor-help {option.security ===
+              class="text-xs mt-1 inline-block px-1.5 py-0.5 rounded-full cursor-help {option.security ===
               'high'
                 ? 'bg-emerald-500/10 text-emerald-400'
                 : 'bg-amber-500/10 text-amber-400'}"
@@ -1084,11 +1084,11 @@
           </h3>
           <button
             class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-200 hover:border-slate-400 transition flex items-center gap-1"
-            onclick={resetAll}><span class="text-[10px]">&#8592;</span> Back</button
+            onclick={resetAll}><span class="text-xs">&#8592;</span> Back</button
           >
         </div>
         <div
-          class="text-[11px] text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-3 py-2 leading-relaxed"
+          class="text-xs text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-3 py-2 leading-relaxed"
         >
           Most users should pick
           <button
@@ -1106,14 +1106,14 @@
         <div class="flex flex-wrap gap-1.5">
           {#each OIDC_PRESETS as p (p.provider)}
             <button
-              class="text-[11px] px-2.5 py-1 rounded border transition {oidcProvider === p.provider
+              class="text-xs px-2.5 py-1 rounded border transition {oidcProvider === p.provider
                 ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
                 : 'border-slate-600 text-slate-400 hover:border-slate-400'}"
               onclick={() => (oidcProvider = p.provider)}>{p.label}</button
             >
           {/each}
         </div>
-        <p class="text-[10px] text-slate-500">
+        <p class="text-xs text-slate-500">
           {oidcPreset.description}
           <a
             href={oidcPreset.docsUrl}
@@ -1123,7 +1123,7 @@
           >
         </p>
         <div class="space-y-2">
-          <p class="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
+          <p class="text-xs uppercase tracking-widest text-slate-500 font-semibold">
             Cluster endpoint
           </p>
           <div class="grid grid-cols-2 gap-2">
@@ -1149,7 +1149,7 @@
         </div>
         {@render tlsSkipControl(oidcCaData)}
         <div class="space-y-2">
-          <p class="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
+          <p class="text-xs uppercase tracking-widest text-slate-500 font-semibold">
             OIDC identity
           </p>
           <div class="grid grid-cols-2 gap-2">
@@ -1173,7 +1173,7 @@
             />
           </div>
         </div>
-        <p class="text-[10px] text-slate-500">
+        <p class="text-xs text-slate-500">
           Requires <code class="bg-slate-700 px-1 rounded">{oidcPreset.execCommand}</code> | Scopes: {oidcPreset.defaultScopes.join(
             ", ",
           )}
@@ -1202,13 +1202,13 @@
           </h3>
           <button
             class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-200 hover:border-slate-400 transition flex items-center gap-1"
-            onclick={resetAll}><span class="text-[10px]">&#8592;</span> Back</button
+            onclick={resetAll}><span class="text-xs">&#8592;</span> Back</button
           >
         </div>
         <div class="flex flex-wrap gap-2 items-end">
           <div>
             <!-- svelte-ignore a11y_label_has_associated_control -->
-            <label class="text-[10px] text-slate-500 block mb-0.5">Provider</label>
+            <label class="text-xs text-slate-500 block mb-0.5">Provider</label>
             <select
               bind:value={cloudProvider}
               onchange={(e) => {
@@ -1222,14 +1222,14 @@
             </select>
           </div>
           {#if cloudProviderTool !== null && !isToolBundled(cloudProviderTool)}
-            <div class="text-[10px] text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1 max-w-64">
+            <div class="text-xs text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1 max-w-64">
               Cloud import is not available in this build: the {cloudProviderTool} CLI is not
               bundled.
             </div>
           {:else}
             <div>
               <!-- svelte-ignore a11y_label_has_associated_control -->
-              <label class="text-[10px] text-slate-500 block mb-0.5">Region (optional)</label>
+              <label class="text-xs text-slate-500 block mb-0.5">Region (optional)</label>
               <input
                 type="text"
                 bind:value={cloudRegion}
@@ -1239,7 +1239,7 @@
             </div>
             <div>
               <!-- svelte-ignore a11y_label_has_associated_control -->
-              <label class="text-[10px] text-slate-500 block mb-0.5"
+              <label class="text-xs text-slate-500 block mb-0.5"
                 >{cloudScopeLabel} (optional)</label
               >
               {#if cloudScopes.length > 0}
@@ -1294,9 +1294,9 @@
               >
                 <div class="flex items-center gap-2 min-w-0">
                   <span class="text-slate-200 font-medium truncate">{cluster.name}</span>
-                  <span class="text-[10px] text-slate-500">{cluster.region}</span>
+                  <span class="text-xs text-slate-500">{cluster.region}</span>
                   {#if cluster.scope}
-                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400"
+                    <span class="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-slate-400"
                       >{cluster.scope}</span
                     >
                   {/if}
@@ -1313,7 +1313,7 @@
           </div>
         {/if}
         {#if cloudErrors.length > 0}
-          <div class="text-[10px] text-amber-400 space-y-0.5 max-h-24 overflow-y-auto">
+          <div class="text-xs text-amber-400 space-y-0.5 max-h-24 overflow-y-auto">
             <div class="font-semibold">Partial scan - {cloudErrors.length} scope(s) failed:</div>
             {#each cloudErrors as err, i (`${err.scope}-${i}`)}
               <div class="truncate" title={err.error}>
@@ -1335,7 +1335,7 @@
           </h3>
           <button
             class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-200 hover:border-slate-400 transition flex items-center gap-1"
-            onclick={resetAll}><span class="text-[10px]">&#8592;</span> Back</button
+            onclick={resetAll}><span class="text-xs">&#8592;</span> Back</button
           >
         </div>
         <div class="grid grid-cols-2 gap-2">
@@ -1347,7 +1347,7 @@
           />
           <div>
             <!-- svelte-ignore a11y_label_has_associated_control -->
-            <label class="text-[10px] text-slate-500 block mb-0.5">Auth method</label>
+            <label class="text-xs text-slate-500 block mb-0.5">Auth method</label>
             <select
               bind:value={vaultAuthMethod}
               class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 w-full"
@@ -1389,7 +1389,7 @@
         </div>
         {#if vaultAddress.trim() && vaultSecretPath.trim()}
           {@const payload = getVaultPayload()}
-          <div class="rounded border border-slate-700 bg-slate-900/60 p-2 text-[10px] font-mono">
+          <div class="rounded border border-slate-700 bg-slate-900/60 p-2 text-xs font-mono">
             <p class="text-slate-500 mb-1">API call to retrieve credentials:</p>
             <p class="text-indigo-300">{payload.method} {payload.url}</p>
             {#each Object.entries(payload.headers) as [k, v] (k)}
@@ -1397,7 +1397,7 @@
             {/each}
           </div>
         {/if}
-        <p class="text-[10px] text-slate-500">
+        <p class="text-xs text-slate-500">
           Vault returns kubeconfig or token from the secret path. <a
             href="https://developer.hashicorp.com/vault/docs/secrets/kubernetes"
             target="_blank"
@@ -1406,7 +1406,7 @@
           >
         </p>
         <div
-          class="text-[10px] text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
+          class="text-xs text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
         >
           The credentials fetched from Vault are held in memory for the active session only.
           Long-term storage happens only if the fetched kubeconfig itself contains a static token.
@@ -1431,7 +1431,7 @@
           </h3>
           <button
             class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-200 hover:border-slate-400 transition flex items-center gap-1"
-            onclick={resetAll}><span class="text-[10px]">&#8592;</span> Back</button
+            onclick={resetAll}><span class="text-xs">&#8592;</span> Back</button
           >
         </div>
         <div class="grid grid-cols-2 gap-2">
@@ -1467,7 +1467,7 @@
           />
         </div>
         {@render tlsSkipControl(certCaData)}
-        <p class="text-[10px] text-slate-500">
+        <p class="text-xs text-slate-500">
           Mutual TLS authentication. Highest security level. <a
             href="https://kubernetes.io/docs/reference/access-authn-authz/authentication/#x509-client-certificates"
             target="_blank"
@@ -1499,7 +1499,7 @@
           </h3>
           <button
             class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-200 hover:border-slate-400 transition flex items-center gap-1"
-            onclick={resetAll}><span class="text-[10px]">&#8592;</span> Back</button
+            onclick={resetAll}><span class="text-xs">&#8592;</span> Back</button
           >
         </div>
         <div class="grid grid-cols-2 gap-2">
@@ -1530,7 +1530,7 @@
         </div>
         {@render tlsSkipControl(tokenCaData)}
         <div
-          class="text-[10px] text-amber-800 dark:text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
+          class="text-xs text-amber-800 dark:text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
         >
           Static tokens don't auto-rotate. Consider using OIDC or exec plugins for production.
         </div>
@@ -1558,11 +1558,11 @@
           </h3>
           <button
             class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-200 hover:border-slate-400 transition flex items-center gap-1"
-            onclick={resetAll}><span class="text-[10px]">&#8592;</span> Back</button
+            onclick={resetAll}><span class="text-xs">&#8592;</span> Back</button
           >
         </div>
         <div
-          class="text-[11px] text-emerald-400 bg-emerald-500/5 border border-emerald-500/20 rounded px-3 py-2 leading-relaxed"
+          class="text-xs text-emerald-400 bg-emerald-500/5 border border-emerald-500/20 rounded px-3 py-2 leading-relaxed"
         >
           Recommended by the Kubernetes project. The plugin returns a short-lived token on every API
           call; nothing long-lived is written to disk.
@@ -1576,7 +1576,7 @@
         <div class="flex flex-wrap gap-1.5">
           {#each EXEC_PLUGIN_PRESETS as p (p.kind)}
             <button
-              class="text-[11px] px-2.5 py-1 rounded border transition flex items-center gap-1.5 {execKind ===
+              class="text-xs px-2.5 py-1 rounded border transition flex items-center gap-1.5 {execKind ===
               p.kind
                 ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
                 : 'border-slate-600 text-slate-400 hover:border-slate-400'}"
@@ -1585,14 +1585,14 @@
               {p.label}
               {#if p.bundled}
                 <span
-                  class="text-[9px] px-1 py-0 rounded bg-emerald-500/20 text-emerald-400"
+                  class="text-xs px-1 py-0 rounded bg-emerald-500/20 text-emerald-400"
                   title="Binary is bundled with the app">bundled</span
                 >
               {/if}
             </button>
           {/each}
         </div>
-        <p class="text-[10px] text-slate-500">
+        <p class="text-xs text-slate-500">
           {execPreset.description}
           <a
             href={execPreset.docsUrl}
@@ -1602,7 +1602,7 @@
           >
         </p>
         <div class="space-y-2">
-          <p class="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
+          <p class="text-xs uppercase tracking-widest text-slate-500 font-semibold">
             Cluster endpoint
           </p>
           <div class="grid grid-cols-2 gap-2">
@@ -1629,7 +1629,7 @@
         {@render tlsSkipControl(execCaData)}
         {#if execPreset.primaryLabel || execPreset.secondaryLabel || execPreset.tertiaryLabel || execPreset.extraLabel || execKind === "generic"}
           <div class="space-y-2">
-            <p class="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
+            <p class="text-xs uppercase tracking-widest text-slate-500 font-semibold">
               Plugin parameters
             </p>
             <div class="grid grid-cols-2 gap-2">
@@ -1678,7 +1678,7 @@
         {/if}
         {#if !execPreset.bundled}
           <div
-            class="text-[10px] text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
+            class="text-xs text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
           >
             This preset expects the plugin binary to be available in PATH. Install it separately
             before first use.
@@ -1704,7 +1704,7 @@
       <div class="rounded border border-slate-700 bg-slate-900/40 p-2 space-y-2">
         <div class="flex flex-wrap items-center gap-2">
           <button
-            class="text-[11px] px-2 py-1 rounded border border-slate-600 text-slate-300 hover:border-slate-400 transition flex items-center gap-1"
+            class="text-xs px-2 py-1 rounded border border-slate-600 text-slate-300 hover:border-slate-400 transition flex items-center gap-1"
             onclick={() => (showPreview = !showPreview)}
             disabled={!previewYaml}
             title={previewYaml ? "Preview YAML" : "Fill required fields first"}
@@ -1713,7 +1713,7 @@
             {showPreview ? "Hide" : "Preview"} kubeconfig
           </button>
           <button
-            class="text-[11px] px-2 py-1 rounded border border-emerald-600/50 text-emerald-400 hover:bg-emerald-500/10 transition flex items-center gap-1 disabled:opacity-50"
+            class="text-xs px-2 py-1 rounded border border-emerald-600/50 text-emerald-400 hover:bg-emerald-500/10 transition flex items-center gap-1 disabled:opacity-50"
             onclick={runTestConnection}
             disabled={testing || !previewYaml}
             title={previewYaml
@@ -1733,7 +1733,7 @@
           {#if testResult}
             {#if testResult.success}
               <span
-                class="text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded px-2 py-0.5 flex items-center gap-1"
+                class="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded px-2 py-0.5 flex items-center gap-1"
                 title={`${testResult.durationMs}ms · ${testResult.serverPlatform ?? ""}`}
               >
                 <Check class="w-3 h-3" />
@@ -1744,7 +1744,7 @@
               </span>
             {:else}
               <span
-                class="text-[11px] text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded px-2 py-0.5 truncate max-w-[360px]"
+                class="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded px-2 py-0.5 truncate max-w-[360px]"
                 title={testResult.error ?? ""}
               >
                 {testResult.error?.split("\n")[0] ?? "Connection failed"}
@@ -1752,26 +1752,26 @@
             {/if}
           {/if}
           {#if preview.blockedReason}
-            <span class="text-[11px] text-rose-400">{preview.blockedReason}</span>
+            <span class="text-xs text-rose-400">{preview.blockedReason}</span>
           {:else if !previewYaml}
-            <span class="text-[10px] text-slate-500">Fill required fields to enable</span>
+            <span class="text-xs text-slate-500">Fill required fields to enable</span>
           {/if}
         </div>
         {#if showPreview && previewYaml}
           <div class="rounded border border-slate-700 bg-slate-950/60 p-2">
             <div class="flex items-center justify-between mb-1">
-              <span class="text-[10px] text-slate-500">
+              <span class="text-xs text-slate-500">
                 Generated kubeconfig (secrets redacted)
               </span>
               <button
-                class="text-[10px] px-1.5 py-0.5 rounded border border-slate-600 text-slate-400 hover:text-white transition"
+                class="text-xs px-1.5 py-0.5 rounded border border-slate-600 text-slate-400 hover:text-white transition"
                 onclick={copyPreview}
               >
                 {previewCopied ? "Copied" : "Copy raw"}
               </button>
             </div>
             <pre
-              class="text-[10px] font-mono text-emerald-300/80 whitespace-pre-wrap overflow-x-auto max-h-56">{maskPreview(
+              class="text-xs font-mono text-emerald-300/80 whitespace-pre-wrap overflow-x-auto max-h-56">{maskPreview(
                 previewYaml,
               )}</pre>
           </div>

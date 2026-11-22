@@ -126,7 +126,7 @@
               >
                 <span class="flex-1 truncate">{cmd.label}</span>
                 {#if cmd.shortcut}
-                  <Badge variant="outline" class="ml-auto text-[10px]">{cmd.shortcut}</Badge>
+                  <Badge variant="outline" class="ml-auto text-xs">{cmd.shortcut}</Badge>
                 {/if}
               </button>
             {/each}

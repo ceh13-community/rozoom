@@ -1002,7 +1002,7 @@
         {#if cluster.needsInitialRefreshHint}
           {#if showInitialRefreshHint}
             <span
-              class="pointer-events-none absolute -right-16 top-1/2 -translate-y-1/2 rounded-full bg-amber-300 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-900 shadow-sm"
+              class="pointer-events-none absolute -right-16 top-1/2 -translate-y-1/2 rounded-full bg-amber-300 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.18em] text-slate-900 shadow-sm"
             >
               refresh me
             </span>
@@ -1069,7 +1069,7 @@
           type="button"
           onclick={() =>
             goto(`/dashboard/clusters/${encodeURIComponent(cluster.uuid)}?workload=compliancehub`)}
-          class="ml-auto inline-flex min-w-0 max-w-full items-center gap-1 rounded h-7 px-2 text-[11px] font-semibold border cursor-help transition {credRiskLabel.risk ===
+          class="ml-auto inline-flex min-w-0 max-w-full items-center gap-1 rounded h-7 px-2 text-xs font-semibold border cursor-help transition {credRiskLabel.risk ===
           'critical'
             ? 'border-rose-500 text-rose-700 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20'
             : 'border-orange-500 text-orange-700 dark:text-orange-400 bg-orange-500/10 hover:bg-orange-500/20'}"
@@ -1145,7 +1145,7 @@
             {/each}
           </select>
           <span
-            class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-white/70"
+            class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-white/70"
             aria-hidden="true">▾</span
           >
         </div>
@@ -1191,7 +1191,7 @@
         </Popover.Root>
       {/if}
     </div>
-    <div class="px-6 mb-2 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
+    <div class="px-6 mb-2 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
       {#if disconnected}
         <!-- Hidden when nothing is recorded: a cluster that worked before this
              version and has not answered since has no record, not "never". -->
@@ -1213,7 +1213,7 @@
         </span>
         <button
           type="button"
-          class="rounded border border-amber-400/60 bg-amber-400/10 px-1.5 py-[1px] text-[10px] font-medium text-amber-300 hover:bg-amber-400/20"
+          class="rounded border border-amber-400/60 bg-amber-400/10 px-1.5 py-[1px] text-xs font-medium text-amber-300 hover:bg-amber-400/20"
           onclick={enableAutoDiagnostics}
           title="Switch the global dashboard profile to Balanced so cards refresh on schedule"
         >
@@ -1504,20 +1504,20 @@
               <div class="min-w-0 pr-2">
                 {#if diagnosticError}
                   <div class="font-semibold">{diagnosticError.title}</div>
-                  <div class="text-[11px] font-normal opacity-80 mt-0.5">
+                  <div class="text-xs font-normal opacity-80 mt-0.5">
                     {diagnosticError.detail}
                   </div>
                   {#if isAuthBlocking}
                     <a
                       href="/cluster-manager"
-                      class="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold underline decoration-dotted underline-offset-2 hover:opacity-80"
+                      class="mt-1 inline-flex items-center gap-1 text-xs font-semibold underline decoration-dotted underline-offset-2 hover:opacity-80"
                     >
                       Open Cluster Manager to refresh credentials →
                     </a>
                   {/if}
                 {:else}
                   <div>Configuration diagnostics are not loaded yet.</div>
-                  <div class="text-[11px] font-normal opacity-80">
+                  <div class="text-xs font-normal opacity-80">
                     Fleet policy allows up to {effectiveRuntimeBudget.maxConcurrentDiagnostics} diagnostics
                     at once.
                   </div>
@@ -1547,10 +1547,10 @@
               </Button>
             </div>
             {#if diagnosticErrorRaw && !isAuthBlocking}
-              <details class="text-[11px] font-normal opacity-80">
+              <details class="text-xs font-normal opacity-80">
                 <summary class="cursor-pointer">Show raw error</summary>
                 <pre
-                  class="mt-1 max-h-24 overflow-auto whitespace-pre-wrap rounded bg-white/60 p-1.5 text-[10px] leading-snug">{diagnosticErrorRaw}</pre>
+                  class="mt-1 max-h-24 overflow-auto whitespace-pre-wrap rounded bg-white/60 p-1.5 text-xs leading-snug">{diagnosticErrorRaw}</pre>
               </details>
             {/if}
           </div>
@@ -1585,7 +1585,7 @@
           >
             <div class="pr-2">
               <div>Infrastructure checks are not loaded yet.</div>
-              <div class="text-[11px] font-normal text-teal-900/80">
+              <div class="text-xs font-normal text-teal-900/80">
                 Fleet policy allows up to {effectiveRuntimeBudget.maxConcurrentDiagnostics} diagnostics
                 at once.
               </div>
@@ -1633,7 +1633,7 @@
             >
               <div class="pr-2">
                 <div>Health diagnostics are not loaded yet.</div>
-                <div class="text-[11px] font-normal text-sky-900/80">
+                <div class="text-xs font-normal text-sky-900/80">
                   Fleet policy allows up to {effectiveRuntimeBudget.maxConcurrentDiagnostics} diagnostics
                   at once.
                 </div>

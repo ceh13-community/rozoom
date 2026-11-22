@@ -90,7 +90,7 @@
       </div>
 
       <div class="text-xs text-muted-foreground mb-1">{summaryText}</div>
-      <div class="text-[11px] text-muted-foreground/90 mb-3">
+      <div class="text-xs text-muted-foreground/90 mb-3">
         Certificate checks are intentionally cached-first on cluster cards. Use `Check now` when you
         want a fresh control-plane and kubelet rotation probe.
       </div>

@@ -478,9 +478,7 @@
   {#if savedViews.length > 0 || groups.length > 0}
     <div class="flex items-center gap-2 mb-3 flex-wrap">
       {#if savedViews.length > 0}
-        <span class="text-[10px] text-muted-foreground uppercase tracking-widest shrink-0"
-          >Views:</span
-        >
+        <span class="text-xs text-muted-foreground uppercase tracking-widest shrink-0">Views:</span>
         <button
           class="text-xs px-2 py-0.5 rounded-full border transition {!activeViewId
             ? 'border-indigo-500 bg-indigo-500/10 text-indigo-400'
@@ -497,7 +495,7 @@
           >
         {/each}
         <button
-          class="text-[10px] text-slate-500 hover:text-rose-400 transition"
+          class="text-xs text-slate-500 hover:text-rose-400 transition"
           title="Save current search as view"
           onclick={async () => {
             const name = await requestText({ title: "Save view", description: "View name" });
@@ -511,7 +509,7 @@
         >
       {:else}
         <button
-          class="text-[10px] text-slate-500 hover:text-indigo-400 transition"
+          class="text-xs text-slate-500 hover:text-indigo-400 transition"
           onclick={async () => {
             const name = await requestText({ title: "Create view", description: "View name" });
             if (name?.trim()) {
@@ -525,7 +523,7 @@
       <span class="mx-1 text-slate-700">|</span>
 
       <button
-        class="text-[10px] px-2 py-0.5 rounded border transition {showGroupPanel
+        class="text-xs px-2 py-0.5 rounded border transition {showGroupPanel
           ? 'border-amber-500 bg-amber-500/10 text-amber-400'
           : 'border-slate-600 text-slate-400 hover:border-slate-400'}"
         onclick={() => (showGroupPanel = !showGroupPanel)}>Groups ({groups.length})</button
@@ -534,7 +532,7 @@
   {:else}
     <div class="flex gap-2 mb-3">
       <button
-        class="text-[10px] text-slate-500 hover:text-indigo-400 transition"
+        class="text-xs text-slate-500 hover:text-indigo-400 transition"
         onclick={async () => {
           const name = await requestText({ title: "Create view", description: "View name" });
           if (name?.trim()) {
@@ -544,7 +542,7 @@
         }}>+ Create view</button
       >
       <button
-        class="text-[10px] text-slate-500 hover:text-amber-400 transition"
+        class="text-xs text-slate-500 hover:text-amber-400 transition"
         onclick={async () => {
           const name = await requestText({ title: "Create group", description: "Group name" });
           if (name?.trim()) {
@@ -579,7 +577,7 @@
           <span class="text-slate-200">{group.name}</span>
           <div class="flex gap-1">
             <button
-              class="text-slate-500 hover:text-rose-400 transition text-[10px]"
+              class="text-slate-500 hover:text-rose-400 transition text-xs"
               onclick={async () => {
                 const result = removeGroupOp(groups, groupMembership, group.id);
                 groups = result.groups;
@@ -592,7 +590,7 @@
         </div>
       {/each}
       {#if groups.length > 0}
-        <p class="text-[10px] text-slate-500">
+        <p class="text-xs text-slate-500">
           Drag clusters to groups or use the dropdown on each card to assign.
         </p>
       {/if}
@@ -611,7 +609,7 @@
             <span class="w-2 h-2 rounded-full bg-slate-600 inline-block"></span>
             Ungrouped
           {/if}
-          <span class="text-[10px] text-slate-600">({section.clusters.length})</span>
+          <span class="text-xs text-slate-600">({section.clusters.length})</span>
         </h3>
         {#key `${cardVersion}-${linterEnabled}-${section.group?.id ?? "u"}`}
           <div

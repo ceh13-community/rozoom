@@ -130,7 +130,7 @@
       </div>
 
       <div class="text-xs text-muted-foreground mb-2">{summaryText}</div>
-      <div class="text-[11px] text-muted-foreground mb-3">
+      <div class="text-xs text-muted-foreground mb-3">
         Events are retained only for a short time and are best-effort operational breadcrumbs, not a
         durable audit trail.
       </div>

@@ -112,12 +112,12 @@
             </button>
           {/each}
         </div>
-        <p class="text-[10px] text-slate-400 mt-1">{preset.description}</p>
+        <p class="text-xs text-slate-400 mt-1">{preset.description}</p>
         <a
           href={preset.docsUrl}
           target="_blank"
           rel="noopener"
-          class="text-[10px] text-indigo-400 hover:underline">Documentation</a
+          class="text-xs text-indigo-400 hover:underline">Documentation</a
         >
       </div>
 
@@ -215,7 +215,7 @@
         </div>
       </div>
 
-      <p class="text-[10px] text-slate-400">
+      <p class="text-xs text-slate-400">
         Requires <code class="bg-slate-100 dark:bg-slate-600 px-1 rounded"
           >{preset.execCommand}</code
         >
@@ -243,13 +243,12 @@
         class="rounded border border-slate-600 bg-slate-900/80 p-3 relative max-h-64 overflow-y-auto"
       >
         <button
-          class="absolute top-1.5 right-1.5 text-[9px] px-2 py-0.5 rounded border border-slate-600 text-slate-400 hover:text-white transition"
+          class="absolute top-1.5 right-1.5 text-xs px-2 py-0.5 rounded border border-slate-600 text-slate-400 hover:text-white transition"
           onclick={async () => {
             await navigator.clipboard.writeText(generatedYaml ?? "");
           }}>Copy</button
         >
-        <pre
-          class="text-[10px] font-mono text-emerald-300/80 whitespace-pre-wrap">{generatedYaml}</pre>
+        <pre class="text-xs font-mono text-emerald-300/80 whitespace-pre-wrap">{generatedYaml}</pre>
       </div>
 
       <div class="flex gap-2">

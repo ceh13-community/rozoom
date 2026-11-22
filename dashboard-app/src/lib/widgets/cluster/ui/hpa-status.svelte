@@ -127,7 +127,7 @@
                 <Table.Cell>
                   {item.reason ?? "-"}
                   {#if item.message}
-                    <div class="text-[10px] text-muted-foreground">{item.message}</div>
+                    <div class="text-xs text-muted-foreground">{item.message}</div>
                   {/if}
                 </Table.Cell>
               </Table.Row>

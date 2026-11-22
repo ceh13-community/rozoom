@@ -763,7 +763,7 @@
         <Button
           variant="outline"
           size="sm"
-          class="h-6 text-[11px]"
+          class="h-6 text-xs"
           onclick={refresh}
           disabled={loading}
         >
@@ -784,7 +784,7 @@
             <p class="text-xs text-amber-400 mt-1">{w}</p>
           {/each}
         {/if}
-        <p class="text-[10px] text-muted-foreground mt-1">
+        <p class="text-xs text-muted-foreground mt-1">
           Last checked: {updatedAtText} ({scanFreshness.label})
         </p>
       </div>
@@ -899,7 +899,7 @@
                   <Table.Cell class="text-xs text-muted-foreground">{csr.requestor}</Table.Cell>
                   <Table.Cell class="text-center text-xs">{csr.age}</Table.Cell>
                   <Table.Cell class="text-right">
-                    <Badge class={`text-[10px] ${statusBadge(csr.status)}`}>{csr.status}</Badge>
+                    <Badge class={`text-xs ${statusBadge(csr.status)}`}>{csr.status}</Badge>
                   </Table.Cell>
                 </Table.Row>
               {/each}
@@ -927,21 +927,21 @@
             <div class="inline-flex items-center rounded border border-border">
               <button
                 type="button"
-                class={`px-2 py-1 text-[11px] ${filterType === "all" ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/50"}`}
+                class={`px-2 py-1 text-xs ${filterType === "all" ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/50"}`}
                 onclick={() => (filterType = "all")}
               >
                 All ({certificates.length})
               </button>
               <button
                 type="button"
-                class={`border-l border-border px-2 py-1 text-[11px] ${filterType === "critical" ? "bg-rose-500/10 font-medium text-rose-300" : "text-muted-foreground hover:bg-muted/50"}`}
+                class={`border-l border-border px-2 py-1 text-xs ${filterType === "critical" ? "bg-rose-500/10 font-medium text-rose-300" : "text-muted-foreground hover:bg-muted/50"}`}
                 onclick={() => (filterType = "critical")}
               >
                 Critical (≤7d)
               </button>
               <button
                 type="button"
-                class={`border-l border-border px-2 py-1 text-[11px] ${filterType === "warning" ? "bg-amber-500/10 font-medium text-amber-300" : "text-muted-foreground hover:bg-muted/50"}`}
+                class={`border-l border-border px-2 py-1 text-xs ${filterType === "warning" ? "bg-amber-500/10 font-medium text-amber-300" : "text-muted-foreground hover:bg-muted/50"}`}
                 onclick={() => (filterType = "warning")}
               >
                 Warning (8–30d)
@@ -1003,7 +1003,7 @@
                     {formatDays(cert.daysLeft)}
                   </Table.Cell>
                   <Table.Cell class="text-right" title={sev.tooltip}>
-                    <Badge class={`text-[10px] ${sev.badge}`}>
+                    <Badge class={`text-xs ${sev.badge}`}>
                       {sev.label.toUpperCase()}
                     </Badge>
                   </Table.Cell>
@@ -1025,7 +1025,7 @@
             <Card.Title class="text-sm font-medium">
               cert-manager Certificates
               {#if cmDriftCount > 0}
-                <Badge class="ml-2 bg-rose-600 text-[10px] text-white">
+                <Badge class="ml-2 bg-rose-600 text-xs text-white">
                   {cmDriftCount} drift
                 </Badge>
               {/if}
@@ -1056,7 +1056,7 @@
           >
             <p class="font-medium">{humanized.title}</p>
             {#if humanized.hint}
-              <p class="text-[11px] opacity-80">{humanized.hint}</p>
+              <p class="text-xs opacity-80">{humanized.hint}</p>
             {/if}
           </div>
         {/if}
@@ -1085,7 +1085,7 @@
                     <Table.Cell class="text-xs">{c.namespace}</Table.Cell>
                     <Table.Cell class="text-center">
                       <Badge
-                        class={`text-[10px] ${
+                        class={`text-xs ${
                           c.ready === "True"
                             ? "bg-emerald-600 text-white"
                             : c.ready === "False"
@@ -1108,7 +1108,7 @@
                       {c.daysLeft === null ? "-" : formatDays(c.daysLeft)}
                     </Table.Cell>
                     <Table.Cell class="text-right" title={sev.tooltip}>
-                      <Badge class={`text-[10px] ${sev.badge}`}>
+                      <Badge class={`text-xs ${sev.badge}`}>
                         {sev.label.toUpperCase()}
                       </Badge>
                     </Table.Cell>
@@ -1159,7 +1159,7 @@
                     {node.rotateServer === true ? "Yes" : node.rotateServer === false ? "No" : "-"}
                   </Table.Cell>
                   <Table.Cell class="text-right">
-                    <Badge class={`text-[10px] ${statusBadge(node.status)}`}>
+                    <Badge class={`text-xs ${statusBadge(node.status)}`}>
                       {node.status.toUpperCase()}
                     </Badge>
                   </Table.Cell>
@@ -1208,7 +1208,7 @@
                     {formatRelativeAge(entry.ts)}
                   </Table.Cell>
                   <Table.Cell>
-                    <Badge class="bg-slate-500 text-[10px] text-white">{entry.action}</Badge>
+                    <Badge class="bg-slate-500 text-xs text-white">{entry.action}</Badge>
                   </Table.Cell>
                   <Table.Cell class="text-xs text-muted-foreground">{entry.detail}</Table.Cell>
                 </Table.Row>
@@ -1237,7 +1237,7 @@
         <div class="text-sm font-semibold">
           Rotation wizard — <span class="text-sky-400">{strategy.label}</span>
         </div>
-        <div class="text-[11px] text-muted-foreground">
+        <div class="text-xs text-muted-foreground">
           Step-by-step guidance for the detected cluster distribution. Commands are read-only; run
           them in a shell with kubectl access.
         </div>
