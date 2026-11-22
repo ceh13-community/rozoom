@@ -37,7 +37,27 @@ const failingChecks = (): ClusterHealthChecks => {
   checks.resourcesHygiene = report({
     status: "critical",
     summary: summary(1, 0, { bestEffort: 1 }),
-    workloads: [],
+    workloads: [
+      {
+        namespace: "lint",
+        workload: "app",
+        workloadType: "Deployment",
+        status: "critical",
+        qosClass: "BestEffort",
+        missing: ["cpu request", "memory request"],
+        optionalMissing: [],
+      },
+      // Status ok: only the optional CPU limit is missing, yet the check lists its container.
+      {
+        namespace: "lint",
+        workload: "fine",
+        workloadType: "Deployment",
+        status: "ok",
+        qosClass: "Burstable",
+        missing: [],
+        optionalMissing: ["cpu limit"],
+      },
+    ],
     items: [
       {
         namespace: "lint",
@@ -47,6 +67,15 @@ const failingChecks = (): ClusterHealthChecks => {
         missing: ["cpu request", "memory request"],
         optionalMissing: [],
         qosClass: "BestEffort",
+      },
+      {
+        namespace: "lint",
+        workload: "fine",
+        workloadType: "Deployment",
+        container: "fine",
+        missing: [],
+        optionalMissing: ["cpu limit"],
+        qosClass: "Burstable",
       },
     ],
     updatedAt: 0,
@@ -218,6 +247,7 @@ describe("cluster score rule list", () => {
   it("names only the flagged objects, each once", () => {
     const rules = byId(failingChecks());
     const refs = (id: string) => rules[id].risk?.references;
+    expect(refs("resources-missing")).toEqual(["lint/Deployment/app"]);
     expect(refs("best-effort")).toEqual(["lint/app-1"]);
     expect(refs("hpa-health")).toEqual(["lint/app"]);
     expect(refs("probes")).toEqual(["lint/app"]);

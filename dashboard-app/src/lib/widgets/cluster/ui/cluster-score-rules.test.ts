@@ -38,6 +38,22 @@ const checks = {
   },
 } as unknown as ClusterHealthChecks;
 
+// A count-only check next to a check that fails without naming anything.
+const countOnlyChecks = {
+  ...checks,
+  imageFreshness: {
+    status: "warning",
+    summary: { totalContainers: 2, latestTagCount: 1, noDigestCount: 2 },
+    updatedAt: 0,
+  },
+  hpaStatus: {
+    status: "warning",
+    summary: { status: "warning", message: "", total: 1, ok: 0, warning: 1, critical: 0 },
+    items: [],
+    updatedAt: 0,
+  },
+} as unknown as ClusterHealthChecks;
+
 const row = (id: string) => {
   const found = screen
     .getAllByTestId("cluster-score-rule")
@@ -62,6 +78,14 @@ describe("cluster score rule list", () => {
     expect(within(probes).getByText("Fail")).toBeTruthy();
     expect(within(probes).getByText("lint/no-probes")).toBeTruthy();
     expect(within(probes).queryByText("lint/probed")).toBeNull();
+  });
+
+  it("explains a missing object list only for count-only checks", () => {
+    render(ClusterScore, { props: { checks: countOnlyChecks } });
+    expect(
+      within(row("image-latest")).getByText("This check reports a count, not names."),
+    ).toBeTruthy();
+    expect(within(row("hpa-health")).getByText("Objects not listed.")).toBeTruthy();
   });
 
   it("tells a passed rule apart from one whose check could not run", () => {

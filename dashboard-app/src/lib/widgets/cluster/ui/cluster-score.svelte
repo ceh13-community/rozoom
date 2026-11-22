@@ -46,6 +46,8 @@
     "not-checked": "text-muted-foreground",
   };
   const REFERENCE_LIMIT = 20;
+  // Checks that return a count only; every other check names its objects.
+  const COUNT_ONLY_RULES = new Set(["image-latest", "rbac-overprivileged"]);
 
   const ruleCounts = $derived.by(() => {
     const counts = { fail: 0, pass: 0, "not-checked": 0 };
@@ -240,7 +242,11 @@
                     </div>
                   {/if}
                 {:else}
-                  <div class="text-muted-foreground">This check reports a count, not names.</div>
+                  <div class="text-muted-foreground">
+                    {COUNT_ONLY_RULES.has(rule.id)
+                      ? "This check reports a count, not names."
+                      : "Objects not listed."}
+                  </div>
                 {/if}
               {:else if rule.status === "not-checked"}
                 <div class="text-muted-foreground">

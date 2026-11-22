@@ -218,9 +218,11 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
           reason: "Scheduling and autoscaling signals are unreliable without requests/limits.",
           fix: "Add CPU/memory requests and limits to the affected workloads.",
           penalty: clamp(missingSeverity, 4, 15),
-          references: resources.items.map(
-            (item) => `${item.namespace}/${item.workloadType}/${item.workload}`,
-          ),
+          // Items also list containers that only lack a CPU limit (optional), so an ok
+          // workload would be named; the per-workload status is the verdict.
+          references: resources.workloads
+            .filter(isFlagged)
+            .map((item) => `${item.namespace}/${item.workloadType}/${item.workload}`),
         }),
       );
     }
