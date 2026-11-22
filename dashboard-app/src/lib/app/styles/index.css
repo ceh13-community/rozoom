@@ -109,6 +109,14 @@
 }
 
 @layer components {
+  /* Pods rows are a fixed 29 px and hide overflow: focus indicators of the controls in a
+     row are drawn inside the control, or the row would cut them off. */
+  .pods-k9s-table__row :is(button, input, [role="checkbox"]):focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: -2px;
+    --tw-ring-inset: inset;
+  }
+
   /* Opaque: rows scroll under sticky table headers and showed through the 80-95% fill. */
   .sticky-table-header {
     @apply sticky top-0 z-10 bg-background;
