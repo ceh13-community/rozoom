@@ -151,7 +151,14 @@ export const triageScorers: Record<TriageScorerId, TriageScorer> = {
         restarts * 35 +
         (waiting ? 90 : 0) +
         (metadata.deletionTimestamp ? 260 : 0),
-      status: phase,
+      // As kubectl's STATUS: a container waiting with a reason (CrashLoopBackOff,
+      // ImagePullBackOff) or Terminating wins over the phase, which stays "Running" for a
+      // pod whose container keeps crashing.
+      status: metadata.deletionTimestamp
+        ? "Terminating"
+        : waiting
+          ? asString(asRecord(asRecord(waiting.state).waiting).reason, phase)
+          : phase,
       reason: joinReasons([
         phase.toLowerCase() === "running" || phase.toLowerCase() === "succeeded"
           ? null

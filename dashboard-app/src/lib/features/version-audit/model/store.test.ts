@@ -51,6 +51,8 @@ describe("version audit store", () => {
     const latest = get(versionAuditState)["cluster-a"]?.history[0]?.charts[0];
 
     expect(summary.outdatedCharts).toBe(1);
+    expect(summary.chartStatus).toBe("warning");
+    expect(summary.uncheckedCharts).toBe(0);
     expect(latest?.latest).toBe("5.31.0");
     expect(latest?.status).toBe("outdated");
   });
@@ -95,6 +97,10 @@ describe("version audit store", () => {
     const summary = await runVersionAudit("cluster-a", { force: true, source: "manual" });
 
     expect(summary.errors?.join(" ")).toContain("repository cache is corrupt");
+    // A chart that could not be checked is not "up to date": no green OK for charts.
+    expect(summary.chartStatus).toBe("unknown");
+    expect(summary.uncheckedCharts).toBe(1);
+    expect(summary.outdatedCharts).toBe(0);
   });
 
   it("deduplicates concurrent runs for the same cluster", async () => {

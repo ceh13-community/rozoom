@@ -199,6 +199,19 @@
     unavailable: "bg-slate-500",
   };
 
+  // Words for people, not the store's snake_case values.
+  const summaryStatusLabel: Record<string, string> = {
+    ok: "Ready",
+    degraded: "Degraded",
+    unavailable: "Not available",
+  };
+
+  const providerStatusLabel: Record<TrivyProviderStatus, string> = {
+    installed: "Installed",
+    not_installed: "Not installed",
+    error: "Error",
+  };
+
   const providerBadgeClass: Record<TrivyProviderStatus, string> = {
     installed: "bg-emerald-500",
     not_installed: "bg-amber-500",
@@ -966,7 +979,9 @@
           Trivy
         </h2>
         {#if summary}
-          <Badge class="text-white {summaryBadgeClass[summary.status]}">{summary.status}</Badge>
+          <Badge class="text-white {summaryBadgeClass[summary.status]}"
+            >{summaryStatusLabel[summary.status] ?? summary.status}</Badge
+          >
         {/if}
         <Popover.Root>
           <Popover.Trigger>
@@ -1289,7 +1304,7 @@
               <div class="mb-2 flex items-center justify-between gap-2">
                 <p class="text-sm font-semibold text-foreground">{provider.title}</p>
                 <Badge class="text-white {providerBadgeClass[provider.status]}"
-                  >{provider.status}</Badge
+                  >{providerStatusLabel[provider.status] ?? provider.status}</Badge
                 >
               </div>
               {#if provider.message}
@@ -1887,7 +1902,9 @@
                       <span
                         class={prov.status === "installed"
                           ? "text-emerald-400"
-                          : "text-muted-foreground"}>{prov.status}</span
+                          : "text-muted-foreground"}
+                        >{providerStatusLabel[prov.status as TrivyProviderStatus] ??
+                          prov.status}</span
                       >
                       {#if prov.namespace}<span class="text-muted-foreground">
                           / {prov.namespace}</span

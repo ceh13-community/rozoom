@@ -25,6 +25,13 @@
   import TableEmptyState from "$shared/ui/table-empty-state.svelte";
   import DiagnosticSummaryCard from "$shared/ui/diagnostic-summary-card.svelte";
 
+  // "v1.33.1" and "v1.33.1+k3s1" are the same version for the target note.
+  function sameVersion(a: string | null | undefined, b: string | null | undefined) {
+    const core = (value: string | null | undefined) =>
+      (value ?? "").replace(/^v/, "").split(/[-+]/)[0];
+    return Boolean(a && b) && core(a) === core(b);
+  }
+
   interface Props {
     clusterId: string;
   }
@@ -472,7 +479,13 @@
       </DiagnosticSummaryCard>
       <DiagnosticSummaryCard title="Target Kubernetes version">
         <p class="text-sm font-semibold text-foreground">{summary?.targetVersion ?? "-"}</p>
-        <p class="mt-1 text-xs text-muted-foreground">Auto-detected from cluster version.</p>
+        <p class="mt-1 text-xs text-muted-foreground">
+          {!summary?.clusterVersion
+            ? "Cluster version unknown: the default target is used."
+            : sameVersion(summary.targetVersion, summary.clusterVersion)
+              ? "Auto-detected from cluster version."
+              : "Set for this cluster; differs from the cluster version."}
+        </p>
         <p class="text-xs text-muted-foreground">
           Cluster version: {summary?.clusterVersion ?? "Unknown"}
         </p>
