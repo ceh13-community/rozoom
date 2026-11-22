@@ -154,15 +154,31 @@
               ? `Notifications, ${$unreadCount} unread`
               : "Notifications"}
           >
-            <Bell class="h-4 w-4" />
-            {#if $unreadCount > 0}
+            <!-- The count sits on the top-right corner of the bell on the collapsed rail and
+                 after the label when the rail is open. The old left offset was a half step
+                 Tailwind 3 does not have, so the badge sat on the left edge over the bell. -->
+            <span class="relative inline-flex shrink-0">
+              <Bell class="h-4 w-4" />
+              {#if $unreadCount > 0 && !sidebarOpen}
+                <span
+                  data-testid="bell-unread-badge"
+                  class="absolute -right-3 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-xs font-bold leading-none text-white animate-pulse"
+                  aria-hidden="true"
+                >
+                  {$unreadCount > 99 ? "99+" : $unreadCount}
+                </span>
+              {/if}
+            </span>
+            <span class={cn(sidebarOpen ? "block" : "hidden")}>Notifications</span>
+            {#if $unreadCount > 0 && sidebarOpen}
               <span
-                class="absolute top-0.5 left-4.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-xs font-bold text-white animate-pulse"
+                data-testid="bell-unread-count"
+                class="ml-auto rounded-full bg-rose-500 px-1.5 text-xs font-bold leading-4 text-white"
+                aria-hidden="true"
               >
                 {$unreadCount > 99 ? "99+" : $unreadCount}
               </span>
             {/if}
-            <span class={cn(sidebarOpen ? "block" : "hidden")}>Notifications</span>
           </button>
         </Popover.Trigger>
         <Popover.Content
