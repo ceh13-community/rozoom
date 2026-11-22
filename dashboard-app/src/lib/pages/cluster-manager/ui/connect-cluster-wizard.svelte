@@ -935,7 +935,7 @@
           <div class="flex gap-1.5">
             <Button
               size="sm"
-              class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7"
+              class="bg-emerald-700 hover:bg-emerald-800 text-white text-xs h-7"
               disabled={$isLocalScanning}
               onclick={grantLocalScan}
             >
@@ -997,7 +997,7 @@
                       size="sm"
                       variant={clusterIndex === 0 ? "default" : "outline"}
                       class={clusterIndex === 0
-                        ? "bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-6 px-2"
+                        ? "bg-emerald-700 hover:bg-emerald-800 text-white text-xs h-6 px-2"
                         : "text-xs h-6 px-2"}
                       disabled={localConnecting !== null}
                       onclick={() => connectLocal(cluster)}

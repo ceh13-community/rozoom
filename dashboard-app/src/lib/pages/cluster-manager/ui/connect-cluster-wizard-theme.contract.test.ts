@@ -26,4 +26,9 @@ describe("connect cluster form fields", () => {
     expect(source).not.toMatch(/<h3 class="[^"]*text-slate-200/);
     expect(source).toContain("border border-input bg-background text-foreground");
   });
+
+  // White 12px text on emerald-600 is 3.77:1 in both themes; emerald-700 is 5.48:1.
+  it("solid emerald buttons are dark enough for white text", () => {
+    expect(source).not.toMatch(/\bbg-emerald-(?:400|500|600)\b[^"]*\btext-white\b/);
+  });
 });
