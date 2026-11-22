@@ -1303,7 +1303,7 @@ lokiCanary:
     <Card.Root>
       <Card.Header class="pb-2">
         <Card.Title class="text-sm font-semibold">Install presets</Card.Title>
-        <Card.Description class="text-[11px] text-muted-foreground">
+        <Card.Description class="text-xs text-muted-foreground">
           One-click bundles. Already-installed charts are skipped automatically.
         </Card.Description>
       </Card.Header>
@@ -1322,14 +1322,14 @@ lokiCanary:
                   <span class="text-sm font-medium text-foreground">{preset.title}</span>
                   <Badge
                     variant="outline"
-                    class="border-slate-500/40 bg-slate-500/10 text-slate-400 text-[10px] px-1.5 py-0"
+                    class="border-slate-500/40 bg-slate-500/10 text-slate-400 text-xs px-1.5 py-0"
                   >
                     {chartsInPreset.length - toInstall.length}/{chartsInPreset.length} installed
                   </Badge>
                 </div>
                 <p class="mt-0.5 text-xs text-muted-foreground">{preset.description}</p>
                 {#if presetBusy}
-                  <p class="mt-1 text-[11px] text-amber-400">
+                  <p class="mt-1 text-xs text-amber-400">
                     Installing {presetProgress?.current ?? "…"} ({presetProgress?.done ??
                       0}/{presetProgress?.total ?? 0})
                   </p>
@@ -1416,7 +1416,7 @@ lokiCanary:
             >
               <span class="text-xs text-muted-foreground">{isCollapsed ? "▸" : "▾"}</span>
               <Card.Title class="text-sm font-semibold">{category}</Card.Title>
-              <Badge class="bg-slate-500 text-white text-[10px] px-1.5 py-0">
+              <Badge class="bg-slate-500 text-white text-xs px-1.5 py-0">
                 {filteredCountsByCategory.get(category) ?? charts.length}
               </Badge>
             </button>
@@ -1440,14 +1440,14 @@ lokiCanary:
                         {#if helmManaged}
                           <Badge
                             variant="outline"
-                            class="border-emerald-500/40 bg-emerald-500/10 text-emerald-400 text-[10px] px-1.5 py-0"
+                            class="border-emerald-500/40 bg-emerald-500/10 text-emerald-400 text-xs px-1.5 py-0"
                           >
                             Installed
                           </Badge>
                         {:else if detected}
                           <Badge
                             variant="outline"
-                            class="border-sky-500/40 bg-sky-500/10 text-sky-400 text-[10px] px-1.5 py-0"
+                            class="border-sky-500/40 bg-sky-500/10 text-sky-400 text-xs px-1.5 py-0"
                             title="Detected in cluster but not managed by Helm (e.g. minikube addon or kubectl apply)"
                           >
                             Detected
@@ -1455,7 +1455,7 @@ lokiCanary:
                         {/if}
                         <Badge
                           variant="outline"
-                          class="border-border/60 bg-muted/30 text-[10px] px-1.5 py-0 text-muted-foreground"
+                          class="border-border/60 bg-muted/30 text-xs px-1.5 py-0 text-muted-foreground"
                           title={`Maintained by ${maintainerFor(chart)}`}
                         >
                           {maintainerFor(chart)}
@@ -1463,12 +1463,12 @@ lokiCanary:
                       </div>
                       <p class="mt-0.5 text-xs text-muted-foreground">{chart.description}</p>
                       <p
-                        class="mt-0.5 text-[11px] text-sky-400/80"
+                        class="mt-0.5 text-xs text-sky-400/80"
                         title="Monitoring and diagnostics unlocked once this chart is installed"
                       >
                         Enables: {chart.scoring}
                       </p>
-                      <div class="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+                      <div class="mt-1 flex flex-wrap items-center gap-2 text-xs">
                         {#if chart.repoUrl}
                           <a
                             href={chart.repoUrl}
@@ -1515,7 +1515,7 @@ lokiCanary:
                           <input
                             type="text"
                             list={`versions-${chart.id}`}
-                            class="h-6 w-28 rounded border border-border bg-background px-1.5 text-[11px]"
+                            class="h-6 w-28 rounded border border-border bg-background px-1.5 text-xs"
                             placeholder="latest"
                             aria-label={`${chart.name} version`}
                             value={chartVersions[chart.id] ?? ""}
@@ -1535,7 +1535,7 @@ lokiCanary:
                             {/each}
                           </datalist>
                           {#if loadingVersionsFor.has(chart.id)}
-                            <span class="text-[10px] text-muted-foreground">loading…</span>
+                            <span class="text-xs text-muted-foreground">loading…</span>
                           {/if}
                         {/if}
                       </div>
@@ -1625,7 +1625,7 @@ lokiCanary:
                             <input
                               type="text"
                               list={`versions-${chart.id}`}
-                              class="h-6 w-28 rounded border border-border bg-background px-1.5 text-[11px]"
+                              class="h-6 w-28 rounded border border-border bg-background px-1.5 text-xs"
                               placeholder="latest"
                               aria-label={`${chart.name} version`}
                               value={chartVersions[chart.id] ?? ""}
@@ -1645,11 +1645,11 @@ lokiCanary:
                               {/each}
                             </datalist>
                             {#if loadingVersionsFor.has(chart.id)}
-                              <span class="text-[10px] text-muted-foreground">loading…</span>
+                              <span class="text-xs text-muted-foreground">loading…</span>
                             {/if}
                           </div>
                           <p
-                            class="text-[11px] text-amber-400/80"
+                            class="text-xs text-amber-400/80"
                             title="Detected in cluster but not managed by Helm - install via Helm to enable upgrades and rollbacks"
                           >
                             Not Helm-managed
@@ -1759,7 +1759,7 @@ lokiCanary:
             ({previewDialog.version}) · ns {previewDialog.chart.namespace}
           </span>
         </div>
-        <div class="text-[11px] text-muted-foreground">
+        <div class="text-xs text-muted-foreground">
           Output of <code>helm upgrade --install --dry-run</code>. Nothing has been applied yet.
         </div>
       </div>
@@ -1778,7 +1778,7 @@ lokiCanary:
         </div>
       {:else}
         <pre
-          class="whitespace-pre-wrap rounded bg-slate-950/70 p-3 text-[11px] font-mono text-slate-300">{previewDialog.output}</pre>
+          class="whitespace-pre-wrap rounded bg-slate-950/70 p-3 text-xs font-mono text-slate-300">{previewDialog.output}</pre>
       {/if}
     </div>
     <div class="flex items-center justify-end gap-2 border-t px-4 py-3">
@@ -1826,7 +1826,7 @@ lokiCanary:
             ({valuesDialog.version}) · ns {valuesDialog.chart.namespace}
           </span>
         </div>
-        <div class="text-[11px] text-muted-foreground">
+        <div class="text-xs text-muted-foreground">
           Prefilled from <code>helm show values</code>. Your edits are passed via
           <code>--values &lt;tmpfile&gt;</code>.
         </div>

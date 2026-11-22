@@ -529,7 +529,7 @@
             <Button
               variant="outline"
               size="sm"
-              class="h-6 text-[11px]"
+              class="h-6 text-xs"
               onclick={runNow}
               disabled={refreshing}
             >
@@ -624,7 +624,7 @@
             </div>
           {/if}
           {#if outdatedCharts.length > 0}
-            <p class="text-[11px] text-muted-foreground">
+            <p class="text-xs text-muted-foreground">
               Patch auto-upgrade only. Major/minor updates require manual review per chart.
             </p>
           {/if}
@@ -672,7 +672,7 @@
                     {chart.name}
                     {#if newFlag}
                       <Badge
-                        class="ml-1 bg-rose-600 text-white text-[10px]"
+                        class="ml-1 bg-rose-600 text-white text-xs"
                         title="Newly detected as outdated since the previous audit run">NEW</Badge
                       >
                     {/if}
@@ -683,7 +683,7 @@
                   <Table.TableCell>
                     {#if chart.status === "outdated"}
                       <Badge
-                        class="text-white text-[10px] {severityStyles[sev]}"
+                        class="text-white text-xs {severityStyles[sev]}"
                         title={sev === "major"
                           ? "Major: APIs or behaviour may break. Review changelog before upgrading."
                           : sev === "minor"
@@ -695,7 +695,7 @@
                         {severityLabels[sev]}
                       </Badge>
                     {:else}
-                      <span class="text-[11px] text-muted-foreground">-</span>
+                      <span class="text-xs text-muted-foreground">-</span>
                     {/if}
                   </Table.TableCell>
                   <Table.TableCell>

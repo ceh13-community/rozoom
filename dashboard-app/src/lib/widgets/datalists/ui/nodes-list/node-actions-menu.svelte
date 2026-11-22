@@ -116,7 +116,7 @@
       <Terminal class="mr-2 h-4 w-4" />
       <span class="flex flex-col">
         Shell
-        <span class="text-[11px] text-muted-foreground">Debug pod on the node, host at /host</span>
+        <span class="text-xs text-muted-foreground">Debug pod on the node, host at /host</span>
       </span>
     </DropdownMenu.Item>
     {#if onRunDebugDescribe}

@@ -109,7 +109,7 @@
       </div>
 
       <div class="text-xs text-muted-foreground mb-1">{summaryText}</div>
-      <div class="text-[11px] text-muted-foreground/90 mb-3">
+      <div class="text-xs text-muted-foreground/90 mb-3">
         This summary is derived from current Pod phase and restart signals such as Pending and
         CrashLoopBackOff. It is a focused workload symptom detector, not a full pod-debugging view.
       </div>

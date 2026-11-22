@@ -308,7 +308,7 @@
     <div class="flex items-start justify-between gap-2">
       <div>
         <Card.Title class="text-sm">Authentication & Credential Security</Card.Title>
-        <p class="mt-0.5 text-[10px] text-slate-500">
+        <p class="mt-0.5 text-xs text-slate-500">
           Detected from this cluster's kubeconfig. JWT expiry tracks in real time; findings come
           with copy-ready remediation commands.
         </p>
@@ -347,20 +347,15 @@
           }`}
         >
           <div class="flex items-center justify-between gap-2">
-            <div class="text-[11px]">
+            <div class="text-xs">
               <span class="font-semibold">
                 {authInfo.tokenExpired ? "Token expired" : "Token expires in"}:
               </span>
               <span class="font-mono">{formatCountdown(authInfo.tokenExpiry)}</span>
-              <span class="ml-2 text-[10px] opacity-80">({authInfo.tokenExpiry})</span>
+              <span class="ml-2 text-xs opacity-80">({authInfo.tokenExpiry})</span>
             </div>
             {#if tokenBannerSeverity}
-              <Button
-                variant="outline"
-                size="sm"
-                class="h-6 text-[10px]"
-                onclick={goToClusterManager}
-              >
+              <Button variant="outline" size="sm" class="h-6 text-xs" onclick={goToClusterManager}>
                 Refresh in Cluster Manager
               </Button>
             {/if}
@@ -371,14 +366,14 @@
       <!-- Policy compliance -->
       {#if policyViolation}
         <div
-          class="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-300"
+          class="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300"
         >
           <span class="font-semibold">Policy mismatch:</span>
           {policyViolation}
         </div>
       {:else if fleetPolicy && fleetPolicy !== "any"}
         <div
-          class="rounded border border-emerald-500/30 bg-emerald-500/5 px-3 py-1 text-[11px] text-emerald-300"
+          class="rounded border border-emerald-500/30 bg-emerald-500/5 px-3 py-1 text-xs text-emerald-300"
         >
           <span class="font-semibold">✓ Policy aligned:</span> fleet policy = {fleetPolicy}.
         </div>
@@ -387,18 +382,18 @@
       <!-- Auth Method -->
       <div class="rounded border border-slate-700 p-2">
         <div class="flex items-center justify-between">
-          <h4 class="text-[11px] font-semibold text-slate-300">Auth Method</h4>
-          <span class="text-[10px] {securityColor} font-semibold uppercase"
+          <h4 class="text-xs font-semibold text-slate-300">Auth Method</h4>
+          <span class="text-xs {securityColor} font-semibold uppercase"
             >{authInfo.securityLevel}</span
           >
         </div>
         <p class="mt-1 text-slate-200">{authInfo.label}</p>
-        <p class="mt-0.5 text-[10px] text-slate-500">{authInfo.description}</p>
+        <p class="mt-0.5 text-xs text-slate-500">{authInfo.description}</p>
 
         {#if authInfo.warnings.length > 0}
           <div class="mt-1 space-y-0.5">
             {#each authInfo.warnings as warning}
-              <p class="text-[10px] text-amber-400">! {warning}</p>
+              <p class="text-xs text-amber-400">! {warning}</p>
             {/each}
           </div>
         {/if}
@@ -406,7 +401,7 @@
         {#if authInfo.recommendations.length > 0}
           <div class="mt-1 space-y-0.5">
             {#each authInfo.recommendations as rec}
-              <p class="text-[10px] text-slate-500">{rec}</p>
+              <p class="text-xs text-slate-500">{rec}</p>
             {/each}
           </div>
         {/if}
@@ -415,8 +410,8 @@
       <!-- Credential Storage -->
       <div class="rounded border border-slate-700 p-2">
         <div class="flex items-center justify-between">
-          <h4 class="text-[11px] font-semibold text-slate-300">Credential Storage</h4>
-          <span class="text-[10px] {riskColor} font-semibold uppercase">
+          <h4 class="text-xs font-semibold text-slate-300">Credential Storage</h4>
+          <span class="text-xs {riskColor} font-semibold uppercase">
             {credReport.overallRisk} risk
           </span>
         </div>
@@ -438,7 +433,7 @@
             {#each credReport.findings as finding}
               {@const cmds = remediationCommandsFor(finding)}
               <div
-                class="rounded border px-1.5 py-1 text-[10px] {finding.risk === 'critical'
+                class="rounded border px-1.5 py-1 text-xs {finding.risk === 'critical'
                   ? 'border-rose-500/30 bg-rose-500/5 text-rose-300'
                   : finding.risk === 'high'
                     ? 'border-orange-500/30 bg-orange-500/5 text-orange-300'
@@ -451,14 +446,14 @@
                 <div class="flex items-start justify-between gap-2">
                   <div class="min-w-0">
                     <p class="font-medium">{finding.title}</p>
-                    <p class="mt-0.5 text-[9px] opacity-70">{finding.remediation}</p>
+                    <p class="mt-0.5 text-xs opacity-70">{finding.remediation}</p>
                   </div>
                   {#if cmds.length > 0}
                     <div class="flex shrink-0 gap-1">
                       {#if cmds.length === 1}
                         <button
                           type="button"
-                          class="shrink-0 rounded border border-current px-1.5 py-0.5 text-[9px] font-semibold opacity-80 hover:opacity-100"
+                          class="shrink-0 rounded border border-current px-1.5 py-0.5 text-xs font-semibold opacity-80 hover:opacity-100"
                           onclick={() => void copyToClipboard(cmds[0]!.command)}
                           title={cmds[0]!.label}
                         >
@@ -467,7 +462,7 @@
                       {:else}
                         <button
                           type="button"
-                          class="shrink-0 rounded border border-current px-1.5 py-0.5 text-[9px] font-semibold opacity-80 hover:opacity-100"
+                          class="shrink-0 rounded border border-current px-1.5 py-0.5 text-xs font-semibold opacity-80 hover:opacity-100"
                           onclick={() => (wizardFinding = finding)}
                         >
                           Fix ({cmds.length})
@@ -499,7 +494,7 @@
     <div class="flex items-center justify-between border-b px-4 py-3">
       <div>
         <div class="text-sm font-semibold">Fix: {wizardFinding.title}</div>
-        <div class="text-[11px] text-muted-foreground">
+        <div class="text-xs text-muted-foreground">
           Pick the cloud/provider that matches your cluster and copy the command.
         </div>
       </div>
@@ -510,17 +505,17 @@
       {#each cmds as c}
         <div class="rounded border border-border bg-muted/30 p-2">
           <div class="mb-1 flex items-center justify-between gap-2">
-            <p class="text-[11px] font-medium text-foreground">{c.label}</p>
+            <p class="text-xs font-medium text-foreground">{c.label}</p>
             <Button
               variant="outline"
               size="sm"
-              class="h-6 text-[10px]"
+              class="h-6 text-xs"
               onclick={() => void copyToClipboard(c.command, `Copied "${c.label}"`)}
             >
               Copy
             </Button>
           </div>
-          <code class="block rounded bg-slate-950/70 px-2 py-1 font-mono text-[11px] text-slate-200"
+          <code class="block rounded bg-slate-950/70 px-2 py-1 font-mono text-xs text-slate-200"
             >{c.command}</code
           >
         </div>

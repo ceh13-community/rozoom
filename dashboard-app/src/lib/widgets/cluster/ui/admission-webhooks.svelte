@@ -92,7 +92,7 @@
       </div>
 
       <div class="text-xs text-muted-foreground mb-1">{summaryText}</div>
-      <div class="text-[11px] text-muted-foreground/90 mb-3">
+      <div class="text-xs text-muted-foreground/90 mb-3">
         This summary is derived from kube-apiserver admission webhook metrics. It highlights
         latency, reject, and fail-open behavior, not the functional correctness of every webhook
         policy.

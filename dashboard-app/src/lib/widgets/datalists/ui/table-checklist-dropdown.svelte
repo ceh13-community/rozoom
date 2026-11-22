@@ -36,7 +36,7 @@
           {#if onSelectAll}
             <button
               type="button"
-              class="rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+              class="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
               onclick={() => onSelectAll?.()}
             >
               All
@@ -45,7 +45,7 @@
           {#if onClearAll}
             <button
               type="button"
-              class="rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+              class="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
               onclick={() => onClearAll?.()}
             >
               None

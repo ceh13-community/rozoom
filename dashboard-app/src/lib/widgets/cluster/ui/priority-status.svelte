@@ -72,7 +72,7 @@
       sideOffset={8}
     >
       <p>{detailText}</p>
-      <div class="mb-2 text-[11px] text-muted-foreground/90">
+      <div class="mb-2 text-xs text-muted-foreground/90">
         This summary reflects Kubernetes `PriorityClass` and preemption posture. It helps surface
         scheduling risk, but it is not itself a scheduler health probe.
       </div>
@@ -122,7 +122,7 @@
                     -
                   {/if}
                   {#if item.recommendations.length}
-                    <div class="mt-2 text-[10px] text-muted-foreground whitespace-pre-wrap">
+                    <div class="mt-2 text-xs text-muted-foreground whitespace-pre-wrap">
                       {item.recommendations.join("\n\n")}
                     </div>
                   {/if}

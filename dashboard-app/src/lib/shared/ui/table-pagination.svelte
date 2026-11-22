@@ -34,7 +34,7 @@
         <select
           value={pageSize}
           onchange={(e) => onPageSizeChange?.(Number((e.currentTarget as HTMLSelectElement).value))}
-          class="h-6 text-[10px] px-1 rounded border border-border bg-background text-foreground"
+          class="h-6 text-xs px-1 rounded border border-border bg-background text-foreground"
         >
           {#each pageSizeOptions as size}
             <option value={size}>{size} / page</option>
@@ -47,7 +47,7 @@
       <Button
         variant="outline"
         size="sm"
-        class="h-6 w-6 p-0 text-[10px]"
+        class="h-6 w-6 p-0 text-xs"
         disabled={currentPage === 0}
         onclick={() => onPageChange(0)}
         aria-label="First page"
@@ -55,7 +55,7 @@
       <Button
         variant="outline"
         size="sm"
-        class="h-6 w-6 p-0 text-[10px]"
+        class="h-6 w-6 p-0 text-xs"
         disabled={currentPage === 0}
         onclick={() => onPageChange(currentPage - 1)}
         aria-label="Previous page"
@@ -65,7 +65,7 @@
         <Button
           variant={page === currentPage ? "default" : "outline"}
           size="sm"
-          class="h-6 min-w-6 px-1.5 text-[10px]"
+          class="h-6 min-w-6 px-1.5 text-xs"
           onclick={() => onPageChange(page)}
         >{page + 1}</Button>
       {/each}
@@ -73,7 +73,7 @@
       <Button
         variant="outline"
         size="sm"
-        class="h-6 w-6 p-0 text-[10px]"
+        class="h-6 w-6 p-0 text-xs"
         disabled={currentPage >= totalPages - 1}
         onclick={() => onPageChange(currentPage + 1)}
         aria-label="Next page"
@@ -81,7 +81,7 @@
       <Button
         variant="outline"
         size="sm"
-        class="h-6 w-6 p-0 text-[10px]"
+        class="h-6 w-6 p-0 text-xs"
         disabled={currentPage >= totalPages - 1}
         onclick={() => onPageChange(totalPages - 1)}
         aria-label="Last page"
@@ -89,7 +89,7 @@
     </div>
   </div>
 {:else if totalRows > 0}
-  <div class="border-t border-border/50 px-3 py-1.5 text-[10px] text-muted-foreground">
+  <div class="border-t border-border/50 px-3 py-1.5 text-xs text-muted-foreground">
     {totalRows} rows
   </div>
 {/if}

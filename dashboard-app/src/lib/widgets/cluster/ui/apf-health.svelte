@@ -92,7 +92,7 @@
       </div>
 
       <div class="text-xs text-muted-foreground mb-1">{summaryText}</div>
-      <div class="text-[11px] text-muted-foreground/90 mb-3">
+      <div class="text-xs text-muted-foreground/90 mb-3">
         This summary reflects API Priority and Fairness queue pressure from kube-apiserver metrics.
         It is a control-plane fairness/saturation signal, not a generic API availability probe.
       </div>

@@ -100,7 +100,7 @@
         <span class="font-medium">{label}</span>
       {/if}
       <span
-        class="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap {statusClass[
+        class="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-medium whitespace-nowrap {statusClass[
           session.status
         ] ?? statusClass.idle}"
       >
@@ -112,7 +112,7 @@
       {#if session.isRunning}
         <button
           type="button"
-          class="text-[11px] text-rose-400 hover:underline"
+          class="text-xs text-rose-400 hover:underline"
           onclick={() => session.cancel()}
           title="Send abort signal to the running command"
         >
@@ -122,7 +122,7 @@
       {#if session.output}
         <button
           type="button"
-          class="ml-auto text-[11px] text-sky-400 hover:underline"
+          class="ml-auto text-xs text-sky-400 hover:underline"
           onclick={() => session.toggleExpanded()}
         >
           {session.expanded ? "Hide output" : "Show output"}
@@ -131,7 +131,7 @@
       {#if terminal}
         <button
           type="button"
-          class="text-[11px] text-slate-400 hover:text-slate-200"
+          class="text-xs text-slate-400 hover:text-slate-200"
           onclick={dismiss}
           title="Dismiss console"
           aria-label="Dismiss console"
@@ -142,12 +142,12 @@
     </div>
 
     {#if !session.output && session.status === "idle" && idleHint}
-      <p class="text-[11px] text-muted-foreground">{idleHint}</p>
+      <p class="text-xs text-muted-foreground">{idleHint}</p>
     {/if}
 
     {#if session.output && session.expanded}
       <pre
-        class="overflow-auto rounded bg-slate-950/70 p-2 text-[10px] font-mono text-slate-200 whitespace-pre-wrap {maxHeightClass}">{session.output}</pre>
+        class="overflow-auto rounded bg-slate-950/70 p-2 text-xs font-mono text-slate-200 whitespace-pre-wrap {maxHeightClass}">{session.output}</pre>
     {/if}
   </div>
 {/if}

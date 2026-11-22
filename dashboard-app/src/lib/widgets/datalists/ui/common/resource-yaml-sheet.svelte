@@ -244,10 +244,10 @@
       disabled={pathSegments.length === 0}
       title="Copy YAML path at cursor"
     >
-      Copy path <span class="ml-1.5 text-[10px] text-muted-foreground">Ctrl+Shift+C</span>
+      Copy path <span class="ml-1.5 text-xs text-muted-foreground">Ctrl+Shift+C</span>
     </Button>
     <Button variant="outline" size="sm" onclick={handleToggleLintPanel} title="Toggle lint panel">
-      Lint panel <span class="ml-1.5 text-[10px] text-muted-foreground">Ctrl+Shift+M</span>
+      Lint panel <span class="ml-1.5 text-xs text-muted-foreground">Ctrl+Shift+M</span>
     </Button>
     <Button
       variant="outline"

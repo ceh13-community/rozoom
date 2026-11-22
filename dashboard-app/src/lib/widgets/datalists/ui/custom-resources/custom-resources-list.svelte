@@ -957,7 +957,7 @@
             />
           </Table.TableHead>
           <Table.TableHead class="w-20">
-            <span class="text-[11px] uppercase tracking-wide">Actions</span>
+            <span class="text-xs uppercase tracking-wide">Actions</span>
           </Table.TableHead>
           {#if isColumnVisible("name")}
             <Table.TableHead class="w-[19%]">

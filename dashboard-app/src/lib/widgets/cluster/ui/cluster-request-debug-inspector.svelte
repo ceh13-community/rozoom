@@ -63,7 +63,7 @@
                 </div>
                 <div class="text-xs text-muted-foreground">{row.detail}</div>
               </div>
-              <div class="shrink-0 text-[11px] text-muted-foreground">{formatAt(row.at)}</div>
+              <div class="shrink-0 text-xs text-muted-foreground">{formatAt(row.at)}</div>
             </div>
           </div>
         {/each}

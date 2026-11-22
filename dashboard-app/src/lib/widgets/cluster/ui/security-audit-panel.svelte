@@ -199,7 +199,7 @@
           </p>
         </div>
         <div class="flex items-center gap-2 shrink-0">
-          <span class="text-[11px] text-muted-foreground">
+          <span class="text-xs text-muted-foreground">
             Last scan: {relativeTime(lastScanAt)}
           </span>
           <Button
@@ -278,7 +278,7 @@
       <div class="flex items-center justify-between">
         <Card.Title class="text-sm">RBAC Risk Scanner</Card.Title>
         {#if rbacReport}
-          <span class="text-[11px] text-muted-foreground">
+          <span class="text-xs text-muted-foreground">
             {rbacReport.summary.totalRoles} roles scanned
           </span>
         {/if}
@@ -330,13 +330,13 @@
                 onclick={() => toggleRole(role)}
               >
                 <div class="flex items-center gap-2">
-                  <Badge variant="outline" class="text-[10px] {rbacBadgeClass(role.highestRisk)}">
+                  <Badge variant="outline" class="text-xs {rbacBadgeClass(role.highestRisk)}">
                     {role.highestRisk}
                   </Badge>
                   <span class="font-mono text-xs">
                     {role.kind}{role.namespace ? `/${role.namespace}` : ""}/{role.name}
                   </span>
-                  <span class="ml-auto text-[11px] text-muted-foreground">
+                  <span class="ml-auto text-xs text-muted-foreground">
                     {role.findings.length}
                     {role.findings.length === 1 ? "finding" : "findings"}
                     · score {role.riskScore}
@@ -348,17 +348,14 @@
                       {@const doc = RBAC_RULE_CATALOG[finding.rule]}
                       <li class="space-y-1 text-xs">
                         <div class="flex flex-wrap items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            class="text-[10px] {rbacBadgeClass(finding.level)}"
-                          >
+                          <Badge variant="outline" class="text-xs {rbacBadgeClass(finding.level)}">
                             {finding.level}
                           </Badge>
                           <span class="font-medium">
                             {doc?.title ?? finding.rule}
                           </span>
                           <code
-                            class="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                            class="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
                           >
                             {finding.resource} · {finding.verbs.join(", ")}
                           </code>
@@ -373,7 +370,7 @@
                           </p>
                           <a
                             href={doc.docUrl}
-                            class="text-[11px] text-sky-400 hover:underline"
+                            class="text-xs text-sky-400 hover:underline"
                             target="_blank"
                             rel="noreferrer"
                           >
@@ -387,7 +384,7 @@
               </button>
             {/each}
             {#if criticalRoles.length + highRoles.length + mediumRoles.length > 20}
-              <p class="text-[11px] text-muted-foreground">
+              <p class="text-xs text-muted-foreground">
                 Showing 20 of {criticalRoles.length + highRoles.length + mediumRoles.length} roles with
                 findings. Fix the critical ones first.
               </p>
@@ -405,11 +402,11 @@
         <Card.Title class="text-sm">Pod Security Standards</Card.Title>
         {#if pssReport}
           <div class="flex items-center gap-2">
-            <span class="text-[11px] text-muted-foreground">
+            <span class="text-xs text-muted-foreground">
               {pssReport.summary.total} pods scanned
             </span>
             <div
-              class="inline-flex items-center rounded border border-border text-[10px] overflow-hidden"
+              class="inline-flex items-center rounded border border-border text-xs overflow-hidden"
             >
               <button
                 type="button"
@@ -478,14 +475,11 @@
                 onclick={() => togglePod(pod)}
               >
                 <div class="flex items-center gap-2">
-                  <Badge
-                    variant="outline"
-                    class="text-[10px] {pssLevelBadge(pod.maxCompliantLevel)}"
-                  >
+                  <Badge variant="outline" class="text-xs {pssLevelBadge(pod.maxCompliantLevel)}">
                     {pod.maxCompliantLevel}
                   </Badge>
                   <span class="font-mono text-xs">{pod.namespace}/{pod.pod}</span>
-                  <span class="ml-auto text-[11px] text-muted-foreground">
+                  <span class="ml-auto text-xs text-muted-foreground">
                     {pod.violations.length}
                     {pod.violations.length === 1 ? "violation" : "violations"}
                   </span>
@@ -496,12 +490,12 @@
                       {@const doc = PSS_CHECK_CATALOG[v.check]}
                       <li class="space-y-1 text-xs">
                         <div class="flex flex-wrap items-center gap-2">
-                          <Badge variant="outline" class="text-[10px] {pssBadgeClass(v.level)}">
+                          <Badge variant="outline" class="text-xs {pssBadgeClass(v.level)}">
                             {v.level}
                           </Badge>
                           <span class="font-medium">{doc?.title ?? v.check}</span>
                           <code
-                            class="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                            class="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
                           >
                             {v.field}
                           </code>
@@ -514,7 +508,7 @@
                           </p>
                           <a
                             href={doc.docUrl}
-                            class="text-[11px] text-sky-400 hover:underline"
+                            class="text-xs text-sky-400 hover:underline"
                             target="_blank"
                             rel="noreferrer"
                           >
@@ -528,7 +522,7 @@
               </button>
             {/each}
             {#if filteredFailingPods.length > 20}
-              <p class="text-[11px] text-muted-foreground">
+              <p class="text-xs text-muted-foreground">
                 Showing 20 of {filteredFailingPods.length} pods with violations.
               </p>
             {/if}

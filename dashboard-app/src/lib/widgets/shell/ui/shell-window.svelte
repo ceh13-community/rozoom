@@ -998,7 +998,7 @@
       {#if !collapsed}
         <div class="text-xs text-muted-foreground">
           {shellTargetLabel} (namespace: {shellTargetNamespace})
-          <span class="ml-2 inline-flex items-center gap-1 text-[10px] uppercase tracking-wide">
+          <span class="ml-2 inline-flex items-center gap-1 text-xs uppercase tracking-wide">
             <span
               class={`h-2 w-2 rounded-full ${shellStatus.dotClass} ${shellStatus.pulse ? "animate-pulse" : ""}`}
               aria-hidden="true"
@@ -1091,7 +1091,7 @@
           </div>
         </div>
         <div
-          class="mt-2 break-all rounded border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-[11px] text-emerald-300"
+          class="mt-2 break-all rounded border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-emerald-300"
         >
           {shellPreset?.commandLine ?? shellCommand}
         </div>

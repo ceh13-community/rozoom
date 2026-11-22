@@ -52,20 +52,20 @@
     <Popover.Content
       class="w-96 max-h-[min(20rem,var(--bits-popover-content-available-height,calc(100dvh-2rem)))] overflow-y-auto"
     >
-      <div class="mb-2 text-[11px] text-muted-foreground/90">
+      <div class="mb-2 text-xs text-muted-foreground/90">
         This check reflects the documented kube-apiserver `/livez` and `/readyz` endpoints. It is a
         direct health-endpoint probe, unlike latency or alert summaries.
       </div>
       <div class="flex flex-col gap-2 text-xs">
         <div>
           <div class="font-medium">/livez: {liveText}</div>
-          <pre class="whitespace-pre-wrap text-[11px] text-muted-foreground">
+          <pre class="whitespace-pre-wrap text-xs text-muted-foreground">
 {health?.live.output || health?.live.error || "No response"}
           </pre>
         </div>
         <div>
           <div class="font-medium">/readyz: {readyText}</div>
-          <pre class="whitespace-pre-wrap text-[11px] text-muted-foreground">
+          <pre class="whitespace-pre-wrap text-xs text-muted-foreground">
 {health?.ready.output || health?.ready.error || "No response"}
           </pre>
         </div>

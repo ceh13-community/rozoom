@@ -721,12 +721,10 @@
         >
           {tab.label}
           {#if tab.k === "policies" && policies.length > 0}
-            <span class="ml-1 text-[10px] text-muted-foreground">({policies.length})</span>
+            <span class="ml-1 text-xs text-muted-foreground">({policies.length})</span>
           {/if}
           {#if tab.k === "alerts" && parsedReport?.summary?.alerts}
-            <span class="ml-1 text-[10px] text-muted-foreground"
-              >({parsedReport.summary.alerts})</span
-            >
+            <span class="ml-1 text-xs text-muted-foreground">({parsedReport.summary.alerts})</span>
           {/if}
         </button>
       {/each}
@@ -829,7 +827,7 @@
               </li>
             {/each}
           </ul>
-          <p class="text-[10px] text-muted-foreground">
+          <p class="text-xs text-muted-foreground">
             Ran {new Date(preflight.ranAt).toLocaleString()}
           </p>
         </div>
@@ -891,7 +889,7 @@
                   style="width: {pct}%"
                 ></div>
               </div>
-              <p class="text-[10px] text-muted-foreground">
+              <p class="text-xs text-muted-foreground">
                 {rollout.ready === rollout.desired
                   ? "All nodes protected"
                   : "Enforcement is partial until all pods are Ready"}
@@ -1022,44 +1020,44 @@
             {#each filteredPolicies as p (p.kind + "/" + p.namespace + "/" + p.name)}
               <div class="rounded border border-border p-2.5 text-xs">
                 <div class="flex flex-wrap items-center gap-2">
-                  <span class="font-mono text-[10px] text-slate-500">{p.kind}</span>
+                  <span class="font-mono text-xs text-slate-500">{p.kind}</span>
                   <span class="font-semibold text-foreground">{p.name}</span>
                   {#if p.namespace}
                     <span class="text-slate-500">- ns: {p.namespace}</span>
                   {/if}
                   <span
-                    class="rounded px-1.5 py-0.5 text-[10px] {p.action === 'Block'
+                    class="rounded px-1.5 py-0.5 text-xs {p.action === 'Block'
                       ? 'bg-rose-500/20 text-rose-300'
                       : p.action === 'Audit'
                         ? 'bg-amber-500/20 text-amber-300'
                         : 'bg-emerald-500/20 text-emerald-300'}">{p.action}</span
                   >
                   {#if p.severity > 0}
-                    <span class="{severityTextClass(p.severity)} font-mono text-[10px]"
+                    <span class="{severityTextClass(p.severity)} font-mono text-xs"
                       >sev {p.severity}</span
                     >
                   {/if}
                   <Button
                     variant="ghost"
                     size="sm"
-                    class="ml-auto h-6 text-[10px]"
+                    class="ml-auto h-6 text-xs"
                     onclick={() => deletePolicy(p)}
                   >
                     Delete
                   </Button>
                 </div>
                 {#if p.selector}
-                  <p class="mt-1 text-[10px] text-muted-foreground">target: {p.selector}</p>
+                  <p class="mt-1 text-xs text-muted-foreground">target: {p.selector}</p>
                 {/if}
                 {#if p.rules.length > 0}
-                  <ul class="mt-0.5 text-[10px] text-slate-400 list-disc pl-4">
+                  <ul class="mt-0.5 text-xs text-slate-400 list-disc pl-4">
                     {#each p.rules as r}
                       <li>{r}</li>
                     {/each}
                   </ul>
                 {/if}
                 {#if p.message}
-                  <p class="mt-1 text-[10px] italic text-slate-500">"{p.message}"</p>
+                  <p class="mt-1 text-xs italic text-slate-500">"{p.message}"</p>
                 {/if}
               </div>
             {/each}
@@ -1079,20 +1077,20 @@
                 <div class="flex items-center gap-2">
                   <span class="font-semibold text-foreground">{sp.title}</span>
                   <span
-                    class="rounded px-1.5 py-0.5 text-[10px] {sp.action === 'Block'
+                    class="rounded px-1.5 py-0.5 text-xs {sp.action === 'Block'
                       ? 'bg-rose-500/20 text-rose-300'
                       : 'bg-amber-500/20 text-amber-300'}">{sp.action}</span
                   >
-                  <span class="{severityTextClass(sp.severity)} font-mono text-[10px]"
+                  <span class="{severityTextClass(sp.severity)} font-mono text-xs"
                     >sev {sp.severity}</span
                   >
                 </div>
-                <p class="text-[11px] text-muted-foreground">{sp.description}</p>
+                <p class="text-xs text-muted-foreground">{sp.description}</p>
                 <div class="flex flex-wrap gap-1 pt-1">
                   <Button
                     size="sm"
                     variant="outline"
-                    class="h-7 text-[10px]"
+                    class="h-7 text-xs"
                     disabled={!kubearmorInstalled}
                     onclick={() => applyStarter(sp.yaml, sp.title, sp.id)}
                   >
@@ -1101,7 +1099,7 @@
                   <Button
                     size="sm"
                     variant="ghost"
-                    class="h-7 text-[10px]"
+                    class="h-7 text-xs"
                     onclick={() => copyText(sp.yaml, sp.title + " YAML")}
                   >
                     <Copy class="mr-1 h-3 w-3" /> Copy YAML

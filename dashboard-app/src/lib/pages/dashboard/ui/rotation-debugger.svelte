@@ -68,17 +68,17 @@
     </dl>
 
     {#if !hasRotation && state.totalClusters > 0}
-      <p class="mt-3 text-[11px] text-emerald-500">
+      <p class="mt-3 text-xs text-emerald-500">
         Every card fits inside the window for this profile - no rotation needed.
       </p>
     {:else if hasRotation}
-      <p class="mt-3 text-[11px] text-muted-foreground">
+      <p class="mt-3 text-xs text-muted-foreground">
         Cards outside the window keep their last snapshot until the window reaches them. Switch to a
         profile with a larger rotation budget ({profile.label} -> Realtime/Fleet) or narrow the fleet
         via Views to keep every card hot.
       </p>
     {:else}
-      <p class="mt-3 text-[11px] text-muted-foreground">Add clusters to see rotation status.</p>
+      <p class="mt-3 text-xs text-muted-foreground">Add clusters to see rotation status.</p>
     {/if}
   </Popover.Content>
 </Popover.Root>

@@ -1074,16 +1074,16 @@
         >
           {tab.label}
           {#if tab.k === "vulnerabilities" && vulns.length > 0}
-            <span class="ml-1 text-[10px] text-rose-400">({vulns.length})</span>
+            <span class="ml-1 text-xs text-rose-400">({vulns.length})</span>
           {/if}
           {#if tab.k === "misconfigs" && misconfigs.length > 0}
-            <span class="ml-1 text-[10px] text-amber-400">({misconfigs.length})</span>
+            <span class="ml-1 text-xs text-amber-400">({misconfigs.length})</span>
           {/if}
           {#if tab.k === "secrets" && secrets.length > 0}
-            <span class="ml-1 text-[10px] text-rose-400">({secrets.length})</span>
+            <span class="ml-1 text-xs text-rose-400">({secrets.length})</span>
           {/if}
           {#if tab.k === "sbom" && sboms.length > 0}
-            <span class="ml-1 text-[10px] text-slate-400">({sboms.length})</span>
+            <span class="ml-1 text-xs text-slate-400">({sboms.length})</span>
           {/if}
         </button>
       {/each}
@@ -1183,7 +1183,7 @@
               </li>
             {/each}
           </ul>
-          <p class="text-[10px] text-muted-foreground">
+          <p class="text-xs text-muted-foreground">
             Ran {new Date(preflight.ranAt).toLocaleString()}
           </p>
         </div>
@@ -1209,19 +1209,19 @@
             <div class="rounded border border-border p-2.5 text-xs">
               <p class="text-muted-foreground mb-1">Vulnerabilities</p>
               <p class="text-2xl font-mono font-bold">{vulns.length}</p>
-              <div class="flex flex-wrap gap-1 mt-1 text-[10px]">
+              <div class="flex flex-wrap gap-1 mt-1 text-xs">
                 {#each Object.entries(severityCountsFromVulns) as [sev, count] (sev)}
                   {#if count > 0}
                     <span class="{severityTextClass[sev]} capitalize">{sev}: {count}</span>
                   {/if}
                 {/each}
               </div>
-              <p class="text-[10px] text-emerald-400 mt-1">{fixableVulns} fixable</p>
+              <p class="text-xs text-emerald-400 mt-1">{fixableVulns} fixable</p>
             </div>
             <div class="rounded border border-border p-2.5 text-xs">
               <p class="text-muted-foreground mb-1">Misconfigurations</p>
               <p class="text-2xl font-mono font-bold">{misconfigs.length}</p>
-              <div class="flex flex-wrap gap-1 mt-1 text-[10px]">
+              <div class="flex flex-wrap gap-1 mt-1 text-xs">
                 {#each Object.entries(severityCountsFromMisconfigs) as [sev, count] (sev)}
                   {#if count > 0}
                     <span class="{severityTextClass[sev]} capitalize">{sev}: {count}</span>
@@ -1234,13 +1234,13 @@
               <p class="text-2xl font-mono font-bold {secrets.length > 0 ? 'text-rose-400' : ''}">
                 {secrets.length}
               </p>
-              <p class="text-[10px] text-muted-foreground mt-1">hard-coded in image layers</p>
+              <p class="text-xs text-muted-foreground mt-1">hard-coded in image layers</p>
             </div>
           </div>
 
           {#if vulns.length > 0}
             <div class="space-y-1">
-              <p class="text-[10px] text-muted-foreground">CVE severity breakdown</p>
+              <p class="text-xs text-muted-foreground">CVE severity breakdown</p>
               <div class="flex h-2 w-full rounded overflow-hidden">
                 {#each ["critical", "high", "medium", "low", "unknown"] as sev}
                   {#if severityCountsFromVulns[sev] > 0}
@@ -1265,7 +1265,7 @@
           <p class="text-sm font-medium text-foreground">{formatDate(lastScanAt)}</p>
           <p class="text-xs text-muted-foreground">Updates after Run Trivy scan.</p>
           {#if dbStatus?.version}
-            <p class="text-[10px] text-muted-foreground mt-1">Trivy {dbStatus.version}</p>
+            <p class="text-xs text-muted-foreground mt-1">Trivy {dbStatus.version}</p>
           {/if}
         </div>
         <div class="rounded-lg border border-border p-3">
@@ -1443,12 +1443,11 @@
                 <tr class="border-t border-border hover:bg-muted/20">
                   <td class="px-2 py-1">
                     <span
-                      class="rounded px-1.5 py-0.5 text-[10px] text-white {severityClass[
-                        v.severity
-                      ] ?? 'bg-slate-500'}">{v.severity}</span
+                      class="rounded px-1.5 py-0.5 text-xs text-white {severityClass[v.severity] ??
+                        'bg-slate-500'}">{v.severity}</span
                     >
                     <span
-                      class="ml-1 rounded border px-1 text-[9px] uppercase {v.source === 'local'
+                      class="ml-1 rounded border px-1 text-xs uppercase {v.source === 'local'
                         ? 'border-sky-500/40 text-sky-300'
                         : 'border-slate-500/40 text-muted-foreground'}"
                       title={v.source === "local"
@@ -1470,19 +1469,19 @@
                       {v.vulnerabilityID}
                     {/if}
                     {#if v.score > 0}
-                      <span class="ml-1 text-[10px] text-muted-foreground">CVSS {v.score}</span>
+                      <span class="ml-1 text-xs text-muted-foreground">CVSS {v.score}</span>
                     {/if}
                   </td>
                   <td class="px-2 py-1">{v.pkgName}</td>
-                  <td class="px-2 py-1 font-mono text-[10px]">{v.installedVersion}</td>
-                  <td class="px-2 py-1 font-mono text-[10px]">
+                  <td class="px-2 py-1 font-mono text-xs">{v.installedVersion}</td>
+                  <td class="px-2 py-1 font-mono text-xs">
                     {#if v.fixedVersion}
                       <span class="text-emerald-400">{v.fixedVersion}</span>
                     {:else}
                       <span class="text-muted-foreground">-</span>
                     {/if}
                   </td>
-                  <td class="px-2 py-1 text-[10px]">
+                  <td class="px-2 py-1 text-xs">
                     <button
                       type="button"
                       class="hover:underline text-left"
@@ -1495,12 +1494,12 @@
                       <span class="text-muted-foreground">{v.namespace}/</span>{v.resource}
                     </button>
                   </td>
-                  <td class="px-2 py-1 font-mono text-[10px] text-muted-foreground">{v.image}</td>
+                  <td class="px-2 py-1 font-mono text-xs text-muted-foreground">{v.image}</td>
                   <td class="px-2 py-1">
                     {#if v.fixedVersion}
                       <button
                         type="button"
-                        class="inline-flex h-6 items-center rounded px-2 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                        class="inline-flex h-6 items-center rounded px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
                         onclick={() => copySetImage(v.resource, v.image, v.fixedVersion)}
                         title="Copy kubectl set image command with fixed version"
                       >
@@ -1513,16 +1512,14 @@
             </tbody>
           </table>
           {#if filteredVulns.length > vulnsRenderLimit}
-            <div
-              class="flex items-center justify-between gap-2 p-2 text-[10px] text-muted-foreground"
-            >
+            <div class="flex items-center justify-between gap-2 p-2 text-xs text-muted-foreground">
               <span
                 >Showing {vulnsRenderLimit} of {filteredVulns.length}. Narrow filters for fewer
                 rows.</span
               >
               <button
                 type="button"
-                class="rounded border border-border px-2 py-1 text-[10px] text-foreground hover:bg-muted"
+                class="rounded border border-border px-2 py-1 text-xs text-foreground hover:bg-muted"
                 onclick={() => (vulnsRenderLimit += PAGE_SIZE)}
               >
                 Show {Math.min(PAGE_SIZE, filteredVulns.length - vulnsRenderLimit)} more
@@ -1592,11 +1589,11 @@
             <div class="rounded border border-border p-2.5 text-xs space-y-1">
               <div class="flex items-center gap-2 flex-wrap">
                 <span
-                  class="rounded px-1.5 py-0.5 text-[10px] text-white {severityClass[m.severity] ??
+                  class="rounded px-1.5 py-0.5 text-xs text-white {severityClass[m.severity] ??
                     'bg-slate-500'}">{m.severity}</span
                 >
                 <span
-                  class="rounded border px-1 text-[9px] uppercase {m.source === 'local'
+                  class="rounded border px-1 text-xs uppercase {m.source === 'local'
                     ? 'border-sky-500/40 text-sky-300'
                     : 'border-slate-500/40 text-muted-foreground'}"
                   title={m.source === "local"
@@ -1615,10 +1612,9 @@
                 {:else}
                   <span class="font-mono">{m.checkID}</span>
                 {/if}
-                {#if m.category}<span class="text-[10px] text-muted-foreground">{m.category}</span
-                  >{/if}
+                {#if m.category}<span class="text-xs text-muted-foreground">{m.category}</span>{/if}
                 <button
-                  class="ml-auto text-[10px] hover:underline text-muted-foreground"
+                  class="ml-auto text-xs hover:underline text-muted-foreground"
                   onclick={() => jumpToResource("pod", m.namespace)}
                 >
                   {m.namespace}/{m.resource}
@@ -1629,21 +1625,21 @@
                 <p class="text-muted-foreground">{m.description}</p>
               {/if}
               {#if m.messages.length > 0}
-                <ul class="text-[10px] text-slate-400 list-disc pl-4">
+                <ul class="text-xs text-slate-400 list-disc pl-4">
                   {#each m.messages as msg}<li>{msg}</li>{/each}
                 </ul>
               {/if}
             </div>
           {/each}
           {#if filteredMisconfigs.length > misconfigsRenderLimit}
-            <div class="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+            <div class="flex items-center justify-between gap-2 text-xs text-muted-foreground">
               <span
                 >Showing {misconfigsRenderLimit} of {filteredMisconfigs.length}. Narrow filters for
                 fewer.</span
               >
               <button
                 type="button"
-                class="rounded border border-border px-2 py-1 text-[10px] text-foreground hover:bg-muted"
+                class="rounded border border-border px-2 py-1 text-xs text-foreground hover:bg-muted"
                 onclick={() => (misconfigsRenderLimit += PAGE_SIZE)}
               >
                 Show {Math.min(PAGE_SIZE, filteredMisconfigs.length - misconfigsRenderLimit)} more
@@ -1699,11 +1695,11 @@
             <div class="rounded border border-rose-500/30 bg-rose-500/5 p-2.5 text-xs space-y-1">
               <div class="flex items-center gap-2 flex-wrap">
                 <span
-                  class="rounded px-1.5 py-0.5 text-[10px] text-white {severityClass[s.severity] ??
+                  class="rounded px-1.5 py-0.5 text-xs text-white {severityClass[s.severity] ??
                     'bg-slate-500'}">{s.severity}</span
                 >
                 <span
-                  class="rounded border px-1 text-[9px] uppercase {s.source === 'local'
+                  class="rounded border px-1 text-xs uppercase {s.source === 'local'
                     ? 'border-sky-500/40 text-sky-300'
                     : 'border-slate-500/40 text-muted-foreground'}"
                   title={s.source === "local"
@@ -1711,11 +1707,10 @@
                     : "Produced by Trivy Operator"}>{s.source}</span
                 >
                 <span class="font-mono">{s.ruleID}</span>
-                {#if s.category}<span class="text-[10px] text-muted-foreground">{s.category}</span
-                  >{/if}
+                {#if s.category}<span class="text-xs text-muted-foreground">{s.category}</span>{/if}
                 <button
                   type="button"
-                  class="ml-auto text-[10px] hover:underline text-muted-foreground"
+                  class="ml-auto text-xs hover:underline text-muted-foreground"
                   onclick={() => jumpToResource("pod", s.namespace)}
                 >
                   {s.namespace}/{s.resource}
@@ -1723,21 +1718,21 @@
               </div>
               <p class="font-medium text-foreground">{s.title}</p>
               {#if s.target}
-                <p class="text-[10px] text-muted-foreground font-mono">location: {s.target}</p>
+                <p class="text-xs text-muted-foreground font-mono">location: {s.target}</p>
               {/if}
               {#if s.match}
-                <p class="text-[10px] text-rose-400 font-mono">match: {s.match}</p>
+                <p class="text-xs text-rose-400 font-mono">match: {s.match}</p>
               {/if}
             </div>
           {/each}
           {#if filteredSecrets.length > secretsRenderLimit}
-            <div class="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+            <div class="flex items-center justify-between gap-2 text-xs text-muted-foreground">
               <span
                 >Showing {secretsRenderLimit} of {filteredSecrets.length}. Narrow filters for fewer.</span
               >
               <button
                 type="button"
-                class="rounded border border-border px-2 py-1 text-[10px] text-foreground hover:bg-muted"
+                class="rounded border border-border px-2 py-1 text-xs text-foreground hover:bg-muted"
                 onclick={() => (secretsRenderLimit += PAGE_SIZE)}
               >
                 Show {Math.min(PAGE_SIZE, filteredSecrets.length - secretsRenderLimit)} more
@@ -1791,7 +1786,7 @@
                       {s.namespace}/{s.resource}
                     </button>
                   </td>
-                  <td class="px-2 py-1 font-mono text-[10px]">{s.image}</td>
+                  <td class="px-2 py-1 font-mono text-xs">{s.image}</td>
                   <td class="px-2 py-1 font-mono">{s.componentCount}</td>
                   <td class="px-2 py-1 text-muted-foreground">{formatDate(s.updatedAt)}</td>
                 </tr>

@@ -746,7 +746,7 @@
               {#if humanized.hint}
                 <p class="mb-1">{humanized.hint}</p>
               {/if}
-              <pre class="whitespace-pre-wrap text-[11px] opacity-80">{actionNotice.text}</pre>
+              <pre class="whitespace-pre-wrap text-xs opacity-80">{actionNotice.text}</pre>
             </Alert.Description>
           </div>
           <button
@@ -870,7 +870,7 @@
             </Button>
             {#if installValuesYaml}
               <div class="flex flex-col gap-0.5">
-                <span class="flex items-center gap-1 text-[11px] text-emerald-400">
+                <span class="flex items-center gap-1 text-xs text-emerald-400">
                   Custom values set ✓
                   <button
                     type="button"
@@ -883,7 +883,7 @@
                   >
                 </span>
                 {#if installValuesForChart && installValuesForChart !== installForm.chart.trim()}
-                  <span class="text-[10px] text-amber-400">
+                  <span class="text-xs text-amber-400">
                     Values set for "{installValuesForChart}" - re-open editor to refresh defaults
                   </span>
                 {/if}
@@ -946,7 +946,7 @@
                 </div>
               </div>
               <pre
-                class="max-h-80 overflow-auto rounded-md border border-border bg-muted p-3 text-[11px] font-mono whitespace-pre-wrap">{dryRunOutput}</pre>
+                class="max-h-80 overflow-auto rounded-md border border-border bg-muted p-3 text-xs font-mono whitespace-pre-wrap">{dryRunOutput}</pre>
             </div>
           {/if}
           {#if diffView}
@@ -974,7 +974,7 @@
                 </div>
               </div>
               <div
-                class="max-h-80 overflow-auto rounded-md border border-border bg-muted font-mono text-[11px]"
+                class="max-h-80 overflow-auto rounded-md border border-border bg-muted font-mono text-xs"
               >
                 {#each unifiedDiff as line}
                   <div
@@ -1302,7 +1302,7 @@
                         <span class="px-1">{entry.revision}</span>
                       {/if}
                       {#if isCurrent}
-                        <Badge class="ml-1 bg-emerald-600 text-[10px] text-white">current</Badge>
+                        <Badge class="ml-1 bg-emerald-600 text-xs text-white">current</Badge>
                       {/if}
                     </Table.TableCell>
                     <Table.TableCell
@@ -1419,7 +1419,7 @@
             {#if installVersion.trim()}· v{installVersion.trim()}{/if}
           </span>
         </div>
-        <div class="text-[11px] text-muted-foreground">
+        <div class="text-xs text-muted-foreground">
           Prefilled from <code>helm show values</code>. Passed via
           <code>--values &lt;tmpfile&gt;</code> on install.
         </div>

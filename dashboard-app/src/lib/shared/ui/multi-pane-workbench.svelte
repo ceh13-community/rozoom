@@ -352,13 +352,13 @@
 
   {#if showTimeline}
     <div class="flex items-center gap-2 border-b px-2 py-1.5">
-      <span class="text-[11px] uppercase tracking-wide text-muted-foreground"
+      <span class="text-xs uppercase tracking-wide text-muted-foreground"
         >Incident timeline</span
       >
       <div class="inline-flex items-center rounded border bg-background p-1">
         <button
           type="button"
-          class={`rounded px-2 py-1.5 text-[11px] ${
+          class={`rounded px-2 py-1.5 text-xs ${
             timelineDensity === "all"
               ? NAV_ACTIVE_CLASS
               : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -369,7 +369,7 @@
         </button>
         <button
           type="button"
-          class={`rounded px-2 py-1.5 text-[11px] ${
+          class={`rounded px-2 py-1.5 text-xs ${
             timelineDensity === "warnings"
               ? NAV_ACTIVE_CLASS
               : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -386,7 +386,7 @@
           {#each timelineMarkers as marker}
             <button
               type="button"
-              class={`whitespace-nowrap rounded border px-2 py-1.5 text-[11px] ${
+              class={`whitespace-nowrap rounded border px-2 py-1.5 text-xs ${
                 activeTimelineMarkerId === marker.id
                   ? `border-primary ${NAV_ACTIVE_CLASS}`
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"

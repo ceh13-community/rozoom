@@ -799,11 +799,11 @@
     <div class="rounded border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
       <p class="font-semibold">{humanizedError.title}</p>
       {#if humanizedError.hint}
-        <p class="text-[11px] text-rose-300/80 mt-1">{humanizedError.hint}</p>
+        <p class="text-xs text-rose-300/80 mt-1">{humanizedError.hint}</p>
       {/if}
       <details class="mt-2">
-        <summary class="cursor-pointer text-[10px] text-rose-300/60">Raw error</summary>
-        <pre class="mt-1 whitespace-pre-wrap text-[10px] text-rose-300/70">{error}</pre>
+        <summary class="cursor-pointer text-xs text-rose-300/60">Raw error</summary>
+        <pre class="mt-1 whitespace-pre-wrap text-xs text-rose-300/70">{error}</pre>
       </details>
     </div>
   {/if}
@@ -812,7 +812,7 @@
     <div
       class="flex items-center gap-2 rounded border {scannedStale
         ? 'border-amber-500/30 bg-amber-500/5 text-amber-300'
-        : 'border-slate-700 bg-slate-800/30 text-slate-400'} px-3 py-1.5 text-[11px]"
+        : 'border-slate-700 bg-slate-800/30 text-slate-400'} px-3 py-1.5 text-xs"
     >
       <span>Scanned {scannedAgoLabel}</span>
       {#if scannedStale}
@@ -960,7 +960,7 @@
           {#snippet child({ props })}
             <button
               {...props}
-              class={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] hover:brightness-125 ${kindColors[node.kind] ?? ""} ${node.exists === false ? "border-dashed opacity-60" : ""}`}
+              class={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs hover:brightness-125 ${kindColors[node.kind] ?? ""} ${node.exists === false ? "border-dashed opacity-60" : ""}`}
               title={node.kind === "Service" && node.ports
                 ? `${node.svcType ?? ""} ${node.ports.map((p) => `${p.port}${p.protocol ? "/" + p.protocol : ""}`).join(",")}`
                 : `${node.kind}/${node.name}`}
@@ -968,37 +968,37 @@
               <span class="font-bold">{kindAbbr[node.kind] ?? node.kind}</span>
               <span class="max-w-[120px] truncate">{node.name}</span>
               {#if node.kind === "Service" && typeof node.readyEndpoints === "number"}
-                <span class="rounded bg-slate-900/60 px-1 text-[9px] text-slate-300"
+                <span class="rounded bg-slate-900/60 px-1 text-xs text-slate-300"
                   >{node.readyEndpoints}ep</span
                 >
               {/if}
               {#if node.kind === "PersistentVolumeClaim" && node.pvcBound === false}
-                <span class="rounded bg-rose-500/20 px-1 text-[9px] text-rose-300">unbound</span>
+                <span class="rounded bg-rose-500/20 px-1 text-xs text-rose-300">unbound</span>
               {/if}
               {#if node.exists === false}
-                <span class="rounded bg-amber-500/20 px-1 text-[9px] text-amber-300">?</span>
+                <span class="rounded bg-amber-500/20 px-1 text-xs text-amber-300">?</span>
               {/if}
               {#if node.managedBy === "helm"}
-                <span class="rounded bg-violet-500/20 px-1 text-[9px] text-violet-300">helm</span>
+                <span class="rounded bg-violet-500/20 px-1 text-xs text-violet-300">helm</span>
               {:else if node.managedBy === "argocd"}
-                <span class="rounded bg-sky-500/20 px-1 text-[9px] text-sky-300">argo</span>
+                <span class="rounded bg-sky-500/20 px-1 text-xs text-sky-300">argo</span>
               {:else if node.managedBy === "flux"}
-                <span class="rounded bg-fuchsia-500/20 px-1 text-[9px] text-fuchsia-300">flux</span>
+                <span class="rounded bg-fuchsia-500/20 px-1 text-xs text-fuchsia-300">flux</span>
               {/if}
             </button>
           {/snippet}
         </Popover.Trigger>
         <Popover.Content class="w-72 p-2 text-xs">
           <p class="font-semibold truncate" title={node.name}>{node.kind} / {node.name}</p>
-          <p class="text-[10px] text-slate-500 mb-2">ns: {node.namespace}</p>
+          <p class="text-xs text-slate-500 mb-2">ns: {node.namespace}</p>
           {#if node.kind === "Service" && node.ports && node.ports.length > 0}
-            <p class="text-[10px] text-slate-400 mb-1">
+            <p class="text-xs text-slate-400 mb-1">
               type: <span class="text-slate-200">{node.svcType}</span>
               {#if node.readyEndpoints != null}
                 &middot; endpoints: <span class="text-slate-200">{node.readyEndpoints}</span>
               {/if}
             </p>
-            <p class="text-[10px] text-slate-400 mb-2">
+            <p class="text-xs text-slate-400 mb-2">
               ports: <span class="text-slate-200"
                 >{node.ports
                   .map(
@@ -1009,26 +1009,26 @@
               >
             </p>
             {#if node.lbIngress && node.lbIngress.length > 0}
-              <p class="text-[10px] text-sky-400 mb-2">LB: {node.lbIngress.join(", ")}</p>
+              <p class="text-xs text-sky-400 mb-2">LB: {node.lbIngress.join(", ")}</p>
             {/if}
           {/if}
           {#if node.kind === "Ingress"}
             {#if node.ingressClass}
-              <p class="text-[10px] text-slate-400 mb-1">
+              <p class="text-xs text-slate-400 mb-1">
                 class: <span class="text-slate-200">{node.ingressClass}</span>
               </p>
             {/if}
             {#if node.ingressHosts && node.ingressHosts.length > 0}
-              <p class="text-[10px] text-slate-400 mb-2">
+              <p class="text-xs text-slate-400 mb-2">
                 hosts: <span class="text-slate-200">{node.ingressHosts.join(", ")}</span>
               </p>
             {/if}
             {#if node.lbIngress && node.lbIngress.length > 0}
-              <p class="text-[10px] text-sky-400 mb-2">LB: {node.lbIngress.join(", ")}</p>
+              <p class="text-xs text-sky-400 mb-2">LB: {node.lbIngress.join(", ")}</p>
             {/if}
           {/if}
           {#if node.kind === "PersistentVolumeClaim"}
-            <p class="text-[10px] text-slate-400 mb-2">
+            <p class="text-xs text-slate-400 mb-2">
               {node.pvcBound ? "Bound" : "Not bound"}{node.pvcCapacity
                 ? " / " + node.pvcCapacity
                 : ""}
@@ -1094,7 +1094,7 @@
           <span class="text-xs font-semibold">
             {group.kind === "managed" && group.label === "unmanaged" ? "unmanaged" : group.label}
           </span>
-          <span class="text-[10px] text-muted-foreground">{group.chains.length} chains</span>
+          <span class="text-xs text-muted-foreground">{group.chains.length} chains</span>
         </button>
         {#if !collapsed}
           <div class="divide-y">
@@ -1120,7 +1120,7 @@
                     </Popover.Trigger>
                     <Popover.Content class="w-72 p-2 text-xs">
                       <p class="font-semibold text-amber-300 mb-1">Chain issues</p>
-                      <ul class="space-y-0.5 text-slate-300 text-[11px] list-disc pl-4">
+                      <ul class="space-y-0.5 text-slate-300 text-xs list-disc pl-4">
                         {#each chain.orphanReasons as reason}
                           <li>{reason}</li>
                         {/each}
@@ -1156,7 +1156,7 @@
                 <!-- Pods -->
                 {#each chain.pods as pod}
                   <span
-                    class={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] ${kindColors.Pod}`}
+                    class={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs ${kindColors.Pod}`}
                     title={`${pod.count ?? 0} pod(s), status ${pod.status}`}
                   >
                     <span class="font-bold">POD</span>
@@ -1173,7 +1173,7 @@
 
                 <!-- Mounted resources -->
                 {#if chain.configmaps.length > 0 || chain.secrets.length > 0 || chain.pvcs.length > 0}
-                  <span class="ml-1 text-[10px] text-slate-600">|</span>
+                  <span class="ml-1 text-xs text-slate-600">|</span>
                   {#each chain.configmaps as cm}
                     {@render nodeBadge(cm)}
                   {/each}
@@ -1186,7 +1186,7 @@
                 {/if}
 
                 <button
-                  class="ml-auto text-[10px] text-muted-foreground hover:text-foreground"
+                  class="ml-auto text-xs text-muted-foreground hover:text-foreground"
                   title="Copy all kubectl get commands for this chain"
                   onclick={() => copyText(chainToKubectl(chain), "chain kubectl commands")}
                 >

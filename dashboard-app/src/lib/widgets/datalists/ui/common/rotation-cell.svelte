@@ -53,7 +53,7 @@
     title={explanation}
   >
     {value}
-    <span class="text-[9px] font-bold opacity-60" aria-hidden="true">?</span>
+    <span class="text-xs font-bold opacity-60" aria-hidden="true">?</span>
   </span>
 {:else}
   <span class={tone}>{value}</span>

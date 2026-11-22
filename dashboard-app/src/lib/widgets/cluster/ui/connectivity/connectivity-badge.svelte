@@ -53,7 +53,7 @@
 
 {#if view}
   <span
-    class="inline-flex h-5 shrink-0 cursor-help items-center gap-1 rounded-md border px-1.5 text-[11px] font-semibold uppercase {view.className}"
+    class="inline-flex h-5 shrink-0 cursor-help items-center gap-1 rounded-md border px-1.5 text-xs font-semibold uppercase {view.className}"
     title={view.tooltip}
     data-testid="cluster-connectivity-badge"
     data-state={view.kind}

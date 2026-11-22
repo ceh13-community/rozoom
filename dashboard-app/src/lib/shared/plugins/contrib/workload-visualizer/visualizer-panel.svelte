@@ -294,7 +294,7 @@
     <div class="flex items-center justify-between">
       <div>
         <Card.Title class="text-sm">Workload Visualizer</Card.Title>
-        <p class="text-[10px] text-slate-500 mt-0.5">
+        <p class="text-xs text-slate-500 mt-0.5">
           Dependency map: Ingress -> Service -> Deployment -> Pod -> ConfigMap/Secret/PVC/RBAC.
         </p>
       </div>
@@ -303,20 +303,20 @@
           type="text"
           bind:value={namespace}
           placeholder="all"
-          class="h-6 w-24 text-[10px] px-1.5 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+          class="h-6 w-24 text-xs px-1.5 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
         />
         <input
           type="text"
           bind:value={filterText}
           placeholder="filter name"
-          class="h-6 w-28 text-[10px] px-1.5 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+          class="h-6 w-28 text-xs px-1.5 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
         />
         <Popover.Root>
           <Popover.Trigger>
             {#snippet child({ props })}
               <button
                 {...props}
-                class="inline-flex h-6 items-center gap-1 rounded border border-slate-600 bg-slate-900/50 px-1.5 text-[10px] text-slate-300 hover:border-slate-400"
+                class="inline-flex h-6 items-center gap-1 rounded border border-slate-600 bg-slate-900/50 px-1.5 text-xs text-slate-300 hover:border-slate-400"
               >
                 <Info class="h-3 w-3" /> Legend
               </button>
@@ -368,7 +368,7 @@
         <Button
           size="sm"
           variant="outline"
-          class="text-[10px] h-6 px-2"
+          class="text-xs h-6 px-2"
           disabled={loading}
           onclick={fetchResources}
         >
@@ -380,15 +380,15 @@
   <Card.Content class="space-y-3 text-xs">
     {#if error && humanizedError}
       <div
-        class="rounded border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300"
+        class="rounded border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-xs text-rose-300"
       >
         <p class="font-semibold">{humanizedError.title}</p>
         {#if humanizedError.hint}
-          <p class="text-[10px] text-rose-300/80 mt-0.5">{humanizedError.hint}</p>
+          <p class="text-xs text-rose-300/80 mt-0.5">{humanizedError.hint}</p>
         {/if}
         <details class="mt-1">
-          <summary class="cursor-pointer text-[9px] text-rose-300/60">Raw error</summary>
-          <pre class="mt-0.5 whitespace-pre-wrap text-[9px] text-rose-300/70">{error}</pre>
+          <summary class="cursor-pointer text-xs text-rose-300/60">Raw error</summary>
+          <pre class="mt-0.5 whitespace-pre-wrap text-xs text-rose-300/70">{error}</pre>
         </details>
       </div>
     {/if}
@@ -397,7 +397,7 @@
       <div
         class="flex items-center gap-2 rounded border {scannedStale
           ? 'border-amber-500/30 bg-amber-500/5 text-amber-300'
-          : 'border-slate-700 bg-slate-800/30 text-slate-400'} px-2 py-1 text-[10px]"
+          : 'border-slate-700 bg-slate-800/30 text-slate-400'} px-2 py-1 text-xs"
       >
         <span>Scanned {scannedAgoLabel}</span>
         {#if scannedStale}<span>- stale, consider refreshing</span>{/if}
@@ -410,7 +410,7 @@
       <LoadingState label="Scanning cluster resources" class="py-3 !text-slate-300" />
     {:else if graph}
       <!-- Summary -->
-      <div class="flex flex-wrap gap-3 text-[10px]">
+      <div class="flex flex-wrap gap-3 text-xs">
         <span class="text-slate-300 font-medium">{graph.summary.totalNodes} resources</span>
         <span class="text-slate-400">{graph.summary.totalEdges} connections</span>
         {#if graph.summary.orphanedNodes > 0}
@@ -421,14 +421,14 @@
       <!-- Kind filter -->
       <div class="flex flex-wrap gap-1">
         <button
-          class="text-[10px] px-2 py-0.5 rounded border transition {filterKind === 'all'
+          class="text-xs px-2 py-0.5 rounded border transition {filterKind === 'all'
             ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
             : 'border-slate-600 text-slate-500 hover:border-slate-400'}"
           onclick={() => (filterKind = "all")}>All ({graph.summary.totalNodes})</button
         >
         {#each Object.entries(graph.summary.byKind).sort((a, b) => b[1] - a[1]) as [kind, count] (kind)}
           <button
-            class="text-[10px] px-2 py-0.5 rounded border transition {filterKind === kind
+            class="text-xs px-2 py-0.5 rounded border transition {filterKind === kind
               ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
               : 'border-slate-600 text-slate-500 hover:border-slate-400'}"
             onclick={() => (filterKind = filterKind === kind ? "all" : kind)}
@@ -451,13 +451,13 @@
             onclick={() => void selectNode(node)}
           >
             <div class="flex items-center gap-1.5">
-              <span class="text-[9px] font-bold opacity-60 w-4">{kindIcons[node.kind] ?? "?"}</span>
+              <span class="text-xs font-bold opacity-60 w-4">{kindIcons[node.kind] ?? "?"}</span>
               {#if node.status}
                 <span class="w-1.5 h-1.5 rounded-full shrink-0 {statusDot[node.status]}"></span>
               {/if}
-              <span class="truncate text-[11px] font-medium">{node.name}</span>
+              <span class="truncate text-xs font-medium">{node.name}</span>
             </div>
-            <span class="text-[9px] opacity-50">{node.namespace}</span>
+            <span class="text-xs opacity-50">{node.namespace}</span>
           </button>
         {/each}
       </div>
@@ -477,10 +477,10 @@
             <span class="text-xs font-semibold text-indigo-300"
               >{selectedNode.kind}/{selectedNode.name}</span
             >
-            <span class="text-[9px] text-slate-500">{selectedNode.namespace}</span>
+            <span class="text-xs text-slate-500">{selectedNode.namespace}</span>
             {#if selectedNode.status}
               <span
-                class="text-[9px] px-1.5 py-0.5 rounded-full {selectedNode.status === 'healthy'
+                class="text-xs px-1.5 py-0.5 rounded-full {selectedNode.status === 'healthy'
                   ? 'bg-emerald-500/10 text-emerald-400'
                   : selectedNode.status === 'warning'
                     ? 'bg-amber-500/10 text-amber-400'
@@ -495,11 +495,11 @@
             {#if selectedNode}
               {@const sel = selectedNode}
               <button
-                class="text-[10px] rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-700/40"
+                class="text-xs rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-700/40"
                 onclick={() => void jumpToWorkload(sel)}>Jump to {sel.kind} page</button
               >
               <button
-                class="text-[10px] rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-700/40"
+                class="text-xs rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-700/40"
                 onclick={() =>
                   copyText(
                     `kubectl describe ${sel.kind.toLowerCase()} ${sel.name} -n ${sel.namespace}`,
@@ -507,7 +507,7 @@
                   )}>Copy describe</button
               >
               <button
-                class="text-[10px] rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-700/40"
+                class="text-xs rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-700/40"
                 onclick={() =>
                   copyText(
                     `kubectl get ${sel.kind.toLowerCase()} ${sel.name} -n ${sel.namespace} -o yaml`,
@@ -515,7 +515,7 @@
                   )}>Copy get -o yaml</button
               >
               <button
-                class="text-[10px] rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-700/40"
+                class="text-xs rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-700/40"
                 onclick={() => copyText(`${sel.kind}/${sel.name} -n ${sel.namespace}`, "reference")}
                 >Copy ref</button
               >
@@ -529,19 +529,19 @@
                 {@const isSource = edge.source === selectedNode.id}
                 {@const otherId = isSource ? edge.target : edge.source}
                 {@const otherNode = graph?.nodes.find((n) => n.id === otherId)}
-                <div class="flex items-center gap-1.5 text-[10px]">
+                <div class="flex items-center gap-1.5 text-xs">
                   <span class="text-slate-600 w-3">{isSource ? ">" : "<"}</span>
                   <span class="text-slate-500 w-14 shrink-0">{edge.label}</span>
                   <span
                     class="px-1 py-0.5 rounded {kindColors[otherNode?.kind ?? ''] ??
-                      'text-slate-300'} text-[9px]">{otherNode?.kind}</span
+                      'text-slate-300'} text-xs">{otherNode?.kind}</span
                   >
                   <span class="text-slate-300 truncate">{otherNode?.name}</span>
                 </div>
               {/each}
             </div>
           {:else}
-            <p class="text-[10px] text-amber-400">No connections - this resource is orphaned</p>
+            <p class="text-xs text-amber-400">No connections - this resource is orphaned</p>
           {/if}
         </div>
       {/if}

@@ -202,7 +202,7 @@
       sideOffset={8}
     >
       <div class="my-2 p-2">
-        <div class="mb-2 text-[11px] text-muted-foreground/90">
+        <div class="mb-2 text-xs text-muted-foreground/90">
           This row shows metrics-source availability, not full observability coverage. `Metrics
           Server` powers resource metrics APIs, while `kube-state-metrics` and `node-exporter` are
           usually optional observability stack components.

@@ -76,22 +76,22 @@
         class="w-full h-6 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200"
       />
       <div class="flex items-center gap-2">
-        <label class="flex items-center gap-1 text-[10px] text-slate-400">
+        <label class="flex items-center gap-1 text-xs text-slate-400">
           <input type="radio" bind:group={editing.matchAll} value={true} /> Match ALL
         </label>
-        <label class="flex items-center gap-1 text-[10px] text-slate-400">
+        <label class="flex items-center gap-1 text-xs text-slate-400">
           <input type="radio" bind:group={editing.matchAll} value={false} /> Match ANY
         </label>
       </div>
       {#each editing.rules as rule, i}
         <div class="flex items-center gap-1.5">
-          <select bind:value={rule.field} class="h-6 text-[10px] px-1 rounded border border-slate-600 bg-slate-900/50 text-slate-300">
+          <select bind:value={rule.field} class="h-6 text-xs px-1 rounded border border-slate-600 bg-slate-900/50 text-slate-300">
             <option value="provider">Provider</option>
             <option value="env">Environment</option>
             <option value="tags">Tags</option>
             <option value="name">Name</option>
           </select>
-          <select bind:value={rule.operator} class="h-6 text-[10px] px-1 rounded border border-slate-600 bg-slate-900/50 text-slate-300">
+          <select bind:value={rule.operator} class="h-6 text-xs px-1 rounded border border-slate-600 bg-slate-900/50 text-slate-300">
             <option value="equals">equals</option>
             <option value="contains">contains</option>
             <option value="matches">matches (regex)</option>
@@ -100,15 +100,15 @@
             type="text"
             bind:value={rule.value}
             placeholder="value"
-            class="flex-1 h-6 text-[10px] px-1.5 rounded border border-slate-600 bg-slate-900/50 text-slate-200"
+            class="flex-1 h-6 text-xs px-1.5 rounded border border-slate-600 bg-slate-900/50 text-slate-200"
           />
-          <button class="text-slate-500 hover:text-rose-400 text-[10px]" onclick={() => removeRule(i)}>x</button>
+          <button class="text-slate-500 hover:text-rose-400 text-xs" onclick={() => removeRule(i)}>x</button>
         </div>
       {/each}
       <div class="flex gap-1.5">
-        <button class="text-[10px] text-slate-500 hover:text-indigo-400" onclick={addRule}>+ Rule</button>
-        <Button size="sm" class="text-[10px] h-5 px-2" onclick={saveNew}>Save</Button>
-        <button class="text-[10px] text-slate-500 hover:text-slate-300" onclick={() => (editing = null)}>Cancel</button>
+        <button class="text-xs text-slate-500 hover:text-indigo-400" onclick={addRule}>+ Rule</button>
+        <Button size="sm" class="text-xs h-5 px-2" onclick={saveNew}>Save</Button>
+        <button class="text-xs text-slate-500 hover:text-slate-300" onclick={() => (editing = null)}>Cancel</button>
       </div>
     </div>
   {/if}
@@ -117,17 +117,17 @@
     <div class="flex items-center justify-between gap-2 rounded border border-slate-600 px-2 py-1">
       <div class="min-w-0">
         <span class="text-slate-200">{group.name}</span>
-        <span class="text-[10px] text-slate-500 ml-1">({group.rules.length} rules, {group.matchAll ? "ALL" : "ANY"})</span>
+        <span class="text-xs text-slate-500 ml-1">({group.rules.length} rules, {group.matchAll ? "ALL" : "ANY"})</span>
         {#if preview}
           {@const match = preview.grouped.find((g) => g.group.id === group.id)}
           {#if match}
-            <span class="text-[10px] text-emerald-400 ml-1">{match.clusters.length} clusters</span>
+            <span class="text-xs text-emerald-400 ml-1">{match.clusters.length} clusters</span>
           {:else}
-            <span class="text-[10px] text-slate-600 ml-1">0 clusters</span>
+            <span class="text-xs text-slate-600 ml-1">0 clusters</span>
           {/if}
         {/if}
       </div>
-      <button class="text-slate-500 hover:text-rose-400 text-[10px]" onclick={() => removeGroup(group.id)}>Delete</button>
+      <button class="text-slate-500 hover:text-rose-400 text-xs" onclick={() => removeGroup(group.id)}>Delete</button>
     </div>
   {/each}
 </div>

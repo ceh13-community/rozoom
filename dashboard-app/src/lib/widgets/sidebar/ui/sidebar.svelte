@@ -157,7 +157,7 @@
             <Bell class="h-4 w-4" />
             {#if $unreadCount > 0}
               <span
-                class="absolute top-0.5 left-4.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white animate-pulse"
+                class="absolute top-0.5 left-4.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-xs font-bold text-white animate-pulse"
               >
                 {$unreadCount > 99 ? "99+" : $unreadCount}
               </span>
@@ -175,7 +175,7 @@
               <span class="text-xs font-semibold">Notifications</span>
               {#if $unreadCount > 0}
                 <span
-                  class="rounded-full bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-medium text-rose-500"
+                  class="rounded-full bg-rose-500/20 px-1.5 py-0.5 text-xs font-medium text-rose-500"
                 >
                   {$unreadCount} new
                 </span>
@@ -184,13 +184,13 @@
             <div class="flex items-center gap-2">
               {#if $unreadCount > 0}
                 <button
-                  class="text-[11px] text-sky-500 hover:text-sky-400"
+                  class="text-xs text-sky-500 hover:text-sky-400"
                   onclick={() => markAllAsRead()}>Mark all read</button
                 >
               {/if}
               {#if $appNotifications.length > 0}
                 <button
-                  class="text-[11px] text-muted-foreground hover:text-foreground"
+                  class="text-xs text-muted-foreground hover:text-foreground"
                   onclick={() => dismissAllNotifications()}>Clear all</button
                 >
               {/if}
@@ -201,7 +201,7 @@
               <div class="px-3 py-8 text-center">
                 <Bell class="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                 <p class="text-xs text-muted-foreground">No notifications</p>
-                <p class="text-[10px] text-muted-foreground mt-1">
+                <p class="text-xs text-muted-foreground mt-1">
                   Certificate and update alerts will appear here
                 </p>
               </div>
@@ -245,32 +245,32 @@
                       {notif.title}
                     </div>
                     {#if notif.detail}
-                      <div class="text-[11px] text-muted-foreground mt-0.5">{notif.detail}</div>
+                      <div class="text-xs text-muted-foreground mt-0.5">{notif.detail}</div>
                     {/if}
                     <div class="flex items-center gap-2 mt-1">
-                      <span class="text-[10px] text-muted-foreground">
+                      <span class="text-xs text-muted-foreground">
                         {formatTimeAgo(notif.createdAt)}
                       </span>
                       {#if notif.category === "certificate"}
                         <span
-                          class="rounded bg-amber-500/20 px-1 py-px text-[9px] font-medium text-amber-500"
+                          class="rounded bg-amber-500/20 px-1 py-px text-xs font-medium text-amber-500"
                           >cert</span
                         >
                       {:else if notif.category === "update"}
                         <span
-                          class="rounded bg-sky-500/20 px-1 py-px text-[9px] font-medium text-sky-400"
+                          class="rounded bg-sky-500/20 px-1 py-px text-xs font-medium text-sky-400"
                           >update</span
                         >
                       {/if}
                       {#if !notif.readAt}
                         <span
-                          class="rounded bg-sky-500/20 px-1 py-px text-[9px] font-medium text-sky-400"
+                          class="rounded bg-sky-500/20 px-1 py-px text-xs font-medium text-sky-400"
                           >new</span
                         >
                       {/if}
                       {#if notif.action}
                         <button
-                          class="ml-auto text-[11px] font-medium text-sky-500 hover:text-sky-400"
+                          class="ml-auto text-xs font-medium text-sky-500 hover:text-sky-400"
                           onclick={(e) => {
                             e.stopPropagation();
                             markAsRead(notif.id);
@@ -372,12 +372,12 @@
     </nav>
     <div
       class={cn(
-        "border-t border-white/10 px-2 py-2 text-[11px] text-slate-400",
+        "border-t border-white/10 px-2 py-2 text-xs text-slate-400",
         sidebarOpen ? "block" : "hidden",
       )}
     >
-      <div class="text-[9px] uppercase tracking-[0.35em] text-slate-400">Bundled Tools</div>
-      <div class="mt-1 space-y-px text-[10px]">
+      <div class="text-xs uppercase tracking-[0.35em] text-slate-400">Bundled Tools</div>
+      <div class="mt-1 space-y-px text-xs">
         {#each BUNDLED_TOOLS as entry (entry.tool)}
           <div class="flex items-center justify-between text-slate-300">
             <span class="text-slate-400">{entry.tool}</span>
@@ -404,7 +404,7 @@
         </Button>
       </span>
       <span
-        class={cn("font-mono text-[10px] text-slate-500", sidebarOpen ? "pr-2" : "hidden")}
+        class={cn("font-mono text-xs text-slate-500", sidebarOpen ? "pr-2" : "hidden")}
         use:hint={"ROZOOM version"}>v{appVersion}</span
       >
     </div>

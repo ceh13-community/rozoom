@@ -144,7 +144,7 @@
     <div class="h-2 w-full overflow-hidden rounded-full bg-slate-700/50">
       <div class={`h-full rounded-full transition-all ${barColor}`} style="width: {usagePercent}%"></div>
     </div>
-    <div class="mt-1 flex justify-between text-[10px] text-muted-foreground">
+    <div class="mt-1 flex justify-between text-xs text-muted-foreground">
       <span>{formatGiB(usedBytes)} used</span>
       <span>{formatGiB(capacityBytes)} total</span>
     </div>

@@ -790,10 +790,10 @@
         >
           {tab.label}
           {#if tab.k === "findings" && findings.length > 0}
-            <span class="ml-1 text-[10px] text-muted-foreground">({findings.length})</span>
+            <span class="ml-1 text-xs text-muted-foreground">({findings.length})</span>
           {/if}
           {#if tab.k === "remediation" && remediationRows.length > 0}
-            <span class="ml-1 text-[10px] text-rose-400">({remediationRows.length})</span>
+            <span class="ml-1 text-xs text-rose-400">({remediationRows.length})</span>
           {/if}
         </button>
       {/each}
@@ -900,7 +900,7 @@
               </li>
             {/each}
           </ul>
-          <p class="text-[10px] text-muted-foreground">
+          <p class="text-xs text-muted-foreground">
             Ran {new Date(preflight.ranAt).toLocaleString()}
           </p>
         </div>
@@ -910,7 +910,7 @@
       {#if kubescapeInstalled}
         <div class="rounded-lg border border-border p-3 space-y-2">
           <p class="text-sm font-semibold">Kubescape framework</p>
-          <p class="text-[11px] text-muted-foreground">
+          <p class="text-xs text-muted-foreground">
             The operator scans continuously across all configured frameworks. Pick one to filter
             findings in the next tab.
           </p>
@@ -918,8 +918,7 @@
             {#each KUBESCAPE_FRAMEWORKS as fw (fw.id)}
               <button
                 type="button"
-                class="rounded border px-2 py-0.5 text-[11px] transition {selectedFramework ===
-                fw.id
+                class="rounded border px-2 py-0.5 text-xs transition {selectedFramework === fw.id
                   ? 'border-primary bg-primary/10 text-foreground'
                   : 'border-border text-muted-foreground hover:text-foreground'}"
                 title={fw.description}
@@ -943,7 +942,7 @@
             {#each KUBE_BENCH_FRAMEWORKS as fw (fw.id)}
               <button
                 type="button"
-                class="rounded border px-2 py-0.5 text-[11px] transition {selectedKubeBenchFramework ===
+                class="rounded border px-2 py-0.5 text-xs transition {selectedKubeBenchFramework ===
                 fw.id
                   ? 'border-primary bg-primary/10 text-foreground'
                   : 'border-border text-muted-foreground hover:text-foreground'}"
@@ -1011,7 +1010,7 @@
               {/if}
             {/each}
           </div>
-          <div class="flex flex-wrap gap-2 text-[10px]">
+          <div class="flex flex-wrap gap-2 text-xs">
             {#each Object.entries(severityCounts) as [sev, count] (sev)}
               {#if count > 0}
                 <span class="flex items-center gap-1">
@@ -1290,7 +1289,7 @@
               <div class="rounded border border-border p-3 text-xs space-y-1">
                 <div class="flex items-center gap-2 flex-wrap">
                   <span class="font-mono text-foreground">{r.controlId}</span>
-                  <span class="text-[10px] text-slate-500">{r.source}</span>
+                  <span class="text-xs text-slate-500">{r.source}</span>
                   <span class="text-rose-400 font-mono">FAIL {r.fail}</span>
                   <span class="text-amber-400 font-mono">WARN {r.warn}</span>
                   <span class="text-emerald-400 font-mono">PASS {r.pass}</span>
@@ -1302,7 +1301,7 @@
                   <Button
                     size="sm"
                     variant="ghost"
-                    class="h-6 text-[10px]"
+                    class="h-6 text-xs"
                     onclick={() =>
                       copyText(
                         `kubectl get events -A --field-selector reason=${r.controlId}`,
@@ -1315,7 +1314,7 @@
                     <Button
                       size="sm"
                       variant="ghost"
-                      class="h-6 text-[10px]"
+                      class="h-6 text-xs"
                       onclick={() =>
                         copyText(
                           `# CIS control ${r.controlId}\n# See kube-bench docs for the exact remediation steps.\n# ${r.desc}`,

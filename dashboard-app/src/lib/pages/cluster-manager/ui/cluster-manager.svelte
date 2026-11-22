@@ -1301,14 +1301,14 @@
             {#each SHORTCUTS as shortcut (shortcut.keys)}
               <li class="flex items-center gap-2">
                 <kbd
-                  class="inline-flex items-center justify-center min-w-[2rem] h-6 px-1.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-mono text-[11px] text-slate-700 dark:text-slate-200"
+                  class="inline-flex items-center justify-center min-w-[2rem] h-6 px-1.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-mono text-xs text-slate-700 dark:text-slate-200"
                   >{shortcut.keys}</kbd
                 >
                 <span>{shortcut.description}</span>
               </li>
             {/each}
           </ul>
-          <p class="mt-2 text-[10px] text-slate-500">
+          <p class="mt-2 text-xs text-slate-500">
             Shortcuts are inactive while typing in a text field.
           </p>
         </div>
@@ -1346,10 +1346,10 @@
           <summary
             class="flex items-center gap-2.5 cursor-pointer select-none px-5 py-3.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
           >
-            <span class="text-[10px] transition-transform group-open:rotate-90">▶</span>
+            <span class="text-xs transition-transform group-open:rotate-90">▶</span>
             Cloud Providers
             <span
-              class="ml-auto flex items-center gap-3 text-[11px] font-normal text-slate-400 dark:text-slate-500"
+              class="ml-auto flex items-center gap-3 text-xs font-normal text-slate-400 dark:text-slate-500"
             >
               <span>{$detectedClis.filter((c) => c.available).length} bundled</span>
               <span class="w-px h-3 bg-slate-300 dark:bg-slate-600"></span>
@@ -1365,7 +1365,7 @@
               <span class="w-px h-3 bg-slate-300 dark:bg-slate-600"></span>
               <button
                 type="button"
-                class="inline-flex items-center gap-1 rounded border border-slate-300 dark:border-slate-600 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-100 dark:hover:bg-slate-700 disabled:cursor-wait disabled:opacity-70"
+                class="inline-flex items-center gap-1 rounded border border-slate-300 dark:border-slate-600 px-1.5 py-0.5 text-xs font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-100 dark:hover:bg-slate-700 disabled:cursor-wait disabled:opacity-70"
                 onclick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -1387,7 +1387,7 @@
             <!-- Bundled CLIs -->
             <div>
               <p
-                class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest"
+                class="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest"
               >
                 Bundled Tools
               </p>
@@ -1401,7 +1401,7 @@
                         ? 'border-amber-500/20 bg-amber-500/5 text-amber-600 dark:text-amber-400/70'
                         : 'border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500'}"
                   >
-                    <code class="text-[11px]">{cli.tool}</code>
+                    <code class="text-xs">{cli.tool}</code>
                     {#if cli.available}
                       <span class="text-emerald-500 dark:text-emerald-400">&#10003;</span>
                     {:else}
@@ -1409,18 +1409,18 @@
                     {/if}
                     {#if cli.planned}
                       <span
-                        class="rounded-full bg-amber-100 dark:bg-amber-900/30 px-1.5 py-px text-[9px] font-medium"
+                        class="rounded-full bg-amber-100 dark:bg-amber-900/30 px-1.5 py-px text-xs font-medium"
                         >planned</span
                       >
                     {/if}
                     {#if cli.version}
-                      <span class="text-[10px] font-normal text-slate-400 dark:text-slate-500"
+                      <span class="text-xs font-normal text-slate-400 dark:text-slate-500"
                         >{cli.version}</span
                       >
                     {/if}
                     {#if cli.provider}
                       <span
-                        class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-[9px] text-indigo-600 dark:text-indigo-400"
+                        class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-xs text-indigo-600 dark:text-indigo-400"
                         >{cli.provider}</span
                       >
                     {/if}
@@ -1433,7 +1433,7 @@
             {#if $detectedOsTools.length > 0}
               <div>
                 <p
-                  class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest"
+                  class="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest"
                 >
                   OS Tools (system PATH)
                 </p>
@@ -1445,20 +1445,20 @@
                         ? 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-400'
                         : 'border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500'}"
                     >
-                      <code class="text-[11px]">{os.tool}</code>
+                      <code class="text-xs">{os.tool}</code>
                       {#if os.available}
                         <span class="text-sky-500 dark:text-sky-400">&#10003;</span>
                       {:else}
                         <span class="text-slate-300 dark:text-slate-600">&times;</span>
                       {/if}
                       {#if os.version}
-                        <span class="text-[10px] font-normal text-slate-400 dark:text-slate-500"
+                        <span class="text-xs font-normal text-slate-400 dark:text-slate-500"
                           >{os.version}</span
                         >
                       {/if}
                       {#if os.path}
                         <span
-                          class="text-[10px] font-normal text-slate-400 dark:text-slate-600 truncate max-w-[180px]"
+                          class="text-xs font-normal text-slate-400 dark:text-slate-600 truncate max-w-[180px]"
                           title={os.path}
                         >
                           {os.path}
@@ -1466,7 +1466,7 @@
                       {/if}
                       {#if os.provider}
                         <span
-                          class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-[9px] text-indigo-600 dark:text-indigo-400"
+                          class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-xs text-indigo-600 dark:text-indigo-400"
                           >{os.provider}</span
                         >
                       {/if}
@@ -1480,7 +1480,7 @@
             {#if $detectedCloudConfigs.length > 0}
               <div>
                 <p
-                  class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest"
+                  class="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest"
                 >
                   Detected Credentials &amp; Configs
                 </p>
@@ -1489,16 +1489,16 @@
                     <div
                       class="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs"
                     >
-                      <span class="text-emerald-500 text-[10px]">&#9919;</span>
+                      <span class="text-emerald-500 text-xs">&#9919;</span>
                       <span class="font-medium text-emerald-700 dark:text-emerald-400"
                         >{config.label}</span
                       >
                       <span
-                        class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-[9px] text-indigo-600 dark:text-indigo-400"
+                        class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-xs text-indigo-600 dark:text-indigo-400"
                         >{config.provider}</span
                       >
                       <span
-                        class="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[180px]"
+                        class="text-xs text-slate-400 dark:text-slate-500 truncate max-w-[180px]"
                         title={config.configPath}
                       >
                         {config.configPath
@@ -1516,7 +1516,7 @@
             {#if $detectedCloudConfigs.length > 0}
               <div>
                 <p
-                  class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest"
+                  class="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest"
                 >
                   Import from Cloud
                 </p>
@@ -1556,7 +1556,7 @@
                 {/if}
 
                 {#if cloudClusters.length > 0}
-                  <p class="text-[10px] text-slate-400 mb-1">
+                  <p class="text-xs text-slate-400 mb-1">
                     {cloudClusters.length} cluster{cloudClusters.length === 1 ? "" : "s"} found
                   </p>
                   <div class="space-y-1">
@@ -1568,14 +1568,14 @@
                           <span class="font-medium text-slate-800 dark:text-slate-200 truncate"
                             >{cluster.name}</span
                           >
-                          <span class="text-[10px] text-slate-400">{cluster.region}</span>
+                          <span class="text-xs text-slate-400">{cluster.region}</span>
                           {#if cluster.resourceGroup}
-                            <span class="text-[10px] text-slate-400"
+                            <span class="text-xs text-slate-400"
                               >rg:{cluster.resourceGroup}</span
                             >
                           {/if}
                           <span
-                            class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-[9px] text-indigo-600 dark:text-indigo-400"
+                            class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-xs text-indigo-600 dark:text-indigo-400"
                             >{cluster.provider}</span
                           >
                         </div>
@@ -1800,7 +1800,7 @@
                                 class="flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-300"
                               >
                                 <span
-                                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] {cluster
+                                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs {cluster
                                     .authInfo.securityLevel === 'high'
                                     ? 'bg-emerald-500/10 text-emerald-400'
                                     : cluster.authInfo.securityLevel === 'medium'
@@ -1819,12 +1819,12 @@
                                 </span>
                                 {#if cluster.authInfo.tokenExpired}
                                   <span
-                                    class="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 animate-pulse"
+                                    class="text-xs px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 animate-pulse"
                                     >Token expired</span
                                   >
                                 {:else if cluster.authInfo.tokenExpiresInHours != null && cluster.authInfo.tokenExpiresInHours < 24}
                                   <span
-                                    class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400"
+                                    class="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400"
                                     >Expires {Math.round(
                                       cluster.authInfo.tokenExpiresInHours,
                                     )}h</span
@@ -1839,14 +1839,14 @@
                               <div class="flex flex-wrap items-center gap-2">
                                 {#each cluster.tags as tag}
                                   <span
-                                    class="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-600/60 dark:text-slate-200"
+                                    class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-600/60 dark:text-slate-200"
                                   >
                                     #{tag}
                                   </span>
                                 {/each}
                                 {#if cluster.warnings.length}
                                   <span
-                                    class="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-500/20 dark:text-amber-100"
+                                    class="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-500/20 dark:text-amber-100"
                                     title={cluster.warnings.join(", ")}
                                   >
                                     ⚠️ Hygiene warning
@@ -1854,7 +1854,7 @@
                                 {/if}
                                 {#if cluster.importWarnings.length}
                                   <span
-                                    class="text-[11px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-500/20 dark:text-rose-100"
+                                    class="text-xs px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-500/20 dark:text-rose-100"
                                     title={cluster.importWarnings.join(" ")}
                                   >
                                     Verify context before add
@@ -1953,7 +1953,7 @@
               </h2>
               <button
                 type="button"
-                class="text-[10px] px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition"
+                class="text-xs px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition"
                 onclick={() => (showKeyboardHelp = !showKeyboardHelp)}
                 title="Show keyboard shortcuts"
               >
@@ -2155,13 +2155,13 @@
                           >
                             {cluster.displayName}
                             <span
-                              class="opacity-0 group-hover:opacity-50 text-[10px] transition-opacity"
+                              class="opacity-0 group-hover:opacity-50 text-xs transition-opacity"
                               >&#9998;</span
                             >
                           </p>
                           {#if cluster.displayName !== cluster.name}
                             <p
-                              class="text-[11px] text-gray-400 dark:text-gray-500 truncate"
+                              class="text-xs text-gray-400 dark:text-gray-500 truncate"
                               title={cluster.name}
                             >
                               {cluster.name}
@@ -2173,7 +2173,7 @@
                             onclick={() => handleTogglePin(cluster.uuid)}
                             variant="outline"
                             size="sm"
-                            class="text-[11px] h-7 px-2 dark:text-white !bg-transparent border-gray-200 dark:border-slate-500"
+                            class="text-xs h-7 px-2 dark:text-white !bg-transparent border-gray-200 dark:border-slate-500"
                             disabled={isLoading}
                           >
                             {cluster.pinned ? "Unpin" : "📌"}
@@ -2184,7 +2184,7 @@
                             onclick={() => handleToggleConnection(cluster.uuid)}
                             variant={cluster?.offline || rowLiveProblem(cluster) ? "outline" : "default"}
                             size="sm"
-                            class="text-[11px] h-7 px-2 dark:text-white {rowLiveProblem(cluster)
+                            class="text-xs h-7 px-2 dark:text-white {rowLiveProblem(cluster)
                               ? 'border-rose-500 text-rose-700 dark:border-rose-400'
                               : ''}"
                             title={rowLiveProblem(cluster) === "Unreachable"
@@ -2217,11 +2217,11 @@
                           class="mt-2 rounded-md border border-rose-400/60 bg-rose-50 dark:bg-rose-950/30 p-2"
                         >
                           <p
-                            class="text-[11px] font-semibold text-rose-700 dark:text-rose-300 mb-1"
+                            class="text-xs font-semibold text-rose-700 dark:text-rose-300 mb-1"
                           >
                             Danger zone: type the cluster name to confirm removal
                           </p>
-                          <p class="text-[10px] text-rose-700/80 dark:text-rose-300/80 mb-2">
+                          <p class="text-xs text-rose-700/80 dark:text-rose-300/80 mb-2">
                             This removes <code class="font-mono">{cluster.name}</code> from ROZOOM. The
                             original kubeconfig file on your system is not touched; the cluster moves
                             to the Recently Removed list and can be restored for 30 days.
@@ -2231,7 +2231,7 @@
                               type="text"
                               placeholder={cluster.name}
                               bind:value={pendingRemovalInput}
-                              class="h-7 text-[11px] px-2 rounded border border-rose-400/60 bg-white dark:bg-slate-900/40 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 flex-1 min-w-0 font-mono"
+                              class="h-7 text-xs px-2 rounded border border-rose-400/60 bg-white dark:bg-slate-900/40 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 flex-1 min-w-0 font-mono"
                               onkeydown={(e) => {
                                 if (e.key === "Enter") {
                                   void confirmRemoveCluster(cluster.uuid, cluster.name);
@@ -2244,7 +2244,7 @@
                               onclick={() => confirmRemoveCluster(cluster.uuid, cluster.name)}
                               disabled={pendingRemovalInput.trim() !== cluster.name || isLoading}
                               size="sm"
-                              class="text-[11px] h-7 px-2 bg-rose-600 hover:bg-rose-700 text-white"
+                              class="text-xs h-7 px-2 bg-rose-600 hover:bg-rose-700 text-white"
                             >
                               Remove
                             </Button>
@@ -2252,7 +2252,7 @@
                               onclick={cancelRemoveCluster}
                               variant="outline"
                               size="sm"
-                              class="text-[11px] h-7 px-2"
+                              class="text-xs h-7 px-2"
                             >
                               Cancel
                             </Button>
@@ -2261,39 +2261,39 @@
                       {/if}
                       <div class="flex flex-wrap items-center gap-1 mt-1">
                         <span
-                          class="text-[11px] px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200"
+                          class="text-xs px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200"
                           >{cluster.provider}</span
                         >
                         <span
-                          class="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-600/60 dark:text-slate-200"
+                          class="text-xs px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-600/60 dark:text-slate-200"
                           >{cluster.env}</span
                         >
                         {#if cluster.readOnly}
                           <span
-                            class="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700 dark:bg-slate-500/30 dark:text-slate-300"
+                            class="text-xs px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700 dark:bg-slate-500/30 dark:text-slate-300"
                             >Read-only</span
                           >
                         {/if}
                         {#if cluster.proxyUrl}
                           <span
-                            class="text-[11px] px-1.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300"
+                            class="text-xs px-1.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300"
                             title={cluster.proxyUrl}>Proxy</span
                           >
                         {/if}
                         {#if cluster.pinnedKubectlVersion}
                           <span
-                            class="text-[11px] px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300"
+                            class="text-xs px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300"
                             >kubectl {cluster.pinnedKubectlVersion}</span
                           >
                         {/if}
                         {#if cluster.pinned}
                           <span
-                            class="text-[11px] px-1.5 py-0.5 rounded-full bg-yellow-50 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-200"
+                            class="text-xs px-1.5 py-0.5 rounded-full bg-yellow-50 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-200"
                             >Pinned</span
                           >
                         {/if}
                         <span
-                          class="text-[11px] px-1.5 py-0.5 rounded-full {bucketChipClass(
+                          class="text-xs px-1.5 py-0.5 rounded-full {bucketChipClass(
                             bucketCluster(
                               cluster,
                               $clusterStates[cluster.uuid],
@@ -2312,7 +2312,7 @@
                         </span>
                         {#if clusterAuthInfo[cluster.uuid] !== undefined}
                           <span
-                            class="text-[11px] px-1.5 py-0.5 rounded-full font-mono lowercase {authChipClass(
+                            class="text-xs px-1.5 py-0.5 rounded-full font-mono lowercase {authChipClass(
                               clusterAuthInfo[cluster.uuid],
                             )}"
                             title={clusterAuthInfo[cluster.uuid]?.label ?? "Auth method unknown"}
@@ -2322,14 +2322,14 @@
                         {/if}
                         {#if probeResults[cluster.name]?.latencyMs != null}
                           <span
-                            class="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-700/40 dark:text-slate-300 tabular-nums"
+                            class="text-xs px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-700/40 dark:text-slate-300 tabular-nums"
                             title="Latency from last connection probe"
                           >
                             {probeResults[cluster.name].latencyMs}ms
                           </span>
                         {/if}
                         <span
-                          class="text-[10px] text-gray-400 ml-1"
+                          class="text-xs text-gray-400 ml-1"
                           title={`Added ${new Date(cluster.addedAt).toLocaleString()} · Last seen ${
                             cluster.lastSeen ? new Date(cluster.lastSeen).toLocaleString() : "never"
                           }`}
@@ -2345,7 +2345,7 @@
                         <div class="flex flex-wrap gap-1 mt-1 items-center">
                           {#if cluster.source && formatKubeconfigSource(cluster.source)}
                             <span
-                              class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300 max-w-[220px] truncate"
+                              class="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300 max-w-[220px] truncate"
                               title={`Kubeconfig source: ${cluster.source}`}
                             >
                               <span class="opacity-70 shrink-0">from</span>
@@ -2356,7 +2356,7 @@
                           {/if}
                           {#each cluster.tags as tag}
                             <span
-                              class="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-600/40 dark:text-slate-400"
+                              class="text-xs px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-600/40 dark:text-slate-400"
                               >#{tag}</span
                             >
                           {/each}
@@ -2364,12 +2364,12 @@
                       {/if}
                       <div class="flex items-center gap-3 mt-1.5 flex-wrap">
                         <div class="flex items-center gap-1">
-                          <span class="text-[10px] text-slate-400 dark:text-slate-500 shrink-0"
+                          <span class="text-xs text-slate-400 dark:text-slate-500 shrink-0"
                             >Default ns:</span
                           >
                           <input
                             type="text"
-                            class="h-5 text-[11px] px-1.5 py-0 rounded border border-slate-200 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-300 w-24 placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                            class="h-5 text-xs px-1.5 py-0 rounded border border-slate-200 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-300 w-24 placeholder:text-slate-300 dark:placeholder:text-slate-600"
                             placeholder="all"
                             value={cluster.defaultNamespace ?? ""}
                             onchange={(e) =>
@@ -2380,12 +2380,12 @@
                           />
                         </div>
                         <div class="flex items-center gap-1">
-                          <span class="text-[10px] text-slate-400 dark:text-slate-500 shrink-0"
+                          <span class="text-xs text-slate-400 dark:text-slate-500 shrink-0"
                             >Proxy:</span
                           >
                           <input
                             type="text"
-                            class="h-5 text-[11px] px-1.5 py-0 rounded border border-slate-200 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-300 w-32 placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                            class="h-5 text-xs px-1.5 py-0 rounded border border-slate-200 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-300 w-32 placeholder:text-slate-300 dark:placeholder:text-slate-600"
                             placeholder="none"
                             value={cluster.proxyUrl ?? ""}
                             onchange={(e) =>
@@ -2395,12 +2395,12 @@
                           />
                         </div>
                         <div class="flex items-center gap-1">
-                          <span class="text-[10px] text-slate-400 dark:text-slate-500 shrink-0"
+                          <span class="text-xs text-slate-400 dark:text-slate-500 shrink-0"
                             >kubectl:</span
                           >
                           <input
                             type="text"
-                            class="h-5 text-[11px] px-1.5 py-0 rounded border border-slate-200 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-300 w-20 placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                            class="h-5 text-xs px-1.5 py-0 rounded border border-slate-200 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-300 w-20 placeholder:text-slate-300 dark:placeholder:text-slate-600"
                             placeholder="bundled"
                             value={cluster.pinnedKubectlVersion ?? ""}
                             onchange={(e) =>
@@ -2423,7 +2423,7 @@
                                 readOnly: (e.currentTarget as HTMLInputElement).checked,
                               })}
                           />
-                          <span class="text-[10px] text-slate-400 dark:text-slate-500"
+                          <span class="text-xs text-slate-400 dark:text-slate-500"
                             >Read-only</span
                           >
                         </label>
@@ -2454,7 +2454,7 @@
               📁 Upload kubeconfig file
             </h2>
             <span
-              class="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300"
+              class="text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300"
               >Recommended</span
             >
           </div>
@@ -2673,7 +2673,7 @@
               <div class="flex flex-wrap gap-2">
                 {#each activeCluster.tags as tag}
                   <span
-                    class="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-600/60 dark:text-slate-200"
+                    class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-600/60 dark:text-slate-200"
                   >
                     #{tag}
                   </span>
@@ -2723,12 +2723,12 @@
                 >
                 {#if cluster.provider}
                   <span
-                    class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-[9px] text-indigo-600 dark:text-indigo-400"
+                    class="rounded bg-indigo-100 dark:bg-indigo-900/30 px-1.5 py-px text-xs text-indigo-600 dark:text-indigo-400"
                     >{cluster.provider}</span
                   >
                 {/if}
                 {#if cluster.removedAt}
-                  <span class="text-[10px] text-slate-400"
+                  <span class="text-xs text-slate-400"
                     >removed {new Date(cluster.removedAt).toLocaleDateString()}</span
                   >
                 {/if}
@@ -2791,11 +2791,11 @@
                 <div
                   class="flex items-center gap-2 text-xs text-slate-400 py-0.5 border-b border-slate-100 dark:border-slate-700/40"
                 >
-                  <span class="text-[10px] font-mono text-slate-500 shrink-0 w-36"
+                  <span class="text-xs font-mono text-slate-500 shrink-0 w-36"
                     >{new Date(entry.timestamp).toLocaleString()}</span
                   >
                   <span
-                    class="px-1.5 py-0.5 rounded text-[9px] font-medium
+                    class="px-1.5 py-0.5 rounded text-xs font-medium
                     {entry.action.includes('removed') || entry.action.includes('purged')
                       ? 'bg-rose-500/10 text-rose-400'
                       : entry.action.includes('restored') || entry.action.includes('added')

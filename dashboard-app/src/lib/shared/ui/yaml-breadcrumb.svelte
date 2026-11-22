@@ -41,7 +41,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div
-  class="yaml-breadcrumb flex items-center gap-1 border-b border-border bg-popover/80 px-3 py-1 text-[11px] font-mono"
+  class="yaml-breadcrumb flex items-center gap-1 border-b border-border bg-popover/80 px-3 py-1 text-xs font-mono"
 >
   <!-- Multi-document navigator -->
   {#if documents.length > 1}
@@ -73,7 +73,7 @@
               <span class={i === activeDocIndex ? NAV_ACTIVE_TEXT_CLASS : "text-foreground"}>
                 {formatDocLabel(doc)}
               </span>
-              <span class="ml-auto text-[10px] text-muted-foreground">L{doc.startLine}</span>
+              <span class="ml-auto text-xs text-muted-foreground">L{doc.startLine}</span>
             </button>
           {/each}
         </div>

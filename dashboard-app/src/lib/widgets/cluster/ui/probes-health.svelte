@@ -94,7 +94,7 @@
       sideOffset={8}
     >
       <p>{detailText}</p>
-      <div class="mb-2 text-[11px] text-muted-foreground/90">
+      <div class="mb-2 text-xs text-muted-foreground/90">
         This summary evaluates readiness, liveness, and startup probe configuration against the
         documented Kubernetes probe model. It highlights misconfiguration risk, not runtime success
         rates of every probe execution.
@@ -137,7 +137,7 @@
                 <Table.Cell>{item.namespace}</Table.Cell>
                 <Table.Cell>
                   {item.workloadType}/{item.workload}
-                  <div class="text-[10px] text-muted-foreground">{item.container}</div>
+                  <div class="text-xs text-muted-foreground">{item.container}</div>
                 </Table.Cell>
                 <Table.Cell>{formatProbe(item.readiness)}</Table.Cell>
                 <Table.Cell>{formatProbe(item.liveness)}</Table.Cell>
@@ -150,7 +150,7 @@
                     -
                   {/if}
                   {#if item.hints.length}
-                    <div class="text-[10px] text-muted-foreground">{item.hints.join(" ")}</div>
+                    <div class="text-xs text-muted-foreground">{item.hints.join(" ")}</div>
                   {/if}
                 </Table.Cell>
               </Table.Row>

@@ -76,7 +76,7 @@
       sideOffset={8}
     >
       <p>{detailText}</p>
-      <div class="mb-2 text-[11px] text-muted-foreground/90">
+      <div class="mb-2 text-xs text-muted-foreground/90">
         This summary reflects PodDisruptionBudget coverage and current disruption allowance. It
         models voluntary disruption safety, not all outage scenarios.
       </div>
@@ -128,7 +128,7 @@
                     -
                   {/if}
                   {#if item.recommendations.length}
-                    <div class="mt-2 text-[10px] text-muted-foreground whitespace-pre-wrap">
+                    <div class="mt-2 text-xs text-muted-foreground whitespace-pre-wrap">
                       {item.recommendations.join("\n\n")}
                     </div>
                   {/if}

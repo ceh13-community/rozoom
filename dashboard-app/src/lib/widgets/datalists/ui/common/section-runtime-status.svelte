@@ -69,9 +69,7 @@
           <span class="text-sm font-medium">{sectionLabel}</span>
           <Badge class={sourceTone(sourceState)}>{sourceLabel(sourceState)}</Badge>
           {#if mode}
-            <span
-              class="rounded border border-border/70 px-2 py-0.5 text-[11px] text-muted-foreground"
-            >
+            <span class="rounded border border-border/70 px-2 py-0.5 text-xs text-muted-foreground">
               {mode}
             </span>
           {/if}
@@ -85,7 +83,7 @@
       </div>
       <div class="flex items-start gap-2">
         {#if lastUpdatedLabel}
-          <span class="text-[10px] tabular-nums text-muted-foreground">{lastUpdatedLabel}</span>
+          <span class="text-xs tabular-nums text-muted-foreground">{lastUpdatedLabel}</span>
         {/if}
         {#if detail}
           <div class="max-w-[32rem] text-xs text-muted-foreground text-right">{detail}</div>

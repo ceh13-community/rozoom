@@ -59,7 +59,7 @@
 <details class="mt-4 rounded border border-border bg-card" data-testid="details-explain-state" open={!!syncError}>
   <summary class="flex cursor-pointer flex-wrap items-center gap-2 px-4 py-3 text-sm font-semibold select-none">
     Explain this state
-    <span class={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${getSourceTone(sourceState)}`}>
+    <span class={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${getSourceTone(sourceState)}`}>
       {getSourceStateLabel(sourceState)}
     </span>
     {#if profileLabel}

@@ -334,7 +334,7 @@
             title={item.name}
           >
             <item.icon class="h-5 w-5 text-foreground" />
-            <span class="text-[10px] text-muted-foreground">{item.name}</span>
+            <span class="text-xs text-muted-foreground">{item.name}</span>
           </div>
         {/each}
       </div>

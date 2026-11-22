@@ -1010,7 +1010,7 @@
       </div>
       {#if credentialsTestResult}
         <div
-          class={`mt-2 flex items-start justify-between gap-2 rounded border px-2 py-1.5 text-[11px] ${
+          class={`mt-2 flex items-start justify-between gap-2 rounded border px-2 py-1.5 text-xs ${
             credentialsTestResult.ok === true
               ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
               : credentialsTestResult.ok === "info"
@@ -1172,7 +1172,7 @@
 
         {#if veleroAdvancedExpanded}
           <div class="mt-2 grid gap-2 md:grid-cols-2 rounded-md border border-border/50 p-3">
-            <p class="text-[11px] text-muted-foreground md:col-span-2">
+            <p class="text-xs text-muted-foreground md:col-span-2">
               Advanced — optional fields. Leave empty if not needed.
             </p>
             {#if showS3Inputs}
@@ -1320,13 +1320,13 @@
               <p class="text-xs text-muted-foreground">No namespaces loaded.</p>
             {:else}
               <div class="mb-2 flex items-center justify-between border-b border-border/60 pb-2">
-                <span class="text-[11px] text-muted-foreground">
+                <span class="text-xs text-muted-foreground">
                   {selectedNamespaces.length}/{availableNamespaces.length} selected
                 </span>
                 <div class="flex gap-2">
                   <button
                     type="button"
-                    class="text-[11px] text-sky-400 hover:underline"
+                    class="text-xs text-sky-400 hover:underline"
                     onclick={() => {
                       selectedNamespaces = [...availableNamespaces];
                     }}
@@ -1336,7 +1336,7 @@
                   </button>
                   <button
                     type="button"
-                    class="text-[11px] text-muted-foreground hover:text-foreground"
+                    class="text-xs text-muted-foreground hover:text-foreground"
                     onclick={() => {
                       selectedNamespaces = [];
                     }}
@@ -1484,7 +1484,7 @@
               {#if humanized.hint}
                 <p class="mb-1">{humanized.hint}</p>
               {/if}
-              <pre class="whitespace-pre-wrap text-[11px] opacity-80">{actionError}</pre>
+              <pre class="whitespace-pre-wrap text-xs opacity-80">{actionError}</pre>
             </Alert.Description>
           </div>
           <button
@@ -1563,7 +1563,7 @@
           <Button
             variant="outline"
             size="sm"
-            class="h-6 text-[11px]"
+            class="h-6 text-xs"
             onclick={createBackup}
             disabled={creating || !hasVeleroInstalled}
           >
@@ -1643,7 +1643,7 @@
                     {#if humanized && humanized.title !== "Backup action failed"}
                       <div class="text-xs font-medium text-rose-300">{humanized.title}</div>
                       {#if humanized.hint}
-                        <div class="truncate text-[11px] text-muted-foreground">
+                        <div class="truncate text-xs text-muted-foreground">
                           {humanized.hint}
                         </div>
                       {/if}
@@ -1703,9 +1703,7 @@
           Step 2 - Select backup and namespaces
         </p>
         {#if restoreBackups.length === 0}
-          <p class="text-[11px] text-muted-foreground">
-            Scan backups in Step 1 to unlock selection.
-          </p>
+          <p class="text-xs text-muted-foreground">Scan backups in Step 1 to unlock selection.</p>
         {/if}
         <div class="grid gap-2 md:grid-cols-3">
           <div class="space-y-1">
@@ -1758,9 +1756,7 @@
       <div class="space-y-2 {restoreBackups.length === 0 ? 'pointer-events-none opacity-50' : ''}">
         <p class="text-xs font-medium text-muted-foreground">Step 3 - Preview, then apply</p>
         {#if restoreBackups.length === 0}
-          <p class="text-[11px] text-muted-foreground">
-            Complete Steps 1-2 first to unlock restore.
-          </p>
+          <p class="text-xs text-muted-foreground">Complete Steps 1-2 first to unlock restore.</p>
         {/if}
         <div class="flex items-center gap-2">
           <Button
@@ -1799,7 +1795,7 @@
             <Button
               variant="ghost"
               size="sm"
-              class="h-6 text-[11px]"
+              class="h-6 text-xs"
               onclick={() => (restorePreview = null)}
             >
               Dismiss
@@ -1813,7 +1809,7 @@
             <div class="text-xs text-rose-400">{restorePreview.error}</div>
           {:else}
             <pre
-              class="max-h-60 overflow-auto whitespace-pre-wrap rounded bg-slate-950/70 p-2 text-[11px] font-mono text-slate-300">{restorePreview.describe}</pre>
+              class="max-h-60 overflow-auto whitespace-pre-wrap rounded bg-slate-950/70 p-2 text-xs font-mono text-slate-300">{restorePreview.describe}</pre>
           {/if}
         </div>
       {/if}
@@ -1830,7 +1826,7 @@
         <div class="grid gap-2 {backupPolicyEnabled ? '' : 'pointer-events-none opacity-40'}">
           <div class="grid grid-cols-3 gap-2">
             <div class="space-y-1">
-              <label for="policy-max-age" class="block text-[11px] text-muted-foreground">
+              <label for="policy-max-age" class="block text-xs text-muted-foreground">
                 Max age (hours)
               </label>
               <input
@@ -1843,7 +1839,7 @@
               />
             </div>
             <div class="space-y-1">
-              <label for="policy-retention" class="block text-[11px] text-muted-foreground">
+              <label for="policy-retention" class="block text-xs text-muted-foreground">
                 Retention (days)
               </label>
               <input
@@ -1856,7 +1852,7 @@
               />
             </div>
             <div class="space-y-1">
-              <label for="policy-cache-ttl" class="block text-[11px] text-muted-foreground">
+              <label for="policy-cache-ttl" class="block text-xs text-muted-foreground">
                 Audit cache (min)
               </label>
               <input

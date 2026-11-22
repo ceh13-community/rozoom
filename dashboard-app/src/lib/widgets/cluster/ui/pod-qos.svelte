@@ -70,7 +70,7 @@
       sideOffset={8}
     >
       <p>{detailText}</p>
-      <div class="mb-2 text-[11px] text-muted-foreground/90">
+      <div class="mb-2 text-xs text-muted-foreground/90">
         This summary maps workloads to Kubernetes Pod QoS classes (`Guaranteed`, `Burstable`,
         `BestEffort`) based on requests and limits. It is derived configuration posture, not a
         separate control-plane health signal.
@@ -112,7 +112,7 @@
                 <Table.Cell>{item.namespace}</Table.Cell>
                 <Table.Cell>
                   {item.workloadType}/{item.workload}
-                  <div class="text-[10px] text-muted-foreground">{item.pod}</div>
+                  <div class="text-xs text-muted-foreground">{item.pod}</div>
                 </Table.Cell>
                 <Table.Cell>{item.qosClass}</Table.Cell>
                 <Table.Cell>
@@ -124,10 +124,10 @@
                 </Table.Cell>
                 <Table.Cell>
                   <div>{item.recommendedQos}</div>
-                  <div class="text-[10px] text-muted-foreground">{item.recommendation}</div>
+                  <div class="text-xs text-muted-foreground">{item.recommendation}</div>
                 </Table.Cell>
                 <Table.Cell>
-                  <pre class="text-[10px] whitespace-pre-wrap text-muted-foreground">
+                  <pre class="text-xs whitespace-pre-wrap text-muted-foreground">
 {item.sampleConfig}</pre>
                 </Table.Cell>
               </Table.Row>

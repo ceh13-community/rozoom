@@ -26,7 +26,7 @@
   <Popover.Root>
     <Popover.Trigger>
       <Badge
-        class="text-white {severityColor} cursor-pointer text-[10px] h-5 px-1.5 whitespace-nowrap shrink-0"
+        class="text-white {severityColor} cursor-pointer text-xs h-5 px-1.5 whitespace-nowrap shrink-0"
         title="Fleet drift: this cluster deviates from the fleet majority in {snapshot.driftCount} configuration dimension{snapshot.driftCount >
         1
           ? 's'
@@ -58,7 +58,7 @@
               <div class="font-medium text-slate-900 flex items-center gap-1.5">
                 {item.label}
                 <span
-                  class="rounded px-1 py-0 text-[9px] font-semibold uppercase {item.dimensionSeverity ===
+                  class="rounded px-1 py-0 text-xs font-semibold uppercase {item.dimensionSeverity ===
                   'critical'
                     ? 'bg-rose-200 text-rose-800'
                     : item.dimensionSeverity === 'high'
@@ -80,7 +80,7 @@
   </Popover.Root>
 {:else if snapshot}
   <Badge
-    class="text-white bg-emerald-600 text-[10px] h-5 px-1.5 whitespace-nowrap shrink-0"
+    class="text-white bg-emerald-600 text-xs h-5 px-1.5 whitespace-nowrap shrink-0"
     title="Fleet drift: this cluster's config matches the fleet majority across all compared dimensions."
   >
     Drift aligned

@@ -436,7 +436,7 @@
       </Button>
     </div>
     {#if logsFolderPath}
-      <div class="mt-1 font-mono text-[11px] text-muted-foreground break-all">
+      <div class="mt-1 font-mono text-xs text-muted-foreground break-all">
         {logsFolderPath}
       </div>
     {/if}
@@ -486,7 +486,7 @@
           <Button
             variant="outline"
             size="sm"
-            class="h-6 px-2 text-[11px]"
+            class="h-6 px-2 text-xs"
             aria-label="Copy install ID"
             onclick={() => void copyIdentity("id")}
           >
@@ -501,7 +501,7 @@
           <Button
             variant="outline"
             size="sm"
-            class="h-6 px-2 text-[11px]"
+            class="h-6 px-2 text-xs"
             aria-label="Copy install hash"
             disabled={!installHash}
             onclick={() => void copyIdentity("hash")}
@@ -534,25 +534,25 @@
           <div
             class="inline-flex items-center gap-0.5 rounded-md border border-border bg-background px-1.5 py-1 text-xs group/item"
           >
-            <span class="text-[10px] text-muted-foreground w-4 text-right">{i + 1}</span>
+            <span class="text-xs text-muted-foreground w-4 text-right">{i + 1}</span>
             <span class="font-medium px-1">{env}</span>
             <button
               type="button"
-              class="text-muted-foreground hover:text-foreground text-[10px] px-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity"
+              class="text-muted-foreground hover:text-foreground text-xs px-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity"
               onclick={() => moveEnv(env, "up")}
               disabled={i === 0}
               title="Move up">▲</button
             >
             <button
               type="button"
-              class="text-muted-foreground hover:text-foreground text-[10px] px-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity"
+              class="text-muted-foreground hover:text-foreground text-xs px-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity"
               onclick={() => moveEnv(env, "down")}
               disabled={i === $envSortPriority.length - 1}
               title="Move down">▼</button
             >
             <button
               type="button"
-              class="text-muted-foreground hover:text-red-500 text-[10px] px-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity"
+              class="text-muted-foreground hover:text-red-500 text-xs px-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity"
               onclick={() => removeEnv(env)}
               title="Remove">✕</button
             >

@@ -138,7 +138,7 @@
           </p>
         </div>
         <div class="flex items-center gap-2 shrink-0">
-          <label class="flex items-center gap-1 text-[11px] text-muted-foreground">
+          <label class="flex items-center gap-1 text-xs text-muted-foreground">
             window
             <select
               bind:value={window}
@@ -149,7 +149,7 @@
               <option value="1h">1h</option>
             </select>
           </label>
-          <span class="text-[11px] text-muted-foreground">
+          <span class="text-xs text-muted-foreground">
             Last scan: {relativeTime(lastScanAt)}
           </span>
           <Button
@@ -240,10 +240,10 @@
             href="https://grafana.com/blog/2018/08/02/the-red-method-how-to-instrument-your-services/"
             target="_blank"
             rel="noreferrer"
-            class="text-[11px] text-sky-400 hover:underline">RED method</a
+            class="text-xs text-sky-400 hover:underline">RED method</a
           >
         </div>
-        <p class="text-[11px] text-muted-foreground">
+        <p class="text-xs text-muted-foreground">
           Rate, errors, and p95/p99 latency per (verb, resource, scope). Thresholds follow the
           <a
             href="https://sre.google/sre-book/monitoring-distributed-systems/"
@@ -300,15 +300,15 @@
                 <div
                   class="flex items-center gap-2 rounded border border-border bg-background/50 p-2 text-xs"
                 >
-                  <Badge variant="outline" class="text-[10px] {redBadgeClass(entry.status)}">
+                  <Badge variant="outline" class="text-xs {redBadgeClass(entry.status)}">
                     {entry.status}
                   </Badge>
-                  <span class="font-mono text-[11px]">
+                  <span class="font-mono text-xs">
                     {entry.verb}
                     {entry.resource}
                     <span class="text-muted-foreground">({entry.scope})</span>
                   </span>
-                  <span class="ml-auto text-[11px] text-muted-foreground">
+                  <span class="ml-auto text-xs text-muted-foreground">
                     rate
                     <span class="font-mono text-foreground">{entry.totalRate}/s</span>
                     · err
@@ -321,7 +321,7 @@
                 </div>
               {/each}
               {#if redReport.entries.length > ROW_LIMIT}
-                <p class="text-[11px] text-muted-foreground">
+                <p class="text-xs text-muted-foreground">
                   Showing top {ROW_LIMIT} of {redReport.entries.length} (verb, resource) rows sorted
                   by error rate then latency.
                 </p>
@@ -341,10 +341,10 @@
             href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#how-pods-with-resource-limits-are-run"
             target="_blank"
             rel="noreferrer"
-            class="text-[11px] text-sky-400 hover:underline">CFS quota</a
+            class="text-xs text-sky-400 hover:underline">CFS quota</a
           >
         </div>
-        <p class="text-[11px] text-muted-foreground">
+        <p class="text-xs text-muted-foreground">
           When a container hits its CPU limit, the Linux CFS scheduler throttles it. Metrics come
           from cAdvisor (<code>container_cpu_cfs_throttled_periods_total</code> /
           <code>container_cpu_cfs_periods_total</code>). Thresholds: &ge;5% warning, &ge;25%
@@ -380,16 +380,13 @@
               {#each topThrottling as entry (`${entry.namespace}/${entry.pod}/${entry.container}`)}
                 <div class="rounded border border-border bg-background/50 p-2 text-xs space-y-1">
                   <div class="flex items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      class="text-[10px] {throttlingBadgeClass(entry.status)}"
-                    >
+                    <Badge variant="outline" class="text-xs {throttlingBadgeClass(entry.status)}">
                       {entry.status}
                     </Badge>
-                    <span class="font-mono text-[11px]">
+                    <span class="font-mono text-xs">
                       {entry.namespace}/{entry.pod}/{entry.container}
                     </span>
-                    <span class="ml-auto font-mono text-[11px] text-foreground">
+                    <span class="ml-auto font-mono text-xs text-foreground">
                       {entry.throttlingPercent}% throttled
                     </span>
                   </div>
@@ -399,7 +396,7 @@
                       {entry.recommendation}
                     </p>
                   {:else}
-                    <p class="text-muted-foreground text-[11px]">
+                    <p class="text-muted-foreground text-xs">
                       Usage <span class="font-mono text-foreground"
                         >{entry.cpuUsageMillicores}m</span
                       >
@@ -432,7 +429,7 @@
           >) but a generic "cluster-wide SLO" is misleading. A per-service SLO editor is the missing
           piece.
         </p>
-        <p class="text-[11px]">
+        <p class="text-xs">
           In the meantime, look at the apiserver RED section above - persistent p95 &gt;1s or error
           rate &gt;1% burns budget for any availability SLO above 99.0%.
         </p>

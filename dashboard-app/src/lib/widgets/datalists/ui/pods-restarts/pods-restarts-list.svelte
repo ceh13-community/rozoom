@@ -417,10 +417,10 @@
       >
         {tab.label}
         {#if tab.k === "restarts" && rows.length > 0}
-          <span class="ml-1 text-[10px] text-muted-foreground">({rows.length})</span>
+          <span class="ml-1 text-xs text-muted-foreground">({rows.length})</span>
         {/if}
         {#if tab.k === "reasons" && groupedByReason.length > 0}
-          <span class="ml-1 text-[10px] text-muted-foreground">({groupedByReason.length})</span>
+          <span class="ml-1 text-xs text-muted-foreground">({groupedByReason.length})</span>
         {/if}
       </button>
     {/each}
@@ -438,7 +438,7 @@
         <div class="rounded border border-border p-2.5 text-xs">
           <p class="text-muted-foreground mb-1">Containers with restarts</p>
           <p class="text-2xl font-mono font-bold">{rows.length}</p>
-          <p class="text-[10px] text-muted-foreground mt-0.5">{uniquePods} unique pods</p>
+          <p class="text-xs text-muted-foreground mt-0.5">{uniquePods} unique pods</p>
         </div>
         <div class="rounded border border-border p-2.5 text-xs">
           <p class="text-muted-foreground mb-1">Crash-looping</p>
@@ -449,7 +449,7 @@
           >
             {severityCounts.crash_loop}
           </p>
-          <p class="text-[10px] text-muted-foreground mt-0.5">need immediate attention</p>
+          <p class="text-xs text-muted-foreground mt-0.5">need immediate attention</p>
         </div>
         <div class="rounded border border-border p-2.5 text-xs">
           <p class="text-muted-foreground mb-1">Flapping</p>
@@ -460,12 +460,12 @@
           >
             {severityCounts.flapping}
           </p>
-          <p class="text-[10px] text-muted-foreground mt-0.5">watch closely</p>
+          <p class="text-xs text-muted-foreground mt-0.5">watch closely</p>
         </div>
         <div class="rounded border border-border p-2.5 text-xs">
           <p class="text-muted-foreground mb-1">Total container restarts</p>
           <p class="text-2xl font-mono font-bold">{totalContainerRestarts}</p>
-          <p class="text-[10px] text-muted-foreground mt-0.5">aggregate counter</p>
+          <p class="text-xs text-muted-foreground mt-0.5">aggregate counter</p>
         </div>
       </div>
 
@@ -474,14 +474,14 @@
           <div class="rounded border border-border p-2.5 text-xs">
             <p class="text-muted-foreground mb-1">Top namespace by restarts</p>
             <p class="text-sm font-mono">{topNamespace[0]}</p>
-            <p class="text-[10px] text-muted-foreground">{topNamespace[1]} total restarts</p>
+            <p class="text-xs text-muted-foreground">{topNamespace[1]} total restarts</p>
           </div>
         {/if}
         {#if topReason}
           <div class="rounded border border-border p-2.5 text-xs">
             <p class="text-muted-foreground mb-1">Top reason</p>
             <p class="text-sm font-mono">{topReason[0]}</p>
-            <p class="text-[10px] text-muted-foreground">{topReason[1]} occurrences</p>
+            <p class="text-xs text-muted-foreground">{topReason[1]} occurrences</p>
           </div>
         {/if}
       </div>
@@ -511,7 +511,7 @@
             ></div>
           {/if}
         </div>
-        <div class="flex flex-wrap gap-3 text-[10px] text-muted-foreground">
+        <div class="flex flex-wrap gap-3 text-xs text-muted-foreground">
           <span class="flex items-center gap-1">
             <span class="h-2 w-2 rounded bg-rose-600"></span> crash-loop {severityCounts.crash_loop}
           </span>
@@ -538,7 +538,7 @@
                   <Button
                     size="sm"
                     variant="ghost"
-                    class="h-6 text-[10px]"
+                    class="h-6 text-xs"
                     onclick={() => copyPreviousLogs(r)}
                   >
                     <Copy class="mr-1 h-3 w-3" /> --previous logs
@@ -638,7 +638,7 @@
                       title="Jump to Pods page (namespace-filtered)"
                     >
                       <p class="font-mono">{r.pod}</p>
-                      <p class="text-[10px] text-muted-foreground">container: {r.container}</p>
+                      <p class="text-xs text-muted-foreground">container: {r.container}</p>
                     </button>
                   </td>
                   <td class="px-2 py-1 text-right font-mono">{r.restarts}</td>
@@ -666,13 +666,13 @@
                       <Popover.Content class="w-[380px] p-3 text-xs space-y-1.5">
                         <p class="font-semibold text-foreground">{r.humanized.title}</p>
                         <p class="text-muted-foreground">{r.humanized.hint}</p>
-                        <p class="text-[10px] text-muted-foreground">
+                        <p class="text-xs text-muted-foreground">
                           Category: <span class="font-mono">{r.humanized.category}</span>
                         </p>
                       </Popover.Content>
                     </Popover.Root>
                   </td>
-                  <td class="px-2 py-1 text-[10px]" title={formatDate(r.startedAt)}>
+                  <td class="px-2 py-1 text-xs" title={formatDate(r.startedAt)}>
                     {relativeAge(r.startedAt)}
                   </td>
                   <td class="px-2 py-1">
@@ -680,7 +680,7 @@
                       <Button
                         size="sm"
                         variant="ghost"
-                        class="h-6 text-[10px]"
+                        class="h-6 text-xs"
                         onclick={() => copyPreviousLogs(r)}
                         title="Copy kubectl logs --previous (shows last crash output)"
                       >
@@ -689,7 +689,7 @@
                       <Button
                         size="sm"
                         variant="ghost"
-                        class="h-6 text-[10px]"
+                        class="h-6 text-xs"
                         onclick={() => copyCurrentLogs(r)}
                         title="Copy kubectl logs -f"
                       >
@@ -698,7 +698,7 @@
                       <Button
                         size="sm"
                         variant="ghost"
-                        class="h-6 text-[10px]"
+                        class="h-6 text-xs"
                         onclick={() => copyDescribe(r)}
                         title="Copy kubectl describe pod"
                       >
@@ -707,7 +707,7 @@
                       <Button
                         size="sm"
                         variant="ghost"
-                        class="h-6 text-[10px]"
+                        class="h-6 text-xs"
                         onclick={() => copyEvents(r)}
                         title="Copy kubectl get events for this pod"
                       >
@@ -745,20 +745,20 @@
             <div class="flex items-center gap-2 flex-wrap">
               <span class="font-mono font-semibold">{group.reason}</span>
               <Badge class="bg-secondary text-secondary-foreground">{group.rows.length}</Badge>
-              <span class="text-[10px] text-muted-foreground">
+              <span class="text-xs text-muted-foreground">
                 {group.humanized.category} - severity {group.humanized.severity}
               </span>
             </div>
             <p class="text-xs text-foreground">{group.humanized.title}</p>
             <p class="text-xs text-muted-foreground">{group.humanized.hint}</p>
             <details class="mt-1">
-              <summary class="cursor-pointer text-[11px] text-muted-foreground">
+              <summary class="cursor-pointer text-xs text-muted-foreground">
                 Show {group.rows.length} affected containers
               </summary>
-              <ul class="mt-1 space-y-0.5 text-[11px] max-h-60 overflow-y-auto">
+              <ul class="mt-1 space-y-0.5 text-xs max-h-60 overflow-y-auto">
                 {#each group.rows as r}
                   <li class="flex items-center gap-2 flex-wrap">
-                    <Badge class="text-white {SEVERITY_BADGE_CLASS[r.severity]} text-[9px]">
+                    <Badge class="text-white {SEVERITY_BADGE_CLASS[r.severity]} text-xs">
                       {SEVERITY_LABEL[r.severity]}
                     </Badge>
                     <button
@@ -773,7 +773,7 @@
                     <Button
                       size="sm"
                       variant="ghost"
-                      class="h-5 ml-auto text-[9px]"
+                      class="h-5 ml-auto text-xs"
                       onclick={() => copyPreviousLogs(r)}
                     >
                       <Copy class="mr-1 h-3 w-3" /> --previous

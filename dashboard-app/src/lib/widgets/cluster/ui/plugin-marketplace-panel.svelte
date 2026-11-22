@@ -125,7 +125,7 @@
           <option value="all">All categories</option>
           {#each categories as cat}<option value={cat}>{cat}</option>{/each}
         </select>
-        <span class="text-[11px] text-muted-foreground ml-auto">
+        <span class="text-xs text-muted-foreground ml-auto">
           {filtered.length} / {BUILTIN_PLUGINS.length} plugins
         </span>
       </div>
@@ -145,12 +145,12 @@
               <div class="min-w-0">
                 <div class="flex items-center gap-1.5 flex-wrap">
                   <span class="font-semibold text-sm">{plugin.name}</span>
-                  <span class="text-[9px] px-1.5 py-0.5 rounded-full {tierColor[plugin.tier]}">
+                  <span class="text-xs px-1.5 py-0.5 rounded-full {tierColor[plugin.tier]}">
                     {plugin.tier}
                   </span>
                   {#if !active && plugin.tier !== "core"}
                     <span
-                      class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/40"
+                      class="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/40"
                       title="Plugin is disabled. Its sidebar pages are hidden."
                     >
                       disabled
@@ -158,7 +158,7 @@
                   {/if}
                   {#if trialDays !== null && trialDays > 0 && plugin.tier === "pro"}
                     <span
-                      class="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300"
+                      class="text-xs px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300"
                       >{trialDays}d trial</span
                     >
                   {/if}
@@ -168,7 +168,7 @@
             </div>
 
             {#if pages.length > 0}
-              <div class="text-[11px] text-muted-foreground">
+              <div class="text-xs text-muted-foreground">
                 <span class="font-medium">Contributes:</span>
                 {pages.map((p) => p.label).join(" · ")}
               </div>
@@ -176,12 +176,12 @@
 
             <div class="flex items-center justify-between gap-2">
               <div class="flex items-center gap-2">
-                <span class="text-[11px] text-muted-foreground">{plugin.category}</span>
-                <span class="text-[11px] text-muted-foreground">· {formatPrice(plugin)}</span>
+                <span class="text-xs text-muted-foreground">{plugin.category}</span>
+                <span class="text-xs text-muted-foreground">· {formatPrice(plugin)}</span>
               </div>
 
               {#if plugin.tier === "core"}
-                <span class="text-[11px] text-muted-foreground">Always on</span>
+                <span class="text-xs text-muted-foreground">Always on</span>
               {:else}
                 <Button
                   size="sm"

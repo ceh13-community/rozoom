@@ -98,7 +98,7 @@
         </Button>
       </div>
 
-      <div class="mb-3 text-[11px] text-muted-foreground/90">
+      <div class="mb-3 text-xs text-muted-foreground/90">
         This summary combines endpoint health, status, and etcd metrics when available. On managed
         control planes it may be partial or cached-first rather than a full direct etcd probe.
       </div>

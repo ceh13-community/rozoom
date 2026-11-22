@@ -207,7 +207,7 @@
     </div>
     {#if hasExtendedMessage}
       <button
-        class="shrink-0 rounded-sm px-1 text-[10px] font-medium uppercase tracking-wide text-slate-500 underline decoration-dotted underline-offset-2 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        class="shrink-0 rounded-sm px-1 text-xs font-medium uppercase tracking-wide text-slate-500 underline decoration-dotted underline-offset-2 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         type="button"
         title={summary.message}
         aria-label="Show backup warning details"
@@ -222,7 +222,7 @@
 {:else if (lazyLoad && !manuallyActivated) || bootstrapInFlight}
   <button
     type="button"
-    class="inline-flex items-center gap-1 rounded-md border border-slate-400 bg-slate-700 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-slate-600 disabled:cursor-wait disabled:opacity-70"
+    class="inline-flex items-center gap-1 rounded-md border border-slate-400 bg-slate-700 px-2 py-0.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-600 disabled:cursor-wait disabled:opacity-70"
     onclick={(e) => {
       e.stopPropagation();
       handleManualLoad();

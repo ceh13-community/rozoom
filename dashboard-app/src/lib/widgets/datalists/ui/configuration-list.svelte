@@ -5312,7 +5312,7 @@ spec:
             />
           </Table.TableHead>
           <Table.TableHead class="w-20">
-            <span class="text-[11px] uppercase tracking-wide">Actions</span>
+            <span class="text-xs uppercase tracking-wide">Actions</span>
           </Table.TableHead>
           {#if columnsVisible.name}
             <Table.TableHead class="w-[28%]">
@@ -5705,7 +5705,7 @@ spec:
                     <span class="truncate">{row.name}</span>
                     {#if isRbacWorkload() && row.rbacRiskScore > 0}
                       <span
-                        class={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                        class={`rounded px-1.5 py-0.5 text-xs font-medium ${
                           getRbacRiskSeverity(row.rbacRiskScore) === "Critical"
                             ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400"
                             : getRbacRiskSeverity(row.rbacRiskScore) === "High"
@@ -5724,7 +5724,7 @@ spec:
                     {/if}
                     {#if row.driftDetected}
                       <span
-                        class="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"
+                        class="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"
                       >
                         Drift
                       </span>
@@ -5988,7 +5988,7 @@ spec:
                         <span class="truncate">{row.name}</span>
                         {#if isRbacWorkload() && row.rbacRiskScore > 0}
                           <span
-                            class={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                            class={`rounded px-1.5 py-0.5 text-xs font-medium ${
                               getRbacRiskSeverity(row.rbacRiskScore) === "Critical"
                                 ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400"
                                 : getRbacRiskSeverity(row.rbacRiskScore) === "High"
@@ -6007,7 +6007,7 @@ spec:
                         {/if}
                         {#if row.driftDetected}
                           <span
-                            class="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"
+                            class="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"
                           >
                             Drift
                           </span>
@@ -6578,7 +6578,7 @@ spec:
           <div
             class="space-y-2 rounded border border-slate-300/60 bg-slate-50/40 p-3 text-xs dark:border-slate-600/40 dark:bg-slate-900/40"
           >
-            <div class="mb-2 flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
+            <div class="mb-2 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
               <span class="inline-flex items-center gap-1"
                 ><span class="inline-block h-2 w-2 rounded-full bg-rose-500"></span> Critical</span
               >
@@ -6690,7 +6690,7 @@ spec:
                 {#if workloadKey === "secrets"}
                   <button
                     type="button"
-                    class="inline-flex items-center gap-1.5 rounded border px-2 py-1.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground whitespace-nowrap"
+                    class="inline-flex items-center gap-1.5 rounded border px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground whitespace-nowrap"
                     onclick={() => cycleSecretGlobalState()}
                     title={secretGlobalState === "masked"
                       ? "Show base64 values"
@@ -6724,7 +6724,7 @@ spec:
                       {#if workloadKey === "secrets"}
                         <button
                           type="button"
-                          class="rounded px-1.5 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                          class="rounded px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
                           onclick={() => cycleSecretKeyState(key)}
                           title={keyState === "masked"
                             ? "Show base64"
@@ -6745,7 +6745,7 @@ spec:
                       {#if keyState !== "masked"}
                         <button
                           type="button"
-                          class="rounded px-1.5 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                          class="rounded px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
                           onclick={() => {
                             const copyValue =
                               keyState === "decoded" ? decodeBase64(value) : String(value ?? "");
