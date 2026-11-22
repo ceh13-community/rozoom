@@ -96,14 +96,37 @@
     };
   });
 
+  // Menus and dialogs above the panel close on Esc themselves.
+  const ESCAPE_OWNERS = '[role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"]';
+
   function toggleFullscreen() {
     isFullscreen = !isFullscreen;
   }
 
-  function handleWindowKeydown(event: KeyboardEvent) {
-    if (event.key !== "Escape") return;
-    if (!isFullscreen) return;
+  // Esc on a full screen panel leaves full screen, and only that. The list behind the panel
+  // (Deployments, DaemonSets) closes the active tab on Esc from a window listener added
+  // before this panel, so every Esc that leaves full screen is marked used (preventDefault),
+  // which the list, the workbench and the overlay stack skip.
+  function leaveFullscreen(event: KeyboardEvent) {
     isFullscreen = false;
+    event.preventDefault();
+  }
+
+  // From inside the panel: after the editor and fields. The YAML editor closes its search
+  // (Ctrl+F), completion or lint panel on Esc and marks the key used; an Esc it leaves
+  // alone, or one from any other control in the panel, leaves full screen.
+  function handlePanelKeydown(event: KeyboardEvent) {
+    if (event.key !== "Escape" || !isFullscreen || event.defaultPrevented) return;
+    leaveFullscreen(event);
+  }
+
+  // From outside the panel (focus left behind on the page): in the capture phase, before
+  // the list's window listener. Esc in an open menu or dialog stays theirs.
+  function handleWindowKeydown(event: KeyboardEvent) {
+    if (event.key !== "Escape" || !isFullscreen || event.defaultPrevented) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest("[data-fullscreen-panel]") || target?.closest(ESCAPE_OWNERS)) return;
+    leaveFullscreen(event);
   }
 
   function getCollapsedLabel() {
@@ -158,7 +181,7 @@
   }
 </script>
 
-<svelte:window onkeydown={handleWindowKeydown} />
+<svelte:window onkeydowncapture={handleWindowKeydown} />
 
 <WorkbenchSheetShell
   {embedded}
@@ -171,6 +194,7 @@
   {onToggleVerticalCollapse}
   {isFullscreen}
   onToggleFullscreen={toggleFullscreen}
+  onPanelKeydown={handlePanelKeydown}
 >
   {#snippet headerActions()}
     <Button
