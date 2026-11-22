@@ -1,6 +1,5 @@
 export { default as Trash } from "@lucide/svelte/icons/trash";
-export { default as MessageSquareCode } from "@lucide/svelte/icons/message-square-code";
-export { default as MessageSquareOff } from "@lucide/svelte/icons/message-square-off";
+export { default as Terminal } from "@lucide/svelte/icons/terminal";
 export { default as Menu } from "@lucide/svelte/icons/menu";
 export { default as Container } from "@lucide/svelte/icons/container";
 export { default as Home } from "@lucide/svelte/icons/home";

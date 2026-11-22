@@ -16,8 +16,7 @@
     ShieldCheck,
     ShieldOff,
     SquareChevronRight,
-    MessageSquareCode,
-    MessageSquareOff,
+    Terminal,
     BookCopy,
   } from "$shared/ui/icons";
   import { openExternalUrl } from "$shared/api/in-app-browser";
@@ -340,27 +339,34 @@
           Runtime {diagnosticsEnabled ? "on" : "off"}
         </span>
       </button>
+      <!-- The state reads in words like its neighbours (Linter on, Runtime off), not by colour
+           alone; the collapsed rail has no words, so a dot on the icon marks on. Off is the
+           plain rail colour, not dimmed: it is a choice, not a disabled control. The name
+           stays fixed and aria-pressed carries the state. -->
       <button
         class={cn(
           "rail-toggle flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium",
           cliNotificationsEnabled
             ? cn(NAV_ACTIVE_CLASS, NAV_ACTIVE_HOVER_CLASS)
-            : "bg-slate-600/20 text-slate-400 hover:bg-slate-600/30",
+            : "text-slate-100 hover:bg-slate-600/30",
         )}
         onclick={toggleCliNotifications}
         aria-pressed={cliNotificationsEnabled}
-        aria-label="Toggle CLI toasts"
-        use:hint={cliNotificationsEnabled
-          ? "CLI toasts shown - click to hide"
-          : "CLI toasts hidden - click to show"}
+        aria-label="Show kubectl commands"
+        use:hint={`Show kubectl commands: ${cliNotificationsEnabled ? "on" : "off"}`}
       >
-        {#if cliNotificationsEnabled}
-          <MessageSquareCode class="h-4 w-4" />
-        {:else}
-          <MessageSquareOff class="h-4 w-4" />
-        {/if}
+        <span class="relative inline-flex shrink-0">
+          <Terminal class="h-4 w-4" />
+          {#if cliNotificationsEnabled && !sidebarOpen}
+            <span
+              data-testid="kubectl-commands-on-dot"
+              class="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-slate-900"
+              aria-hidden="true"
+            ></span>
+          {/if}
+        </span>
         <span class={cn(sidebarOpen ? "block" : "hidden")}>
-          Toasts {cliNotificationsEnabled ? "on" : "off"}
+          Show kubectl commands {cliNotificationsEnabled ? "on" : "off"}
         </span>
       </button>
     </nav>
