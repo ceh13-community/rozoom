@@ -31,6 +31,8 @@ const PAGE = `<!doctype html>
 </body></html>`;
 
 type Measured = {
+  layer: string;
+  bodyPointer: string;
   elements: number;
   text: number;
   invisible: number;
@@ -173,6 +175,32 @@ test.describe("main pane log line", () => {
       expect(state.hits).toBe(0);
       expect(state.blank).toBe(false);
       expect(state.line).toMatch(/ covered=25\/25 /);
+    });
+
+    test("names the layer over the pane", async ({ page }) => {
+      await page.evaluate(() => {
+        const layer = document.createElement("div");
+        layer.setAttribute("role", "dialog");
+        layer.setAttribute("data-terminal-window", "");
+        layer.setAttribute("style", "position:fixed;inset:0;z-index:180;background:#000");
+        layer.innerHTML = '<div style="height:100%"><pre style="margin:0">output</pre></div>';
+        document.body.appendChild(layer);
+      });
+      const state = await measure(page);
+      expect(state.covered).toBe(25);
+      expect(state.layer).toBe("div:role-dialog:data-terminal-window:z180");
+      expect(state.line).toContain(" layer=div:role-dialog:data-terminal-window:z180 ");
+    });
+
+    test("pointer events off on the body read as root, with the body state", async ({ page }) => {
+      await page.evaluate(() => {
+        document.body.style.pointerEvents = "none";
+      });
+      const state = await measure(page);
+      expect(state.covered).toBe(25);
+      expect(state.layer).toBe("root");
+      expect(state.bodyPointer).toBe("none");
+      expect(state.line).toMatch(/ center=outside:html layer=root body-pointer=none$/);
     });
 
     test("a toast in one corner does not hide clipped content", async ({ page }) => {

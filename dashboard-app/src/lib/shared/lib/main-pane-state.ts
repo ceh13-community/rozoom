@@ -3,7 +3,9 @@
  * e2e suite can load it into a real browser page (layout is what it measures, and jsdom
  * has none). The probe in main-pane-probe.ts writes it to logs.log.
  *
- * Counts and sizes only: no text, names or ids ever leave this module.
+ * Counts and sizes only: no page text, resource names or ids ever leave this module. A
+ * layer over the pane is named by its tag, role and data-attribute names (never values),
+ * which the app and its libraries define.
  */
 
 export interface MainPaneState {
@@ -23,6 +25,15 @@ export interface MainPaneState {
   covered: number;
   animations: number;
   center: string;
+  /**
+   * The layer whose element is topmost at the centre when that is outside the pane: the
+   * nearest positioned ancestor with a z-index, as tag, role, data-attribute names and
+   * z-index. "root" when nothing in the body takes the point (pointer events off), "none"
+   * when the pane itself is on top.
+   */
+  layer: string;
+  /** pointer-events of <body>: a menu or dialog sets "none" while it is open. */
+  bodyPointer: string;
 }
 
 export const HIT_POINTS = 25;
@@ -213,15 +224,50 @@ function countInvisible(main: HTMLElement, view: Window): number {
   return invisible;
 }
 
-function describeCenter(main: HTMLElement, doc: Document, box: Box | null): string {
-  if (!box) return "none";
-  const hit = doc.elementFromPoint((box.left + box.right) / 2, (box.top + box.bottom) / 2);
+function centerHit(doc: Document, box: Box | null): Element | null {
+  if (!box) return null;
+  return doc.elementFromPoint((box.left + box.right) / 2, (box.top + box.bottom) / 2);
+}
+
+function describeCenter(main: HTMLElement, hit: Element | null): string {
   if (!hit) return "none";
   if (hit === main) return "main";
   if (main.contains(hit)) return "content";
   // Something outside the pane sits on top of it, for example an overlay left open.
   const slot = hit.getAttribute("data-slot");
   return `outside:${hit.tagName.toLowerCase()}${slot ? `[${slot}]` : ""}`;
+}
+
+const DATA_NAME = /^data-[a-z][a-z0-9-]{0,40}$/;
+const WORD = /^[a-z-]{1,20}$/;
+const LAYER_DATA_NAMES = 3;
+
+/** Which layer covers the centre of the pane; see MainPaneState.layer. */
+export function describeLayer(main: HTMLElement, hit: Element | null, view: Window): string {
+  if (!hit || main.contains(hit)) return "none";
+  const doc = hit.ownerDocument;
+  if (hit === doc.documentElement) return "root";
+  let layer: Element | null = hit;
+  let style: CSSStyleDeclaration | null = null;
+  while (layer && layer !== doc.body && layer !== doc.documentElement) {
+    style = view.getComputedStyle(layer);
+    const positioned = style.position !== "" && style.position !== "static";
+    if (positioned && Number.isFinite(Number.parseInt(style.zIndex, 10))) break;
+    layer = layer.parentElement;
+  }
+  if (!layer || !style || layer === doc.body || layer === doc.documentElement) {
+    return `${hit.tagName.toLowerCase()}:in-flow`;
+  }
+  const parts = [layer.tagName.toLowerCase()];
+  const role = layer.getAttribute("role");
+  if (role && WORD.test(role)) parts.push(`role-${role}`);
+  const dataNames = Array.from(layer.attributes)
+    .map((attribute) => attribute.name)
+    .filter((name) => DATA_NAME.test(name))
+    .slice(0, LAYER_DATA_NAMES);
+  parts.push(...dataNames);
+  parts.push(`z${Number.parseInt(style.zIndex, 10) || 0}`);
+  return parts.join(":");
 }
 
 function countAnimations(main: HTMLElement, doc: Document): number {
@@ -235,6 +281,8 @@ export function describeMainPane(main: HTMLElement, doc: Document = document): M
   const view = doc.defaultView ?? window;
   const box = visibleBox(main, view);
   const { hits, covered } = countHits(main, doc, view, box);
+  const hit = centerHit(doc, box);
+  const bodyPointer = view.getComputedStyle(doc.body).pointerEvents;
   return {
     visibility: doc.visibilityState,
     focused: doc.hasFocus(),
@@ -248,7 +296,9 @@ export function describeMainPane(main: HTMLElement, doc: Document = document): M
     hits,
     covered,
     animations: countAnimations(main, doc),
-    center: describeCenter(main, doc, box),
+    center: describeCenter(main, hit),
+    layer: describeLayer(main, hit, view),
+    bodyPointer: WORD.test(bodyPointer) ? bodyPointer : "other",
   };
 }
 
@@ -294,5 +344,7 @@ export function formatMainPaneLine(
     `covered=${state.covered}/${HIT_POINTS}`,
     `animations=${state.animations}`,
     `center=${state.center}`,
+    `layer=${state.layer}`,
+    `body-pointer=${state.bodyPointer}`,
   ].join(" ");
 }
