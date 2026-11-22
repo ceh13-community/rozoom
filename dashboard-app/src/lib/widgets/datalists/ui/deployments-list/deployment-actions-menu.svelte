@@ -86,18 +86,26 @@
 </script>
 
 <DropdownMenu.Root bind:open>
-  <DropdownMenu.Trigger bind:ref={triggerRef} class="flex">
-    <Button
-      variant="ghost"
-      size="icon"
-      class="h-6 w-6"
-      aria-label={`Open actions for ${name}`}
-      title={`Actions: ${namespace}/${name}`}
-      disabled={disabled || isBusy}
-      onclick={(event) => event.stopPropagation()}
-    >
-      <MoreVertical class="h-4 w-4" />
-    </Button>
+  <!-- One button: the trigger props go on it (a button inside a button was two Tab stops). -->
+  <DropdownMenu.Trigger bind:ref={triggerRef}>
+    {#snippet child({ props })}
+      <Button
+        {...props}
+        variant="ghost"
+        size="icon"
+        class="h-6 w-6"
+        aria-label={`Open actions for ${name}`}
+        title={`Actions: ${namespace}/${name}`}
+        disabled={disabled || isBusy}
+        onclick={(event: MouseEvent) => {
+          // The row opens its details on click: the menu button keeps the click.
+          event.stopPropagation();
+          (props.onclick as ((event: MouseEvent) => void) | undefined)?.(event);
+        }}
+      >
+        <MoreVertical class="h-4 w-4" />
+      </Button>
+    {/snippet}
   </DropdownMenu.Trigger>
   <DropdownMenu.Content align="end" class="pt-0" onCloseAutoFocus={menuAction.onCloseAutoFocus}>
     <DropdownMenu.Item onSelect={() => selectAction(onShowDetails)}>
