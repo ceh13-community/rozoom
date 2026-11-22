@@ -25,6 +25,7 @@ export const CONFIG_FIXED_COLUMN_PX: Readonly<Record<string, number>> = {
   metrics: 100,
   minPods: 100,
   maxPods: 100,
+  usage: 340,
   replicas: 110,
   bindings: 220,
   resource: 180,
