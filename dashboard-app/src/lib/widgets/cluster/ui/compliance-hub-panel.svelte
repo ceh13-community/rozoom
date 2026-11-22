@@ -179,6 +179,11 @@
   });
 
   const overallScore = $derived(computeScore(overallTotals));
+  // With no PASS, WARN or FAIL there is nothing to score: a red "0 / 100" read as a failed
+  // cluster when nothing was scanned.
+  const hasScoredChecks = $derived(
+    overallTotals.pass + overallTotals.warn + overallTotals.fail > 0,
+  );
 
   const severityCounts = $derived.by(() => {
     const out: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
@@ -963,9 +968,15 @@
           <div class="flex items-center justify-between flex-wrap gap-2">
             <p class="text-sm font-semibold">Compliance score</p>
             <div class="flex items-center gap-3">
-              <span class="text-3xl font-bold font-mono {scoreColor}">{overallScore}</span>
-              <span class="text-xs text-muted-foreground">/100</span>
-              {#if scoreDelta != null}
+              {#if hasScoredChecks}
+                <span class="text-3xl font-bold font-mono {scoreColor}">{overallScore}</span>
+                <span class="text-xs text-muted-foreground">/100</span>
+              {:else}
+                <span class="text-sm font-semibold text-muted-foreground"
+                  >No data: no checks were scored</span
+                >
+              {/if}
+              {#if scoreDelta != null && hasScoredChecks}
                 <span
                   class="text-xs {scoreDelta > 0
                     ? 'text-emerald-400'
