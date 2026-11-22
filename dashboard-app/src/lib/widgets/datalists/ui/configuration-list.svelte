@@ -4810,8 +4810,8 @@ spec:
     <div class="flex flex-col gap-1 py-0.5">
       {#each usage.slice(0, 3) as item (item.resource)}
         <div class="flex items-center gap-2 text-xs" title={formatQuotaUsageItem(item)}>
-          <span class="w-28 shrink-0 truncate text-muted-foreground">{item.label}</span>
-          <span class="h-1.5 w-16 shrink-0 overflow-hidden rounded bg-muted" role="presentation">
+          <span class="w-32 shrink-0 truncate text-muted-foreground">{item.label}</span>
+          <span class="h-1.5 w-12 shrink-0 overflow-hidden rounded bg-muted" role="presentation">
             <span
               class="block h-full rounded {item.ratio === null
                 ? 'bg-muted-foreground/40'
@@ -5458,7 +5458,7 @@ spec:
             </Table.TableHead>
           {/if}
           {#if columnsVisible.usage}
-            <Table.TableHead class="min-w-[240px]">Used / hard</Table.TableHead>
+            <Table.TableHead class="w-[340px]">Used / hard</Table.TableHead>
           {/if}
           {#if columnsVisible.maxPods}
             <Table.TableHead class="w-[100px]">
