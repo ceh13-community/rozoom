@@ -39,7 +39,7 @@
     if (!isOpen) onCancel();
   }}
 >
-  <Dialog.Content side="bottom" class="sm:max-w-lg sm:rounded-t-xl">
+  <Dialog.Content side="bottom" class="sm:mx-auto sm:max-w-lg sm:rounded-t-xl">
     <Dialog.Header>
       <Dialog.Title class="flex items-center gap-2 text-destructive">
         <Trash class="size-4" />
