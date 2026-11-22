@@ -18,8 +18,7 @@
     getOverviewWarningEventsWatcherError,
     getLastHealthCheck,
     loadPostureChecks,
-    missingPostureChecks,
-    POSTURE_CHECK_MAX_AGE_MS,
+    takeDuePostureChecks,
     updateClusterHealthChecks,
     initOverviewWarningEventsSync,
     isOverviewWarningEventsWatcherActive,
@@ -1212,15 +1211,12 @@
   }
 
   // The posture score's HPA, VPA, Ingress TLS and RBAC rules read checks that config
-  // diagnostics leave out. Run the missing or stale ones, at most once per max age while
-  // this Overview is open; a check that fails stays "Not checked" in the score.
-  const postureChecksRequestedAt = new Map<string, number>();
+  // diagnostics leave out. Run the missing or stale ones, each at most once per max age per
+  // cluster (the gate outlives this component); a check that fails stays "Not checked".
   async function loadMissingPostureChecks(clusterId: string) {
-    const missing = missingPostureChecks(clusterHealth);
-    const requestedAt = postureChecksRequestedAt.get(clusterId) ?? 0;
-    if (missing.length === 0 || Date.now() - requestedAt < POSTURE_CHECK_MAX_AGE_MS) return;
-    postureChecksRequestedAt.set(clusterId, Date.now());
-    const loaded = await loadPostureChecks(clusterId, missing);
+    const due = takeDuePostureChecks(clusterId, clusterHealth);
+    if (due.length === 0) return;
+    const loaded = await loadPostureChecks(clusterId, due);
     if (loaded.length === 0 || data?.slug !== clusterId) return;
     const refreshed = await getLastHealthCheck(clusterId);
     if (refreshed && !("errors" in refreshed) && data?.slug === clusterId) {

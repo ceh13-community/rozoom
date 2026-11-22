@@ -32,6 +32,7 @@ export {
   missingPostureChecks,
   POSTURE_CHECK_FIELDS,
   POSTURE_CHECK_MAX_AGE_MS,
+  takeDuePostureChecks,
   type PostureCheckField,
 } from "./model/posture-checks";
 

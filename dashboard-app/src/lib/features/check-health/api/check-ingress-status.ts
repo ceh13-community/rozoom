@@ -40,8 +40,11 @@ export async function checkIngressStatus(
       `get ingresses --all-namespaces --no-headers -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,HOSTS:.spec.rules[*].host,TLS:.spec.tls[*].secretName`,
       { clusterId },
     );
-    if (result.errors && result.code !== 0) {
-      errorMessage = result.errors || "Failed to fetch ingress data.";
+    // kubectlRawFront fills errors only for a non-zero exit with stderr: a process killed by a
+    // signal (code null) or the OOM killer (137) has none, and its empty output must not read
+    // as a cluster without ingresses.
+    if (result.code !== 0) {
+      errorMessage = result.errors || `kubectl exited with code ${String(result.code)}`;
       await logError(`Ingress status check failed: ${errorMessage}`);
     } else {
       const lines = result.output.split("\n");
@@ -66,7 +69,9 @@ export async function checkIngressStatus(
     status = "unknown";
     message = "Ingress data unavailable.";
   } else if (total === 0) {
-    status = "unknown";
+    // Read fine and found none: nothing can lack TLS. "unknown" here made the posture score
+    // treat the check as never run and ask for it again on every Overview.
+    status = "ok";
     message = "No ingresses found.";
   } else if (withoutTls > 0) {
     status = "warning";

@@ -39,6 +39,28 @@ export function missingPostureChecks(
   });
 }
 
+const requestedAt = new Map<string, number>();
+
+/**
+ * The missing or stale checks of a cluster that were not asked for within the max age, and
+ * marks them as asked. Kept at module level: every open of an Overview mounts a new one, and
+ * a check that cannot read the cluster (no RBAC rights) stays "unknown", so a per-component
+ * gate asked again, and logged the same error, on every open.
+ */
+export function takeDuePostureChecks(
+  clusterId: string,
+  check: ClusterHealthChecks | null,
+  now: number = Date.now(),
+  gate: Map<string, number> = requestedAt,
+): PostureCheckField[] {
+  const due = missingPostureChecks(check, now).filter((field) => {
+    const askedAt = gate.get(`${clusterId}\n${field}`);
+    return askedAt === undefined || now - askedAt >= POSTURE_CHECK_MAX_AGE_MS;
+  });
+  for (const field of due) gate.set(`${clusterId}\n${field}`, now);
+  return due;
+}
+
 type Runners = Record<PostureCheckField, (clusterId: string) => Promise<unknown>>;
 
 const defaultRunners: Runners = {

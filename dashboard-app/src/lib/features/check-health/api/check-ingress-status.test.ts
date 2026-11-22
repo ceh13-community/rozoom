@@ -57,7 +57,9 @@ describe("checkIngressStatus", () => {
     expect(result.summary.withoutTls).toBe(1);
   });
 
-  it("returns unknown when no ingresses found", async () => {
+  // kubectl prints "No resources found" to stderr with exit 0; kubectlRawFront drops stderr
+  // at exit 0, so the caller sees empty output and empty errors.
+  it("returns ok with total 0 when the cluster has no ingresses", async () => {
     mockedKubectl.mockResolvedValue({
       output: "",
       errors: "",
@@ -66,8 +68,9 @@ describe("checkIngressStatus", () => {
 
     const result = await checkIngressStatus(clusterId, { force: true });
 
-    expect(result.status).toBe("unknown");
+    expect(result.status).toBe("ok");
     expect(result.summary.total).toBe(0);
+    expect(result.summary.withoutTls).toBe(0);
   });
 
   it("returns unknown on kubectl error", async () => {
@@ -76,6 +79,18 @@ describe("checkIngressStatus", () => {
       errors: "connection refused",
       code: 1,
     });
+
+    const result = await checkIngressStatus(clusterId, { force: true });
+
+    expect(result.status).toBe("unknown");
+  });
+
+  // Killed by a signal (code null) or OOM (137): no stderr, so no errors either.
+  it.each([
+    ["killed by a signal", null],
+    ["killed by the OOM killer", 137],
+  ])("returns unknown, not an empty cluster, when kubectl was %s", async (_, code) => {
+    mockedKubectl.mockResolvedValue({ output: "", errors: "", code } as never);
 
     const result = await checkIngressStatus(clusterId, { force: true });
 
