@@ -844,7 +844,7 @@
 
 {#snippet tlsSkipControl(caData: string)}
   <div class="space-y-1">
-    <label class="flex items-center gap-2 text-xs text-slate-400">
+    <label class="flex items-center gap-2 text-xs text-muted-foreground">
       <input type="checkbox" bind:checked={skipTlsVerify} disabled={caData.trim().length > 0} />
       Skip TLS verification (insecure)
     </label>
@@ -868,11 +868,11 @@
   >
     <div>
       <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100">Connect Cluster</h2>
-      <p class="text-xs text-slate-400 mt-0.5">
+      <p class="text-xs text-muted-foreground mt-0.5">
         Auto-detect cloud clusters, pick a method, or paste a kubeconfig.
       </p>
     </div>
-    <span class="text-slate-400 group-open:rotate-180 transition-transform text-sm">&#9660;</span>
+    <span class="text-muted-foreground group-open:rotate-180 transition-transform text-sm">&#9660;</span>
   </summary>
   <div class="px-6 pb-6 pt-2 space-y-4">
     {#if success}
@@ -881,7 +881,7 @@
       >
         <span>{success}</span>
         <button
-          class="text-emerald-400 hover:text-white text-xs"
+          class="text-emerald-700 dark:text-emerald-400 hover:text-white text-xs"
           onclick={() => (success = null)}>x</button
         >
       </div>
@@ -891,7 +891,7 @@
         class="text-xs text-rose-500 bg-rose-500/10 border border-rose-500/30 rounded px-3 py-2 flex justify-between items-center"
       >
         <span>{error}</span>
-        <button class="text-rose-400 hover:text-white text-xs" onclick={() => (error = null)}
+        <button class="text-rose-700 dark:text-rose-400 hover:text-white text-xs" onclick={() => (error = null)}
           >x</button
         >
       </div>
@@ -904,11 +904,11 @@
         <div
           class="rounded-lg border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/[0.04] p-3 space-y-2"
         >
-          <p class="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
+          <p class="text-xs font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
             <Container size={14} /> Find local clusters
           </p>
-          <p class="text-xs text-slate-400 leading-relaxed flex items-start gap-1.5">
-            <ShieldCheck size={13} class="text-emerald-400 mt-0.5 shrink-0" />
+          <p class="text-xs text-muted-foreground leading-relaxed flex items-start gap-1.5">
+            <ShieldCheck size={13} class="text-emerald-700 dark:text-emerald-400 mt-0.5 shrink-0" />
             <span>{LOCAL_SCAN_PRIVACY_NOTE}</span>
           </p>
           <div class="flex gap-1.5">
@@ -934,10 +934,10 @@
         >
           <div class="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <p class="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
+              <p class="text-xs font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
                 <Container size={14} /> Local clusters {$isLocalScanning ? "..." : ""}
               </p>
-              <p class="text-xs text-slate-400 mt-0.5">
+              <p class="text-xs text-muted-foreground mt-0.5">
                 minikube, kind, k3d, docker-desktop — one-click connect.
               </p>
             </div>
@@ -958,9 +958,9 @@
                   class="flex items-center justify-between gap-2 rounded border border-border px-2.5 py-1.5 text-xs"
                 >
                   <div class="flex items-center gap-2 min-w-0">
-                    <span class="text-slate-200 font-medium truncate">{cluster.contextName}</span>
+                    <span class="text-foreground font-medium truncate">{cluster.contextName}</span>
                     <span
-                      class="text-xs px-1.5 py-0.5 rounded bg-emerald-900/30 text-emerald-300"
+                      class="text-xs px-1.5 py-0.5 rounded bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
                       >{cluster.provider}</span
                     >
                     {#if cluster.server}
@@ -968,7 +968,7 @@
                     {/if}
                   </div>
                   {#if isLocalConnected(cluster)}
-                    <span class="text-xs text-emerald-400 flex items-center gap-1">
+                    <span class="text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
                       <Check class="w-3 h-3" /> Connected
                     </span>
                   {:else}
@@ -1007,7 +1007,7 @@
       >
         <div class="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <p class="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
+            <p class="text-xs font-semibold text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
               <Cloud size={14} /> Auto-detected from local credentials
             </p>
             <p class="text-xs text-slate-500 mt-0.5">
@@ -1056,7 +1056,7 @@
                 />
                 <span class="text-foreground font-medium truncate">{cluster.name}</span>
                 <span class="text-xs text-muted-foreground">{cluster.region}</span>
-                <span class="text-xs px-1.5 py-0.5 rounded bg-indigo-900/30 text-indigo-300"
+                <span class="text-xs px-1.5 py-0.5 rounded bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
                   >{cluster.provider}</span
                 >
                 {#if cluster.scope}
@@ -1073,7 +1073,7 @@
           </p>
         {/if}
         {#if autoErrors.length > 0}
-          <details class="text-xs text-amber-400">
+          <details class="text-xs text-amber-700 dark:text-amber-400">
             <summary class="cursor-pointer">
               {autoErrors.length} scope(s) failed during scan
             </summary>
@@ -1099,18 +1099,18 @@
             class="text-left rounded-lg border border-slate-200 dark:border-slate-600 p-3 hover:border-indigo-500 hover:bg-indigo-500/5 transition group"
             onclick={() => selectMethod(option.id)}
           >
-            <Icon size={18} class="text-indigo-400" />
+            <Icon size={18} class="text-indigo-700 dark:text-indigo-400" />
             <p
-              class="text-xs font-semibold text-slate-700 dark:text-slate-200 mt-1 group-hover:text-indigo-400"
+              class="text-xs font-semibold text-slate-700 dark:text-slate-200 mt-1 group-hover:text-indigo-900 dark:group-hover:text-indigo-400"
             >
               {option.label}
             </p>
-            <p class="text-xs text-slate-400 mt-0.5">{option.desc}</p>
+            <p class="text-xs text-muted-foreground mt-0.5">{option.desc}</p>
             <span
               class="text-xs mt-1 inline-block px-1.5 py-0.5 rounded-full cursor-help {option.security ===
               'high'
-                ? 'bg-emerald-500/10 text-emerald-400'
-                : 'bg-amber-500/10 text-amber-400'}"
+                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'}"
               title={option.securityDetail}
             >
               {option.security} security
@@ -1128,23 +1128,23 @@
             <KeyRound size={14} /> Manual OIDC (advanced)
           </h3>
           <button
-            class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-200 hover:border-slate-400 transition flex items-center gap-1"
+            class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-foreground hover:border-slate-400 transition flex items-center gap-1"
             onclick={resetAll}><span class="text-xs">&#8592;</span> Back</button
           >
         </div>
         <div
-          class="text-xs text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-3 py-2 leading-relaxed"
+          class="text-xs text-amber-700 dark:text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-3 py-2 leading-relaxed"
         >
           Most users should pick
           {#if availableCloudProviders.length > 0}
             <button
-              class="underline text-indigo-400 hover:text-indigo-300"
+              class="underline text-indigo-700 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
               onclick={() => selectMethod("cloud")}>Cloud Provider</button
             >
             (for AWS/GCP/Azure) or
           {/if}
           <button
-            class="underline text-indigo-400 hover:text-indigo-300"
+            class="underline text-indigo-700 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
             onclick={() => selectMethod("exec")}>Exec Plugin</button
           >
           first - they handle token rotation automatically. Use this form only if you're manually configuring
@@ -1154,8 +1154,8 @@
           {#each OIDC_PRESETS as p (p.provider)}
             <button
               class="text-xs px-2.5 py-1 rounded border transition {oidcProvider === p.provider
-                ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
-                : 'border-slate-600 text-slate-400 hover:border-slate-400'}"
+                ? 'border-indigo-500 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300'
+                : 'border-slate-600 text-muted-foreground hover:border-slate-400'}"
               onclick={() => (oidcProvider = p.provider)}>{p.label}</button
             >
           {/each}
@@ -1166,7 +1166,7 @@
             href={oidcPreset.docsUrl}
             target="_blank"
             rel="noopener"
-            class="text-indigo-400 hover:underline">Docs</a
+            class="text-indigo-700 dark:text-indigo-400 hover:underline">Docs</a
           >
         </p>
         <div class="space-y-2">
@@ -1248,7 +1248,7 @@
             <Cloud size={14} /> Cloud Provider Import
           </h3>
           <button
-            class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-200 hover:border-slate-400 transition flex items-center gap-1"
+            class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-foreground hover:border-slate-400 transition flex items-center gap-1"
             onclick={resetAll}><span class="text-xs">&#8592;</span> Back</button
           >
         </div>
@@ -1269,7 +1269,7 @@
             </select>
           </div>
           {#if !availableCloudProviders.includes(cloudProvider)}
-            <div class="text-xs text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1 max-w-64">
+            <div class="text-xs text-amber-700 dark:text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1 max-w-64">
               Install the {cloudProviderTool ?? "provider"} CLI to import from {cloudProvider}.
             </div>
           {:else}
@@ -1360,7 +1360,7 @@
           </div>
         {/if}
         {#if cloudErrors.length > 0}
-          <div class="text-xs text-amber-400 space-y-0.5 max-h-24 overflow-y-auto">
+          <div class="text-xs text-amber-700 dark:text-amber-400 space-y-0.5 max-h-24 overflow-y-auto">
             <div class="font-semibold">Partial scan - {cloudErrors.length} scope(s) failed:</div>
             {#each cloudErrors as err, i (`${err.scope}-${i}`)}
               <div class="truncate" title={err.error}>
@@ -1381,7 +1381,7 @@
             <Vault size={14} /> HashiCorp Vault
           </h3>
           <button
-            class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-200 hover:border-slate-400 transition flex items-center gap-1"
+            class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-foreground hover:border-slate-400 transition flex items-center gap-1"
             onclick={resetAll}><span class="text-xs">&#8592;</span> Back</button
           >
         </div>
@@ -1449,11 +1449,11 @@
             href="https://developer.hashicorp.com/vault/docs/secrets/kubernetes"
             target="_blank"
             rel="noopener"
-            class="text-indigo-400 hover:underline">Docs</a
+            class="text-indigo-700 dark:text-indigo-400 hover:underline">Docs</a
           >
         </p>
         <div
-          class="text-xs text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
+          class="text-xs text-amber-700 dark:text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
         >
           The credentials fetched from Vault are held in memory for the active session only.
           Long-term storage happens only if the fetched kubeconfig itself contains a static token.
@@ -1477,7 +1477,7 @@
             <FileText size={14} /> X.509 Client Certificate
           </h3>
           <button
-            class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-200 hover:border-slate-400 transition flex items-center gap-1"
+            class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-foreground hover:border-slate-400 transition flex items-center gap-1"
             onclick={resetAll}><span class="text-xs">&#8592;</span> Back</button
           >
         </div>
@@ -1519,7 +1519,7 @@
             href="https://kubernetes.io/docs/reference/access-authn-authz/authentication/#x509-client-certificates"
             target="_blank"
             rel="noopener"
-            class="text-indigo-400 hover:underline">K8s docs</a
+            class="text-indigo-700 dark:text-indigo-400 hover:underline">K8s docs</a
           >
         </p>
         <Button
@@ -1545,7 +1545,7 @@
             <Ticket size={14} /> Bearer Token
           </h3>
           <button
-            class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-200 hover:border-slate-400 transition flex items-center gap-1"
+            class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-foreground hover:border-slate-400 transition flex items-center gap-1"
             onclick={resetAll}><span class="text-xs">&#8592;</span> Back</button
           >
         </div>
@@ -1604,12 +1604,12 @@
             <TerminalSquare size={14} /> Exec Plugin (client-go credential plugin)
           </h3>
           <button
-            class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-200 hover:border-slate-400 transition flex items-center gap-1"
+            class="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-foreground hover:border-slate-400 transition flex items-center gap-1"
             onclick={resetAll}><span class="text-xs">&#8592;</span> Back</button
           >
         </div>
         <div
-          class="text-xs text-emerald-400 bg-emerald-500/5 border border-emerald-500/20 rounded px-3 py-2 leading-relaxed"
+          class="text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-500/5 border border-emerald-500/20 rounded px-3 py-2 leading-relaxed"
         >
           Recommended by the Kubernetes project. The plugin returns a short-lived token on every API
           call; nothing long-lived is written to disk.
@@ -1625,14 +1625,14 @@
             <button
               class="text-xs px-2.5 py-1 rounded border transition flex items-center gap-1.5 {execKind ===
               p.kind
-                ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
-                : 'border-slate-600 text-slate-400 hover:border-slate-400'}"
+                ? 'border-indigo-500 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300'
+                : 'border-slate-600 text-muted-foreground hover:border-slate-400'}"
               onclick={() => (execKind = p.kind)}
             >
               {p.label}
               {#if p.bundled}
                 <span
-                  class="text-xs px-1 py-0 rounded bg-emerald-500/20 text-emerald-400"
+                  class="text-xs px-1 py-0 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-400"
                   title="Binary is bundled with the app">bundled</span
                 >
               {/if}
@@ -1645,7 +1645,7 @@
             href={execPreset.docsUrl}
             target="_blank"
             rel="noopener"
-            class="text-indigo-400 hover:underline">Docs</a
+            class="text-indigo-700 dark:text-indigo-400 hover:underline">Docs</a
           >
         </p>
         <div class="space-y-2">
@@ -1725,7 +1725,7 @@
         {/if}
         {#if !execPreset.bundled}
           <div
-            class="text-xs text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
+            class="text-xs text-amber-700 dark:text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1"
           >
             This preset expects the plugin binary to be available in PATH. Install it separately
             before first use.
@@ -1760,7 +1760,7 @@
             {showPreview ? "Hide" : "Preview"} kubeconfig
           </button>
           <button
-            class="text-xs px-2 py-1 rounded border border-emerald-600/50 text-emerald-400 hover:bg-emerald-500/10 transition flex items-center gap-1 disabled:opacity-50"
+            class="text-xs px-2 py-1 rounded border border-emerald-600/50 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 transition flex items-center gap-1 disabled:opacity-50"
             onclick={runTestConnection}
             disabled={testing || !previewYaml}
             title={previewYaml
@@ -1780,18 +1780,18 @@
           {#if testResult}
             {#if testResult.success}
               <span
-                class="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded px-2 py-0.5 flex items-center gap-1"
+                class="text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded px-2 py-0.5 flex items-center gap-1"
                 title={`${testResult.durationMs}ms · ${testResult.serverPlatform ?? ""}`}
               >
                 <Check class="w-3 h-3" />
                 Reachable
                 {#if testResult.serverVersion}
-                  <span class="text-slate-400 ml-1">{testResult.serverVersion}</span>
+                  <span class="text-muted-foreground ml-1">{testResult.serverVersion}</span>
                 {/if}
               </span>
             {:else}
               <span
-                class="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded px-2 py-0.5 truncate max-w-[360px]"
+                class="text-xs text-rose-700 dark:text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded px-2 py-0.5 truncate max-w-[360px]"
                 title={testResult.error ?? ""}
               >
                 {testResult.error?.split("\n")[0] ?? "Connection failed"}
@@ -1799,7 +1799,7 @@
             {/if}
           {/if}
           {#if preview.blockedReason}
-            <span class="text-xs text-rose-400">{preview.blockedReason}</span>
+            <span class="text-xs text-rose-700 dark:text-rose-400">{preview.blockedReason}</span>
           {:else if !previewYaml}
             <span class="text-xs text-slate-500">Fill required fields to enable</span>
           {/if}
@@ -1811,7 +1811,7 @@
                 Generated kubeconfig (secrets redacted)
               </span>
               <button
-                class="text-xs px-1.5 py-0.5 rounded border border-slate-600 text-slate-400 hover:text-white transition"
+                class="text-xs px-1.5 py-0.5 rounded border border-slate-600 text-muted-foreground hover:text-white transition"
                 onclick={copyPreview}
               >
                 {previewCopied ? "Copied" : "Copy raw"}

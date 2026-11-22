@@ -7,6 +7,17 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(resolve(__dirname, "connect-cluster-wizard.svelte"), "utf8");
 
 describe("connect cluster form fields", () => {
+  // Light text shades (200 to 400) are for dark backgrounds: without a dark: pair they are
+  // near-invisible on the light theme (the local cluster name, amber and indigo hints).
+  it("pair every light text shade with dark:, on hover too", () => {
+    const bare = [...source.matchAll(/(?<![\w:-])text-[a-z]+-(200|300|400)\b/g)].map((m) => m[0]);
+    const hover = [
+      ...source.matchAll(/(?<!dark:)(?<![\w-])(?:group-)?hover:text-[a-z]+-(200|300|400)\b/g),
+    ].map((m) => m[0]);
+    expect(bare).toEqual([]);
+    expect(hover).toEqual([]);
+  });
+
   it("follow the app theme", () => {
     expect(source).not.toContain("bg-slate-900/50");
     // The preview, test and Vault panels were fixed dark boxes too.
