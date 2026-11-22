@@ -27,6 +27,13 @@ export {
   pruneHealthCheckSelectors,
   pruneHealthCheckData,
 } from "./model/cache-store";
+export {
+  loadPostureChecks,
+  missingPostureChecks,
+  POSTURE_CHECK_FIELDS,
+  POSTURE_CHECK_MAX_AGE_MS,
+  type PostureCheckField,
+} from "./model/posture-checks";
 
 export { collectClusterData } from "./model/collect-cluster-data";
 export { checkKubelet } from "./api/check-kubelet";

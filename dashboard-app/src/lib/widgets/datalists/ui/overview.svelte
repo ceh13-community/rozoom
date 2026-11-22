@@ -17,6 +17,9 @@
     getOverviewWarningEventsSnapshot,
     getOverviewWarningEventsWatcherError,
     getLastHealthCheck,
+    loadPostureChecks,
+    missingPostureChecks,
+    POSTURE_CHECK_MAX_AGE_MS,
     updateClusterHealthChecks,
     initOverviewWarningEventsSync,
     isOverviewWarningEventsWatcherActive,
@@ -1208,6 +1211,23 @@
     }
   }
 
+  // The posture score's HPA, VPA, Ingress TLS and RBAC rules read checks that config
+  // diagnostics leave out. Run the missing or stale ones, at most once per max age while
+  // this Overview is open; a check that fails stays "Not checked" in the score.
+  const postureChecksRequestedAt = new Map<string, number>();
+  async function loadMissingPostureChecks(clusterId: string) {
+    const missing = missingPostureChecks(clusterHealth);
+    const requestedAt = postureChecksRequestedAt.get(clusterId) ?? 0;
+    if (missing.length === 0 || Date.now() - requestedAt < POSTURE_CHECK_MAX_AGE_MS) return;
+    postureChecksRequestedAt.set(clusterId, Date.now());
+    const loaded = await loadPostureChecks(clusterId, missing);
+    if (loaded.length === 0 || data?.slug !== clusterId) return;
+    const refreshed = await getLastHealthCheck(clusterId);
+    if (refreshed && !("errors" in refreshed) && data?.slug === clusterId) {
+      clusterHealth = refreshed as ClusterHealthChecks;
+    }
+  }
+
   async function loadClusterHealthScore(token: RefreshRunToken = activeRefreshToken) {
     if (!data?.slug) return;
     const clusterId = data.slug;
@@ -1230,6 +1250,7 @@
           const needsConfig = !clusterHealth.resourcesHygiene;
           const needsHealth =
             !clusterHealth.apiServerHealth || clusterHealth.apiServerHealth.status === "unknown";
+          let diagnostics: Promise<unknown> = Promise.resolve();
           if (needsConfig || needsHealth) {
             const scopes: Array<"config" | "health"> = [];
             if (needsConfig) scopes.push("config");
@@ -1244,7 +1265,7 @@
                 }),
               );
             }
-            void chain
+            diagnostics = chain
               .then(() => getLastHealthCheck(clusterId))
               .then((refreshed) => {
                 if (refreshed && !("errors" in refreshed)) {
@@ -1255,6 +1276,12 @@
                 /* best effort */
               });
           }
+          // After the diagnostics are stored, so the stored check they build on is current.
+          void diagnostics
+            .then(() => loadMissingPostureChecks(clusterId))
+            .catch(() => {
+              /* best effort */
+            });
         }
       }
       traceOverviewStage("health.success", {
