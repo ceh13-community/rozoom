@@ -161,3 +161,59 @@ describe("workbench reveal after a row action", () => {
     expect(scroll).toHaveBeenCalled();
   });
 });
+
+// At 1024 px the tab row is 287 px and a YAML tab 345 px: its close button stayed out of
+// view. A row narrower than a tab drops the namespace; the tooltip keeps the full name.
+describe("workbench tabs on a narrow row", () => {
+  const TAB_WIDTH = 345;
+  let rowWidth = 0;
+  let restore: () => void;
+
+  beforeEach(() => {
+    const offset = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetWidth");
+    const client = Object.getOwnPropertyDescriptor(Element.prototype, "clientWidth");
+    Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
+      configurable: true,
+      get(this: HTMLElement) {
+        return this.dataset.workbenchTab ? TAB_WIDTH : 0;
+      },
+    });
+    Object.defineProperty(Element.prototype, "clientWidth", {
+      configurable: true,
+      get(this: Element) {
+        return this.classList.contains("group/tabs") ? rowWidth : 0;
+      },
+    });
+    restore = () => {
+      if (offset) Object.defineProperty(HTMLElement.prototype, "offsetWidth", offset);
+      if (client) Object.defineProperty(Element.prototype, "clientWidth", client);
+    };
+  });
+
+  afterEach(() => {
+    restore();
+  });
+
+  async function renderTabs() {
+    const view = render(MultiPaneWorkbench, { props: props() });
+    await settle();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const tab = view.getByRole("button", { name: /^Logs/ });
+    const row = tab.closest(".group\\/tabs") as HTMLElement;
+    return { tab, row };
+  }
+
+  it("hides the namespace when a tab is wider than the row, with the full name on hover", async () => {
+    rowWidth = 287;
+    const { tab, row } = await renderTabs();
+    expect(row.hasAttribute("data-compact-tabs")).toBe(true);
+    expect(tab.getAttribute("title")).toBe("Logs (shop/web)");
+  });
+
+  it("keeps the namespace when the tabs fit", async () => {
+    rowWidth = 900;
+    const { tab, row } = await renderTabs();
+    expect(row.hasAttribute("data-compact-tabs")).toBe(false);
+    expect(tab.getAttribute("title")).toBe("Logs (shop/web)");
+  });
+});

@@ -241,6 +241,7 @@
             : "text-muted-foreground hover:bg-muted"
         }`}
         onclick={() => onActivateTab(tab.id)}
+        title={tab.subtitle ? `${tab.title} (${tab.subtitle})` : tab.title}
         aria-label={paneBadges.has(tab.id)
           ? `${tab.title}: ${tab.subtitle ?? ""}, pane ${paneBadges.get(tab.id)}`
           : undefined}
@@ -253,9 +254,11 @@
           >
         {/if}
         <!-- When the tab is narrow the subtitle gives way first: the kind (YAML, Logs) and the
-             name must stay readable. -->
+             name must stay readable. On a row narrower than a tab it is hidden (the header
+             sets data-compact-tabs); the tooltip keeps it. -->
         <span class="inline-block max-w-[10rem] shrink-0 truncate">{tab.title}</span>
-        <span class="inline-block min-w-0 max-w-[12rem] truncate text-xs opacity-70"
+        <span
+          class="inline-block min-w-0 max-w-[12rem] truncate text-xs opacity-70 group-data-[compact-tabs]/tabs:hidden"
           >{tab.subtitle}</span
         >
       </button>

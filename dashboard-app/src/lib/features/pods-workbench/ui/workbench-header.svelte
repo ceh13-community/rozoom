@@ -37,21 +37,43 @@
     }
   }
 
+  // On a narrow window one tab can be wider than the whole row (a YAML tab is 345 px, the
+  // row 287 px at 1024 px): the tabs then drop the namespace and keep the full name in their
+  // tooltip. The check measures the tabs with the namespace shown, so hiding it does not
+  // make them fit and switch it back on.
+  function fitTabsToRow() {
+    const row = viewport;
+    if (!row) return;
+    delete row.dataset.compactTabs;
+    const items = Array.from(row.querySelectorAll<HTMLElement>("[data-workbench-tab]"));
+    const widest = Math.max(0, ...items.map((item) => item.offsetWidth));
+    if (widest > row.clientWidth) row.dataset.compactTabs = "";
+  }
+
+  // In the next frame: the tab buttons render then, and a size change made here does not
+  // land inside the ResizeObserver callback.
+  let fitFrame = 0;
+  function scheduleFit() {
+    cancelAnimationFrame(fitFrame);
+    fitFrame = requestAnimationFrame(() => {
+      fitTabsToRow();
+      revealActiveTab();
+    });
+  }
+
   $effect(() => {
     void activeTabId;
     void tabs.length;
-    const frame = requestAnimationFrame(revealActiveTab);
+    scheduleFit();
     return () => {
-      cancelAnimationFrame(frame);
+      cancelAnimationFrame(fitFrame);
     };
   });
 
   $effect(() => {
     const row = viewport;
     if (!row || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => {
-      revealActiveTab();
-    });
+    const observer = new ResizeObserver(scheduleFit);
     observer.observe(row);
     if (row.firstElementChild) observer.observe(row.firstElementChild);
     return () => {
