@@ -25,6 +25,60 @@ export type ClusterRiskItem = {
   references: string[];
 };
 
+export type ClusterRuleId =
+  | "resources-missing"
+  | "best-effort"
+  | "hpa-health"
+  | "hpa-no-requests"
+  | "vpa-hpa-conflict"
+  | "image-latest"
+  | "probes"
+  | "topology"
+  | "pdb"
+  | "psa"
+  | "security-hardening"
+  | "network-policy"
+  | "secrets"
+  | "priority"
+  | "rbac-overprivileged"
+  | "ingress-no-tls";
+
+// "not-checked": the check behind the rule has not run, or could not read the cluster.
+export type ClusterRuleStatus = "fail" | "pass" | "not-checked";
+
+export type ClusterRuleResult = {
+  id: ClusterRuleId;
+  category: ScoreCategory;
+  title: string;
+  status: ClusterRuleStatus;
+  risk: ClusterRiskItem | null;
+};
+
+// Every rule the score is built from, in display order. A rule without a risk is shown as
+// passed only when its check produced a usable report.
+export const CLUSTER_SCORE_RULES: ReadonlyArray<{
+  id: ClusterRuleId;
+  category: ScoreCategory;
+  title: string;
+}> = [
+  { id: "resources-missing", category: "reliability", title: "Resource requests and limits" },
+  { id: "best-effort", category: "reliability", title: "No BestEffort pods" },
+  { id: "hpa-health", category: "reliability", title: "HPA targets and metrics" },
+  { id: "hpa-no-requests", category: "reliability", title: "HPA targets have requests" },
+  { id: "vpa-hpa-conflict", category: "reliability", title: "No HPA and VPA Auto conflict" },
+  { id: "image-latest", category: "reliability", title: "No :latest image tags" },
+  { id: "probes", category: "reliability", title: "Probe coverage" },
+  { id: "topology", category: "reliability", title: "Topology spread for HA workloads" },
+  { id: "pdb", category: "reliability", title: "PodDisruptionBudgets" },
+  { id: "psa", category: "security", title: "PSA/PSS compliance" },
+  { id: "security-hardening", category: "security", title: "SecurityContext hardening" },
+  { id: "network-policy", category: "security", title: "NetworkPolicy baseline" },
+  { id: "secrets", category: "security", title: "No secrets in ConfigMaps" },
+  { id: "priority", category: "security", title: "PriorityClass for critical workloads" },
+  { id: "rbac-overprivileged", category: "security", title: "No overprivileged RBAC bindings" },
+  { id: "ingress-no-tls", category: "security", title: "Ingress TLS" },
+];
+
 export type ClusterScoreSummary = {
   score: number | null;
   status: ClusterScoreStatus;
@@ -36,16 +90,12 @@ export type ClusterScoreSummary = {
   risks: ClusterRiskItem[];
   topRisks: ClusterRiskItem[];
   scoreDelta: number;
+  rules: ClusterRuleResult[];
 };
 
 const MAX_CATEGORY_SCORE = 50;
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-
-const summarizeList = (items: string[], limit = 3) => {
-  if (items.length <= limit) return items.join(", ");
-  return `${items.slice(0, limit).join(", ")} +${items.length - limit} more`;
-};
 
 const buildWorkloadKey = (namespace: string, workloadType: string, workload: string) =>
   `${namespace}/${workloadType}/${workload}`.toLowerCase();
@@ -100,9 +150,27 @@ const collectPriorityIssues = (report?: PriorityHealthReport | null) => {
     .map((item) => `${item.namespace}/${item.workload}`);
 };
 
+// Report states that mean the check could not judge the cluster.
+const UNUSABLE_REPORT_STATUSES = new Set(["unreachable", "insufficient", "unsupported", "unknown"]);
+
+const isUsable = (report: { status?: unknown } | null | undefined) =>
+  report != null && !UNUSABLE_REPORT_STATUSES.has(String(report.status));
+
+// References name the flagged objects only, not every object the check looked at.
+const isFlagged = (item: { status?: unknown }) =>
+  item.status === "warning" || item.status === "critical";
+
+type ResourcesHygieneWorkloads = NonNullable<ClusterHealthChecks["resourcesHygiene"]>["workloads"];
+
+// Synthetic fleet and fixture reports carry summary and items only; the workload list is
+// optional there, and a report without it names nothing.
+const listWorkloads = (report: { workloads?: ResourcesHygieneWorkloads }) => report.workloads ?? [];
+
+// Per-container items repeat the same pod or workload; each object is named once.
 const createRisk = (risk: Omit<ClusterRiskItem, "penalty"> & { penalty: number }) => ({
   ...risk,
   penalty: clamp(risk.penalty, 1, MAX_CATEGORY_SCORE),
+  references: [...new Set(risk.references)],
 });
 
 const getStatusLabel = (status: ClusterScoreStatus) => {
@@ -125,6 +193,7 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
       risks: [],
       topRisks: [],
       scoreDelta: 0,
+      rules: CLUSTER_SCORE_RULES.map((rule) => ({ ...rule, status: "not-checked", risk: null })),
     };
   }
 
@@ -155,9 +224,11 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
           reason: "Scheduling and autoscaling signals are unreliable without requests/limits.",
           fix: "Add CPU/memory requests and limits to the affected workloads.",
           penalty: clamp(missingSeverity, 4, 15),
-          references: resources.items.map(
-            (item) => `${item.namespace}/${item.workloadType}/${item.workload}`,
-          ),
+          // Items also list containers that only lack a CPU limit (optional), so an ok
+          // workload would be named; the per-workload status is the verdict.
+          references: listWorkloads(resources)
+            .filter(isFlagged)
+            .map((item) => `${item.namespace}/${item.workloadType}/${item.workload}`),
         }),
       );
     }
@@ -174,7 +245,13 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
         reason: "BestEffort pods have no guarantees and are first to be evicted under pressure.",
         fix: "Define CPU/memory requests to move pods to Burstable or Guaranteed QoS.",
         penalty: clamp(bestEffortCount * 5, 5, 20),
-        references: [],
+        references: podQos?.items
+          ? podQos.items
+              .filter((item) => item.qosClass === "BestEffort")
+              .map((item) => `${item.namespace}/${item.pod}`)
+          : (resources?.items ?? [])
+              .filter((item) => item.qosClass === "BestEffort")
+              .map((item) => `${item.namespace}/${item.workloadType}/${item.workload}`),
       }),
     );
   }
@@ -191,7 +268,9 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
           reason: "Autoscaling cannot stabilize workloads when HPA targets or metrics fail.",
           fix: "Fix HPA targets/metrics and add HPAs for required workloads.",
           penalty: clamp(hpaSeverity, 5, 12),
-          references: hpaStatus.items.map((item) => `${item.namespace}/${item.workload}`),
+          references: hpaStatus.items
+            .filter(isFlagged)
+            .map((item) => `${item.namespace}/${item.workload}`),
         }),
       );
     }
@@ -236,7 +315,7 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
   }
 
   const imageFreshness = (checks as Record<string, unknown>).imageFreshness as
-    | { summary?: { latestTagCount?: number } }
+    | { status?: string; summary?: { latestTagCount?: number } }
     | undefined;
   if (imageFreshness?.summary && (imageFreshness.summary.latestTagCount ?? 0) > 0) {
     const latestCount = imageFreshness.summary.latestTagCount ?? 0;
@@ -266,7 +345,9 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
           reason: "Missing or broken probes delay recovery and hide failures.",
           fix: "Add readiness/liveness/startup probes with sane thresholds.",
           penalty: clamp(probeSeverity, 4, 12),
-          references: probes.items.map((item) => `${item.namespace}/${item.workload}`),
+          references: probes.items
+            .filter(isFlagged)
+            .map((item) => `${item.namespace}/${item.workload}`),
         }),
       );
     }
@@ -325,7 +406,9 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
           reason: "Privileged settings bypass baseline security controls.",
           fix: "Align namespaces with PSA levels and remove privileged settings.",
           penalty: clamp(psaSeverity, 6, 15),
-          references: podSecurity.items.map((item) => `${item.namespace}/${item.pod}`),
+          references: podSecurity.items
+            .filter(isFlagged)
+            .map((item) => `${item.namespace}/${item.pod}`),
         }),
       );
     }
@@ -344,9 +427,9 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
           reason: "Containers run with elevated permissions or writable filesystems.",
           fix: "Set runAsNonRoot, readOnlyRootFilesystem, and drop capabilities.",
           penalty: clamp(hardeningSeverity, 5, 12),
-          references: securityHardening.items.map(
-            (item) => `${item.namespace}/${item.workloadType}/${item.workload}`,
-          ),
+          references: securityHardening.items
+            .filter(isFlagged)
+            .map((item) => `${item.namespace}/${item.workloadType}/${item.workload}`),
         }),
       );
     }
@@ -375,7 +458,6 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
   if (secrets?.summary) {
     const secretSeverity = secrets.summary.critical * 7 + secrets.summary.warning * 4;
     if (secretSeverity > 0) {
-      const references = summarizeList(collectSecrets(secrets.items), 4);
       risks.push(
         createRisk({
           id: "secrets",
@@ -385,7 +467,7 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
           reason: "Sensitive data in ConfigMaps is unencrypted and widely readable.",
           fix: "Move sensitive keys to Secrets and enable encryption at rest.",
           penalty: clamp(secretSeverity, 10, 20),
-          references: references ? [references] : [],
+          references: collectSecrets(secrets.items),
         }),
       );
     }
@@ -410,7 +492,7 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
   }
 
   const rbacOverview = (checks as Record<string, unknown>).rbacOverview as
-    | { summary?: { overprivilegedCount?: number } }
+    | { status?: string; summary?: { overprivilegedCount?: number } }
     | undefined;
   if (rbacOverview?.summary && (rbacOverview.summary.overprivilegedCount ?? 0) > 0) {
     const count = rbacOverview.summary.overprivilegedCount ?? 0;
@@ -429,7 +511,11 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
   }
 
   const ingressStatus = (checks as Record<string, unknown>).ingressStatus as
-    | { summary?: { withoutTls?: number; total?: number } }
+    | {
+        status?: string;
+        summary?: { withoutTls?: number; total?: number };
+        items?: Array<{ namespace: string; name: string; hasTls: boolean }>;
+      }
     | undefined;
   if (ingressStatus?.summary && (ingressStatus.summary.withoutTls ?? 0) > 0) {
     const noTls = ingressStatus.summary.withoutTls ?? 0;
@@ -442,7 +528,9 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
         reason: "Unencrypted ingress routes expose traffic to interception.",
         fix: "Configure TLS certificates for all public-facing ingress routes.",
         penalty: clamp(noTls * 3, 4, 10),
-        references: [],
+        references: (ingressStatus.items ?? [])
+          .filter((item) => !item.hasTls)
+          .map((item) => `${item.namespace}/${item.name}`),
       }),
     );
   }
@@ -485,6 +573,30 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
   );
   const scoreDelta = clamp(nextScore - score, 0, MAX_CATEGORY_SCORE * 2);
 
+  const checked: Record<ClusterRuleId, boolean> = {
+    "resources-missing": isUsable(resources),
+    "best-effort": isUsable(podQos) || isUsable(resources),
+    "hpa-health": isUsable(hpaStatus),
+    "hpa-no-requests": isUsable(resources) && isUsable(hpaStatus),
+    "vpa-hpa-conflict": isUsable(vpaStatus),
+    "image-latest": isUsable(imageFreshness),
+    probes: isUsable(probes),
+    topology: isUsable(topology),
+    pdb: isUsable(pdb),
+    psa: isUsable(podSecurity),
+    "security-hardening": isUsable(securityHardening),
+    "network-policy": isUsable(networkIsolation),
+    secrets: isUsable(secrets),
+    priority: isUsable(priority),
+    "rbac-overprivileged": isUsable(rbacOverview),
+    "ingress-no-tls": isUsable(ingressStatus),
+  };
+  const rules: ClusterRuleResult[] = CLUSTER_SCORE_RULES.map((rule) => {
+    const risk = risks.find((item) => item.id === rule.id) ?? null;
+    const ruleStatus: ClusterRuleStatus = risk ? "fail" : checked[rule.id] ? "pass" : "not-checked";
+    return { ...rule, status: ruleStatus, risk };
+  });
+
   return {
     score,
     status,
@@ -496,5 +608,6 @@ export const buildClusterScore = (checks: ClusterHealthChecks | null): ClusterSc
     risks,
     topRisks,
     scoreDelta,
+    rules,
   };
 };

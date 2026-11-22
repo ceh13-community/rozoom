@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ClusterHealthChecks } from "$features/check-health";
+  import type { ClusterHealthChecks, ClusterRuleStatus } from "$features/check-health";
   import { buildClusterScore } from "$features/check-health";
   import { STATUS_CLASSES } from "$entities/cluster";
   import { Badge } from "$shared/ui/badge";
@@ -32,6 +32,28 @@
     return `${Math.round(scoreSummary.score)}`;
   });
   let detailsOpen = $state(false);
+
+  // Top risks show three rules; the full list shows every rule with its verdict and the
+  // objects it flagged, so a passed rule is told apart from one that never ran.
+  const RULE_STATUS_LABEL: Record<ClusterRuleStatus, string> = {
+    fail: "Fail",
+    pass: "Pass",
+    "not-checked": "Not checked",
+  };
+  const RULE_STATUS_CLASS: Record<ClusterRuleStatus, string> = {
+    fail: "text-rose-700 dark:text-rose-300",
+    pass: "text-emerald-700 dark:text-emerald-300",
+    "not-checked": "text-muted-foreground",
+  };
+  const REFERENCE_LIMIT = 20;
+  // Checks that return a count only; every other check names its objects.
+  const COUNT_ONLY_RULES = new Set(["image-latest", "rbac-overprivileged"]);
+
+  const ruleCounts = $derived.by(() => {
+    const counts = { fail: 0, pass: 0, "not-checked": 0 };
+    for (const rule of scoreSummary.rules) counts[rule.status] += 1;
+    return counts;
+  });
 
   const indicatorNotes = [
     {
@@ -179,6 +201,66 @@
         No major risks detected yet. Run health checks to populate the score.
       </div>
     {/if}
+
+    <details
+      class="mt-3 rounded border border-border/80 bg-muted/20 px-2 py-2"
+      data-testid="cluster-score-rules"
+    >
+      <summary class="cursor-pointer text-xs font-semibold text-muted-foreground">
+        All rules: {ruleCounts.fail} failing, {ruleCounts.pass} passing, {ruleCounts["not-checked"]}
+        not checked
+      </summary>
+      <ul class="mt-2 space-y-2 text-xs">
+        {#each scoreSummary.rules as rule (rule.id)}
+          <li
+            class="flex items-start gap-2"
+            data-testid="cluster-score-rule"
+            data-rule-id={rule.id}
+            data-rule-status={rule.status}
+          >
+            <span class={`w-20 shrink-0 font-semibold ${RULE_STATUS_CLASS[rule.status]}`}>
+              {RULE_STATUS_LABEL[rule.status]}
+            </span>
+            <div class="min-w-0 flex-1">
+              <div class="font-medium text-foreground">
+                {rule.title}
+                <span class="font-normal text-muted-foreground">
+                  ({rule.category === "security" ? "Security" : "Reliability"})
+                </span>
+              </div>
+              {#if rule.risk}
+                <div class="text-muted-foreground">{rule.risk.title}. {rule.risk.fix}</div>
+                {#if rule.risk.references.length}
+                  <ul class="mt-1 space-y-0.5 font-mono text-foreground">
+                    {#each rule.risk.references.slice(0, REFERENCE_LIMIT) as reference (reference)}
+                      <li class="break-all">{reference}</li>
+                    {/each}
+                  </ul>
+                  {#if rule.risk.references.length > REFERENCE_LIMIT}
+                    <div class="text-muted-foreground">
+                      +{rule.risk.references.length - REFERENCE_LIMIT} more
+                    </div>
+                  {/if}
+                {:else}
+                  <div class="text-muted-foreground">
+                    {COUNT_ONLY_RULES.has(rule.id)
+                      ? "This check reports a count, not names."
+                      : "Objects not listed."}
+                  </div>
+                {/if}
+              {:else if rule.status === "not-checked"}
+                <div class="text-muted-foreground">
+                  The check behind this rule has not run or could not read the cluster.
+                </div>
+              {/if}
+            </div>
+            {#if rule.risk}
+              <span class="shrink-0 text-muted-foreground">+{rule.risk.penalty}</span>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    </details>
 
     <details class="mt-3 rounded border border-border/80 bg-muted/20 px-2 py-2">
       <summary class="cursor-pointer text-xs font-semibold text-muted-foreground">
