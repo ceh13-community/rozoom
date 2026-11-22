@@ -16,8 +16,7 @@
     ShieldCheck,
     ShieldOff,
     SquareChevronRight,
-    MessageSquareCode,
-    MessageSquareOff,
+    Terminal,
     BookCopy,
   } from "$shared/ui/icons";
   import { openExternalUrl } from "$shared/api/in-app-browser";
@@ -340,28 +339,22 @@
           Runtime {diagnosticsEnabled ? "on" : "off"}
         </span>
       </button>
+      <!-- One label and icon for both states; aria-pressed and the highlight carry on/off.
+           Off is the plain rail colour, not dimmed: it is a choice, not a disabled control. -->
       <button
         class={cn(
           "rail-toggle flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium",
           cliNotificationsEnabled
             ? cn(NAV_ACTIVE_CLASS, NAV_ACTIVE_HOVER_CLASS)
-            : "bg-slate-600/20 text-slate-400 hover:bg-slate-600/30",
+            : "text-slate-100 hover:bg-slate-600/30",
         )}
         onclick={toggleCliNotifications}
         aria-pressed={cliNotificationsEnabled}
-        aria-label="Toggle CLI toasts"
-        use:hint={cliNotificationsEnabled
-          ? "CLI toasts shown - click to hide"
-          : "CLI toasts hidden - click to show"}
+        aria-label="Show kubectl commands"
+        use:hint={"Show kubectl commands"}
       >
-        {#if cliNotificationsEnabled}
-          <MessageSquareCode class="h-4 w-4" />
-        {:else}
-          <MessageSquareOff class="h-4 w-4" />
-        {/if}
-        <span class={cn(sidebarOpen ? "block" : "hidden")}>
-          Toasts {cliNotificationsEnabled ? "on" : "off"}
-        </span>
+        <Terminal class="h-4 w-4" />
+        <span class={cn(sidebarOpen ? "block" : "hidden")}>Show kubectl commands</span>
       </button>
     </nav>
     <div
