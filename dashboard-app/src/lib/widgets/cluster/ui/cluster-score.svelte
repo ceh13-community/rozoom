@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ClusterHealthChecks } from "$features/check-health";
+  import type { ClusterHealthChecks, ClusterRuleItem } from "$features/check-health";
   import { buildClusterScore } from "$features/check-health";
   import { STATUS_CLASSES } from "$entities/cluster";
   import { Badge } from "$shared/ui/badge";
@@ -32,6 +32,52 @@
     return `${Math.round(scoreSummary.score)}`;
   });
   let detailsOpen = $state(false);
+
+  // Every rule, not only the top three: the user sees what passed, what fired and on which
+  // objects, and what could not run at all.
+  const MAX_VISIBLE_REFERENCES = 5;
+
+  const ruleGroups = $derived.by(() => [
+    {
+      id: "reliability",
+      title: "Reliability",
+      rules: scoreSummary.rules.filter((rule) => rule.category === "reliability"),
+    },
+    {
+      id: "security",
+      title: "Security",
+      rules: scoreSummary.rules.filter((rule) => rule.category === "security"),
+    },
+  ]);
+
+  const ruleCounts = $derived.by(() => {
+    const failing = scoreSummary.rules.filter(
+      (rule) => rule.status === "warning" || rule.status === "critical",
+    ).length;
+    const ok = scoreSummary.rules.filter((rule) => rule.status === "ok").length;
+    const unknown = scoreSummary.rules.length - failing - ok;
+    return { total: scoreSummary.rules.length, failing, ok, unknown };
+  });
+
+  const ruleIcon = (status: ClusterRuleItem["status"]) => {
+    if (status === "critical") return "❌";
+    if (status === "warning") return "⚠️";
+    if (status === "ok") return "✅";
+    return "⚪";
+  };
+
+  const ruleStatusClass = (status: ClusterRuleItem["status"]) => {
+    if (status === "critical") return "text-red-600 dark:text-red-400";
+    if (status === "warning") return "text-amber-600 dark:text-amber-400";
+    if (status === "ok") return "text-emerald-700 dark:text-emerald-400";
+    return "text-muted-foreground";
+  };
+
+  const visibleReferences = (rule: ClusterRuleItem) =>
+    rule.references.slice(0, MAX_VISIBLE_REFERENCES);
+
+  const hiddenReferenceCount = (rule: ClusterRuleItem) =>
+    Math.max(0, rule.references.length - MAX_VISIBLE_REFERENCES);
 
   const indicatorNotes = [
     {
@@ -180,7 +226,72 @@
       </div>
     {/if}
 
-    <details class="mt-3 rounded border border-border/80 bg-muted/20 px-2 py-2">
+    <details
+      class="mt-3 rounded border border-border/80 bg-muted/20 px-2 py-2"
+      data-testid="cluster-score-rules"
+    >
+      <summary class="cursor-pointer text-xs font-semibold text-muted-foreground">
+        All rules ({ruleCounts.total}): {ruleCounts.failing} failing, {ruleCounts.ok} OK, {ruleCounts.unknown}
+        not checked
+      </summary>
+      <div class="mt-2 text-xs text-muted-foreground">
+        Objects are listed as namespace/name. Fixing a rule returns the points shown next to it.
+      </div>
+      {#each ruleGroups as group (group.id)}
+        <div class="mt-2 text-xs font-semibold text-foreground">{group.title}</div>
+        <ul class="mt-1 space-y-2 text-xs">
+          {#each group.rules as rule (rule.id)}
+            <li
+              class="flex items-start gap-2"
+              data-testid="cluster-score-rule"
+              data-rule-id={rule.id}
+              data-rule-status={rule.status}
+            >
+              <span class="mt-0.5" aria-hidden="true">{ruleIcon(rule.status)}</span>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-start justify-between gap-2">
+                  <span class="font-medium text-foreground">{rule.title}</span>
+                  <span class="shrink-0 text-right">
+                    <span
+                      class={`font-medium ${ruleStatusClass(rule.status)}`}
+                      data-testid="cluster-score-rule-status">{rule.statusLabel}</span
+                    >
+                    {#if rule.penalty > 0}
+                      <span class="text-muted-foreground"> +{rule.penalty}</span>
+                    {/if}
+                  </span>
+                </div>
+                <div class="text-muted-foreground">
+                  {rule.reason || rule.description}
+                </div>
+                {#if rule.status === "warning" || rule.status === "critical"}
+                  <div class="text-muted-foreground">Fix: {rule.fix}</div>
+                {/if}
+                {#if rule.references.length}
+                  <ul class="mt-1 flex flex-wrap gap-1" data-testid="cluster-score-rule-references">
+                    {#each visibleReferences(rule) as reference (reference)}
+                      <li
+                        class="rounded border border-border/80 bg-background px-1.5 py-0.5 text-foreground"
+                        data-testid="cluster-score-rule-reference"
+                      >
+                        {reference}
+                      </li>
+                    {/each}
+                    {#if hiddenReferenceCount(rule) > 0}
+                      <li class="px-1 py-0.5 text-muted-foreground">
+                        +{hiddenReferenceCount(rule)} more
+                      </li>
+                    {/if}
+                  </ul>
+                {/if}
+              </div>
+            </li>
+          {/each}
+        </ul>
+      {/each}
+    </details>
+
+    <details class="mt-2 rounded border border-border/80 bg-muted/20 px-2 py-2">
       <summary class="cursor-pointer text-xs font-semibold text-muted-foreground">
         Indicator explanations
       </summary>

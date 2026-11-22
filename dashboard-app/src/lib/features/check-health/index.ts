@@ -246,6 +246,12 @@ export {
 } from "./model/watchers";
 export { countTotalPodRestarts } from "./model/get-statuses";
 export { buildClusterScore } from "./model/cluster-score";
+export type {
+  ClusterRiskItem,
+  ClusterRuleItem,
+  ClusterRuleStatus,
+  ClusterScoreSummary,
+} from "./model/cluster-score";
 export { buildClusterHealthScore } from "./model/cluster-health-score";
 export {
   DEFAULT_REFRESH_INTERVAL_MINUTES,
