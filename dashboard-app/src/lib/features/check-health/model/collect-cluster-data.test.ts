@@ -1006,6 +1006,47 @@ describe("collectClusterData - error handling", () => {
     vi.useRealTimers();
   });
 
+  // Ingress and RBAC reports come from outside this function; a refresh that dropped them
+  // turned the posture score's two rules back to "Not checked".
+  it("carries the ingress and rbac reports of the previous check over", async () => {
+    clusterHealthChecks.set({
+      abc: {
+        timestamp: Date.now() - 10 * 60_000,
+        namespaces: ["default"],
+        ...dashboardDiagnosticsSnapshot,
+        ingressStatus: { status: "warning", summary: { withoutTls: 1 }, items: [], updatedAt: 1 },
+        rbacOverview: { status: "ok", summary: { overprivilegedCount: 0 }, updatedAt: 1 },
+      } as any,
+    });
+    vi.mocked(loadClusterEntities).mockResolvedValueOnce({
+      uuid: "abc",
+      pods: { items: [] },
+      daemonsets: { items: [] },
+      deployments: { items: [] },
+      jobs: { items: [] },
+      configmaps: { items: [] },
+      networkpolicies: { items: [] },
+      poddisruptionbudgets: { items: [] },
+      priorityclasses: { items: [] },
+      replicasets: { items: [] },
+      statefulsets: { items: [] },
+      cronjobs: { items: [] },
+      nodes: { items: [] },
+      namespaces: { items: [] },
+      secrets: { items: [] },
+      name: "abc",
+      offline: false,
+      status: "ok",
+    } as any);
+
+    const result = await collectClusterData("abc", { mode: "dashboardConfigDiagnostics" });
+
+    expect(result).toMatchObject({
+      ingressStatus: { status: "warning", summary: { withoutTls: 1 } },
+      rbacOverview: { status: "ok" },
+    });
+  });
+
   it("reruns health diagnostics when only the dashboard timestamp is fresh but the health snapshot marker is stale", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-15T23:50:00.000Z"));

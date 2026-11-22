@@ -951,6 +951,10 @@ export async function collectClusterData(
     networkIsolation,
     secretsHygiene,
     securityHardening,
+    // Loaded outside this function (Overview posture checks, the Detailed card); carried
+    // over so a later refresh does not drop them from the stored check.
+    ingressStatus: previousCheck?.ingressStatus,
+    rbacOverview: previousCheck?.rbacOverview,
     daemonSets: usePreviousDaemonSets
       ? (previousCheck?.daemonSets ?? 0)
       : daemonSetItems.length || 0,
