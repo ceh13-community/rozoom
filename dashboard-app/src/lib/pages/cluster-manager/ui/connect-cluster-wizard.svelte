@@ -43,6 +43,7 @@
     detectedCloudConfigs,
     detectedOsTools,
     loadCloudCliPresence,
+    recheckCloudCliPresence,
   } from "$features/cluster-finder/model/cli-store";
   import {
     getLocalScanConsent,
@@ -367,7 +368,7 @@
   // machine for slim. Without any of them the method is not offered at all.
   const availableCloudProviders = $derived(getAvailableCloudProviders($detectedOsTools));
   // A cloud CLI the build does not bundle counts once it is found on the PATH (`which`
-  // only; the CLI itself is not run until the person lists clusters).
+  // only; the CLI itself is not run until the person lists clusters). Scan looks again.
   $effect(() => {
     const tools = getUnbundledCloudTools();
     if (tools.length > 0) void loadCloudCliPresence(tools);
@@ -458,6 +459,7 @@
     autoLoading = true;
     autoClusters = [];
     autoErrors = [];
+    await recheckCloudCliPresence(getUnbundledCloudTools());
     const uniqueProviders = Array.from(new Set(configs.map((c) => c.provider)));
     const supported = new Set(availableCloudProviders);
     const results = await Promise.allSettled(
@@ -655,14 +657,28 @@
     cloudScopes = result.scopes;
   }
 
+  // Listing looks again with `which` first: a CLI removed since start is not run (it fails to
+  // start), one installed since start is offered without a restart.
+  async function isCloudCliStillInstalled(provider: string): Promise<boolean> {
+    await recheckCloudCliPresence(getUnbundledCloudTools());
+    if (availableCloudProviders.includes(provider)) return true;
+    error = `${getProviderTool(provider) ?? provider} is no longer found on this machine. Install it, then try again.`;
+    return false;
+  }
+
   async function listClouds() {
-    void ensureCloudScopes();
     clearMessages();
     cloudLoading = true;
     cloudClusters = [];
     cloudErrors = [];
+    const provider = cloudProvider;
+    if (!(await isCloudCliStillInstalled(provider))) {
+      cloudLoading = false;
+      return;
+    }
+    void ensureCloudScopes();
     const result = await listCloudClusters(
-      cloudProvider,
+      provider,
       cloudRegion.trim() || undefined,
       cloudScope || undefined,
     );
@@ -680,7 +696,12 @@
     cloudLoading = true;
     cloudClusters = [];
     cloudErrors = [];
-    const result = await listCloudClustersAllScopes(cloudProvider);
+    const provider = cloudProvider;
+    if (!(await isCloudCliStillInstalled(provider))) {
+      cloudLoading = false;
+      return;
+    }
+    const result = await listCloudClustersAllScopes(provider);
     cloudLoading = false;
     cloudClusters = result.clusters;
     cloudErrors = result.errors;

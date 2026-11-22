@@ -74,3 +74,17 @@ export async function loadCloudCliPresence(tools: readonly string[]): Promise<vo
     // Detection is best-effort: without it no installed CLI is offered.
   }
 }
+
+/**
+ * Looks again with `which` (on Scan): a cloud CLI removed since the app started is no longer
+ * offered and one installed since then is, without a restart. The new result wins.
+ */
+export async function recheckCloudCliPresence(tools: readonly string[]): Promise<void> {
+  if (tools.length === 0) return;
+  try {
+    const found = await detectOsToolPresence(tools);
+    detectedOsTools.update((current) => mergeOsTools(current, found));
+  } catch {
+    // A failed probe proves nothing about the CLI: keep what is known.
+  }
+}

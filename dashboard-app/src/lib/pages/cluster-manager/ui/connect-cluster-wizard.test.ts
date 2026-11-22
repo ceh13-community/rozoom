@@ -26,6 +26,7 @@ vi.mock("$features/cluster-manager/api/cloud-import", () => ({
 vi.mock("$features/cluster-finder/model/cli-store", () => ({
   detectedCloudConfigs: readable([]),
   loadCloudCliPresence: vi.fn(async () => undefined),
+  recheckCloudCliPresence: vi.fn(async () => undefined),
   detectedOsTools: readable([]),
 }));
 vi.mock("$features/cluster-finder", () => ({

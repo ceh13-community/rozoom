@@ -19,7 +19,13 @@ vi.mock("../api/cli-detection", () => ({
   ),
 }));
 
-import { detectedOsTools, loadCloudCliPresence, loadDetectedClis, mergeOsTools } from "./cli-store";
+import {
+  detectedOsTools,
+  loadCloudCliPresence,
+  loadDetectedClis,
+  mergeOsTools,
+  recheckCloudCliPresence,
+} from "./cli-store";
 
 // On slim the full scan probes kubectl and helm only and replaced the store: the aws found
 // by the presence check was dropped and Cloud Provider disappeared after Scan.
@@ -45,6 +51,27 @@ describe("detected OS tools", () => {
     await loadDetectedClis();
     await loadCloudCliPresence(["aws", "kubectl"]);
     expect(vi.mocked(detectOsToolPresence)).toHaveBeenLastCalledWith(["aws"]);
+  });
+
+  it("recheck: a CLI removed since start is gone, one installed since start is found", async () => {
+    const { detectOsToolPresence } = await import("../api/cli-detection");
+    await loadCloudCliPresence(["aws", "gcloud"]);
+    vi.mocked(detectOsToolPresence).mockImplementationOnce(async (tools) =>
+      tools.map((name) => tool(name, name === "gcloud")),
+    );
+    await recheckCloudCliPresence(["aws", "gcloud"]);
+    expect(vi.mocked(detectOsToolPresence)).toHaveBeenLastCalledWith(["aws", "gcloud"]);
+    const tools = get(detectedOsTools);
+    expect(tools.find((t) => t.tool === "aws")?.available).toBe(false);
+    expect(tools.find((t) => t.tool === "gcloud")?.available).toBe(true);
+  });
+
+  it("recheck: a failed probe keeps what is known", async () => {
+    const { detectOsToolPresence } = await import("../api/cli-detection");
+    await loadCloudCliPresence(["aws"]);
+    vi.mocked(detectOsToolPresence).mockRejectedValueOnce(new Error("which failed"));
+    await recheckCloudCliPresence(["aws"]);
+    expect(get(detectedOsTools).find((t) => t.tool === "aws")?.available).toBe(true);
   });
 
   it("merge: a newer probe wins for the tools it looked at", () => {

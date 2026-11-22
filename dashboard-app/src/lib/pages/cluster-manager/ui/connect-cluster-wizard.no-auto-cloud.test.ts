@@ -32,6 +32,7 @@ vi.mock("$features/cluster-finder/model/cli-store", () => ({
   detectedCloudConfigs: readable([{ provider: "AWS EKS", label: "AWS", path: "~/.aws/config" }]),
   detectedOsTools: readable([{ tool: "aws", available: true }]),
   loadCloudCliPresence: vi.fn(async () => undefined),
+  recheckCloudCliPresence: vi.fn(async () => undefined),
 }));
 vi.mock("$features/cluster-finder", () => ({
   getLocalScanConsent: () => "denied",
@@ -73,6 +74,6 @@ describe("cloud CLIs run only on an explicit action", () => {
     expect(listCloudScopes).toHaveBeenCalledWith("AWS EKS");
 
     await fireEvent.click(view.getByRole("button", { name: "Scan" }));
-    expect(listCloudClustersAllScopes).toHaveBeenCalled();
+    await vi.waitFor(() => expect(listCloudClustersAllScopes).toHaveBeenCalled());
   });
 });
