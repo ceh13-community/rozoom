@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { registerUnsavedWork } from "$shared/lib/unsaved-work";
+  import { confirmLeaveWithUnsavedWork, registerUnsavedWork } from "$shared/lib/unsaved-work";
   import { goto } from "$app/navigation";
   import { revealListFilteredTo } from "$shared/lib/jump-reveal";
   import IngressUrlCell from "./configuration-list/ingress-url-cell.svelte";
@@ -3580,6 +3580,9 @@
 
   /** Rules in an Ingress's details lead to the Service: its namespace, filtered to it. */
   async function openServiceFromIngress(service: string, namespace: string) {
+    // Ask about unsaved YAML before the namespace changes: a cancelled jump must leave the
+    // Ingresses list as it was.
+    if (!(await confirmLeaveWithUnsavedWork())) return;
     setSelectedNamespace(data.slug, namespace);
     const params = new URLSearchParams(window.location.search);
     params.set("workload", "services");

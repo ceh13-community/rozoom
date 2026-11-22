@@ -20,6 +20,8 @@
   import { stopAllBackgroundPollers } from "$shared/lib/background-pollers";
   import { confirmAction } from "$shared/lib/confirm-action";
   import {
+    approveNextLeave,
+    consumeLeaveApproval,
     describeUnsavedWork,
     listUnsavedWork,
     navigationLeavesList,
@@ -122,11 +124,10 @@
   });
 
   // Set while the navigation the user agreed to (leaving unsaved YAML) runs again.
-  let leaveApproved = false;
 
   beforeNavigate((navigation) => {
-    if (leaveApproved) {
-      leaveApproved = false;
+    if (consumeLeaveApproval()) {
+      // The user already agreed to leave.
     } else if (
       !navigation.willUnload &&
       navigation.to &&
@@ -139,7 +140,7 @@
         const target = navigation.to.url;
         void confirmAction(describeUnsavedWork(unsaved), "Unsaved changes").then((confirmed) => {
           if (!confirmed) return;
-          leaveApproved = true;
+          approveNextLeave();
           void goto(target);
         });
         return;

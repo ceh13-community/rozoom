@@ -1,5 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  confirmLeaveWithUnsavedWork,
+  consumeLeaveApproval,
   describeUnsavedWork,
   listUnsavedWork,
   navigationLeavesList,
@@ -46,5 +48,26 @@ describe("unsaved work", () => {
       "Leave this page?\n\nYAML web\n\nUnsaved changes will be lost.",
     );
     expect(describeUnsavedWork(["1", "2", "3", "4", "5", "6", "7"])).toContain("5\nand 2 more");
+  });
+
+  it("a jump asks before it changes anything and lets its own navigation through", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm");
+    try {
+      expect(await confirmLeaveWithUnsavedWork()).toBe(true);
+      expect(confirmSpy).not.toHaveBeenCalled();
+      expect(consumeLeaveApproval()).toBe(false);
+
+      registerUnsavedWork(() => ["YAML shop"]);
+      confirmSpy.mockReturnValueOnce(false);
+      expect(await confirmLeaveWithUnsavedWork()).toBe(false);
+      expect(consumeLeaveApproval()).toBe(false);
+
+      confirmSpy.mockReturnValueOnce(true);
+      expect(await confirmLeaveWithUnsavedWork()).toBe(true);
+      expect(consumeLeaveApproval()).toBe(true);
+      expect(consumeLeaveApproval()).toBe(false);
+    } finally {
+      confirmSpy.mockRestore();
+    }
   });
 });
