@@ -77,6 +77,25 @@ describe("muted text", () => {
   });
 });
 
+describe("Workload Map", () => {
+  // It was drawn in fixed dark slate colours: on the light theme the subtitle, the filters
+  // and the kind chips were close to invisible. It follows the app theme now.
+  it("uses theme colours, and dark variants for its light kind colours", () => {
+    const panel = readFileSync(
+      resolve(
+        __dirname,
+        "../../shared/plugins/contrib/workload-visualizer/visualizer-panel.svelte",
+      ),
+      "utf8",
+    );
+    expect(panel).not.toMatch(/slate-/);
+    const lightOnly = [...panel.matchAll(/(?<!dark:)text-[a-z]+-(200|300|400)\b/g)].map(
+      (m) => m[0],
+    );
+    expect(lightOnly).toEqual([]);
+  });
+});
+
 describe("K9s overrides", () => {
   it("set no font size below 12 px", () => {
     const k9s = readFileSync(resolve(__dirname, "themes/k9s.css"), "utf8");

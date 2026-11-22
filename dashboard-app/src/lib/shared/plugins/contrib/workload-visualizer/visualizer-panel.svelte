@@ -241,26 +241,26 @@
   };
 
   const kindColors: Record<string, string> = {
-    Ingress: "bg-violet-500/20 border-violet-500/40 text-violet-300",
-    Service: "bg-blue-500/20 border-blue-500/40 text-blue-300",
-    Deployment: "bg-indigo-500/20 border-indigo-500/40 text-indigo-300",
-    StatefulSet: "bg-indigo-500/20 border-indigo-500/40 text-indigo-300",
-    DaemonSet: "bg-indigo-500/20 border-indigo-500/40 text-indigo-300",
-    ReplicaSet: "bg-slate-500/20 border-slate-500/40 text-slate-300",
-    Pod: "bg-emerald-500/20 border-emerald-500/40 text-emerald-300",
-    ConfigMap: "bg-amber-500/20 border-amber-500/40 text-amber-300",
-    Secret: "bg-rose-500/20 border-rose-500/40 text-rose-300",
-    PersistentVolumeClaim: "bg-cyan-500/20 border-cyan-500/40 text-cyan-300",
-    ServiceAccount: "bg-orange-500/20 border-orange-500/40 text-orange-300",
-    NetworkPolicy: "bg-teal-500/20 border-teal-500/40 text-teal-300",
-    HPA: "bg-pink-500/20 border-pink-500/40 text-pink-300",
+    Ingress: "bg-violet-500/15 border-violet-500/40 text-violet-700 dark:text-violet-300",
+    Service: "bg-blue-500/15 border-blue-500/40 text-blue-700 dark:text-blue-300",
+    Deployment: "bg-indigo-500/15 border-indigo-500/40 text-indigo-700 dark:text-indigo-300",
+    StatefulSet: "bg-indigo-500/15 border-indigo-500/40 text-indigo-700 dark:text-indigo-300",
+    DaemonSet: "bg-indigo-500/15 border-indigo-500/40 text-indigo-700 dark:text-indigo-300",
+    ReplicaSet: "bg-muted border-border text-foreground",
+    Pod: "bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300",
+    ConfigMap: "bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-300",
+    Secret: "bg-rose-500/15 border-rose-500/40 text-rose-700 dark:text-rose-300",
+    PersistentVolumeClaim: "bg-cyan-500/15 border-cyan-500/40 text-cyan-700 dark:text-cyan-300",
+    ServiceAccount: "bg-orange-500/15 border-orange-500/40 text-orange-700 dark:text-orange-300",
+    NetworkPolicy: "bg-teal-500/15 border-teal-500/40 text-teal-700 dark:text-teal-300",
+    HPA: "bg-pink-500/15 border-pink-500/40 text-pink-700 dark:text-pink-300",
   };
 
   const statusDot: Record<string, string> = {
     healthy: "bg-emerald-400",
     warning: "bg-amber-400",
     error: "bg-rose-400",
-    unknown: "bg-slate-500",
+    unknown: "bg-muted-foreground",
   };
 
   const filteredNodes = $derived.by(() => {
@@ -289,12 +289,12 @@
   }
 </script>
 
-<Card.Root class="border-slate-700 bg-slate-800/60">
+<Card.Root>
   <Card.Header class="pb-2">
     <div class="flex items-center justify-between">
       <div>
         <Card.Title class="text-sm">Workload Visualizer</Card.Title>
-        <p class="text-xs text-slate-500 mt-0.5">
+        <p class="text-xs text-muted-foreground mt-0.5">
           Dependency map: Ingress -> Service -> Deployment -> Pod -> ConfigMap/Secret/PVC/RBAC.
         </p>
       </div>
@@ -303,20 +303,20 @@
           type="text"
           bind:value={namespace}
           placeholder="all"
-          class="h-6 w-24 text-xs px-1.5 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+          class="h-6 w-24 text-xs px-1.5 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
         />
         <input
           type="text"
           bind:value={filterText}
           placeholder="filter name"
-          class="h-6 w-28 text-xs px-1.5 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+          class="h-6 w-28 text-xs px-1.5 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
         />
         <Popover.Root>
           <Popover.Trigger>
             {#snippet child({ props })}
               <button
                 {...props}
-                class="inline-flex h-6 items-center gap-1 rounded border border-slate-600 bg-slate-900/50 px-1.5 text-xs text-slate-300 hover:border-slate-400"
+                class="inline-flex h-6 items-center gap-1 rounded border border-input bg-background px-1.5 text-xs text-foreground hover:border-ring"
               >
                 <Info class="h-3 w-3" /> Legend
               </button>
@@ -324,32 +324,37 @@
           </Popover.Trigger>
           <Popover.Content class="w-80 p-3 text-xs">
             <p class="font-semibold text-sm mb-2">Edge types</p>
-            <div class="space-y-1.5 text-slate-400">
+            <div class="space-y-1.5 text-muted-foreground">
               <div>
-                <span class="font-mono text-violet-400">routes-to</span> - Ingress routes HTTP traffic
-                to Service
+                <span class="font-mono text-violet-700 dark:text-violet-400">routes-to</span> - Ingress
+                routes HTTP traffic to Service
               </div>
               <div>
-                <span class="font-mono text-sky-400">selects</span> - Service selects pods via label
-                selector
+                <span class="font-mono text-sky-700 dark:text-sky-400">selects</span> - Service selects
+                pods via label selector
               </div>
               <div>
-                <span class="font-mono text-emerald-400">owns</span> - Workload owns pod replicas
+                <span class="font-mono text-emerald-700 dark:text-emerald-400">owns</span> - Workload
+                owns pod replicas
               </div>
               <div>
-                <span class="font-mono text-orange-400">mounts / uses</span> - Pod mounts ConfigMap or
-                Secret (volume / envFrom)
+                <span class="font-mono text-orange-700 dark:text-orange-400">mounts / uses</span> - Pod
+                mounts ConfigMap or Secret (volume / envFrom)
               </div>
               <div>
-                <span class="font-mono text-cyan-400">binds</span> - Pod binds PersistentVolumeClaim
+                <span class="font-mono text-cyan-700 dark:text-cyan-400">binds</span> - Pod binds PersistentVolumeClaim
               </div>
-              <div><span class="font-mono text-pink-400">scales</span> - HPA scales a workload</div>
               <div>
-                <span class="font-mono text-teal-400">secures</span> - NetworkPolicy applies to pods
+                <span class="font-mono text-pink-700 dark:text-pink-400">scales</span> - HPA scales a
+                workload
+              </div>
+              <div>
+                <span class="font-mono text-teal-700 dark:text-teal-400">secures</span> - NetworkPolicy
+                applies to pods
               </div>
             </div>
             <p class="font-semibold text-sm mt-3 mb-2">Status dot</p>
-            <div class="space-y-1 text-slate-400">
+            <div class="space-y-1 text-muted-foreground">
               <div>
                 <span class="inline-block h-2 w-2 rounded-full bg-emerald-400 mr-1"></span> healthy
               </div>
@@ -360,7 +365,7 @@
                 <span class="inline-block h-2 w-2 rounded-full bg-rose-400 mr-1"></span> error
               </div>
               <div>
-                <span class="inline-block h-2 w-2 rounded-full bg-slate-500 mr-1"></span> unknown
+                <span class="inline-block h-2 w-2 rounded-full bg-muted-foreground mr-1"></span> unknown
               </div>
             </div>
           </Popover.Content>
@@ -380,15 +385,20 @@
   <Card.Content class="space-y-3 text-xs">
     {#if error && humanizedError}
       <div
-        class="rounded border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-xs text-rose-300"
+        class="rounded border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-xs text-rose-700 dark:text-rose-300"
       >
         <p class="font-semibold">{humanizedError.title}</p>
         {#if humanizedError.hint}
-          <p class="text-xs text-rose-300/80 mt-0.5">{humanizedError.hint}</p>
+          <p class="text-xs text-rose-700 dark:text-rose-300/80 mt-0.5">
+            {humanizedError.hint}
+          </p>
         {/if}
         <details class="mt-1">
-          <summary class="cursor-pointer text-xs text-rose-300/60">Raw error</summary>
-          <pre class="mt-0.5 whitespace-pre-wrap text-xs text-rose-300/70">{error}</pre>
+          <summary class="cursor-pointer text-xs text-rose-700 dark:text-rose-300/60"
+            >Raw error</summary
+          >
+          <pre
+            class="mt-0.5 whitespace-pre-wrap text-xs text-rose-700 dark:text-rose-300/70">{error}</pre>
         </details>
       </div>
     {/if}
@@ -396,8 +406,8 @@
     {#if scannedAt && !loading}
       <div
         class="flex items-center gap-2 rounded border {scannedStale
-          ? 'border-amber-500/30 bg-amber-500/5 text-amber-300'
-          : 'border-slate-700 bg-slate-800/30 text-slate-400'} px-2 py-1 text-xs"
+          ? 'border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-300'
+          : 'border-border bg-muted/40 text-muted-foreground'} px-2 py-1 text-xs"
       >
         <span>Scanned {scannedAgoLabel}</span>
         {#if scannedStale}<span>- stale, consider refreshing</span>{/if}
@@ -405,16 +415,18 @@
     {/if}
 
     {#if loading}
-      <!-- Top of the panel, not the middle of a height that is not there yet. The card is
-           dark in every theme, so the text keeps the card's light colour. -->
-      <LoadingState label="Scanning cluster resources" class="py-3 !text-slate-300" />
+      <!-- Top of the panel, not the middle of a height that is not there yet. The card follows
+           the app theme, so the text takes the theme's foreground colour. -->
+      <LoadingState label="Scanning cluster resources" class="py-3 !text-foreground" />
     {:else if graph}
       <!-- Summary -->
       <div class="flex flex-wrap gap-3 text-xs">
-        <span class="text-slate-300 font-medium">{graph.summary.totalNodes} resources</span>
-        <span class="text-slate-400">{graph.summary.totalEdges} connections</span>
+        <span class="text-foreground font-medium">{graph.summary.totalNodes} resources</span>
+        <span class="text-muted-foreground">{graph.summary.totalEdges} connections</span>
         {#if graph.summary.orphanedNodes > 0}
-          <span class="text-amber-400">{graph.summary.orphanedNodes} orphaned</span>
+          <span class="text-amber-700 dark:text-amber-400"
+            >{graph.summary.orphanedNodes} orphaned</span
+          >
         {/if}
       </div>
 
@@ -422,15 +434,15 @@
       <div class="flex flex-wrap gap-1">
         <button
           class="text-xs px-2 py-0.5 rounded border transition {filterKind === 'all'
-            ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
-            : 'border-slate-600 text-slate-500 hover:border-slate-400'}"
+            ? 'border-indigo-500 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300'
+            : 'border-input text-muted-foreground hover:border-ring'}"
           onclick={() => (filterKind = "all")}>All ({graph.summary.totalNodes})</button
         >
         {#each Object.entries(graph.summary.byKind).sort((a, b) => b[1] - a[1]) as [kind, count] (kind)}
           <button
             class="text-xs px-2 py-0.5 rounded border transition {filterKind === kind
-              ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
-              : 'border-slate-600 text-slate-500 hover:border-slate-400'}"
+              ? 'border-indigo-500 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300'
+              : 'border-input text-muted-foreground hover:border-ring'}"
             onclick={() => (filterKind = filterKind === kind ? "all" : kind)}
             >{kind} ({count})</button
           >
@@ -445,7 +457,7 @@
           <button
             class="text-left rounded-lg border p-2 transition hover:brightness-125 {kindColors[
               node.kind
-            ] ?? 'bg-slate-500/20 border-slate-500/40 text-slate-300'} {selectedNode?.id === node.id
+            ] ?? 'bg-muted border-border text-foreground'} {selectedNode?.id === node.id
               ? 'ring-1 ring-indigo-400'
               : ''}"
             onclick={() => void selectNode(node)}
@@ -463,7 +475,7 @@
       </div>
 
       {#if filteredNodes.length === 0}
-        <p class="text-slate-500 italic text-center py-4">{emptyStateCopy}</p>
+        <p class="text-muted-foreground italic text-center py-4">{emptyStateCopy}</p>
       {/if}
 
       <!-- Selected node detail -->
@@ -474,19 +486,19 @@
           class="scroll-mt-32 rounded-lg border border-indigo-500/30 bg-indigo-950/20 p-3 space-y-1.5"
         >
           <div class="flex items-center gap-2">
-            <span class="text-xs font-semibold text-indigo-300"
+            <span class="text-xs font-semibold text-indigo-700 dark:text-indigo-300"
               >{selectedNode.kind}/{selectedNode.name}</span
             >
-            <span class="text-xs text-slate-500">{selectedNode.namespace}</span>
+            <span class="text-xs text-muted-foreground">{selectedNode.namespace}</span>
             {#if selectedNode.status}
               <span
                 class="text-xs px-1.5 py-0.5 rounded-full {selectedNode.status === 'healthy'
-                  ? 'bg-emerald-500/10 text-emerald-400'
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
                   : selectedNode.status === 'warning'
-                    ? 'bg-amber-500/10 text-amber-400'
+                    ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
                     : selectedNode.status === 'error'
-                      ? 'bg-rose-500/10 text-rose-400'
-                      : 'bg-slate-500/10 text-slate-400'}">{selectedNode.status}</span
+                      ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
+                      : 'bg-muted text-muted-foreground'}">{selectedNode.status}</span
               >
             {/if}
           </div>
@@ -495,11 +507,11 @@
             {#if selectedNode}
               {@const sel = selectedNode}
               <button
-                class="text-xs rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-700/40"
+                class="text-xs rounded border border-input px-2 py-0.5 hover:bg-muted"
                 onclick={() => void jumpToWorkload(sel)}>Jump to {sel.kind} page</button
               >
               <button
-                class="text-xs rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-700/40"
+                class="text-xs rounded border border-input px-2 py-0.5 hover:bg-muted"
                 onclick={() =>
                   copyText(
                     `kubectl describe ${sel.kind.toLowerCase()} ${sel.name} -n ${sel.namespace}`,
@@ -507,7 +519,7 @@
                   )}>Copy describe</button
               >
               <button
-                class="text-xs rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-700/40"
+                class="text-xs rounded border border-input px-2 py-0.5 hover:bg-muted"
                 onclick={() =>
                   copyText(
                     `kubectl get ${sel.kind.toLowerCase()} ${sel.name} -n ${sel.namespace} -o yaml`,
@@ -515,7 +527,7 @@
                   )}>Copy get -o yaml</button
               >
               <button
-                class="text-xs rounded border border-slate-600 px-2 py-0.5 hover:bg-slate-700/40"
+                class="text-xs rounded border border-input px-2 py-0.5 hover:bg-muted"
                 onclick={() => copyText(`${sel.kind}/${sel.name} -n ${sel.namespace}`, "reference")}
                 >Copy ref</button
               >
@@ -530,23 +542,25 @@
                 {@const otherId = isSource ? edge.target : edge.source}
                 {@const otherNode = graph?.nodes.find((n) => n.id === otherId)}
                 <div class="flex items-center gap-1.5 text-xs">
-                  <span class="text-slate-600 w-3">{isSource ? ">" : "<"}</span>
-                  <span class="text-slate-500 w-14 shrink-0">{edge.label}</span>
+                  <span class="text-muted-foreground w-3">{isSource ? ">" : "<"}</span>
+                  <span class="text-muted-foreground w-14 shrink-0">{edge.label}</span>
                   <span
                     class="px-1 py-0.5 rounded {kindColors[otherNode?.kind ?? ''] ??
-                      'text-slate-300'} text-xs">{otherNode?.kind}</span
+                      'text-foreground'} text-xs">{otherNode?.kind}</span
                   >
-                  <span class="text-slate-300 truncate">{otherNode?.name}</span>
+                  <span class="text-foreground truncate">{otherNode?.name}</span>
                 </div>
               {/each}
             </div>
           {:else}
-            <p class="text-xs text-amber-400">No connections - this resource is orphaned</p>
+            <p class="text-xs text-amber-700 dark:text-amber-400">
+              No connections - this resource is orphaned
+            </p>
           {/if}
         </div>
       {/if}
     {:else}
-      <p class="text-slate-500 italic text-center py-4">{emptyStateCopy}</p>
+      <p class="text-muted-foreground italic text-center py-4">{emptyStateCopy}</p>
     {/if}
   </Card.Content>
 </Card.Root>
