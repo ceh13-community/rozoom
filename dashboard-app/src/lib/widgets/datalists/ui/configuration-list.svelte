@@ -16,6 +16,7 @@
   import { path } from "@tauri-apps/api";
   import { openExternalUrl } from "$shared/api/in-app-browser";
   import { confirmAction } from "$shared/lib/confirm-action";
+  import { formatQuotaUsageItem, quotaUsage, type QuotaUsageItem } from "$shared/lib/quota-usage";
   import { isTauriAvailable } from "$shared/lib/tauri-runtime";
   import { resolveClusterIds, resolvePrimaryClusterId } from "$shared/lib/cluster-ids";
   import { debounce } from "$shared/lib/debounce";
@@ -205,6 +206,7 @@
     | "metrics"
     | "minPods"
     | "maxPods"
+    | "usage"
     | "replicas"
     | "bindings"
     | "resource"
@@ -279,6 +281,8 @@
     metrics: number;
     minPods: number;
     maxPods: number;
+    /** ResourceQuota: each hard limit with what is used of it. */
+    usage: QuotaUsageItem[];
     replicas: string;
     bindings: string;
     resource: string;
@@ -581,6 +585,7 @@
     metrics: boolean;
     minPods: boolean;
     maxPods: boolean;
+    usage: boolean;
     replicas: boolean;
     bindings: boolean;
     resource: boolean;
@@ -637,6 +642,7 @@
         metrics: false,
         minPods: false,
         maxPods: false,
+        usage: false,
         replicas: false,
         bindings: false,
         resource: false,
@@ -704,6 +710,7 @@
       desiredHealthy: workloadKey === "poddisruptionbudgets",
       metrics: workloadKey === "horizontalpodautoscalers",
       minPods: workloadKey === "horizontalpodautoscalers",
+      usage: workloadKey === "resourcequotas",
       maxPods: workloadKey === "horizontalpodautoscalers",
       replicas:
         workloadKey === "horizontalpodautoscalers" || workloadKey === "replicationcontrollers",
@@ -1262,6 +1269,7 @@
       metrics: hpaMetrics,
       minPods: hpaMinPods,
       maxPods: hpaMaxPods,
+      usage: workloadKey === "resourcequotas" ? quotaUsage(item) : [],
       replicas:
         workloadKey === "replicationcontrollers"
           ? `${String(status.readyReplicas ?? 0)}/${String(spec.replicas ?? 0)}`
@@ -1795,6 +1803,7 @@
       ...(columnsVisible.metrics ? ["metrics"] : []),
       ...(columnsVisible.minPods ? ["minPods"] : []),
       ...(columnsVisible.maxPods ? ["maxPods"] : []),
+      ...(columnsVisible.usage ? ["usage"] : []),
       ...(columnsVisible.replicas ? ["replicas"] : []),
       ...(columnsVisible.bindings ? ["bindings"] : []),
       ...(columnsVisible.resource ? ["resource"] : []),
@@ -1850,6 +1859,7 @@
         ...(columnsVisible.metrics ? [row.metrics] : []),
         ...(columnsVisible.minPods ? [row.minPods] : []),
         ...(columnsVisible.maxPods ? [row.maxPods] : []),
+        ...(columnsVisible.usage ? [row.usage.map(formatQuotaUsageItem).join("; ")] : []),
         ...(columnsVisible.replicas ? [row.replicas] : []),
         ...(columnsVisible.bindings ? [row.bindings] : []),
         ...(columnsVisible.resource ? [row.resource] : []),
@@ -1996,6 +2006,7 @@
       Number(columnsVisible.metrics) +
       Number(columnsVisible.minPods) +
       Number(columnsVisible.maxPods) +
+      Number(columnsVisible.usage) +
       Number(columnsVisible.replicas) +
       Number(columnsVisible.bindings) +
       Number(columnsVisible.resource) +
@@ -4220,6 +4231,9 @@ spec:
         checked: columnsVisible.desiredHealthy,
       });
     }
+    if (workloadKey === "resourcequotas") {
+      entries.push({ id: "usage", label: "Used / hard", checked: columnsVisible.usage });
+    }
     if (workloadKey === "horizontalpodautoscalers") {
       entries.push({ id: "metrics", label: "Metrics", checked: columnsVisible.metrics });
       entries.push({ id: "minPods", label: "Min Pods", checked: columnsVisible.minPods });
@@ -4370,6 +4384,7 @@ spec:
       metrics: false,
       minPods: false,
       maxPods: false,
+      usage: false,
       replicas: false,
       bindings: false,
       resource: false,
@@ -4785,6 +4800,38 @@ spec:
     ),
   );
 </script>
+
+<!-- Used against hard per limit: CPU, memory and pods first, a bar per line (amber from 80%,
+     red at the limit), the numbers in words for screen readers. -->
+{#snippet quotaUsageCell(usage: QuotaUsageItem[])}
+  {#if usage.length === 0}
+    <span class="text-muted-foreground">-</span>
+  {:else}
+    <div class="flex flex-col gap-1 py-0.5">
+      {#each usage.slice(0, 3) as item (item.resource)}
+        <div class="flex items-center gap-2 text-xs" title={formatQuotaUsageItem(item)}>
+          <span class="w-32 shrink-0 truncate text-muted-foreground">{item.label}</span>
+          <span class="h-1.5 w-12 shrink-0 overflow-hidden rounded bg-muted" role="presentation">
+            <span
+              class="block h-full rounded {item.ratio === null
+                ? 'bg-muted-foreground/40'
+                : item.ratio >= 1
+                  ? 'bg-rose-500'
+                  : item.ratio >= 0.8
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'}"
+              style={`width: ${Math.min(100, Math.round((item.ratio ?? 0) * 100))}%`}
+            ></span>
+          </span>
+          <span class="whitespace-nowrap font-mono">{item.used} / {item.hard}</span>
+        </div>
+      {/each}
+      {#if usage.length > 3}
+        <span class="text-xs text-muted-foreground">+{usage.length - 3} more in details</span>
+      {/if}
+    </div>
+  {/if}
+{/snippet}
 
 <div class="space-y-4">
   {#if hasWorkbenchTabs}
@@ -5410,6 +5457,9 @@ spec:
               <SortingButton truncate label="Min Pods" onclick={() => toggleSort("minPods")} />
             </Table.TableHead>
           {/if}
+          {#if columnsVisible.usage}
+            <Table.TableHead class="w-[340px]">Used / hard</Table.TableHead>
+          {/if}
           {#if columnsVisible.maxPods}
             <Table.TableHead class="w-[100px]">
               <SortingButton truncate label="Max Pods" onclick={() => toggleSort("maxPods")} />
@@ -5777,6 +5827,9 @@ spec:
               {#if columnsVisible.minPods}
                 <Table.TableCell>{row.minPods}</Table.TableCell>
               {/if}
+              {#if columnsVisible.usage}
+                <Table.TableCell>{@render quotaUsageCell(row.usage)}</Table.TableCell>
+              {/if}
               {#if columnsVisible.maxPods}
                 <Table.TableCell>{row.maxPods}</Table.TableCell>
               {/if}
@@ -6060,6 +6113,9 @@ spec:
                   {#if columnsVisible.minPods}
                     <Table.TableCell>{row.minPods}</Table.TableCell>
                   {/if}
+                  {#if columnsVisible.usage}
+                    <Table.TableCell>{@render quotaUsageCell(row.usage)}</Table.TableCell>
+                  {/if}
                   {#if columnsVisible.maxPods}
                     <Table.TableCell>{row.maxPods}</Table.TableCell>
                   {/if}
@@ -6312,7 +6368,12 @@ spec:
                 ]
               : []),
             ...(workloadKey === "resourcequotas"
-              ? [{ label: "Hard limits", value: detailRow.details || "-" }]
+              ? detailRow.usage.length > 0
+                ? detailRow.usage.map((item) => ({
+                    label: item.label,
+                    value: `${item.used} / ${item.hard}${item.ratio === null ? "" : ` (${Math.round(item.ratio * 100)}%)`}`,
+                  }))
+                : [{ label: "Hard limits", value: detailRow.details || "-" }]
               : []),
             ...(workloadKey === "limitranges"
               ? [{ label: "Limits", value: detailRow.details || "-" }]
