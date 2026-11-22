@@ -43,6 +43,7 @@
     detectedCloudConfigs,
     detectedOsTools,
     loadCloudCliPresence,
+    recheckCloudCliPresence,
   } from "$features/cluster-finder/model/cli-store";
   import {
     getLocalScanConsent,
@@ -367,10 +368,14 @@
   // machine for slim. Without any of them the method is not offered at all.
   const availableCloudProviders = $derived(getAvailableCloudProviders($detectedOsTools));
   // A cloud CLI the build does not bundle counts once it is found on the PATH (`which`
-  // only; the CLI itself is not run until the person lists clusters).
-  $effect(() => {
+  // only; the CLI itself is not run until the person lists clusters). Looked for when the
+  // page opens and each time the wizard is expanded; Scan and List clusters look again.
+  function lookForCloudClis() {
     const tools = getUnbundledCloudTools();
     if (tools.length > 0) void loadCloudCliPresence(tools);
+  }
+  $effect(() => {
+    lookForCloudClis();
   });
 
   // Start on a provider this build can run.
@@ -458,6 +463,7 @@
     autoLoading = true;
     autoClusters = [];
     autoErrors = [];
+    await recheckCloudCliPresence(getUnbundledCloudTools());
     const uniqueProviders = Array.from(new Set(configs.map((c) => c.provider)));
     const supported = new Set(availableCloudProviders);
     const results = await Promise.allSettled(
@@ -655,14 +661,28 @@
     cloudScopes = result.scopes;
   }
 
+  // Listing looks again with `which` first: a CLI removed since start is not run (it fails to
+  // start), one installed since start is offered without a restart.
+  async function isCloudCliStillInstalled(provider: string): Promise<boolean> {
+    await recheckCloudCliPresence(getUnbundledCloudTools());
+    if (availableCloudProviders.includes(provider)) return true;
+    error = `${getProviderTool(provider) ?? provider} is no longer found on this machine. Install it, then try again.`;
+    return false;
+  }
+
   async function listClouds() {
-    void ensureCloudScopes();
     clearMessages();
     cloudLoading = true;
     cloudClusters = [];
     cloudErrors = [];
+    const provider = cloudProvider;
+    if (!(await isCloudCliStillInstalled(provider))) {
+      cloudLoading = false;
+      return;
+    }
+    void ensureCloudScopes();
     const result = await listCloudClusters(
-      cloudProvider,
+      provider,
       cloudRegion.trim() || undefined,
       cloudScope || undefined,
     );
@@ -680,7 +700,12 @@
     cloudLoading = true;
     cloudClusters = [];
     cloudErrors = [];
-    const result = await listCloudClustersAllScopes(cloudProvider);
+    const provider = cloudProvider;
+    if (!(await isCloudCliStillInstalled(provider))) {
+      cloudLoading = false;
+      return;
+    }
+    const result = await listCloudClustersAllScopes(provider);
     cloudLoading = false;
     cloudClusters = result.clusters;
     cloudErrors = result.errors;
@@ -862,6 +887,9 @@
 <details
   class="bg-white/70 backdrop-blur-sm border border-slate-200/50 dark:bg-slate-800/60 dark:border-slate-700/60 rounded-xl shadow-sm group"
   open={$clustersList.length === 0}
+  ontoggle={(event) => {
+    if (event.currentTarget.open) lookForCloudClis();
+  }}
 >
   <summary
     class="flex items-center justify-between cursor-pointer p-4 hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition rounded-xl"
@@ -914,7 +942,7 @@
           <div class="flex gap-1.5">
             <Button
               size="sm"
-              class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7"
+              class="bg-emerald-700 hover:bg-emerald-800 text-white text-xs h-7"
               disabled={$isLocalScanning}
               onclick={grantLocalScan}
             >
@@ -976,7 +1004,7 @@
                       size="sm"
                       variant={clusterIndex === 0 ? "default" : "outline"}
                       class={clusterIndex === 0
-                        ? "bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-6 px-2"
+                        ? "bg-emerald-700 hover:bg-emerald-800 text-white text-xs h-6 px-2"
                         : "text-xs h-6 px-2"}
                       disabled={localConnecting !== null}
                       onclick={() => connectLocal(cluster)}
