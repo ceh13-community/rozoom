@@ -16,7 +16,6 @@
     type ExecPluginKind,
   } from "$features/cluster-manager/model/exec-plugin";
   import { humanizeConnectError } from "$features/cluster-manager/model/humanize-connect-error";
-  import { isToolBundled } from "$shared/config/tooling";
   import { TlsBlockedError } from "$features/cluster-manager/model/tls-gate";
   import { caDataFromForm } from "$features/cluster-manager/model/ca-normalize";
   import {
@@ -28,7 +27,9 @@
     listCloudScopes,
     listCloudClustersAllScopes,
     importCloudCluster,
-    getSupportedCloudProviders,
+    getAvailableCloudProviders,
+    getUnbundledCloudTools,
+    getCloudScopeLabel,
     getProviderTool,
     type CloudCluster,
     type CloudScope,
@@ -38,7 +39,11 @@
     addClustersFromKubeconfigSelection,
     clustersList,
   } from "$features/cluster-manager";
-  import { detectedCloudConfigs } from "$features/cluster-finder/model/cli-store";
+  import {
+    detectedCloudConfigs,
+    detectedOsTools,
+    loadCloudCliPresence,
+  } from "$features/cluster-finder/model/cli-store";
   import {
     getLocalScanConsent,
     setLocalScanConsent,
@@ -358,6 +363,25 @@
     },
   ];
 
+  // Cloud import runs the provider's CLI: bundled in the full build, installed on the
+  // machine for slim. Without any of them the method is not offered at all.
+  const availableCloudProviders = $derived(getAvailableCloudProviders($detectedOsTools));
+  // A cloud CLI the build does not bundle counts once it is found on the PATH (`which`
+  // only; the CLI itself is not run until the person lists clusters).
+  $effect(() => {
+    const tools = getUnbundledCloudTools();
+    if (tools.length > 0) void loadCloudCliPresence(tools);
+  });
+
+  // Start on a provider this build can run.
+  $effect(() => {
+    const first = availableCloudProviders[0];
+    if (first && !availableCloudProviders.includes(cloudProvider)) cloudProvider = first;
+  });
+  const visibleMethods = $derived(
+    METHODS.filter((option) => option.id !== "cloud" || availableCloudProviders.length > 0),
+  );
+
   function clearMessages() {
     error = null;
     success = null;
@@ -413,7 +437,7 @@
     testResult = null;
     showPreview = false;
     skipTlsVerify = false;
-    if (next === "cloud") void loadScopesForProvider();
+    if (next === "cloud") resetCloudScopes();
   }
 
   function resetAll() {
@@ -435,7 +459,7 @@
     autoClusters = [];
     autoErrors = [];
     const uniqueProviders = Array.from(new Set(configs.map((c) => c.provider)));
-    const supported = new Set(getSupportedCloudProviders());
+    const supported = new Set(availableCloudProviders);
     const results = await Promise.allSettled(
       uniqueProviders.filter((p) => supported.has(p)).map((p) => listCloudClustersAllScopes(p)),
     );
@@ -599,11 +623,30 @@
   }
 
   // ── Cloud import ──
+  // No cloud CLI runs without the person's action: listing scopes runs the provider's CLI
+  // with their credentials (aws configure list-profiles, gcloud projects list), so scopes
+  // load when the scope field is opened or clusters are listed, never on mount or when the
+  // method or provider is picked.
+  let cloudScopesLoadedFor = $state<string | null>(null);
+
+  function resetCloudScopes(provider: string = cloudProvider) {
+    cloudScope = "";
+    cloudScopes = [];
+    cloudScopeLabel = getCloudScopeLabel(provider);
+    cloudScopesLoadedFor = null;
+  }
+
+  async function ensureCloudScopes() {
+    if (cloudScopesLoadedFor === cloudProvider || cloudScopesLoading) return;
+    await loadScopesForProvider(cloudProvider);
+  }
+
   async function loadScopesForProvider(provider: string = cloudProvider) {
     cloudScope = "";
     cloudScopes = [];
-    cloudScopeLabel = "Scope";
+    cloudScopeLabel = getCloudScopeLabel(provider);
     cloudScopesLoading = true;
+    cloudScopesLoadedFor = provider;
     const result = await listCloudScopes(provider);
     cloudScopesLoading = false;
     if (provider !== cloudProvider) return;
@@ -613,6 +656,7 @@
   }
 
   async function listClouds() {
+    void ensureCloudScopes();
     clearMessages();
     cloudLoading = true;
     cloudClusters = [];
@@ -785,14 +829,14 @@
     restoreExecKind();
     try {
       const saved = localStorage.getItem(STORAGE_METHOD) as ConnectMethod;
-      if (saved && METHODS.some((m) => m.id === saved)) {
+      if (saved && visibleMethods.some((m) => m.id === saved)) {
         method = saved;
-        if (saved === "cloud") void loadScopesForProvider();
+        if (saved === "cloud") resetCloudScopes();
       }
     } catch {
       /* storage unavailable */
     }
-    void runAutoDetect();
+    // Detecting clusters from local credentials runs the cloud CLIs with them: only on Scan.
     localConsent = getLocalScanConsent();
     if (localConsent === "granted") void runLocalScan();
   });
@@ -967,8 +1011,9 @@
               <Cloud size={14} /> Auto-detected from local credentials
             </p>
             <p class="text-xs text-slate-500 mt-0.5">
-              Scanning {[...new Set($detectedCloudConfigs.map((c) => c.provider))].join(", ")}
-              {autoLoading ? "..." : ""}
+              {autoLoading ? "Scanning" : autoScanned ? "Scanned" : "Credentials found for"}
+              {[...new Set($detectedCloudConfigs.map((c) => c.provider))].join(", ")}
+              {autoLoading ? "..." : autoScanned ? "" : "(Scan lists their clusters)"}
             </p>
           </div>
           <div class="flex gap-1.5">
@@ -1048,7 +1093,7 @@
     <!-- Method selector -->
     {#if !method}
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-        {#each METHODS as option (option.id)}
+        {#each visibleMethods as option (option.id)}
           {@const Icon = option.icon}
           <button
             class="text-left rounded-lg border border-slate-200 dark:border-slate-600 p-3 hover:border-indigo-500 hover:bg-indigo-500/5 transition group"
@@ -1091,11 +1136,13 @@
           class="text-xs text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-3 py-2 leading-relaxed"
         >
           Most users should pick
-          <button
-            class="underline text-indigo-400 hover:text-indigo-300"
-            onclick={() => selectMethod("cloud")}>Cloud Provider</button
-          >
-          (for AWS/GCP/Azure) or
+          {#if availableCloudProviders.length > 0}
+            <button
+              class="underline text-indigo-400 hover:text-indigo-300"
+              onclick={() => selectMethod("cloud")}>Cloud Provider</button
+            >
+            (for AWS/GCP/Azure) or
+          {/if}
           <button
             class="underline text-indigo-400 hover:text-indigo-300"
             onclick={() => selectMethod("exec")}>Exec Plugin</button
@@ -1214,17 +1261,16 @@
               onchange={(e) => {
                 const next = (e.currentTarget as HTMLSelectElement).value;
                 cloudProvider = next;
-                void loadScopesForProvider(next);
+                resetCloudScopes(next);
               }}
               class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground"
             >
-              {#each getSupportedCloudProviders() as p}<option value={p}>{p}</option>{/each}
+              {#each availableCloudProviders as p}<option value={p}>{p}</option>{/each}
             </select>
           </div>
-          {#if cloudProviderTool !== null && !isToolBundled(cloudProviderTool)}
+          {#if !availableCloudProviders.includes(cloudProvider)}
             <div class="text-xs text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1 max-w-64">
-              Cloud import is not available in this build: the {cloudProviderTool} CLI is not
-              bundled.
+              Install the {cloudProviderTool ?? "provider"} CLI to import from {cloudProvider}.
             </div>
           {:else}
             <div>
@@ -1256,6 +1302,7 @@
                 <input
                   type="text"
                   bind:value={cloudScope}
+                  onfocus={() => void ensureCloudScopes()}
                   placeholder={cloudScopesLoading
                     ? "loading..."
                     : `${cloudScopeLabel.toLowerCase()} name`}

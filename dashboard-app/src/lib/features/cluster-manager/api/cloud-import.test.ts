@@ -5,6 +5,7 @@ import {
   listCloudClustersAllScopes,
   importCloudCluster,
   getSupportedCloudProviders,
+  getAvailableCloudProviders,
   getProviderTool,
   parseAwsEksList,
   parseAwsRegions,
@@ -36,6 +37,29 @@ vi.mock("$shared/api/cli", () => ({
   ),
 }));
 
+// The CLI installed on the machine (used when this build bundles none): same routing.
+const systemCommand = vi.fn<(tool: string, args: string[]) => void>();
+vi.mock("@tauri-apps/plugin-shell", () => ({
+  Command: {
+    create: vi.fn().mockImplementation((tool: string, args: string[]) => {
+      systemCommand(tool, args);
+      return {
+        execute: () => {
+          const routed = mockExecuteByArgs(tool, args);
+          if (routed !== undefined) return Promise.resolve(routed);
+          return mockExecute();
+        },
+      };
+    }),
+  },
+}));
+
+// What this build bundles: the full build's set (aws, az, doctl; gcloud is not bundled).
+const bundled = vi.fn((tool: string) => ["aws", "az", "doctl"].includes(tool));
+vi.mock("$shared/config/tooling", () => ({
+  isToolBundled: (tool: string) => bundled(tool),
+}));
+
 vi.mock("@tauri-apps/api/path", () => ({
   appDataDir: vi.fn().mockResolvedValue("/tmp/test-app-data"),
 }));
@@ -46,9 +70,46 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
 }));
 
 beforeEach(() => {
+  systemCommand.mockReset();
+  bundled.mockImplementation((tool: string) => ["aws", "az", "doctl"].includes(tool));
   mockExecute.mockReset();
   mockExecuteByArgs.mockReset();
   mockExecuteByArgs.mockReturnValue(undefined);
+});
+
+// ---------------------------------------------------------------------------
+// getAvailableCloudProviders and the command a provider runs
+// ---------------------------------------------------------------------------
+
+// The slim build bundles no cloud CLI: Cloud Import is offered only for a CLI installed on
+// the machine, and runs that CLI. It used to always call the bundled sidecar and fail.
+describe("cloud providers a build can run", () => {
+  const installed = (...tools: string[]) =>
+    ["aws", "gcloud", "az", "doctl"].map((tool) => ({ tool, available: tools.includes(tool) }));
+
+  it("offers bundled CLIs and installed ones", () => {
+    expect(getAvailableCloudProviders(installed())).toEqual(["AWS EKS", "AKS", "DigitalOcean"]);
+    expect(getAvailableCloudProviders(installed("gcloud"))).toContain("GKE");
+  });
+
+  it("offers nothing in slim without an installed CLI, and only the installed one with it", () => {
+    bundled.mockReturnValue(false);
+    expect(getAvailableCloudProviders(installed())).toEqual([]);
+    expect(getAvailableCloudProviders(installed("aws"))).toEqual(["AWS EKS"]);
+  });
+
+  it("runs the installed CLI when the build does not bundle it", async () => {
+    bundled.mockReturnValue(false);
+    mockExecute.mockResolvedValue({ code: 0, stdout: "[]", stderr: "" });
+    await listCloudClusters("DigitalOcean");
+    expect(systemCommand).toHaveBeenCalledWith("doctl", expect.arrayContaining(["kubernetes"]));
+  });
+
+  it("runs the bundled CLI when the build has it", async () => {
+    mockExecute.mockResolvedValue({ code: 0, stdout: "[]", stderr: "" });
+    await listCloudClusters("DigitalOcean");
+    expect(systemCommand).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -461,7 +522,9 @@ describe("listCloudClusters", () => {
 
     const result = await listCloudClusters("GKE", undefined, "my-project");
 
-    expect(createCliCommand).toHaveBeenCalledWith(
+    // gcloud is not bundled in any build: the installed gcloud runs.
+    expect(createCliCommand).not.toHaveBeenCalledWith("gcloud", expect.anything());
+    expect(systemCommand).toHaveBeenCalledWith(
       "gcloud",
       expect.arrayContaining(["--project=my-project"]),
     );
