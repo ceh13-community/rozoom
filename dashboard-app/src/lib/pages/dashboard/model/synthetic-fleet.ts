@@ -69,6 +69,8 @@ function buildDiagnosticsSummary(status: "ok" | "warning" | "critical") {
       updatedAt: Date.now(),
     },
     items: [],
+    // Rule references read the per-workload verdicts; an empty list keeps the shape.
+    workloads: [],
   };
 }
 
