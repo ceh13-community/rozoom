@@ -175,6 +175,40 @@ describe("configuration-list", () => {
     expect(firstNameCell?.textContent?.trim()).toBe("a-role");
   });
 
+  // Resource Quotas listed only Name, Namespace and Age: not what is used of the limits.
+  it("shows used against hard for Resource Quotas", () => {
+    const { container } = render(ConfigurationList, {
+      props: {
+        data: {
+          title: "Resource Quotas - Cluster: minikube",
+          slug: "minikube",
+          uuid: "cluster-a",
+          workload: "resourcequotas",
+          sort_field: null,
+          workloadKey: "resourcequotas",
+          items: [
+            {
+              metadata: { name: "qa-quota", namespace: "qa" },
+              spec: { hard: { pods: "20", "requests.cpu": "2", "requests.memory": "2Gi" } },
+              status: {
+                hard: { pods: "20", "requests.cpu": "2", "requests.memory": "2Gi" },
+                used: { pods: "5", "requests.cpu": "225m", "requests.memory": "288Mi" },
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    const headers = [...container.querySelectorAll("thead th")].map((th) => th.textContent?.trim());
+    expect(headers).toContain("Used / hard");
+    const row = container.querySelector("tbody tr")?.textContent ?? "";
+    expect(row).toContain("CPU requests");
+    expect(row).toContain("225m / 2");
+    expect(row).toContain("288Mi / 2Gi");
+    expect(row).toContain("5 / 20");
+  });
+
   it("defaults StorageClasses to default-class first ordering", () => {
     const { container } = render(ConfigurationList, {
       props: {
