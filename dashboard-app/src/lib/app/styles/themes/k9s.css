@@ -145,7 +145,8 @@
     border-bottom-color: hsl(191 88% 44% / 0.45);
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    font-size: 0.72rem;
+    /* 12 px: the floor of the type scale. */
+    font-size: 0.75rem;
   }
 
   .k9s .nodes-k9s-table tbody tr {

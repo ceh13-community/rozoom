@@ -68,14 +68,24 @@ function sourceFiles(dir: string): string[] {
 describe("muted text", () => {
   // Muted text below /90 opacity drops under 4.5:1 in at least one theme.
   it("is not faded below 90% opacity", () => {
-    const faded = sourceFiles(resolve(__dirname, "../.."))
+    // src/lib and src/routes: the error page lives in routes.
+    const faded = [resolve(__dirname, "../.."), resolve(__dirname, "../../../routes")]
+      .flatMap(sourceFiles)
       .filter((file) => /text-muted-foreground\/[1-8]\d?\b/.test(readFileSync(file, "utf8")))
-      .map((file) => file.slice(file.indexOf("src/lib")));
+      .map((file) => file.slice(file.indexOf("src/")));
     expect(faded).toEqual([]);
   });
 });
 
 describe("K9s overrides", () => {
+  it("set no font size below 12 px", () => {
+    const k9s = readFileSync(resolve(__dirname, "themes/k9s.css"), "utf8");
+    const sizes = [...k9s.matchAll(/font-size:\s*([\d.]+)(rem|px)/g)].map(([, value, unit]) =>
+      unit === "rem" ? Number(value) * 16 : Number(value),
+    );
+    expect(sizes.filter((px) => px < 12)).toEqual([]);
+  });
+
   it("draw field borders with the input token, not a faded colour", () => {
     const k9s = readFileSync(resolve(__dirname, "themes/k9s.css"), "utf8");
     const rule = /\.k9s \.border-input \{\s*border-color: ([^;]+);/.exec(k9s)?.[1];

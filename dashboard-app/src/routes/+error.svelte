@@ -27,7 +27,7 @@
 
 <main class="flex flex-col h-screen bg-background text-foreground">
   <div class="m-auto max-w-md text-center px-6">
-    <div class="text-6xl font-bold text-muted-foreground/30 mb-4">{page.status}</div>
+    <div class="text-6xl font-bold text-muted-foreground mb-4">{page.status}</div>
     <h1 class="text-xl font-semibold mb-2">Something went wrong</h1>
     <p class="text-sm text-muted-foreground mb-6">
       {page.error?.message || "An unexpected error occurred."}
@@ -59,7 +59,7 @@
         {/if}
       </button>
     </div>
-    <p class="mt-3 text-[11px] text-muted-foreground/70">
+    <p class="mt-3 text-xs text-muted-foreground">
       Copies the error, app version and recent log lines with secrets removed - paste it into a
       Telegram message or GitHub issue.
     </p>
