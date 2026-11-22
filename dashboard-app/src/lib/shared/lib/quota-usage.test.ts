@@ -34,12 +34,14 @@ describe("quotaUsage", () => {
       "CPU requests 225m / 2 (11%)",
       "Memory requests 288Mi / 2Gi (14%)",
       "Pods 5 / 20 (25%)",
-      "count/jobs 0 / 10 (0%)",
+      "count/jobs - / 10",
     ]);
   });
 
-  it("falls back to spec.hard before the quota controller fills the status", () => {
+  // Before the quota controller fills status.used nothing is measured: unknown, not 0%.
+  it("falls back to spec.hard and leaves the use unknown until it is reported", () => {
     const usage = quotaUsage({ spec: { hard: { pods: "4" } } });
-    expect(usage).toEqual([{ resource: "pods", label: "Pods", used: "0", hard: "4", ratio: 0 }]);
+    expect(usage).toEqual([{ resource: "pods", label: "Pods", used: "-", hard: "4", ratio: null }]);
+    expect(usage.map(formatQuotaUsageItem)).toEqual(["Pods - / 4"]);
   });
 });

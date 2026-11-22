@@ -75,11 +75,14 @@ export function quotaUsage(quota: { status?: unknown; spec?: unknown }): QuotaUs
     .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
     .map((resource) => {
       const hardValue = parseQuantity(hard[resource]);
-      const usedValue = parseQuantity(used[resource] ?? "0");
+      // Not reported yet (the quota controller has not filled status.used): unknown, not
+      // zero. "0 / 4 (0%)" in green read as a measured, empty quota.
+      const usedText = used[resource] as string | undefined;
+      const usedValue = usedText === undefined ? null : parseQuantity(usedText);
       return {
         resource,
         label: LABELS[resource] ?? resource,
-        used: used[resource] ?? "0",
+        used: usedText ?? "-",
         hard: hard[resource],
         ratio:
           hardValue !== null && usedValue !== null && hardValue > 0 ? usedValue / hardValue : null,

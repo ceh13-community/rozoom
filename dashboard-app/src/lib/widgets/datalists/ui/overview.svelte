@@ -10,6 +10,7 @@
   import { getNodeMetrics } from "$shared/api/tauri";
   import { scanTlsCertificates } from "$features/check-health/api/check-tls-certificates";
   import {
+    buildClusterScore,
     checkCertificatesHealth,
     checkWarningEvents,
     destroyOverviewWarningEventsSync,
@@ -264,6 +265,7 @@
   let usageMetricsError = $state<string | null>(null);
   let overviewSyncSeconds = $state(60);
   let clusterHealth = $state<ClusterHealthChecks | null>(null);
+  const postureSummary = $derived(buildClusterScore(clusterHealth));
   let clusterHealthError = $state<string | null>(null);
   let warningItems = $state<WarningEventItem[]>([]);
   // Per-kind counts over the whole event list; null when only the cut list is known.
@@ -1866,8 +1868,20 @@
           class="rounded-lg border border-border bg-card px-3 py-2 text-xs"
           data-testid="overview-posture-details"
         >
+          <!-- The status word stays visible while closed, so "Unsafe" is not hidden behind the
+               expander; the number opens on request. -->
           <summary class="cursor-pointer text-xs font-semibold text-foreground">
-            Reliability and security posture
+            Reliability and security posture:
+            <span
+              data-testid="overview-posture-status"
+              class={postureSummary.status === "unsafe"
+                ? "text-rose-700 dark:text-rose-400"
+                : postureSummary.status === "at-risk"
+                  ? "text-amber-700 dark:text-amber-400"
+                  : postureSummary.status === "healthy"
+                    ? "text-emerald-700 dark:text-emerald-400"
+                    : "text-muted-foreground"}>{postureSummary.statusLabel}</span
+            >
             <span class="font-normal text-muted-foreground">(expand for the score)</span>
           </summary>
           <div class="mt-2">
