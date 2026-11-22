@@ -240,7 +240,8 @@
     (isGroupedView ? groupedViewRows : sortedRows).map((row) => row.uid).filter(Boolean),
   );
 
-  const VIRTUAL_ROW_HEIGHT = 42;
+  // Compact rows: 2 px padding around 24 px controls, 1 px border (15+ rows at 1200x650).
+  const VIRTUAL_ROW_HEIGHT = 29;
   let tableScrollTop = $state(0);
   let tableViewportHeight = $state(560);
   let podPageIndex = $state(0);
@@ -698,7 +699,7 @@
             {#if !isGroupCollapsed(groupKey)}
               {#each groupRows as row (row.uid)}
                 <div
-                  class={`pods-k9s-table__row grid gap-3 border-t border-border/60 px-4 py-2.5 text-sm transition-colors ${isSelected(row.uid) ? "bg-muted/30" : "hover:bg-muted/20"}`}
+                  class={`pods-k9s-table__row grid items-center gap-3 border-t border-border/60 px-4 py-0.5 text-sm transition-colors ${isSelected(row.uid) ? "bg-muted/30" : "hover:bg-muted/20"}`}
                   style={`grid-template-columns: ${tableGridTemplate};`}
                   role="button"
                   tabindex="0"
@@ -822,7 +823,7 @@
         {/if}
         {#each flatVisibleRows as row (row.uid)}
           <div
-            class={`pods-k9s-table__row grid gap-3 border-b border-border/60 px-4 py-2.5 text-sm transition-colors ${isSelected(row.uid) ? "bg-muted/30" : "hover:bg-muted/20"}`}
+            class={`pods-k9s-table__row grid items-center gap-3 border-b border-border/60 px-4 py-0.5 text-sm transition-colors ${isSelected(row.uid) ? "bg-muted/30" : "hover:bg-muted/20"}`}
             style={`grid-template-columns: ${tableGridTemplate};`}
             role="button"
             tabindex="0"
