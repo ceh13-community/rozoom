@@ -17,6 +17,11 @@
   import { openExternalUrl } from "$shared/api/in-app-browser";
   import { confirmAction } from "$shared/lib/confirm-action";
   import { formatQuotaUsageItem, quotaUsage, type QuotaUsageItem } from "$shared/lib/quota-usage";
+  import {
+    forceFinalizeConfirmText,
+    forceFinalizeNamespace as finalizeNamespaceViaApi,
+  } from "$shared/api/namespace-finalize";
+  import { writePrivateTextFile } from "$shared/lib/private-files";
   import { isTauriAvailable } from "$shared/lib/tauri-runtime";
   import { resolveClusterIds, resolvePrimaryClusterId } from "$shared/lib/cluster-ids";
   import { debounce } from "$shared/lib/debounce";
@@ -3998,23 +4003,26 @@
       return;
     }
     const confirmed = await confirmAction(
-      `Force remove finalizers from namespace "${name}"? Use only when namespace is stuck in Terminating.`,
+      forceFinalizeConfirmText(name),
       "Force finalize namespace",
     );
     if (!confirmed) return;
     actionInFlight = true;
     errorMessage = null;
     try {
-      const patchPayload = JSON.stringify({
-        spec: { finalizers: [] },
+      const { appDataDir } = await import("@tauri-apps/api/path");
+      const { remove } = await import("@tauri-apps/plugin-fs");
+      const appDir = await appDataDir();
+      const result = await finalizeNamespaceViaApi(name, {
+        kubectl: (args) => kubectlRawArgsFront(args, { clusterId }),
+        writeTempFile: async (content) => {
+          const path = `${appDir}/namespace-finalize-${crypto.randomUUID()}.json`;
+          await writePrivateTextFile(path, content);
+          return path;
+        },
+        removeFile: (path) => remove(path),
       });
-      const result = await kubectlRawArgsFront(
-        ["patch", "namespace", name, "--type=merge", "-p", patchPayload],
-        { clusterId },
-      );
-      if (result.errors || result.code !== 0) {
-        throw new Error(result.errors || result.output || `Failed to finalize namespace ${name}`);
-      }
+      if (!result.ok) throw new Error(result.error);
       actionNotification = notifySuccess(`Finalizers removed for namespace "${name}".`);
       invalidateConfigurationSnapshotCache();
       mutationReconcile.track({
@@ -5174,6 +5182,7 @@ spec:
               <Button
                 variant="outline"
                 size="sm"
+                class="text-destructive"
                 disabled={actionInFlight}
                 onclick={forceFinalizeNamespace}
               >
