@@ -911,7 +911,7 @@
             <div class="space-y-1 max-h-48 overflow-y-auto">
               {#each $localScanClusters as cluster, clusterIndex (localKey(cluster))}
                 <div
-                  class="flex items-center justify-between gap-2 rounded border border-slate-700 px-2.5 py-1.5 text-xs"
+                  class="flex items-center justify-between gap-2 rounded border border-border px-2.5 py-1.5 text-xs"
                 >
                   <div class="flex items-center gap-2 min-w-0">
                     <span class="text-slate-200 font-medium truncate">{cluster.contextName}</span>
@@ -1001,7 +1001,7 @@
             {#each autoClusters as cluster (autoKey(cluster))}
               {@const key = autoKey(cluster)}
               <label
-                class="flex items-center gap-2 rounded border border-slate-700 px-2.5 py-1.5 text-xs hover:border-indigo-500 cursor-pointer"
+                class="flex items-center gap-2 rounded border border-border px-2.5 py-1.5 text-xs hover:border-indigo-500 cursor-pointer"
               >
                 <input
                   type="checkbox"
@@ -1009,13 +1009,13 @@
                   onchange={() => toggleAutoSelection(cluster)}
                   class="h-3.5 w-3.5 accent-indigo-500"
                 />
-                <span class="text-slate-200 font-medium truncate">{cluster.name}</span>
-                <span class="text-xs text-slate-500">{cluster.region}</span>
+                <span class="text-foreground font-medium truncate">{cluster.name}</span>
+                <span class="text-xs text-muted-foreground">{cluster.region}</span>
                 <span class="text-xs px-1.5 py-0.5 rounded bg-indigo-900/30 text-indigo-300"
                   >{cluster.provider}</span
                 >
                 {#if cluster.scope}
-                  <span class="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-slate-400"
+                  <span class="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
                     >{cluster.scope}</span
                   >
                 {/if}
@@ -1079,7 +1079,7 @@
     {#if method === "oidc"}
       <div class="space-y-3">
         <div class="flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-1.5">
+          <h3 class="text-sm font-semibold text-foreground flex items-center gap-1.5">
             <KeyRound size={14} /> Manual OIDC (advanced)
           </h3>
           <button
@@ -1131,19 +1131,19 @@
               type="text"
               bind:value={oidcClusterName}
               placeholder="Cluster name *"
-              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+              class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
             />
             <input
               type="text"
               bind:value={oidcServerUrl}
               placeholder="API server URL *"
-              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+              class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
             />
             <input
               type="text"
               bind:value={oidcCaData}
               placeholder="CA certificate data (required for remote clusters)"
-              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 col-span-2"
+              class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground col-span-2"
             />
           </div>
         </div>
@@ -1157,19 +1157,19 @@
               type="text"
               bind:value={oidcIssuerUrl}
               placeholder={oidcPreset.issuerUrlTemplate + " *"}
-              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 col-span-2"
+              class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground col-span-2"
             />
             <input
               type="text"
               bind:value={oidcClientId}
               placeholder="Client ID *"
-              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+              class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
             />
             <input
               type="password"
               bind:value={oidcClientSecret}
               placeholder="Client secret (optional, prefer PKCE)"
-              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+              class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
             />
           </div>
         </div>
@@ -1197,7 +1197,7 @@
     {#if method === "cloud"}
       <div class="space-y-3">
         <div class="flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-1.5">
+          <h3 class="text-sm font-semibold text-foreground flex items-center gap-1.5">
             <Cloud size={14} /> Cloud Provider Import
           </h3>
           <button
@@ -1208,7 +1208,7 @@
         <div class="flex flex-wrap gap-2 items-end">
           <div>
             <!-- svelte-ignore a11y_label_has_associated_control -->
-            <label class="text-xs text-slate-500 block mb-0.5">Provider</label>
+            <label class="text-xs text-muted-foreground block mb-0.5">Provider</label>
             <select
               bind:value={cloudProvider}
               onchange={(e) => {
@@ -1216,7 +1216,7 @@
                 cloudProvider = next;
                 void loadScopesForProvider(next);
               }}
-              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200"
+              class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground"
             >
               {#each getSupportedCloudProviders() as p}<option value={p}>{p}</option>{/each}
             </select>
@@ -1229,23 +1229,23 @@
           {:else}
             <div>
               <!-- svelte-ignore a11y_label_has_associated_control -->
-              <label class="text-xs text-slate-500 block mb-0.5">Region (optional)</label>
+              <label class="text-xs text-muted-foreground block mb-0.5">Region (optional)</label>
               <input
                 type="text"
                 bind:value={cloudRegion}
                 placeholder="all regions"
-                class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 w-32"
+                class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground w-32"
               />
             </div>
             <div>
               <!-- svelte-ignore a11y_label_has_associated_control -->
-              <label class="text-xs text-slate-500 block mb-0.5"
+              <label class="text-xs text-muted-foreground block mb-0.5"
                 >{cloudScopeLabel} (optional)</label
               >
               {#if cloudScopes.length > 0}
                 <select
                   bind:value={cloudScope}
-                  class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200"
+                  class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground"
                 >
                   <option value="">default credentials</option>
                   {#each cloudScopes as s (s.id)}
@@ -1259,7 +1259,7 @@
                   placeholder={cloudScopesLoading
                     ? "loading..."
                     : `${cloudScopeLabel.toLowerCase()} name`}
-                  class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 w-36"
+                  class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground w-36"
                 />
               {/if}
             </div>
@@ -1290,13 +1290,13 @@
           <div class="space-y-1 max-h-48 overflow-y-auto">
             {#each cloudClusters as cluster (cluster.scope ? `${cluster.scope}::${cluster.region}::${cluster.name}` : `${cluster.region}::${cluster.name}`)}
               <div
-                class="flex items-center justify-between gap-2 rounded border border-slate-700 px-2.5 py-1.5 text-xs"
+                class="flex items-center justify-between gap-2 rounded border border-border px-2.5 py-1.5 text-xs"
               >
                 <div class="flex items-center gap-2 min-w-0">
-                  <span class="text-slate-200 font-medium truncate">{cluster.name}</span>
-                  <span class="text-xs text-slate-500">{cluster.region}</span>
+                  <span class="text-foreground font-medium truncate">{cluster.name}</span>
+                  <span class="text-xs text-muted-foreground">{cluster.region}</span>
                   {#if cluster.scope}
-                    <span class="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-slate-400"
+                    <span class="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
                       >{cluster.scope}</span
                     >
                   {/if}
@@ -1330,7 +1330,7 @@
     {#if method === "vault"}
       <div class="space-y-3">
         <div class="flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-1.5">
+          <h3 class="text-sm font-semibold text-foreground flex items-center gap-1.5">
             <Vault size={14} /> HashiCorp Vault
           </h3>
           <button
@@ -1343,14 +1343,14 @@
             type="text"
             bind:value={vaultAddress}
             placeholder="Vault address (https://vault.example.com) *"
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 col-span-2"
+            class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground col-span-2"
           />
           <div>
             <!-- svelte-ignore a11y_label_has_associated_control -->
-            <label class="text-xs text-slate-500 block mb-0.5">Auth method</label>
+            <label class="text-xs text-muted-foreground block mb-0.5">Auth method</label>
             <select
               bind:value={vaultAuthMethod}
-              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 w-full"
+              class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground w-full"
             >
               <option value="token">Token</option>
               <option value="kubernetes">Kubernetes</option>
@@ -1366,25 +1366,25 @@
               : vaultAuthMethod === "approle"
                 ? "Secret ID"
                 : "JWT token"}
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+            class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
           />
           <input
             type="text"
             bind:value={vaultSecretPath}
             placeholder="Secret path (secret/data/k8s/prod) *"
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+            class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
           />
           <input
             type="text"
             bind:value={vaultRole}
             placeholder={vaultAuthMethod === "approle" ? "Role ID" : "Vault role (optional)"}
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+            class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
           />
           <input
             type="text"
             bind:value={vaultNamespace}
             placeholder="Vault namespace (optional)"
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 col-span-2"
+            class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground col-span-2"
           />
         </div>
         {#if vaultAddress.trim() && vaultSecretPath.trim()}
@@ -1426,7 +1426,7 @@
     {#if method === "certificate"}
       <div class="space-y-3">
         <div class="flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-1.5">
+          <h3 class="text-sm font-semibold text-foreground flex items-center gap-1.5">
             <FileText size={14} /> X.509 Client Certificate
           </h3>
           <button
@@ -1439,31 +1439,31 @@
             type="text"
             bind:value={certClusterName}
             placeholder="Cluster name *"
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+            class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
           />
           <input
             type="text"
             bind:value={certServerUrl}
             placeholder="API server URL *"
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+            class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
           />
           <textarea
             bind:value={certClientCert}
             placeholder="Client certificate (base64 PEM) *"
             rows="2"
-            class="text-xs px-2 py-1 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 font-mono col-span-2"
+            class="text-xs px-2 py-1 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground font-mono col-span-2"
           ></textarea>
           <textarea
             bind:value={certClientKey}
             placeholder="Client private key (base64 PEM) *"
             rows="2"
-            class="text-xs px-2 py-1 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 font-mono col-span-2"
+            class="text-xs px-2 py-1 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground font-mono col-span-2"
           ></textarea>
           <input
             type="text"
             bind:value={certCaData}
             placeholder="CA certificate data (required for remote clusters)"
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 col-span-2"
+            class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground col-span-2"
           />
         </div>
         {@render tlsSkipControl(certCaData)}
@@ -1494,7 +1494,7 @@
     {#if method === "token"}
       <div class="space-y-3">
         <div class="flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-1.5">
+          <h3 class="text-sm font-semibold text-foreground flex items-center gap-1.5">
             <Ticket size={14} /> Bearer Token
           </h3>
           <button
@@ -1507,25 +1507,25 @@
             type="text"
             bind:value={tokenClusterName}
             placeholder="Cluster name *"
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+            class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
           />
           <input
             type="text"
             bind:value={tokenServerUrl}
             placeholder="API server URL *"
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+            class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
           />
           <textarea
             bind:value={tokenValue}
             placeholder="Bearer token or ServiceAccount token *"
             rows="2"
-            class="text-xs px-2 py-1 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 font-mono col-span-2"
+            class="text-xs px-2 py-1 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground font-mono col-span-2"
           ></textarea>
           <input
             type="text"
             bind:value={tokenCaData}
             placeholder="CA certificate data (required for remote clusters)"
-            class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 col-span-2"
+            class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground col-span-2"
           />
         </div>
         {@render tlsSkipControl(tokenCaData)}
@@ -1553,7 +1553,7 @@
     {#if method === "exec"}
       <div class="space-y-3">
         <div class="flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-1.5">
+          <h3 class="text-sm font-semibold text-foreground flex items-center gap-1.5">
             <TerminalSquare size={14} /> Exec Plugin (client-go credential plugin)
           </h3>
           <button
@@ -1610,19 +1610,19 @@
               type="text"
               bind:value={execClusterName}
               placeholder="Cluster name *"
-              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+              class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
             />
             <input
               type="text"
               bind:value={execServerUrl}
               placeholder="API server URL *"
-              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+              class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
             />
             <input
               type="text"
               bind:value={execCaData}
               placeholder="CA certificate data (required for remote clusters)"
-              class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 col-span-2"
+              class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground col-span-2"
             />
           </div>
         </div>
@@ -1638,7 +1638,7 @@
                   type="text"
                   bind:value={execCommand}
                   placeholder="Command *"
-                  class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600 col-span-2"
+                  class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground col-span-2"
                 />
               {/if}
               {#if execPreset.primaryLabel}
@@ -1646,7 +1646,7 @@
                   type="text"
                   bind:value={execPrimary}
                   placeholder={execPreset.primaryLabel}
-                  class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+                  class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
                 />
               {/if}
               {#if execPreset.secondaryLabel}
@@ -1654,7 +1654,7 @@
                   type="text"
                   bind:value={execSecondary}
                   placeholder={execPreset.secondaryLabel}
-                  class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+                  class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
                 />
               {/if}
               {#if execPreset.tertiaryLabel}
@@ -1662,7 +1662,7 @@
                   type="password"
                   bind:value={execTertiary}
                   placeholder={execPreset.tertiaryLabel}
-                  class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+                  class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
                 />
               {/if}
               {#if execPreset.extraLabel}
@@ -1670,7 +1670,7 @@
                   type="text"
                   bind:value={execExtra}
                   placeholder={execPreset.extraLabel}
-                  class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200 placeholder:text-slate-600"
+                  class="h-7 text-xs px-2 rounded border border-input bg-background text-foreground placeholder:text-muted-foreground"
                 />
               {/if}
             </div>
