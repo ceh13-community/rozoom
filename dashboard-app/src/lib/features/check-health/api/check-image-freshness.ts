@@ -29,13 +29,13 @@ export function podContainerImages(pods: PodItem[]): ContainerImageInput[] {
   });
 }
 
+// A digest pins the image whatever the tag says: the kubelet pulls by the digest. The tag
+// is what follows ":" in the last path segment; a ":" before the last "/" is a registry port.
 function isLatestOrUntagged(image: string): boolean {
-  const atIndex = image.indexOf("@");
-  const imageWithoutDigest = atIndex >= 0 ? image.substring(0, atIndex) : image;
-  const colonIndex = imageWithoutDigest.lastIndexOf(":");
-  if (colonIndex < 0) return true;
-  const tag = imageWithoutDigest.substring(colonIndex + 1);
-  return tag === "latest";
+  if (image.includes("@")) return false;
+  const name = image.slice(image.lastIndexOf("/") + 1);
+  const colonIndex = name.lastIndexOf(":");
+  return colonIndex < 0 || name.slice(colonIndex + 1) === "latest";
 }
 
 function hasNoDigest(image: string): boolean {
