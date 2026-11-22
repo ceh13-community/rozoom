@@ -116,6 +116,26 @@ describe("workbench reveal after a row action", () => {
     expect(onCloseTab).toHaveBeenCalledWith("logs:web");
   });
 
+  it("Esc in a panel shown full screen does not close the tab", async () => {
+    const fullscreenBody = createRawSnippet(() => ({
+      render: () =>
+        '<div data-fullscreen-panel><pre tabindex="0" data-testid="full-output">line 1</pre></div>',
+    }));
+    const onCloseTab = vi.fn();
+    const view = render(MultiPaneWorkbench, {
+      props: props({ revealToken: 1, onCloseTab, body: fullscreenBody }),
+    });
+    await settle();
+
+    // Esc on the full screen output leaves full screen (the panel's own handler) only.
+    await fireEvent.keyDown(view.getByTestId("full-output"), { key: "Escape" });
+    // Esc on the workbench itself while a panel covers the screen: the same.
+    await fireEvent.keyDown(view.getByRole("region", { name: "Logs: shop/web" }), {
+      key: "Escape",
+    });
+    expect(onCloseTab).not.toHaveBeenCalled();
+  });
+
   it("gives focus back when the panel goes away with focus inside", async () => {
     const view = render(MultiPaneWorkbench, { props: props({ revealToken: 1 }) });
     await settle();

@@ -186,6 +186,8 @@
   const ESCAPE_OWNERS =
     'input, textarea, select, [contenteditable="true"], .cm-editor, [role="combobox"], [role="listbox"], [role="menu"], [role="dialog"]';
 
+  const FULLSCREEN_PANEL = "[data-fullscreen-panel]";
+
   function closeActiveTabFromKeyboard(event: KeyboardEvent) {
     // Esc anywhere in the panel closes the active tab: on the panel itself (where reveal
     // put focus) and on its content, such as the log output of a Logs tab. Esc inside a
@@ -193,6 +195,9 @@
     if (event.key !== "Escape" || event.defaultPrevented || !activeTabId) return;
     const target = event.target instanceof Element ? event.target : null;
     if (!target || !rootEl?.contains(target) || target.closest(ESCAPE_OWNERS)) return;
+    // A panel shown full screen takes Esc to leave full screen (its handler is on the
+    // window and does not look at defaultPrevented): the same key must not close the tab.
+    if (target.closest(FULLSCREEN_PANEL) || rootEl.querySelector(FULLSCREEN_PANEL)) return;
     event.preventDefault();
     // Focus goes back to the row menu when the panel goes away (onDestroy); a cancelled
     // close keeps it on the panel.
