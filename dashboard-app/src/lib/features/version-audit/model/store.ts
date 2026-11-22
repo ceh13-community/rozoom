@@ -104,7 +104,15 @@ function getK8sStatus(version: K8sVersionInfo | null, minSupported: string): K8s
 
 function buildSummary(run: VersionAuditRun, cacheTtlMs: number): VersionAuditSummary {
   const cacheExpiresAt = new Date(new Date(run.runAt).getTime() + cacheTtlMs).toISOString();
-  const chartStatus = run.charts.length ? (run.outdatedCharts > 0 ? "warning" : "ok") : "unknown";
+  // A chart whose latest version could not be looked up is not up to date: "ok" with
+  // lookup errors read as a clean result.
+  const uncheckedCharts = run.charts.filter((chart) => chart.status === "unknown").length;
+  const chartStatus =
+    run.outdatedCharts > 0
+      ? "warning"
+      : run.charts.length > 0 && uncheckedCharts === 0
+        ? "ok"
+        : "unknown";
   const k8sVersion = run.k8s.version?.gitVersion ?? null;
   const statusLabel = run.k8s.status === "ok" ? "Supported" : run.k8s.status;
   const message = `K8s ${k8sVersion ?? "unknown"} · ${statusLabel}`;
@@ -116,6 +124,7 @@ function buildSummary(run: VersionAuditRun, cacheTtlMs: number): VersionAuditSum
     chartStatus,
     outdatedCharts: run.outdatedCharts,
     totalCharts: run.charts.length,
+    uncheckedCharts,
     lastRunAt: run.runAt,
     cacheExpiresAt,
     message,

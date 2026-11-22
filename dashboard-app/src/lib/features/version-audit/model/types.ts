@@ -45,6 +45,8 @@ export interface VersionAuditSummary {
   chartStatus: "ok" | "warning" | "unknown";
   outdatedCharts: number;
   totalCharts: number;
+  /** Charts whose latest version could not be looked up (no repository, lookup error). */
+  uncheckedCharts?: number;
   lastRunAt: string | null;
   cacheExpiresAt: string | null;
   message: string;

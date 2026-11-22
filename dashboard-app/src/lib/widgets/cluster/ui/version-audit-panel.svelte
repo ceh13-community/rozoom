@@ -100,6 +100,14 @@
   );
 
   const chartsWithErrors = $derived(charts.filter((c) => Boolean(c.error)));
+  // Per-chart lookup errors are listed in the chart errors block; the audit errors block
+  // repeated them word for word.
+  const auditErrors = $derived(
+    (summary?.errors ?? []).filter(
+      (error) => !(chartsWithErrors.length > 0 && error.startsWith("Helm lookup (")),
+    ),
+  );
+  const uncheckedCharts = $derived(summary?.uncheckedCharts ?? 0);
   const outdatedCharts = $derived(charts.filter((c) => c.status === "outdated"));
   const patchOnly = $derived(
     outdatedCharts.filter((c) => Boolean(c.chartPath) && severity(c.version, c.latest) === "patch"),
@@ -387,9 +395,16 @@
           Cluster Version & Helm Audit
         </h2>
         {#if summary}
+          <!-- The badge is about the Kubernetes version only; say so, and say when the
+               charts could not be checked, so a green OK is not read as "all clear". -->
           <Badge class="text-white {k8sStatusStyles[summary.k8sStatus]}">
-            {k8sStatusLabels[summary.k8sStatus] ?? summary.k8sStatus}
+            Kubernetes {k8sStatusLabels[summary.k8sStatus] ?? summary.k8sStatus}
           </Badge>
+          {#if summary.totalCharts > 0 && uncheckedCharts > 0}
+            <Badge class="bg-slate-500 text-white">
+              {uncheckedCharts} of {summary.totalCharts} charts not checked
+            </Badge>
+          {/if}
         {/if}
         <Popover.Root>
           <Popover.Trigger>
@@ -463,14 +478,14 @@
       </Alert.Root>
     {/if}
 
-    {#if summary?.errors?.length && !dismissedAuditErrors}
+    {#if auditErrors.length && !dismissedAuditErrors}
       <Alert.Root variant="destructive">
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0 flex-1">
             <Alert.Title>Audit errors</Alert.Title>
             <Alert.Description>
               <ul class="list-disc pl-4 text-xs">
-                {#each summary.errors as err}
+                {#each auditErrors as err}
                   <li>{err}</li>
                 {/each}
               </ul>
@@ -557,10 +572,18 @@
         </p>
       </DiagnosticSummaryCard>
       <DiagnosticSummaryCard title="Outdated charts">
+        <!-- 0 only when every chart was checked: a lookup that failed is not "none outdated". -->
         <p class="text-2xl font-semibold text-foreground">
-          {summary ? summary.outdatedCharts : "-"}
+          {summary && !(summary.outdatedCharts === 0 && uncheckedCharts > 0)
+            ? summary.outdatedCharts
+            : "-"}
         </p>
         {#if !summary}<p class="text-xs text-muted-foreground">Run audit to populate</p>{/if}
+        {#if summary && uncheckedCharts > 0}
+          <p class="text-xs text-muted-foreground">
+            {uncheckedCharts} of {summary.totalCharts} not checked: see the chart errors above
+          </p>
+        {/if}
       </DiagnosticSummaryCard>
       <DiagnosticSummaryCard title="Total charts">
         <p class="text-2xl font-semibold text-foreground">
