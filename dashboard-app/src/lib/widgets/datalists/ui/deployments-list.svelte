@@ -1,7 +1,10 @@
 <script lang="ts">
   import { registerUnsavedWork } from "$shared/lib/unsaved-work";
-  import { pickLiveItem } from "./common/workload-details-model";
-  import { isLiveItemGone, pickLiveItem } from "./common/workload-details-model";
+  import {
+    createTrailingThrottle,
+    isLiveItemGone,
+    pickLiveItem,
+  } from "./common/workload-details-model";
   import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
@@ -2577,14 +2580,15 @@
     });
   }
 
-  async function loadDetailsData() {
+  async function loadDetailsData(options: { quiet?: boolean } = {}) {
     if (!data?.slug || !selectedItem) return;
     const currentSelected = selectedItem;
     const name = currentSelected.metadata?.name;
     const namespace = currentSelected.metadata?.namespace ?? "default";
     if (!name) return;
     await detailsActions.runLatest("details", async ({ signal, isLatest }) => {
-      detailsLoading = true;
+      // A reload while the panel is open keeps what it shows until the new data is in.
+      if (!options.quiet) detailsLoading = true;
       detailsError = null;
       try {
         const selector = (currentSelected.spec?.selector?.matchLabels ?? {}) as Record<
@@ -2920,12 +2924,43 @@
     };
   });
 
+  // Pods, events and revisions load when the panel opens, then follow the object while it
+  // changes (a rollout changes it several times a second): at most every 5 s, plus once
+  // after the last change.
+  let detailsKeyRequested: string | null = null;
+  let detailsVersionRequested: string | null = null;
+  const detailsReload = createTrailingThrottle(() => {
+    void loadDetailsData({ quiet: true });
+  }, 5_000);
+
   $effect(() => {
-    if (!isOpen || !selectedItem) return;
-    const key = toActiveDetailsKey();
-    if (!key) return;
-    if (detailsKeyLoaded === key) return;
-    void loadDetailsData();
+    const open = isOpen;
+    const key = open ? toActiveDetailsKey() : null;
+    const version =
+      (selectedItem?.metadata as { resourceVersion?: string } | undefined)?.resourceVersion ?? "";
+    untrack(() => {
+      if (!key) {
+        detailsReload.cancel();
+        detailsKeyRequested = null;
+        return;
+      }
+      if (key !== detailsKeyRequested) {
+        detailsReload.cancel();
+        detailsReload.markRan();
+        detailsKeyRequested = key;
+        detailsVersionRequested = version;
+        void loadDetailsData();
+        return;
+      }
+      if (version !== detailsVersionRequested) {
+        detailsVersionRequested = version;
+        detailsReload.call();
+      }
+    });
+  });
+
+  $effect(() => () => {
+    detailsReload.cancel();
   });
 
   $effect(() => {
