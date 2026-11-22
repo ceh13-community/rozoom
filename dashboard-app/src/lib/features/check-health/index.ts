@@ -245,7 +245,8 @@ export {
   listGlobalWatcherRuntimeRows,
 } from "./model/watchers";
 export { countTotalPodRestarts } from "./model/get-statuses";
-export { buildClusterScore } from "./model/cluster-score";
+export { buildClusterScore, CLUSTER_SCORE_RULES } from "./model/cluster-score";
+export type { ClusterRuleId, ClusterRuleResult, ClusterRuleStatus } from "./model/cluster-score";
 export { buildClusterHealthScore } from "./model/cluster-health-score";
 export {
   DEFAULT_REFRESH_INTERVAL_MINUTES,
