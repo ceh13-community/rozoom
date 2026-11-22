@@ -6558,7 +6558,7 @@ spec:
           <h3 class="my-4 font-bold">RBAC Relations</h3>
           <div class="rounded border bg-muted/10 p-2 text-xs">
             {#each getRbacRelationLines(detailRow) as line}
-              <p class="font-mono">{line}</p>
+              <p>{line}</p>
             {/each}
           </div>
         {/if}
@@ -6600,7 +6600,7 @@ spec:
                   }`}
                 ></span>
                 <span
-                  class={`font-mono ${
+                  class={`${
                     finding.severity === "critical"
                       ? "text-rose-700 dark:text-rose-400"
                       : finding.severity === "high"
@@ -6619,7 +6619,7 @@ spec:
             class="space-y-1.5 rounded border border-amber-300/60 bg-amber-50/40 p-3 text-xs dark:border-amber-500/30 dark:bg-amber-950/30"
           >
             {#each getStorageDebugHints(detailRow) as hint}
-              <p class="font-mono text-amber-700 dark:text-amber-300">{hint}</p>
+              <p class="text-amber-700 dark:text-amber-300">{hint}</p>
             {/each}
           </div>
         {/if}
