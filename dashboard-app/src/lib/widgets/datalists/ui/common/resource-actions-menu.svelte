@@ -81,7 +81,7 @@
 </script>
 
 <DropdownMenu.Root bind:open>
-  <DropdownMenu.Trigger bind:ref={triggerRef}>
+  <DropdownMenu.Trigger bind:ref={triggerRef} class="flex">
     <Button
       variant="ghost"
       size="icon"

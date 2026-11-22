@@ -16,7 +16,13 @@
   });
 </script>
 
-<div class="flex items-center">
+<!-- 24 px click target around the 16 px box; a click on the margin does not open details. -->
+<!-- The checkbox inside takes the keyboard; the label only stops the row click. -->
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+<label
+  class="-m-1 flex cursor-pointer items-center p-1"
+  onclick={(event) => event.stopPropagation()}
+>
   <input
     bind:this={inputElement}
     type="checkbox"
@@ -27,4 +33,4 @@
     onclick={(event) => event.stopPropagation()}
     onchange={(event) => onToggle(event.currentTarget.checked)}
   />
-</div>
+</label>
