@@ -18,6 +18,8 @@
     onToggleVerticalCollapse?: () => void;
     isFullscreen?: boolean;
     onToggleFullscreen?: () => void;
+    /** Keys from inside the panel, after the editor and fields inside had their turn. */
+    onPanelKeydown?: (event: KeyboardEvent) => void;
     headerActions?: import("svelte").Snippet;
     toolbar?: import("svelte").Snippet;
     children?: import("svelte").Snippet;
@@ -34,6 +36,7 @@
     onToggleVerticalCollapse = () => {},
     isFullscreen = false,
     onToggleFullscreen,
+    onPanelKeydown,
     headerActions,
     toolbar,
     children,
@@ -45,6 +48,8 @@
        this panel covers the screen (see multi-pane-workbench). -->
   <div
     data-fullscreen-panel={isFullscreen ? "" : undefined}
+    onkeydown={onPanelKeydown}
+    role="presentation"
     class={`flex flex-col ${
       isFullscreen
         ? "fixed inset-3 z-[195] rounded-lg border bg-background shadow-2xl"

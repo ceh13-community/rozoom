@@ -90,13 +90,13 @@ describe("Esc on a logs or YAML panel shown full screen, in the Deployments list
     },
   );
 
-  // The editor closes its search (Ctrl+F), completion and lint tooltips on Esc; a field
-  // keeps Esc too. The panel must not take that key in the capture phase.
+  // The YAML editor closes its search (Ctrl+F), completion or lint panel on Esc and marks
+  // the key used. That Esc must stay the editor's; the next one leaves full screen.
   it.each([
     ["logs", ResourceLogsSheet, logsProps],
     ["YAML", ResourceYamlSheet, yamlProps],
   ] as const)(
-    "%s: Esc with focus in the editor or a field stays full screen",
+    "%s: Esc the editor uses stays full screen, the next Esc leaves it",
     async (_, Sheet, props) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       render(Sheet as any, { props });
@@ -105,25 +105,36 @@ describe("Esc on a logs or YAML panel shown full screen, in the Deployments list
       const editor = document.createElement("div");
       editor.className = "cm-editor";
       editor.innerHTML =
-        '<div class="cm-content" tabindex="0">kind: Deployment</div><input aria-label="Find" />';
+        '<input aria-label="Find" /><div class="cm-content" contenteditable="true">kind: Deployment</div>';
       panel.appendChild(editor);
+      // Like the editor's search field: Esc closes the search and is marked used.
+      const find = editor.querySelector("input") as HTMLInputElement;
+      find.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") event.preventDefault();
+      });
 
-      for (const target of [
-        editor.querySelector(".cm-content") as Element,
-        editor.querySelector("input") as Element,
-      ]) {
-        const event = new KeyboardEvent("keydown", {
-          key: "Escape",
-          bubbles: true,
-          cancelable: true,
-        });
-        target.dispatchEvent(event);
-        expect(event.defaultPrevented).toBe(false);
-      }
-      await Promise.resolve();
+      await fireEvent.keyDown(find, { key: "Escape" });
       expect(document.querySelector("[data-fullscreen-panel]")).not.toBeNull();
+      expect(closeTab).not.toHaveBeenCalled();
+
+      // Back in the text, nothing in the editor takes Esc: full screen ends, the tab stays.
+      await fireEvent.keyDown(editor.querySelector(".cm-content") as Element, { key: "Escape" });
+      expect(document.querySelector("[data-fullscreen-panel]")).toBeNull();
+      expect(closeTab).not.toHaveBeenCalled();
     },
   );
+
+  it("Esc in a field of the panel leaves full screen and keeps the tab", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    render(ResourceLogsSheet as any, { props: logsProps });
+    await fireEvent.click(screen.getByTitle("Open full screen"));
+    const field = document.createElement("input");
+    (document.querySelector("[data-fullscreen-panel]") as Element).appendChild(field);
+
+    await fireEvent.keyDown(field, { key: "Escape" });
+    expect(document.querySelector("[data-fullscreen-panel]")).toBeNull();
+    expect(closeTab).not.toHaveBeenCalled();
+  });
 
   it.each(["deployments-list.svelte", "daemon-sets-list.svelte"])(
     "%s skips an Esc that is already used",
