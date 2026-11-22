@@ -108,6 +108,9 @@
   async function resolveChain() {
     if (resolved || loading) return;
     loading = true;
+    // The resource this lookup is for: if the panel moves to another one meanwhile, the
+    // result is dropped and the lookup runs again for the new resource.
+    const startedFor = currentKey();
     const links: ChainLink[] = [];
 
     try {
@@ -304,10 +307,20 @@
     } catch {
       // Silently handle errors
     } finally {
-      chain = links;
       loading = false;
-      resolved = true;
+      if (startedFor === currentKey()) {
+        chain = links;
+        resolved = true;
+      } else {
+        chain = [];
+        resolved = false;
+        void resolveChain();
+      }
     }
+  }
+
+  function currentKey() {
+    return `${resourceKind}/${resourceNamespace}/${resourceName}`;
   }
 
   function matchesSelector(item: unknown, selector: Record<string, string>): boolean {
@@ -462,7 +475,7 @@
   // Use untrack to avoid reactive loop: read props, write state
   let lastKey = "";
   $effect(() => {
-    const key = `${resourceKind}/${resourceNamespace}/${resourceName}`;
+    const key = currentKey();
     if (key === lastKey) return;
     lastKey = key;
     // Use queueMicrotask to break out of the reactive tracking context

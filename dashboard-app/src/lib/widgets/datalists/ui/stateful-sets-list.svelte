@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { parseKubeEvents } from "$shared/lib/kube-events";
   import { registerUnsavedWork } from "$shared/lib/unsaved-work";
   import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
@@ -500,22 +501,7 @@
         );
         if (!isLatest()) return;
         if (!eventsResponse.errors && eventsResponse.code === 0 && eventsResponse.output) {
-          const parsedEvents = JSON.parse(eventsResponse.output) as {
-            items?: Array<{
-              type?: string;
-              reason?: string;
-              message?: string;
-              lastTimestamp?: string;
-              eventTime?: string;
-              firstTimestamp?: string;
-            }>;
-          };
-          detailsEvents = (parsedEvents.items ?? []).map((event) => ({
-            type: event.type ?? "-",
-            reason: event.reason ?? "-",
-            message: event.message ?? "-",
-            lastTimestamp: event.lastTimestamp || event.eventTime || event.firstTimestamp || "-",
-          }));
+          detailsEvents = parseKubeEvents(eventsResponse.output);
         } else {
           detailsEvents = [];
         }

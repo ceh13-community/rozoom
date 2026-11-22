@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toKubeEvent, type KubeEventJson } from "$shared/lib/kube-events";
   import { confirmLeaveWithUnsavedWork, registerUnsavedWork } from "$shared/lib/unsaved-work";
   import { goto } from "$app/navigation";
   import { revealListFilteredTo } from "$shared/lib/jump-reveal";
@@ -2981,16 +2982,12 @@
           ? ((payload as { items: GenericItem[] }).items ?? [])
           : [];
         detailsEvents = items.map((item) => {
-          const source = asRecord(item.source);
+          const event = toKubeEvent(item as KubeEventJson);
           return {
-            type: typeof item.type === "string" ? item.type : "Normal",
-            reason: typeof item.reason === "string" ? item.reason : "-",
-            message: typeof item.message === "string" ? item.message : "-",
-            lastTimestamp: String(
-              item.lastTimestamp ?? item.eventTime ?? item.firstTimestamp ?? "",
-            ),
-            source: String(source.component ?? source.host ?? ""),
-            count: Number(item.count ?? asRecord(item.series).count ?? 1),
+            ...event,
+            type: event.type === "-" ? "Normal" : event.type,
+            source: event.source ?? "",
+            count: event.count ?? 1,
           };
         });
       } catch (error) {
