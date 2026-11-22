@@ -78,7 +78,7 @@
   import {
     listCloudClusters,
     importCloudCluster,
-    getSupportedCloudProviders,
+    getAvailableCloudProviders,
     type CloudCluster,
   } from "$features/cluster-manager/api/cloud-import";
   import { recordAudit } from "$features/cluster-manager/model/audit-trail";
@@ -294,6 +294,7 @@
   const isProbing = $derived(Object.values(probeInFlight).some(Boolean));
 
   // Cloud import state
+  const availableCloudProviders = $derived(getAvailableCloudProviders($detectedOsTools));
   let cloudClusters = $state<CloudCluster[]>([]);
   let cloudImportProvider = $state<string | null>(null);
   let cloudListLoading = $state(false);
@@ -1512,8 +1513,9 @@
               </div>
             {/if}
 
-            <!-- Cloud Import -->
-            {#if $detectedCloudConfigs.length > 0}
+            <!-- Cloud Import: only providers whose CLI this build can run (bundled, or installed
+                 on the machine for slim); with none of them the section is not shown. -->
+            {#if $detectedCloudConfigs.length > 0 && availableCloudProviders.length > 0}
               <div>
                 <p
                   class="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-widest"
@@ -1521,7 +1523,7 @@
                   Import from Cloud
                 </p>
                 <div class="flex flex-wrap gap-1.5 mb-2">
-                  {#each getSupportedCloudProviders() as provider (provider)}
+                  {#each availableCloudProviders as provider (provider)}
                     {@const hasConfig = $detectedCloudConfigs.some((c) => c.provider === provider)}
                     <Button
                       size="sm"

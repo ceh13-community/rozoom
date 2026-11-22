@@ -16,7 +16,6 @@
     type ExecPluginKind,
   } from "$features/cluster-manager/model/exec-plugin";
   import { humanizeConnectError } from "$features/cluster-manager/model/humanize-connect-error";
-  import { isToolBundled } from "$shared/config/tooling";
   import { TlsBlockedError } from "$features/cluster-manager/model/tls-gate";
   import { caDataFromForm } from "$features/cluster-manager/model/ca-normalize";
   import {
@@ -28,7 +27,7 @@
     listCloudScopes,
     listCloudClustersAllScopes,
     importCloudCluster,
-    getSupportedCloudProviders,
+    getAvailableCloudProviders,
     getProviderTool,
     type CloudCluster,
     type CloudScope,
@@ -38,7 +37,10 @@
     addClustersFromKubeconfigSelection,
     clustersList,
   } from "$features/cluster-manager";
-  import { detectedCloudConfigs } from "$features/cluster-finder/model/cli-store";
+  import {
+    detectedCloudConfigs,
+    detectedOsTools,
+  } from "$features/cluster-finder/model/cli-store";
   import {
     getLocalScanConsent,
     setLocalScanConsent,
@@ -358,6 +360,18 @@
     },
   ];
 
+  // Cloud import runs the provider's CLI: bundled in the full build, installed on the
+  // machine for slim. Without any of them the method is not offered at all.
+  const availableCloudProviders = $derived(getAvailableCloudProviders($detectedOsTools));
+  // Start on a provider this build can run.
+  $effect(() => {
+    const first = availableCloudProviders[0];
+    if (first && !availableCloudProviders.includes(cloudProvider)) cloudProvider = first;
+  });
+  const visibleMethods = $derived(
+    METHODS.filter((option) => option.id !== "cloud" || availableCloudProviders.length > 0),
+  );
+
   function clearMessages() {
     error = null;
     success = null;
@@ -435,7 +449,7 @@
     autoClusters = [];
     autoErrors = [];
     const uniqueProviders = Array.from(new Set(configs.map((c) => c.provider)));
-    const supported = new Set(getSupportedCloudProviders());
+    const supported = new Set(availableCloudProviders);
     const results = await Promise.allSettled(
       uniqueProviders.filter((p) => supported.has(p)).map((p) => listCloudClustersAllScopes(p)),
     );
@@ -785,7 +799,7 @@
     restoreExecKind();
     try {
       const saved = localStorage.getItem(STORAGE_METHOD) as ConnectMethod;
-      if (saved && METHODS.some((m) => m.id === saved)) {
+      if (saved && visibleMethods.some((m) => m.id === saved)) {
         method = saved;
         if (saved === "cloud") void loadScopesForProvider();
       }
@@ -1048,7 +1062,7 @@
     <!-- Method selector -->
     {#if !method}
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-        {#each METHODS as option (option.id)}
+        {#each visibleMethods as option (option.id)}
           {@const Icon = option.icon}
           <button
             class="text-left rounded-lg border border-slate-200 dark:border-slate-600 p-3 hover:border-indigo-500 hover:bg-indigo-500/5 transition group"
@@ -1091,11 +1105,13 @@
           class="text-xs text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-3 py-2 leading-relaxed"
         >
           Most users should pick
-          <button
-            class="underline text-indigo-400 hover:text-indigo-300"
-            onclick={() => selectMethod("cloud")}>Cloud Provider</button
-          >
-          (for AWS/GCP/Azure) or
+          {#if availableCloudProviders.length > 0}
+            <button
+              class="underline text-indigo-400 hover:text-indigo-300"
+              onclick={() => selectMethod("cloud")}>Cloud Provider</button
+            >
+            (for AWS/GCP/Azure) or
+          {/if}
           <button
             class="underline text-indigo-400 hover:text-indigo-300"
             onclick={() => selectMethod("exec")}>Exec Plugin</button
@@ -1218,13 +1234,12 @@
               }}
               class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200"
             >
-              {#each getSupportedCloudProviders() as p}<option value={p}>{p}</option>{/each}
+              {#each availableCloudProviders as p}<option value={p}>{p}</option>{/each}
             </select>
           </div>
-          {#if cloudProviderTool !== null && !isToolBundled(cloudProviderTool)}
+          {#if !availableCloudProviders.includes(cloudProvider)}
             <div class="text-xs text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1 max-w-64">
-              Cloud import is not available in this build: the {cloudProviderTool} CLI is not
-              bundled.
+              Install the {cloudProviderTool ?? "provider"} CLI to import from {cloudProvider}.
             </div>
           {:else}
             <div>

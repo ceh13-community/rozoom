@@ -1,4 +1,6 @@
 import { createCliCommand, type CliTool } from "$shared/api/cli";
+import { isToolBundled } from "$shared/config/tooling";
+import { Command } from "@tauri-apps/plugin-shell";
 import { appDataDir } from "@tauri-apps/api/path";
 import { readTextFile, remove } from "@tauri-apps/plugin-fs";
 import type { ClusterProvider } from "$shared/lib/provider-detection";
@@ -297,6 +299,23 @@ export function getSupportedCloudProviders(): string[] {
   return Object.keys(PROVIDERS);
 }
 
+/**
+ * Providers whose CLI this build can run: bundled in this build, or installed on the
+ * machine (found by the OS tool probe). The slim build bundles none of them, so it imports
+ * only through an installed aws, gcloud, az or doctl.
+ */
+export function getAvailableCloudProviders(
+  osTools: ReadonlyArray<{ tool: string; available: boolean }>,
+): string[] {
+  return Object.entries(PROVIDERS)
+    .filter(
+      ([, config]) =>
+        isToolBundled(config.tool) ||
+        osTools.some((osTool) => osTool.tool === config.tool && osTool.available),
+    )
+    .map(([provider]) => provider);
+}
+
 /** Tool the provider's import flow needs (bundled or PATH). */
 export function getProviderTool(provider: string): string | null {
   return provider in PROVIDERS ? PROVIDERS[provider].tool : null;
@@ -310,7 +329,12 @@ async function execProvider(
   tool: CliTool,
   args: string[],
 ): Promise<{ code: number; stdout: string; stderr: string }> {
-  const command = await createCliCommand(tool, args);
+  // The bundled sidecar when this build has it; otherwise the CLI installed on the machine
+  // (the capability allows aws, gcloud, az and doctl by name). The slim build has no
+  // sidecar for them, so it always took the first branch and failed.
+  const command = isToolBundled(tool)
+    ? await createCliCommand(tool, args)
+    : Command.create(tool, args);
   const result = await command.execute();
   return {
     code: typeof result.code === "number" ? result.code : 1,

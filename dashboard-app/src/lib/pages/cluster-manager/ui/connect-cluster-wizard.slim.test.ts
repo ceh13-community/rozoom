@@ -16,16 +16,31 @@ vi.mock("$features/cluster-manager", () => ({
   addClustersFromKubeconfigSelection: vi.fn(),
   clustersList: readable([]),
 }));
+// The slim build bundles no cloud CLI: what the OS probe finds decides what is offered.
+const { osTools } = vi.hoisted(() => ({
+  osTools: { value: [] as Array<{ tool: string; available: boolean }> },
+}));
 vi.mock("$features/cluster-manager/api/cloud-import", () => ({
   listCloudClusters: vi.fn(),
   listCloudScopes: vi.fn(async () => ({ scopes: [], label: "Scope" })),
   listCloudClustersAllScopes: vi.fn(async () => ({ clusters: [], errors: [] })),
   importCloudCluster: vi.fn(),
-  getSupportedCloudProviders: () => ["AWS EKS"],
-  getProviderTool: (provider: string) => (provider === "AWS EKS" ? "aws" : null),
+  getSupportedCloudProviders: () => ["AWS EKS", "GKE"],
+  getAvailableCloudProviders: (tools: Array<{ tool: string; available: boolean }>) =>
+    [
+      ["AWS EKS", "aws"],
+      ["GKE", "gcloud"],
+    ]
+      .filter(([, tool]) => tools.some((t) => t.tool === tool && t.available))
+      .map(([provider]) => provider),
+  getProviderTool: (provider: string) =>
+    provider === "AWS EKS" ? "aws" : provider === "GKE" ? "gcloud" : null,
 }));
 vi.mock("$features/cluster-finder/model/cli-store", () => ({
   detectedCloudConfigs: readable([]),
+  get detectedOsTools() {
+    return readable(osTools.value);
+  },
 }));
 vi.mock("$features/cluster-finder", () => ({
   getLocalScanConsent: () => "denied",
@@ -44,13 +59,24 @@ vi.mock("$features/cluster-manager/api/test-connection", () => ({ testKubeconfig
 describe("cloud import on a slim build", () => {
   beforeEach(() => {
     localStorage.clear();
+    osTools.value = [];
   });
 
-  it("tells the user import is unavailable and hides the search button for AWS EKS", async () => {
+  it("offers no Cloud Provider method when no cloud CLI is installed", () => {
+    const view = render(ConnectClusterWizard);
+    expect(view.queryByRole("button", { name: /Cloud Provider/ })).toBeNull();
+  });
+
+  it("offers only the provider whose CLI is installed, ready to list", async () => {
+    osTools.value = [
+      { tool: "aws", available: false },
+      { tool: "gcloud", available: true },
+    ];
     const view = render(ConnectClusterWizard);
     await fireEvent.click(view.getByRole("button", { name: /Cloud Provider/ }));
-    expect(await view.findByText(/Cloud import is not available in this build/)).toBeTruthy();
-    expect(view.queryByRole("button", { name: "List clusters" })).toBeNull();
-    expect(view.queryByRole("button", { name: "Scan all" })).toBeNull();
+    const options = [...view.container.querySelectorAll("option")].map((o) => o.textContent);
+    expect(options).toContain("GKE");
+    expect(options).not.toContain("AWS EKS");
+    expect(view.queryByText(/not available in this build/)).toBeNull();
   });
 });
