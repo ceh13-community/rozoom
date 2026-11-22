@@ -159,6 +159,8 @@
       if (pods.code !== 0) throw new Error(pods.errors || "Failed to load pods.");
       clusterPods = mapWorkloadPods(pods.output || "{}", target.namespace);
       clusterPodsError = null;
+      // A pod going away does not change the workload: reload (throttled) until it is gone.
+      if (clusterPods.some((pod) => pod.status === "Terminating")) clusterPodsReload.call();
     } catch (error) {
       if (controller.signal.aborted || clusterPodsObject !== target.object) return;
       clusterPodsError = error instanceof Error ? error.message : "Failed to load pods.";

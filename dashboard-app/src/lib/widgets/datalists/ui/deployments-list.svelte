@@ -2652,11 +2652,16 @@
 
         const parsedPods = JSON.parse(podsResponse.output) as {
           items?: Array<{
-            metadata?: { name?: string; namespace?: string };
+            metadata?: { name?: string; namespace?: string; deletionTimestamp?: string };
             spec?: { nodeName?: string };
             status?: { phase?: string; containerStatuses?: Array<{ ready?: boolean }> };
           }>;
         };
+        // A pod going away does not change the Deployment: keep reloading (throttled) until
+        // the pods being deleted are gone from the list.
+        if ((parsedPods.items ?? []).some((item) => item.metadata?.deletionTimestamp)) {
+          detailsReload.call();
+        }
         detailsPods = (parsedPods.items ?? []).map((item) => {
           const statuses = item.status?.containerStatuses ?? [];
           const ready = statuses.filter((status) => status.ready).length;
@@ -2671,7 +2676,9 @@
             ready: `${ready} / ${total}`,
             cpu: top?.cpu ?? "-",
             memory: top?.memory ?? "-",
-            status: item.status?.phase ?? "Unknown",
+            status: item.metadata?.deletionTimestamp
+              ? "Terminating"
+              : (item.status?.phase ?? "Unknown"),
           };
         });
 
