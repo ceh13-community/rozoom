@@ -29,6 +29,7 @@
     importCloudCluster,
     getAvailableCloudProviders,
     getUnbundledCloudTools,
+    getCloudScopeLabel,
     getProviderTool,
     type CloudCluster,
     type CloudScope,
@@ -436,7 +437,7 @@
     testResult = null;
     showPreview = false;
     skipTlsVerify = false;
-    if (next === "cloud") void loadScopesForProvider();
+    if (next === "cloud") resetCloudScopes();
   }
 
   function resetAll() {
@@ -622,11 +623,30 @@
   }
 
   // ── Cloud import ──
+  // No cloud CLI runs without the person's action: listing scopes runs the provider's CLI
+  // with their credentials (aws configure list-profiles, gcloud projects list), so scopes
+  // load when the scope field is opened or clusters are listed, never on mount or when the
+  // method or provider is picked.
+  let cloudScopesLoadedFor = $state<string | null>(null);
+
+  function resetCloudScopes(provider: string = cloudProvider) {
+    cloudScope = "";
+    cloudScopes = [];
+    cloudScopeLabel = getCloudScopeLabel(provider);
+    cloudScopesLoadedFor = null;
+  }
+
+  async function ensureCloudScopes() {
+    if (cloudScopesLoadedFor === cloudProvider || cloudScopesLoading) return;
+    await loadScopesForProvider(cloudProvider);
+  }
+
   async function loadScopesForProvider(provider: string = cloudProvider) {
     cloudScope = "";
     cloudScopes = [];
-    cloudScopeLabel = "Scope";
+    cloudScopeLabel = getCloudScopeLabel(provider);
     cloudScopesLoading = true;
+    cloudScopesLoadedFor = provider;
     const result = await listCloudScopes(provider);
     cloudScopesLoading = false;
     if (provider !== cloudProvider) return;
@@ -636,6 +656,7 @@
   }
 
   async function listClouds() {
+    void ensureCloudScopes();
     clearMessages();
     cloudLoading = true;
     cloudClusters = [];
@@ -810,12 +831,12 @@
       const saved = localStorage.getItem(STORAGE_METHOD) as ConnectMethod;
       if (saved && visibleMethods.some((m) => m.id === saved)) {
         method = saved;
-        if (saved === "cloud") void loadScopesForProvider();
+        if (saved === "cloud") resetCloudScopes();
       }
     } catch {
       /* storage unavailable */
     }
-    void runAutoDetect();
+    // Detecting clusters from local credentials runs the cloud CLIs with them: only on Scan.
     localConsent = getLocalScanConsent();
     if (localConsent === "granted") void runLocalScan();
   });
@@ -990,8 +1011,9 @@
               <Cloud size={14} /> Auto-detected from local credentials
             </p>
             <p class="text-xs text-slate-500 mt-0.5">
-              Scanning {[...new Set($detectedCloudConfigs.map((c) => c.provider))].join(", ")}
-              {autoLoading ? "..." : ""}
+              {autoLoading ? "Scanning" : autoScanned ? "Scanned" : "Credentials found for"}
+              {[...new Set($detectedCloudConfigs.map((c) => c.provider))].join(", ")}
+              {autoLoading ? "..." : autoScanned ? "" : "(Scan lists their clusters)"}
             </p>
           </div>
           <div class="flex gap-1.5">
@@ -1239,7 +1261,7 @@
               onchange={(e) => {
                 const next = (e.currentTarget as HTMLSelectElement).value;
                 cloudProvider = next;
-                void loadScopesForProvider(next);
+                resetCloudScopes(next);
               }}
               class="h-7 text-xs px-2 rounded border border-slate-600 bg-slate-900/50 text-slate-200"
             >
@@ -1280,6 +1302,7 @@
                 <input
                   type="text"
                   bind:value={cloudScope}
+                  onfocus={() => void ensureCloudScopes()}
                   placeholder={cloudScopesLoading
                     ? "loading..."
                     : `${cloudScopeLabel.toLowerCase()} name`}

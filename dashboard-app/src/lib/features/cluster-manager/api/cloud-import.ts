@@ -316,6 +316,11 @@ export function getAvailableCloudProviders(
     .map(([provider]) => provider);
 }
 
+/** What a provider calls its scope (Profile, Project, Subscription), without running its CLI. */
+export function getCloudScopeLabel(provider: string): string {
+  return provider in PROVIDERS ? (PROVIDERS[provider].scopes?.label ?? "Scope") : "Scope";
+}
+
 /** Cloud CLIs this build does not bundle: Cloud Import can run them only if installed. */
 export function getUnbundledCloudTools(): string[] {
   return [...new Set(Object.values(PROVIDERS).map((config) => config.tool))].filter(

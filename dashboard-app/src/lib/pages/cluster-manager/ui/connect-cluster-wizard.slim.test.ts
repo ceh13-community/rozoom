@@ -27,6 +27,7 @@ vi.mock("$features/cluster-manager/api/cloud-import", () => ({
   importCloudCluster: vi.fn(),
   getSupportedCloudProviders: () => ["AWS EKS", "GKE"],
   getUnbundledCloudTools: () => [],
+  getCloudScopeLabel: () => "Scope",
   getAvailableCloudProviders: (tools: Array<{ tool: string; available: boolean }>) =>
     [
       ["AWS EKS", "aws"],

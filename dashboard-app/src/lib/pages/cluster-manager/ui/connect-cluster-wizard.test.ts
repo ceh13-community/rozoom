@@ -19,6 +19,7 @@ vi.mock("$features/cluster-manager/api/cloud-import", () => ({
   importCloudCluster: vi.fn(),
   getSupportedCloudProviders: () => [],
   getUnbundledCloudTools: () => [],
+  getCloudScopeLabel: () => "Scope",
   getAvailableCloudProviders: () => [],
   getProviderTool: () => null,
 }));
