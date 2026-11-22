@@ -182,10 +182,17 @@
     if (focusLost) restoreFocus(revealTrigger);
   }
 
+  // Places where Esc already means something: typing, editors, open menus and dialogs.
+  const ESCAPE_OWNERS =
+    'input, textarea, select, [contenteditable="true"], .cm-editor, [role="combobox"], [role="listbox"], [role="menu"], [role="dialog"]';
+
   function closeActiveTabFromKeyboard(event: KeyboardEvent) {
-    // Esc on the panel itself (where reveal put focus) closes the active tab. Esc inside an
-    // editor or a field stays theirs.
-    if (event.key !== "Escape" || event.target !== rootEl || !activeTabId) return;
+    // Esc anywhere in the panel closes the active tab: on the panel itself (where reveal
+    // put focus) and on its content, such as the log output of a Logs tab. Esc inside a
+    // field, an editor or a menu stays theirs.
+    if (event.key !== "Escape" || event.defaultPrevented || !activeTabId) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target || !rootEl?.contains(target) || target.closest(ESCAPE_OWNERS)) return;
     event.preventDefault();
     // Focus goes back to the row menu when the panel goes away (onDestroy); a cancelled
     // close keeps it on the panel.
@@ -224,7 +231,7 @@
       : "relative z-20 has-[[data-fullscreen-panel]]:z-[100] mb-4 scroll-mt-32 rounded-lg border shadow-sm"
   }`}
 >
-  <WorkbenchHeader {tabs}>
+  <WorkbenchHeader {tabs} {activeTabId}>
     {#snippet renderTab(tab)}
       <button
         type="button"
@@ -245,8 +252,12 @@
             aria-hidden="true">{paneBadges.get(tab.id)}</span
           >
         {/if}
-        <span class="inline-block max-w-[10rem] truncate">{tab.title}</span>
-        <span class="inline-block max-w-[12rem] truncate text-xs opacity-70">{tab.subtitle}</span>
+        <!-- When the tab is narrow the subtitle gives way first: the kind (YAML, Logs) and the
+             name must stay readable. -->
+        <span class="inline-block max-w-[10rem] shrink-0 truncate">{tab.title}</span>
+        <span class="inline-block min-w-0 max-w-[12rem] truncate text-xs opacity-70"
+          >{tab.subtitle}</span
+        >
       </button>
       <button
         type="button"

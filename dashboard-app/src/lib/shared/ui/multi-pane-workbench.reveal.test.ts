@@ -3,7 +3,10 @@ import { createRawSnippet, tick } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import MultiPaneWorkbench from "./multi-pane-workbench.svelte";
 
-const body = createRawSnippet(() => ({ render: () => "<div>panel body</div>" }));
+const body = createRawSnippet(() => ({
+  render: () =>
+    '<div><pre tabindex="0" data-testid="log-output">line 1</pre><input aria-label="Search in logs" /></div>',
+}));
 const tabs = [{ id: "logs:web", title: "Logs", subtitle: "shop/web" }];
 
 function props(overrides: Record<string, unknown> = {}) {
@@ -99,6 +102,18 @@ describe("workbench reveal after a row action", () => {
     // The last tab closed: the panel goes away and focus returns to the row menu.
     view.unmount();
     expect(document.activeElement).toBe(opener);
+  });
+
+  it("Esc on the log output closes the tab; Esc in the search field does not", async () => {
+    const onCloseTab = vi.fn();
+    const view = render(MultiPaneWorkbench, { props: props({ revealToken: 1, onCloseTab }) });
+    await settle();
+
+    await fireEvent.keyDown(view.getByLabelText("Search in logs"), { key: "Escape" });
+    expect(onCloseTab).not.toHaveBeenCalled();
+
+    await fireEvent.keyDown(view.getByTestId("log-output"), { key: "Escape" });
+    expect(onCloseTab).toHaveBeenCalledWith("logs:web");
   });
 
   it("gives focus back when the panel goes away with focus inside", async () => {

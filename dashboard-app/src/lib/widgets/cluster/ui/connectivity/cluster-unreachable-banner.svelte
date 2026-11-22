@@ -55,7 +55,7 @@
     if (connectivity.reason === "Certificate not trusted") {
       return "Check the certificate-authority entry in your kubeconfig.";
     }
-    return "Check the server: address in your kubeconfig, then your VPN or network.";
+    return "Check the server address in your kubeconfig, then your VPN or network.";
   });
   const tone = $derived(
     mode === "waiting"

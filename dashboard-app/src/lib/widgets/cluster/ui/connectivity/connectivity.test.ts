@@ -79,7 +79,7 @@ describe("ClusterUnreachableBanner", () => {
     expect(banner).toHaveTextContent("minikube did not answer, so there is no data to show.");
     expect(banner).toHaveTextContent("Reason: No route to the cluster address.");
     expect(banner).toHaveTextContent(
-      "Check the server: address in your kubeconfig, then your VPN or network.",
+      "Check the server address in your kubeconfig, then your VPN or network.",
     );
     // The raw error stays under Details.
     expect(banner).not.toHaveTextContent(NO_ROUTE);
