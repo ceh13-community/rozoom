@@ -14,6 +14,7 @@ import {
   RESTORE_DELAY_MS,
 } from "./main-pane-probe";
 import {
+  describeLayer,
   formatMainPaneLine,
   looksBlank,
   probeRoute,
@@ -38,6 +39,8 @@ const healthy: MainPaneState = {
   covered: 0,
   animations: 0,
   center: "content",
+  layer: "none",
+  bodyPointer: "auto",
 };
 
 describe("looksBlank", () => {
@@ -71,6 +74,38 @@ describe("looksBlank", () => {
   });
 });
 
+// The field line said only "outside:div" or "outside:html" for a covered pane, which did
+// not tell which layer it was.
+describe("describeLayer", () => {
+  function setupLayer(html: string) {
+    document.body.innerHTML = `<main id="pane"><p id="row">row</p></main>${html}`;
+    const main = document.getElementById("pane") as HTMLElement;
+    return { main, find: (id: string) => document.getElementById(id) };
+  }
+
+  it("names the positioned layer by tag, role, data-attribute names and z-index", () => {
+    const { main, find } = setupLayer(
+      '<div role="dialog" data-details-panel data-state="open" data-name="payments-api" style="position:fixed;z-index:180"><pre id="out">secret-output</pre></div>',
+    );
+    const layer = describeLayer(main, find("out"), window);
+    expect(layer).toBe("div:role-dialog:data-details-panel:data-state:data-name:z180");
+    expect(layer).not.toContain("payments-api");
+    expect(layer).not.toContain("secret-output");
+  });
+
+  it("says root when the hit is the document element, none when the pane is on top", () => {
+    const { main, find } = setupLayer("");
+    expect(describeLayer(main, document.documentElement, window)).toBe("root");
+    expect(describeLayer(main, find("row"), window)).toBe("none");
+    expect(describeLayer(main, null, window)).toBe("none");
+  });
+
+  it("says in-flow when no positioned ancestor with a z-index holds the hit", () => {
+    const { main, find } = setupLayer('<aside><span id="label">Pods</span></aside>');
+    expect(describeLayer(main, find("label"), window)).toBe("span:in-flow");
+  });
+});
+
 describe("probeRoute", () => {
   it("keeps a plain workload slug", () => {
     expect(probeRoute("/dashboard/clusters/[slug]", "daemonsets")).toBe(
@@ -100,7 +135,7 @@ describe("formatMainPaneLine", () => {
     expect(formatMainPaneLine(healthy, "/dashboard", "navigate")).toBe(
       "[main-pane] trigger=navigate route=/dashboard visibility=visible focus=1 size=1180x820 " +
         "scroll=0/2400 elements=900 text=4200 invisible=0 hits=25/25 covered=0/25 animations=0 " +
-        "center=content",
+        "center=content layer=none body-pointer=auto",
     );
   });
 
