@@ -861,8 +861,12 @@ async function buildRun(
   const sourceSummaries: DeprecationSourceSummary[] = [];
 
   const clusterVersion = await fetchClusterVersion(clusterId);
-  const configuredTarget = getClusterTargetVersion(clusterId, config);
-  const targetVersion = configuredTarget || clusterVersion;
+  // The cluster's own version unless the person set one for this cluster. The config
+  // default (v1.31.0) used to win over the detected version, so a v1.33 cluster was
+  // scanned against v1.31 while the page said "Auto-detected from cluster version".
+  const clusterOverride = get(deprecationScanTargetVersionByCluster)[clusterId] || null;
+  const targetVersion =
+    clusterOverride || clusterVersion || getClusterTargetVersion(clusterId, config);
   if (!targetVersion || !isVersionLike(targetVersion)) {
     return {
       run: null,

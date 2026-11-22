@@ -76,6 +76,29 @@ describe("deprecation scan store", () => {
     expect(versions["cluster-a"]).toBe("v1.32.0");
   });
 
+  // The config default (v1.31.0) used to win over the detected version: a v1.33 cluster
+  // was scanned against v1.31 while the page said "Auto-detected from cluster version".
+  it("targets the cluster's own version unless one is set for the cluster", async () => {
+    vi.mocked(kubectlRawArgsFront).mockImplementation(async (args: string[]) =>
+      args.includes("version")
+        ? {
+            output: JSON.stringify({ serverVersion: { gitVersion: "v1.33.1" } }),
+            errors: "",
+            code: 0,
+          }
+        : { output: "", errors: "", code: 0 },
+    );
+    vi.mocked(execCli).mockResolvedValue({ code: 1, stdout: "", stderr: "pluto: not found" });
+
+    const auto = await runDeprecationScan("cluster-a", { force: true, source: "manual" });
+    expect(auto.targetVersion).toBe("v1.33.1");
+    expect(auto.warnings?.join(" ") ?? "").not.toContain("lower than cluster server version");
+
+    setDeprecationScanTargetVersion("cluster-a", "v1.32.0");
+    const chosen = await runDeprecationScan("cluster-a", { force: true, source: "manual" });
+    expect(chosen.targetVersion).toBe("v1.32.0");
+  });
+
   it("returns needsConfig when target version is invalid", async () => {
     deprecationScanConfig.set({
       targetVersion: null,
