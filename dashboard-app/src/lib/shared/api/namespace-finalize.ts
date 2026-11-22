@@ -74,6 +74,6 @@ export function forceFinalizeConfirmText(name: string) {
     "",
     "Kubernetes deletes the namespace without waiting for the cleanup its finalizers guard. Use this only for a namespace stuck in Terminating.",
     "",
-    "Objects still in the namespace are removed without their own cleanup: cloud load balancers, volumes and DNS records they created can stay behind and keep costing money. This cannot be undone.",
+    "Objects still in the namespace are not deleted: they stay in the cluster store, hidden, and come back if a namespace with the same name is created. Their own cleanup does not run, so cloud load balancers, volumes and DNS records they created stay behind and can keep costing money. This cannot be undone.",
   ].join("\n");
 }

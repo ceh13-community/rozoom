@@ -61,10 +61,16 @@ describe("forceFinalizeNamespace", () => {
     expect(d.files.size).toBe(0);
   });
 
+  // Seen on minikube: a ConfigMap with a finalizer survived the force finalize and came
+  // back when a namespace with the same name was created again.
   it("says what is lost before the person agrees", () => {
     const text = forceFinalizeConfirmText("shop");
     expect(text).toContain("stuck in Terminating");
+    expect(text).toContain("are not deleted");
+    expect(text).toContain("come back if a namespace with the same name is created");
     expect(text).toContain("load balancers, volumes and DNS records");
+    expect(text).toContain("can keep costing money");
     expect(text).toContain("cannot be undone");
+    expect(text).not.toContain("are removed");
   });
 });
