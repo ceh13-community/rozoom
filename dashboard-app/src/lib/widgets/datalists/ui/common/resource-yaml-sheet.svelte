@@ -96,14 +96,23 @@
     };
   });
 
+  const ESCAPE_OWNERS = '[role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"]';
+
   function toggleFullscreen() {
     isFullscreen = !isFullscreen;
   }
 
+  // Esc leaves full screen, and only that. The list behind the panel (Deployments,
+  // DaemonSets) closes the active tab on Esc from its own window listener, added before
+  // this one: listening in the capture phase runs first, and preventDefault tells the list,
+  // the workbench and the overlay stack that the key is used. Esc in an open menu or
+  // dialog stays theirs.
   function handleWindowKeydown(event: KeyboardEvent) {
-    if (event.key !== "Escape") return;
-    if (!isFullscreen) return;
+    if (event.key !== "Escape" || !isFullscreen || event.defaultPrevented) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest(ESCAPE_OWNERS)) return;
     isFullscreen = false;
+    event.preventDefault();
   }
 
   function getCollapsedLabel() {
@@ -158,7 +167,7 @@
   }
 </script>
 
-<svelte:window onkeydown={handleWindowKeydown} />
+<svelte:window onkeydowncapture={handleWindowKeydown} />
 
 <WorkbenchSheetShell
   {embedded}
