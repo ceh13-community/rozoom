@@ -60,31 +60,26 @@ export function mergeOsTools(
 }
 
 /**
- * Which cloud CLIs are installed, for Cloud Import: `which` only, the CLIs themselves are
- * not run. Tools a probe already looked at are not probed again.
+ * Which cloud CLIs are installed, for Cloud Import, when the wizard opens: `which` only, the
+ * CLIs themselves are not run. A CLI already found is not probed again; one not found (or not
+ * probed yet) is, so a CLI installed since the last look shows up without a restart.
  */
 export async function loadCloudCliPresence(tools: readonly string[]): Promise<void> {
-  const known = new Set(get(detectedOsTools).map((tool) => tool.tool));
-  const missing = tools.filter((tool) => !known.has(tool));
-  if (missing.length === 0) return;
-  try {
-    const found = await detectOsToolPresence(missing);
-    detectedOsTools.update((current) => mergeOsTools(found, current));
-  } catch {
-    // Detection is best-effort: without it no installed CLI is offered.
-  }
+  const found = new Set(
+    get(detectedOsTools)
+      .filter((tool) => tool.available)
+      .map((tool) => tool.tool),
+  );
+  await recheckCloudCliPresence(tools.filter((tool) => !found.has(tool)));
 }
 
 /**
  * Looks again with `which` (on Scan): a cloud CLI removed since the app started is no longer
- * offered and one installed since then is, without a restart. The new result wins.
+ * offered and one installed since then is, without a restart. The new result wins; a tool
+ * the probe could not answer for is not in it, so what is known about it stays.
  */
 export async function recheckCloudCliPresence(tools: readonly string[]): Promise<void> {
   if (tools.length === 0) return;
-  try {
-    const found = await detectOsToolPresence(tools);
-    detectedOsTools.update((current) => mergeOsTools(current, found));
-  } catch {
-    // A failed probe proves nothing about the CLI: keep what is known.
-  }
+  const probed = await detectOsToolPresence(tools);
+  detectedOsTools.update((current) => mergeOsTools(current, probed));
 }

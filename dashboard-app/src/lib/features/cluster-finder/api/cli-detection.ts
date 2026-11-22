@@ -150,16 +150,21 @@ async function probeOsTool(entry: ToolEntry): Promise<DetectedOsTool> {
  * Whether each tool is on the PATH, with `which` (or `where.exe`) only: the tools themselves
  * are not run, so nothing of theirs executes before the person asks for it. Version stays
  * null; the full scan fills it.
+ *
+ * Exit 0 is found, exit 1 is not found. Any other exit, or `which` failing to start, says
+ * nothing about the tool: it is left out of the result (unknown), so it never overwrites
+ * what is known and a broken probe does not read as "removed".
  */
 export async function detectOsToolPresence(tools: readonly string[]): Promise<DetectedOsTool[]> {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, @typescript-eslint/no-deprecated -- runtime guard for SSR; no alternative to navigator.platform
   const isWindows = typeof navigator !== "undefined" && /Win/i.test(navigator.platform ?? "");
   const whichCmd = isWindows ? "where.exe" : "which";
-  return Promise.all(
-    tools.map(async (tool) => {
+  const probed = await Promise.all(
+    tools.map(async (tool): Promise<DetectedOsTool | null> => {
       const entry = TOOL_REGISTRY.find((candidate) => candidate.tool === tool);
       try {
         const result = await Command.create(whichCmd, [tool]).execute();
+        if (result.code !== 0 && result.code !== 1) return null;
         const stdout = typeof result.stdout === "string" ? result.stdout : "";
         return {
           tool,
@@ -169,16 +174,11 @@ export async function detectOsToolPresence(tools: readonly string[]): Promise<De
           version: null,
         };
       } catch {
-        return {
-          tool,
-          provider: entry?.provider ?? null,
-          available: false,
-          path: null,
-          version: null,
-        };
+        return null;
       }
     }),
   );
+  return probed.filter((tool): tool is DetectedOsTool => tool !== null);
 }
 
 export async function detectOsTools(): Promise<DetectedOsTool[]> {

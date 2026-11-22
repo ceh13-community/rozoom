@@ -28,4 +28,21 @@ describe("detectOsToolPresence", () => {
     ]);
     expect(create.mock.calls.every(([program]) => program === "which")).toBe(true);
   });
+
+  // Exit 1 is "not found". A which that exits otherwise or does not start says nothing about
+  // the tool: it is left out (unknown) instead of reading as removed.
+  it("leaves out tools whose which exits with another code or does not start", async () => {
+    create.mockImplementation((_program: string, args: string[]) => ({
+      execute: async () => {
+        if (args[0] === "gcloud") throw new Error("which: failed to start");
+        return args[0] === "az"
+          ? { code: 2, stdout: "", stderr: "which: invalid option" }
+          : { code: 1, stdout: "", stderr: "" };
+      },
+    }));
+    const found = await detectOsToolPresence(["aws", "gcloud", "az"]);
+    expect(found.map(({ tool, available }) => ({ tool, available }))).toEqual([
+      { tool: "aws", available: false },
+    ]);
+  });
 });

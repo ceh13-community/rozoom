@@ -368,10 +368,14 @@
   // machine for slim. Without any of them the method is not offered at all.
   const availableCloudProviders = $derived(getAvailableCloudProviders($detectedOsTools));
   // A cloud CLI the build does not bundle counts once it is found on the PATH (`which`
-  // only; the CLI itself is not run until the person lists clusters). Scan looks again.
-  $effect(() => {
+  // only; the CLI itself is not run until the person lists clusters). Looked for when the
+  // page opens and each time the wizard is expanded; Scan and List clusters look again.
+  function lookForCloudClis() {
     const tools = getUnbundledCloudTools();
     if (tools.length > 0) void loadCloudCliPresence(tools);
+  }
+  $effect(() => {
+    lookForCloudClis();
   });
 
   // Start on a provider this build can run.
@@ -883,6 +887,9 @@
 <details
   class="bg-white/70 backdrop-blur-sm border border-slate-200/50 dark:bg-slate-800/60 dark:border-slate-700/60 rounded-xl shadow-sm group"
   open={$clustersList.length === 0}
+  ontoggle={(event) => {
+    if (event.currentTarget.open) lookForCloudClis();
+  }}
 >
   <summary
     class="flex items-center justify-between cursor-pointer p-4 hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition rounded-xl"

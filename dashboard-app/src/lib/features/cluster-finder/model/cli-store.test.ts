@@ -66,12 +66,24 @@ describe("detected OS tools", () => {
     expect(tools.find((t) => t.tool === "gcloud")?.available).toBe(true);
   });
 
-  it("recheck: a failed probe keeps what is known", async () => {
+  it("recheck: a tool the probe could not answer for keeps what is known", async () => {
     const { detectOsToolPresence } = await import("../api/cli-detection");
     await loadCloudCliPresence(["aws"]);
-    vi.mocked(detectOsToolPresence).mockRejectedValueOnce(new Error("which failed"));
+    // The probe leaves out a tool whose `which` broke (unknown).
+    vi.mocked(detectOsToolPresence).mockResolvedValueOnce([]);
     await recheckCloudCliPresence(["aws"]);
     expect(get(detectedOsTools).find((t) => t.tool === "aws")?.available).toBe(true);
+  });
+
+  it("on open, a CLI not found before is looked for again, a found one is not", async () => {
+    const { detectOsToolPresence } = await import("../api/cli-detection");
+    await loadCloudCliPresence(["aws", "gcloud"]);
+    vi.mocked(detectOsToolPresence).mockImplementationOnce(async (tools) =>
+      tools.map((name) => tool(name, true)),
+    );
+    await loadCloudCliPresence(["aws", "gcloud"]);
+    expect(vi.mocked(detectOsToolPresence)).toHaveBeenLastCalledWith(["gcloud"]);
+    expect(get(detectedOsTools).find((t) => t.tool === "gcloud")?.available).toBe(true);
   });
 
   it("merge: a newer probe wins for the tools it looked at", () => {

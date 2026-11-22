@@ -6,26 +6,28 @@ import ConnectClusterWizard from "./connect-cluster-wizard.svelte";
 
 // Which cloud CLIs are installed was checked once, at start: an aws removed later stayed
 // offered and failed on Scan, one installed later stayed hidden until a restart. Scan looks
-// again with `which`. The real CLI store runs here; only `which` is faked.
-const { installed, listCloudClusters, listCloudClustersAllScopes } = vi.hoisted(() => ({
+// again with `which`. The real CLI store and detection run here; only the `which` process is
+// faked: exit 0 found, exit 1 not found, `broken` makes it exit 2 or fail to start.
+const { installed, which, listCloudClusters, listCloudClustersAllScopes } = vi.hoisted(() => ({
   installed: new Set<string>(),
+  which: { broken: null as null | "exit 2" | "no start" },
   listCloudClusters: vi.fn(async () => ({ clusters: [] })),
   listCloudClustersAllScopes: vi.fn(async () => ({ clusters: [], errors: [] })),
 }));
 
-vi.mock("$features/cluster-finder/api/cli-detection", () => ({
-  detectAvailableClis: vi.fn(async () => []),
-  detectOsTools: vi.fn(async () => []),
-  detectCloudConfigs: vi.fn(async () => []),
-  detectOsToolPresence: vi.fn(async (tools: string[]) =>
-    tools.map((tool) => ({
-      tool,
-      provider: null,
-      available: installed.has(tool),
-      path: installed.has(tool) ? `/usr/bin/${tool}` : null,
-      version: null,
-    })),
-  ),
+vi.mock("@tauri-apps/plugin-shell", () => ({
+  Command: {
+    create: (program: string, args: string[]) => ({
+      execute: async () => {
+        if (program !== "which") throw new Error(`unexpected ${program}`);
+        if (which.broken === "no start") throw new Error("which: failed to start");
+        if (which.broken === "exit 2") return { code: 2, stdout: "", stderr: "" };
+        return installed.has(args[0])
+          ? { code: 0, stdout: `/usr/bin/${args[0]}\n`, stderr: "" }
+          : { code: 1, stdout: "", stderr: "" };
+      },
+    }),
+  },
 }));
 vi.mock("$features/cluster-manager/api/cloud-import", () => ({
   listCloudClusters,
@@ -67,6 +69,7 @@ describe("Scan checks again which cloud CLIs are installed", () => {
   beforeEach(() => {
     localStorage.clear();
     installed.clear();
+    which.broken = null;
     detectedOsTools.set([]);
     detectedCloudConfigs.set([]);
     listCloudClusters.mockClear();
@@ -119,5 +122,49 @@ describe("Scan checks again which cloud CLIs are installed", () => {
 
     await vi.waitFor(() => expect(listCloudClustersAllScopes).toHaveBeenCalledWith("AWS EKS"));
     expect(cloudMethod()).toBeTruthy();
+  });
+
+  it.each(["exit 2", "no start"] as const)(
+    "a which that breaks (%s) does not read as removed: aws stays offered and runs",
+    async (broken) => {
+      installed.add("aws");
+      const view = render(ConnectClusterWizard);
+      await vi.waitFor(() => expect(cloudMethod()).toBeTruthy());
+      await fireEvent.click(cloudMethod()!);
+
+      which.broken = broken;
+      await fireEvent.click(view.getByRole("button", { name: "List clusters" }));
+      await vi.waitFor(() => expect(listCloudClusters).toHaveBeenCalled());
+      expect(view.queryByText(/no longer found/)).toBeNull();
+      expect(view.getByRole("button", { name: "List clusters" })).toBeTruthy();
+    },
+  );
+
+  it("an aws installed since start shows up when the wizard is expanded, without cloud configs", async () => {
+    const view = render(ConnectClusterWizard);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(cloudMethod()).toBeNull();
+    // No cloud config: the auto-detect panel and its Scan are not there.
+    expect(view.queryByRole("button", { name: "Scan" })).toBeNull();
+
+    const wizard = view.container.querySelector("details")!;
+    wizard.open = false;
+    await fireEvent(wizard, new Event("toggle"));
+    installed.add("aws");
+    wizard.open = true;
+    await fireEvent(wizard, new Event("toggle"));
+
+    await vi.waitFor(() => expect(cloudMethod()).toBeTruthy());
+  });
+
+  it("an aws installed since start shows up when the page is opened again", async () => {
+    const first = render(ConnectClusterWizard);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(cloudMethod()).toBeNull();
+    first.unmount();
+
+    installed.add("aws");
+    render(ConnectClusterWizard);
+    await vi.waitFor(() => expect(cloudMethod()).toBeTruthy());
   });
 });
