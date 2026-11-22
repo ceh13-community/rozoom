@@ -35,7 +35,7 @@ export async function loadDetectedClis(): Promise<void> {
     ]);
     const clis = await detectAvailableClis(manifest);
     detectedClis.set(clis);
-    detectedOsTools.set(osTools);
+    detectedOsTools.set(mergeOsTools(get(detectedOsTools), osTools));
     detectedCloudConfigs.set(configs);
   } catch {
     detectedClis.set([]);
@@ -47,14 +47,29 @@ export async function loadDetectedClis(): Promise<void> {
 }
 
 /**
- * Which cloud CLIs are installed, for Cloud Import, before the person runs the full scan:
- * `which` only, the CLIs themselves are not run. A full scan already done is kept.
+ * Tools found by a newer probe replace the same tools from an older one; tools the newer
+ * probe did not look at stay. The full scan on slim probes only the tools the build enables
+ * (kubectl, helm) and used to drop the cloud CLIs the presence check had found.
+ */
+export function mergeOsTools(
+  previous: readonly DetectedOsTool[],
+  next: readonly DetectedOsTool[],
+): DetectedOsTool[] {
+  const probed = new Set(next.map((tool) => tool.tool));
+  return [...previous.filter((tool) => !probed.has(tool.tool)), ...next];
+}
+
+/**
+ * Which cloud CLIs are installed, for Cloud Import: `which` only, the CLIs themselves are
+ * not run. Tools a probe already looked at are not probed again.
  */
 export async function loadCloudCliPresence(tools: readonly string[]): Promise<void> {
-  if (get(detectedOsTools).length > 0) return;
+  const known = new Set(get(detectedOsTools).map((tool) => tool.tool));
+  const missing = tools.filter((tool) => !known.has(tool));
+  if (missing.length === 0) return;
   try {
-    const found = await detectOsToolPresence(tools);
-    if (get(detectedOsTools).length === 0) detectedOsTools.set(found);
+    const found = await detectOsToolPresence(missing);
+    detectedOsTools.update((current) => mergeOsTools(found, current));
   } catch {
     // Detection is best-effort: without it no installed CLI is offered.
   }
