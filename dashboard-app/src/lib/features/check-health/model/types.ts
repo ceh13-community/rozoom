@@ -1075,6 +1075,13 @@ export type ServiceMeshReport = {
   updatedAt: number;
 };
 
+export type ImageFreshnessItem = {
+  namespace: string;
+  pod: string;
+  container: string;
+  image: string;
+};
+
 export type ImageFreshnessReport = {
   status: "ok" | "warning" | "critical" | "unknown";
   summary: {
@@ -1082,6 +1089,8 @@ export type ImageFreshnessReport = {
     latestTagCount: number;
     noDigestCount: number;
   };
+  /** Containers running a :latest or untagged image. */
+  items?: ImageFreshnessItem[];
   updatedAt: number;
 };
 

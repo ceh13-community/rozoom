@@ -154,6 +154,12 @@ describe("getLastHealthCheck", () => {
             healthLoadedAt: 19,
           },
           apiServerLatency: { status: "warning", updatedAt: 19 },
+          imageFreshness: {
+            status: "warning",
+            summary: { totalContainers: 1, latestTagCount: 1, noDigestCount: 1 },
+            items: [],
+            updatedAt: 19,
+          },
           resourcesHygiene: {
             status: "ok",
             summary: {
@@ -183,6 +189,7 @@ describe("getLastHealthCheck", () => {
       },
       apiServerLatency: { status: "warning" },
       resourcesHygiene: { status: "ok" },
+      imageFreshness: { status: "warning" },
     });
   });
 

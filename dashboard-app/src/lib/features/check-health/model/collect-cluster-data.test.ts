@@ -1047,6 +1047,53 @@ describe("collectClusterData - error handling", () => {
     });
   });
 
+  // Image freshness had a check and a score rule but nothing ever ran it.
+  it("checks image tags in config diagnostics from the pods already loaded", async () => {
+    vi.mocked(loadClusterEntities).mockResolvedValueOnce({
+      uuid: "abc",
+      pods: {
+        items: [
+          {
+            metadata: { namespace: "lint", name: "app-1" },
+            spec: { containers: [{ name: "app", image: "busybox:latest" }] },
+            status: { phase: "Running", containerStatuses: [] },
+          },
+          {
+            metadata: { namespace: "lint", name: "pinned-1" },
+            spec: { containers: [{ name: "app", image: "busybox:1.36.1" }] },
+            status: { phase: "Running", containerStatuses: [] },
+          },
+        ],
+      },
+      daemonsets: { items: [] },
+      deployments: { items: [] },
+      jobs: { items: [] },
+      configmaps: { items: [] },
+      networkpolicies: { items: [] },
+      poddisruptionbudgets: { items: [] },
+      priorityclasses: { items: [] },
+      replicasets: { items: [] },
+      statefulsets: { items: [] },
+      cronjobs: { items: [] },
+      nodes: { items: [] },
+      namespaces: { items: [] },
+      secrets: { items: [] },
+      name: "abc",
+      offline: false,
+      status: "ok",
+    } as any);
+
+    const result = await collectClusterData("abc", { mode: "dashboardConfigDiagnostics" });
+
+    expect(result).toMatchObject({
+      imageFreshness: {
+        status: "warning",
+        summary: { totalContainers: 2, latestTagCount: 1 },
+        items: [{ namespace: "lint", pod: "app-1", container: "app", image: "busybox:latest" }],
+      },
+    });
+  });
+
   it("reruns health diagnostics when only the dashboard timestamp is fresh but the health snapshot marker is stale", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-15T23:50:00.000Z"));

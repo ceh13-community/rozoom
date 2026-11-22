@@ -127,7 +127,8 @@ type ConfigDiagnosticsField =
   | "podSecurity"
   | "networkIsolation"
   | "secretsHygiene"
-  | "securityHardening";
+  | "securityHardening"
+  | "imageFreshness";
 
 type HealthDiagnosticsField =
   | "apiServerHealth"
@@ -153,6 +154,7 @@ const CONFIG_DIAGNOSTICS_FIELDS: ConfigDiagnosticsField[] = [
   "networkIsolation",
   "secretsHygiene",
   "securityHardening",
+  "imageFreshness",
 ];
 
 const HEALTH_DIAGNOSTICS_FIELDS: HealthDiagnosticsField[] = [

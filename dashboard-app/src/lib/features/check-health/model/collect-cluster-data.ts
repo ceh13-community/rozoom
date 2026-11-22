@@ -33,6 +33,7 @@ import { checkPdbStatus } from "../api/check-pdb";
 import { checkPriorityStatus } from "../api/check-priority";
 import { checkPodSecurity } from "../api/check-pod-security";
 import { checkSecurityHardening } from "../api/check-security-hardening";
+import { checkImageFreshness, podContainerImages } from "../api/check-image-freshness";
 import { checkNetworkIsolation } from "../api/check-network-isolation";
 import { checkSecretsHygiene } from "../api/check-secrets-hygiene";
 import { loadClusterEntities } from "../api/get-cluster-info";
@@ -898,6 +899,11 @@ export async function collectClusterData(
         ? checkSecurityHardening(clusterId, { data: diagnosticsData })
         : Promise.resolve(previousCheck?.securityHardening),
   ]);
+  // Same gate as the config checks above; reads the pods already loaded, no extra request.
+  const imageFreshness =
+    (dashboardLightMode && !bootstrapDashboardDiagnostics) || !dashboardConfigDiagnosticsMode
+      ? previousCheck?.imageFreshness
+      : checkImageFreshness(podContainerImages(diagnosticsPodItems));
   if (isStopped()) {
     clusterStates.update((states) => ({
       ...states,
@@ -955,6 +961,7 @@ export async function collectClusterData(
     // over so a later refresh does not drop them from the stored check.
     ingressStatus: previousCheck?.ingressStatus,
     rbacOverview: previousCheck?.rbacOverview,
+    imageFreshness,
     daemonSets: usePreviousDaemonSets
       ? (previousCheck?.daemonSets ?? 0)
       : daemonSetItems.length || 0,
