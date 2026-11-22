@@ -3533,7 +3533,7 @@
                 <div class="text-muted-foreground">No images found.</div>
               {:else}
                 {#each getImages() as image}
-                  <div class="break-all">{image}</div>
+                  <div class="break-all font-mono">{image}</div>
                 {/each}
               {/if}
             </div>

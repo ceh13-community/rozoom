@@ -66,7 +66,7 @@
           <div class="text-muted-foreground">{emptyText}</div>
         {:else}
           {#each entries as [key, value]}
-            <div class="break-all">
+            <div class="break-all font-mono">
               <span class="font-medium">{key}</span>: {String(value)}
             </div>
           {/each}
@@ -89,7 +89,7 @@
         <p class="text-muted-foreground">{emptyText}</p>
       {:else}
         {#each entries as [key, value]}
-          <p><span class="font-medium">{key}:</span> {String(value)}</p>
+          <p class="break-all font-mono"><span class="font-medium">{key}:</span> {String(value)}</p>
         {/each}
       {/if}
     </div>

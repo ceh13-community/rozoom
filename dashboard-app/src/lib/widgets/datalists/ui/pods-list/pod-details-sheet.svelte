@@ -457,7 +457,7 @@
               class="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0"
             >
               <div class="min-w-0 truncate font-medium text-foreground">{container.name}</div>
-              <div class="min-w-0 truncate text-muted-foreground">{container.image}</div>
+              <div class="min-w-0 truncate font-mono text-muted-foreground">{container.image}</div>
               <div class="min-w-0 truncate text-muted-foreground">{container.ready}</div>
               <div class="min-w-0 truncate text-muted-foreground">{container.restarts}</div>
             </div>

@@ -95,6 +95,7 @@
       onclick={onClose}
     ></button>
     <aside
+      data-details-panel
       class="fixed inset-y-0 right-0 z-[195] w-full border-l bg-background shadow-lg outline-none {maxWidthClass}"
       tabindex="-1"
       use:focusOnOpen
