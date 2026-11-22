@@ -29,6 +29,16 @@ describe("connect cluster form fields", () => {
     expect(dark).toEqual([]);
   });
 
+  // White text on hover and light placeholders vanish on a light background.
+  it("pair white hovers and light placeholders with dark:", () => {
+    const light = [
+      ...source.matchAll(
+        /(?<![\w:-])(?:(?:group-)?hover:text-white|placeholder:text-[a-z]+-(?:200|300|400))\b/g,
+      ),
+    ].map((m) => m[0]);
+    expect(light).toEqual([]);
+  });
+
   it("follow the app theme", () => {
     expect(source).not.toContain("bg-slate-900/50");
     // The preview, test and Vault panels were fixed dark boxes too.
