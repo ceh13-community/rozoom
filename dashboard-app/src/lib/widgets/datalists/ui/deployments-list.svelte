@@ -1,6 +1,7 @@
 <script lang="ts">
   import { registerUnsavedWork } from "$shared/lib/unsaved-work";
   import { pickLiveItem } from "./common/workload-details-model";
+  import { isLiveItemGone, pickLiveItem } from "./common/workload-details-model";
   import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
@@ -250,6 +251,13 @@
   // while the Pods block already showed the pods ready.
   $effect(() => {
     const current = untrack(() => selectedItem);
+    // Deleted while the panel was open: close it instead of showing what is gone.
+    if (isLiveItemGone<DeploymentItem>(current, deploymentsSnapshot)) {
+      untrack(() => {
+        isOpen = false;
+      });
+      return;
+    }
     const next = pickLiveItem<DeploymentItem>(current, deploymentsSnapshot);
     if (next && current) selectedItem = { ...next, uuid: current.uuid };
   });

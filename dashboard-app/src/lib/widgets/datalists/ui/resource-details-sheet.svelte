@@ -16,9 +16,10 @@
   import ScrollText from "@lucide/svelte/icons/scroll-text";
   import Search from "@lucide/svelte/icons/search";
   import Trash from "@lucide/svelte/icons/trash";
-  import { tick } from "svelte";
+  import { tick, untrack } from "svelte";
   import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
   import {
+    createTrailingThrottle,
     mapWorkloadPods,
     parseTopPods,
     workloadPodsSelector,
@@ -49,6 +50,8 @@
   type ResourceMetadata = NonNullable<ResourceItem["metadata"]>;
 
   interface ResourceDetailsSheetProps<TItem> {
+    /** How often CPU and memory of the Pods block refresh: the list's sync interval. */
+    podMetricsRefreshSeconds?: number;
     clusterId: string;
     title: string;
     selectedItem: Writable<TItem | null>;
@@ -112,6 +115,7 @@
     runtimeReason = null,
     runtimeRequestPath = null,
     runtimeSyncError = null,
+    podMetricsRefreshSeconds = 30,
     events = [],
     eventsLoading = false,
     eventsError = null,
@@ -122,72 +126,122 @@
   }
 
   // The Pods block reads the cluster: a StatefulSet, ReplicaSet or CronJob object does not
-  // list its pods. Loaded when the panel opens and again when the object changes.
+  // list its pods. They load when the panel opens, then at most every 5 s while the object
+  // changes (a rollout changes it several times a second), always once more after the last
+  // change. CPU and memory come from `kubectl top` on the list's sync interval.
+  const PODS_RELOAD_MIN_MS = 5_000;
   let clusterPods = $state<WorkloadDetailsPod[] | null>(null);
+  let clusterPodsTop = $state<Map<string, { cpu: string; memory: string }>>(new Map());
   let clusterPodsError = $state<string | null>(null);
   let clusterPodsLoading = $state(false);
-  // Plain, not $state: the effect below reads and writes it.
-  let clusterPodsKey: string | null = null;
+  // Plain, not $state: the effects below read and write them.
+  let clusterPodsObject: string | null = null;
+  let clusterPodsVersion: string | null = null;
+  let clusterPodsTarget: { namespace: string; selector: string; object: string } | null = null;
   let clusterPodsController: AbortController | null = null;
+  let clusterPodsTopTimer: ReturnType<typeof setInterval> | null = null;
+  const clusterPodsReload = createTrailingThrottle(() => {
+    void loadClusterPods();
+  }, PODS_RELOAD_MIN_MS);
 
-  async function loadClusterPods(item: ResourceItem, selector: string, key: string) {
+  async function loadClusterPods() {
+    const target = clusterPodsTarget;
+    if (!target) return;
     clusterPodsController?.abort();
     const controller = new AbortController();
     clusterPodsController = controller;
-    const namespace = item.metadata?.namespace ?? "default";
     try {
-      const [pods, top] = await Promise.all([
-        kubectlRawArgsFront(["get", "pods", "-n", namespace, "-l", selector, "-o", "json"], {
-          clusterId,
-          signal: controller.signal,
-        }),
-        kubectlRawArgsFront(["top", "pods", "-n", namespace, "-l", selector, "--no-headers"], {
-          clusterId,
-          signal: controller.signal,
-        }).catch(() => null),
-      ]);
-      if (controller.signal.aborted || clusterPodsKey !== key) return;
-      if (pods.code !== 0) throw new Error(pods.errors || "Failed to load pods.");
-      clusterPods = mapWorkloadPods(
-        pods.output || "{}",
-        namespace,
-        top?.code === 0 ? parseTopPods(top.output) : undefined,
+      const pods = await kubectlRawArgsFront(
+        ["get", "pods", "-n", target.namespace, "-l", target.selector, "-o", "json"],
+        { clusterId, signal: controller.signal },
       );
+      if (controller.signal.aborted || clusterPodsObject !== target.object) return;
+      if (pods.code !== 0) throw new Error(pods.errors || "Failed to load pods.");
+      clusterPods = mapWorkloadPods(pods.output || "{}", target.namespace);
       clusterPodsError = null;
     } catch (error) {
-      if (controller.signal.aborted || clusterPodsKey !== key) return;
+      if (controller.signal.aborted || clusterPodsObject !== target.object) return;
       clusterPodsError = error instanceof Error ? error.message : "Failed to load pods.";
     } finally {
-      if (clusterPodsKey === key) clusterPodsLoading = false;
+      if (clusterPodsObject === target.object) clusterPodsLoading = false;
     }
+  }
+
+  async function loadClusterPodsTop() {
+    const target = clusterPodsTarget;
+    if (!target) return;
+    const top = await kubectlRawArgsFront(
+      ["top", "pods", "-n", target.namespace, "-l", target.selector, "--no-headers"],
+      { clusterId },
+    ).catch(() => null);
+    if (clusterPodsObject !== target.object || top?.code !== 0) return;
+    clusterPodsTop = parseTopPods(top.output);
+  }
+
+  function stopClusterPods() {
+    clusterPodsReload.cancel();
+    clusterPodsController?.abort();
+    clusterPodsController = null;
+    if (clusterPodsTopTimer) clearInterval(clusterPodsTopTimer);
+    clusterPodsTopTimer = null;
   }
 
   $effect(() => {
     const item = $selectedItem;
     const open = $isOpen;
     const selector = open && !isJobDetails() ? workloadPodsSelector(item) : null;
-    if (!item || !selector) {
-      clusterPodsKey = null;
-      clusterPods = null;
-      clusterPodsError = null;
-      clusterPodsLoading = false;
-      clusterPodsController?.abort();
-      return;
-    }
-    const key = `${item.metadata?.namespace ?? ""}/${item.metadata?.name ?? ""}@${(item.metadata as { resourceVersion?: string } | undefined)?.resourceVersion ?? ""}|${selector}`;
-    if (key === clusterPodsKey) return;
-    const sameObject = clusterPodsKey?.split("@")[0] === key.split("@")[0];
-    clusterPodsKey = key;
-    if (!sameObject) {
-      clusterPods = null;
-      clusterPodsError = null;
-      clusterPodsLoading = true;
-    }
-    void loadClusterPods(item, selector, key);
+    untrack(() => {
+      if (!item || !selector) {
+        stopClusterPods();
+        clusterPodsObject = null;
+        clusterPodsTarget = null;
+        clusterPods = null;
+        clusterPodsTop = new Map();
+        clusterPodsError = null;
+        clusterPodsLoading = false;
+        return;
+      }
+      const namespace = item.metadata?.namespace ?? "default";
+      const object = `${namespace}/${item.metadata?.name ?? ""}|${selector}`;
+      const version =
+        (item.metadata as { resourceVersion?: string } | undefined)?.resourceVersion ?? "";
+      clusterPodsTarget = { namespace, selector, object };
+      if (object !== clusterPodsObject) {
+        stopClusterPods();
+        clusterPodsObject = object;
+        clusterPodsVersion = version;
+        clusterPods = null;
+        clusterPodsTop = new Map();
+        clusterPodsError = null;
+        clusterPodsLoading = true;
+        clusterPodsReload.markRan();
+        void loadClusterPods();
+        void loadClusterPodsTop();
+        clusterPodsTopTimer = setInterval(
+          () => {
+            void loadClusterPodsTop();
+          },
+          Math.max(5, podMetricsRefreshSeconds) * 1000,
+        );
+        return;
+      }
+      if (version !== clusterPodsVersion) {
+        clusterPodsVersion = version;
+        clusterPodsReload.call();
+      }
+    });
   });
 
+  // Leaving the page: stop the pending reload, the request in flight and the metrics timer.
+  $effect(() => stopClusterPods);
+
   function getDetailsPods(): WorkloadDetailsPod[] {
-    return clusterPods ?? getPodsFromStatus();
+    const pods = clusterPods ?? getPodsFromStatus();
+    if (clusterPodsTop.size === 0) return pods;
+    return pods.map((pod) => {
+      const top = clusterPodsTop.get(pod.name);
+      return top ? { ...pod, cpu: top.cpu, memory: top.memory } : pod;
+    });
   }
 
   async function runAction(action?: (item: ResourceItem) => void) {

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { registerUnsavedWork } from "$shared/lib/unsaved-work";
-  import { pickLiveItem } from "./common/workload-details-model";
+  import { isLiveItemGone, pickLiveItem } from "./common/workload-details-model";
   import { createWorkbenchReveal } from "./common/workbench-reveal.svelte";
   import { provideListFreshness, watchStreamLive } from "./common/list-freshness-context.svelte";
   import { expandWorkbenchOnRealtimeSwitch } from "./common/realtime-expand.svelte";
@@ -330,7 +330,15 @@
   // The open details follow the list: status, ready counts and conditions change while the
   // panel is open, and a copy from the moment it opened contradicted the Pods block.
   $effect(() => {
-    const next = pickLiveItem(untrack(() => get(selectedItem)), statefulSetsSnapshot);
+    const current = untrack(() => get(selectedItem));
+    // Deleted while the panel was open: close it instead of showing what is gone.
+    if (isLiveItemGone(current, statefulSetsSnapshot)) {
+      untrack(() => {
+        isSheetOpen.set(false);
+      });
+      return;
+    }
+    const next = pickLiveItem(current, statefulSetsSnapshot);
     if (next) selectedItem.set(next);
   });
   const isSheetOpen = writable(false);
@@ -2662,6 +2670,7 @@
 </div>
 <ResourceDetailsSheet
   clusterId={data.slug}
+  podMetricsRefreshSeconds={watcherPolicy.refreshSeconds}
   title="Stateful Set"
   selectedItem={selectedItem}
   isOpen={isSheetOpen}

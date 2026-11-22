@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  createTrailingThrottle,
+  isLiveItemGone,
   mapWorkloadPods,
   parseTopPods,
   pickLiveItem,
@@ -88,5 +90,52 @@ describe("pods of a workload", () => {
         status: "ImagePullBackOff",
       },
     ]);
+  });
+});
+
+describe("isLiveItemGone", () => {
+  const open = { metadata: { name: "db", namespace: "shop" } };
+
+  it("is true only when a loaded list no longer has the object", () => {
+    expect(isLiveItemGone(open, [{ metadata: { name: "web", namespace: "shop" } }])).toBe(true);
+    expect(isLiveItemGone(open, [{ metadata: { name: "db", namespace: "shop" } }])).toBe(false);
+    expect(isLiveItemGone(open, [])).toBe(false);
+    expect(isLiveItemGone(null, [{ metadata: { name: "web", namespace: "shop" } }])).toBe(false);
+  });
+});
+
+describe("createTrailingThrottle", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("10 changes in a second after the open load run the load at most twice in all", () => {
+    const run = vi.fn();
+    const throttle = createTrailingThrottle(run, 5_000);
+    // The panel opened and loaded its pods.
+    run();
+    throttle.markRan();
+    for (let change = 0; change < 10; change += 1) {
+      vi.advanceTimersByTime(100);
+      throttle.call();
+    }
+    vi.advanceTimersByTime(10_000);
+    expect(run).toHaveBeenCalledTimes(2);
+  });
+
+  it("runs a change right away once the interval has passed, and cancel drops a pending run", () => {
+    const run = vi.fn();
+    const throttle = createTrailingThrottle(run, 5_000);
+    throttle.call();
+    expect(run).toHaveBeenCalledTimes(1);
+    throttle.call();
+    throttle.cancel();
+    vi.advanceTimersByTime(10_000);
+    expect(run).toHaveBeenCalledTimes(1);
+    throttle.call();
+    expect(run).toHaveBeenCalledTimes(2);
   });
 });

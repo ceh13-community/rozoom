@@ -22,6 +22,55 @@ export function pickLiveItem<T extends WithMeta>(current: T | null, items: reado
   return live;
 }
 
+/**
+ * Whether the object the open panel shows is gone from a loaded list (it was deleted).
+ * An empty list is not taken as "deleted": it may still be loading.
+ */
+export function isLiveItemGone<T extends WithMeta>(
+  current: T | null,
+  items: readonly T[],
+): boolean {
+  const name = current?.metadata?.name;
+  if (!current || !name || items.length === 0) return false;
+  const namespace = current.metadata?.namespace ?? "";
+  return !items.some(
+    (item) => item.metadata?.name === name && (item.metadata.namespace ?? "") === namespace,
+  );
+}
+
+/**
+ * Runs `run` at most once per `intervalMs`: a call inside the interval is folded into one
+ * run at its end, so the last change is always loaded. `markRan` records a run made
+ * elsewhere (the load when a panel opens).
+ */
+export function createTrailingThrottle(run: () => void, intervalMs: number) {
+  let lastRun = Number.NEGATIVE_INFINITY;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return {
+    call(now = Date.now()) {
+      if (timer) return;
+      const wait = lastRun + intervalMs - now;
+      if (wait <= 0) {
+        lastRun = now;
+        run();
+        return;
+      }
+      timer = setTimeout(() => {
+        timer = null;
+        lastRun = Date.now();
+        run();
+      }, wait);
+    },
+    markRan(now = Date.now()) {
+      lastRun = now;
+    },
+    cancel() {
+      if (timer) clearTimeout(timer);
+      timer = null;
+    },
+  };
+}
+
 type LabelSelector = {
   matchLabels?: Record<string, string>;
   matchExpressions?: Array<{ key?: string; operator?: string; values?: string[] }>;
