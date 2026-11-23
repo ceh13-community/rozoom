@@ -8,6 +8,7 @@ export const HELP_MENU_EVENT = "help-menu";
 export type HelpMenuHandlers = {
   keyboardShortcuts: () => void;
   checkForUpdates: () => void;
+  aboutTeam: () => void;
 };
 
 /** Listens for the native Help menu. Returns the cleanup. */
@@ -18,6 +19,7 @@ export function listenHelpMenu(handlers: HelpMenuHandlers): () => void {
   void listen<string>(HELP_MENU_EVENT, (event) => {
     if (event.payload === "keyboard-shortcuts") handlers.keyboardShortcuts();
     else if (event.payload === "check-for-updates") handlers.checkForUpdates();
+    else if (event.payload === "about-team") handlers.aboutTeam();
   }).then((stop) => {
     if (disposed) stop();
     else unlisten = stop;

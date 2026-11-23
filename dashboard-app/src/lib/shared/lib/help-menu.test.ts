@@ -16,16 +16,19 @@ describe("help menu", () => {
   it("routes the native menu events to their handlers", async () => {
     const keyboardShortcuts = vi.fn();
     const checkForUpdates = vi.fn();
-    const stop = listenHelpMenu({ keyboardShortcuts, checkForUpdates });
+    const aboutTeam = vi.fn();
+    const stop = listenHelpMenu({ keyboardShortcuts, checkForUpdates, aboutTeam });
     await Promise.resolve();
 
     const emit = listeners.get(HELP_MENU_EVENT);
     emit?.({ payload: "keyboard-shortcuts" });
     emit?.({ payload: "check-for-updates" });
+    emit?.({ payload: "about-team" });
     emit?.({ payload: "something-else" });
 
     expect(keyboardShortcuts).toHaveBeenCalledTimes(1);
     expect(checkForUpdates).toHaveBeenCalledTimes(1);
+    expect(aboutTeam).toHaveBeenCalledTimes(1);
     stop();
     expect(unlisten).toHaveBeenCalledTimes(1);
   });

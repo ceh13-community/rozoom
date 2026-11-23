@@ -7,7 +7,7 @@
   import { initCliNotifications } from "$shared/lib/cli-notification";
   import { checkForUpdateManually, checkForUpdateSilently } from "$shared/lib/app-updater";
   import { listenHelpMenu, updateCheckMessage } from "$shared/lib/help-menu";
-  import { KeyboardShortcutsDialog } from "$widgets/help";
+  import { AboutTeamDialog, KeyboardShortcutsDialog } from "$widgets/help";
   import { toast } from "svelte-sonner";
   import {
     startCertNotificationWatcher,
@@ -27,6 +27,7 @@
 
   let { children } = $props();
   let shortcutsOpen = $state(false);
+  let aboutTeamOpen = $state(false);
 
   // Native Help menu items the webview shows itself.
   onMount(() =>
@@ -40,6 +41,9 @@
           if (message?.kind === "success") toast.success(message.text);
           else if (message) toast.error(message.text);
         });
+      },
+      aboutTeam: () => {
+        aboutTeamOpen = true;
       },
     }),
   );
@@ -124,6 +128,12 @@
   open={shortcutsOpen}
   onClose={() => {
     shortcutsOpen = false;
+  }}
+/>
+<AboutTeamDialog
+  open={aboutTeamOpen}
+  onClose={() => {
+    aboutTeamOpen = false;
   }}
 />
 {@render children()}
