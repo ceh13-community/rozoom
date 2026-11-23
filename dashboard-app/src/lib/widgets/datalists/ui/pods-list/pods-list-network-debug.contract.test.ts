@@ -50,7 +50,7 @@ describe("pods list network debug Pod Security contract", () => {
     expect(
       table.match(/onOpen=\{onMenuOpen \? \(\) => onMenuOpen\(row\) : undefined\}/g),
     ).toHaveLength(2);
-    expect(menu).toContain("onOpen?.();");
+    expect(menu).toContain("untrack(() => onOpen?.());");
   });
 
   it("a Pod Security refusal found only at launch is one sentence, kubectl's line goes to the log", () => {
