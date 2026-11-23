@@ -3965,10 +3965,6 @@
     onToggleWatcher={toggleWatcher}
     onWatcherRefreshSecondsChange={setWatcherRefreshSeconds}
     onResetWatcherSettings={resetWatcherSettings}
-    onCsvDownloaded={({ pathHint, rows: csvRows }) => {
-      actionNotification = null;
-      actionNotification = notifySuccess(`CSV exported: ${pathHint} (${csvRows} rows).`);
-    }}
     onViewModeChange={(mode) => {
       deploymentsTableViewMode = mode;
       persistWatcherSettings();

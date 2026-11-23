@@ -2437,9 +2437,6 @@
     onToggleWatcher={toggleWatcher}
     onWatcherRefreshSecondsChange={setWatcherRefreshSeconds}
     onResetWatcherSettings={resetWatcherSettings}
-    onCsvDownloaded={({ pathHint, rows: csvRows }) => {
-      actionNotification = notifySuccess(`CSV exported: ${pathHint} (${csvRows} rows).`);
-    }}
     onRowClick={(row) => {
       const item = findCronJobItem(cronJobs, row);
       if (item) openSheet(item);

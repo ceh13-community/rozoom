@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { saveCsvExport } from "$shared/lib/save-export";
   import { onMount } from "svelte";
   import { timeAgo, type NodeItem } from "$shared";
   import type { PageData } from "$entities/cluster";
@@ -602,15 +603,10 @@
     const csv = [header, ...body]
       .map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
       .join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `nodes-pressures-${clusterSlug}-${Date.now()}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    void saveCsvExport({
+      filename: `nodes-pressures-${clusterSlug}-${Date.now()}.csv`,
+      csv,
+    });
   }
 
   // Initialize snapshot history for flapping detection on first load

@@ -22,7 +22,7 @@
   import WatcherToolbarControls from "../watcher-toolbar-controls.svelte";
   import TableSurface from "$shared/ui/table-surface.svelte";
   import TableEmptyState from "$shared/ui/table-empty-state.svelte";
-  import { exportCsvArtifact } from "$shared/lib/text-export";
+  import { saveCsvExport } from "$shared/lib/save-export";
 
   type DataTableProps<T extends NodesStatusesData> = {
     columns: ColumnDef<T>[];
@@ -34,7 +34,6 @@
     onToggleWatcher: () => void;
     onWatcherRefreshSecondsChange: (value: number) => void;
     onResetWatcherSettings: () => void;
-    onCsvDownloaded?: (payload: { pathHint: string; rows: number }) => void;
   };
 
   let {
@@ -47,7 +46,6 @@
     onToggleWatcher,
     onWatcherRefreshSecondsChange,
     onResetWatcherSettings,
-    onCsvDownloaded,
   }: DataTableProps<TData> = $props();
 
   let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: 15 });
@@ -119,8 +117,11 @@
     }
     const csv = lines.join("\n");
     const filename = "nodes-status.csv";
-    const result = await exportCsvArtifact({ filename, csv });
-    onCsvDownloaded?.({ pathHint: result.pathHint, rows: table.getRowModel().rows.length });
+    await saveCsvExport({
+      filename,
+      csv,
+      rows: table.getRowModel().rows.length,
+    });
   }
 
   function getToggleableColumns() {

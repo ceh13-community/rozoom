@@ -25,11 +25,8 @@
   import { isTauriAvailable } from "$shared/lib/tauri-runtime";
   import { resolveClusterIds, resolvePrimaryClusterId } from "$shared/lib/cluster-ids";
   import { debounce } from "$shared/lib/debounce";
-  import {
-    buildTextExportFilename,
-    exportCsvArtifact,
-    exportTextArtifact,
-  } from "$shared/lib/text-export";
+  import { buildTextExportFilename } from "$shared/lib/text-export";
+  import { saveCsvExport, saveTextExport } from "$shared/lib/save-export";
   import { readJsonFromStorage, writeJsonToStorage } from "$shared/lib/local-storage";
   import {
     dashboardDataProfile,
@@ -1742,13 +1739,9 @@
 
   async function exportDebugBundle(text: string, parts: string[], successMessage: string) {
     if (!text.trim()) return;
-    try {
-      const filename = buildTextExportFilename("support", parts, "txt");
-      const result = await exportTextArtifact({ filename, text });
-      actionNotification = notifySuccess(`${successMessage} Saved to ${result.pathHint}.`);
-    } catch {
-      errorMessage = "Failed to export debug bundle.";
-    }
+    const filename = buildTextExportFilename("support", parts, "txt");
+    if (await saveTextExport({ filename, text }))
+      actionNotification = notifySuccess(successMessage);
   }
 
   function getKubectlTarget(row: ConfigurationRow) {
@@ -1906,10 +1899,7 @@
     }
     const csv = lines.join("\n");
     const filename = `${workloadKey || "configuration"}.csv`;
-    const result = await exportCsvArtifact({ filename, csv });
-    actionNotification = notifySuccess(
-      `CSV exported: ${result.pathHint} (${filteredRows.length} rows).`,
-    );
+    await saveCsvExport({ filename, csv, rows: filteredRows.length });
   }
 
   function resetWatcherSettings() {

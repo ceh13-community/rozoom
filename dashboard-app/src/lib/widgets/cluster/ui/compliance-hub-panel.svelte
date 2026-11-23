@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { saveTextExport } from "$shared/lib/save-export";
   import {
     complianceHubState,
     fetchLatestKubeBenchLogs,
@@ -377,15 +378,11 @@
 
   function downloadKubeBenchJson() {
     if (!kubeBenchLogsRaw || !hasJsonLogs()) return;
-    const blob = new Blob([kubeBenchLogsRaw], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${(kubeBenchLogsTitle || "compliance-report").replace(/\s+/g, "-").toLowerCase()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    void saveTextExport({
+      filename: `${(kubeBenchLogsTitle || "compliance-report").replace(/\s+/g, "-").toLowerCase()}.json`,
+      text: kubeBenchLogsRaw,
+      mimeType: "application/json",
+    });
   }
 
   function downloadCombinedReport() {
@@ -417,15 +414,11 @@
       })),
       history: history.slice(0, 5),
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `compliance-report-${clusterId}-${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    void saveTextExport({
+      filename: `compliance-report-${clusterId}-${Date.now()}.json`,
+      text: JSON.stringify(payload, null, 2),
+      mimeType: "application/json",
+    });
   }
 
   function copyText(text: string, label: string) {

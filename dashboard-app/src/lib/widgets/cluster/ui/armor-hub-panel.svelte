@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { saveTextExport } from "$shared/lib/save-export";
   import { confirmAction } from "$shared/lib/confirm-action";
   import {
     armorHubReports,
@@ -214,15 +215,11 @@
 
   function downloadReportJson() {
     if (!reportRaw) return;
-    const blob = new Blob([reportRaw], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "armor-scan-report.json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    void saveTextExport({
+      filename: "armor-scan-report.json",
+      text: reportRaw,
+      mimeType: "application/json",
+    });
   }
 
   function copyText(text: string, label: string) {

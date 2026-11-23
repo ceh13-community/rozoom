@@ -3335,10 +3335,6 @@
   onToggleWatcher={toggleWatcher}
   onWatcherRefreshSecondsChange={setWatcherRefreshSeconds}
   onResetWatcherSettings={resetWatcherSettings}
-  onCsvDownloaded={({ pathHint, rows: csvRows }) => {
-    actionNotification = null;
-    actionNotification = notifySuccess(`CSV exported: ${pathHint} (${csvRows} rows).`);
-  }}
   onRowClick={(row) => {
     const item = findDaemonSetItem(daemonSets, row);
     if (item) openSheet(item);

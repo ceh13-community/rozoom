@@ -2,6 +2,8 @@ import { isTauriAvailable } from "./tauri-runtime";
 
 export type TextExportResult = {
   method: "tauri-download" | "browser-download";
+  /** Where the file is: the absolute path in the desktop app, the file name in a browser. */
+  path: string;
   pathHint: string;
 };
 
@@ -34,11 +36,13 @@ export async function exportTextArtifact(options: {
   const { filename, text, mimeType = "text/plain;charset=utf-8" } = options;
   if (isTauriAvailable()) {
     const { BaseDirectory, writeTextFile } = await import("@tauri-apps/plugin-fs");
+    const { downloadDir, join } = await import("@tauri-apps/api/path");
+    // The Downloads folder is the OS one (on Linux XDG_DOWNLOAD_DIR, which may not be
+    // ~/Downloads); resolving it first gives the path to show and a clear error without one.
+    const folder = await downloadDir();
     await writeTextFile(filename, text, { baseDir: BaseDirectory.Download });
-    return {
-      method: "tauri-download",
-      pathHint: `${DOWNLOADS_PATH_PREFIX}/${filename}`,
-    };
+    const path = await join(folder, filename);
+    return { method: "tauri-download", path, pathHint: path };
   }
 
   if (typeof document === "undefined" || typeof window === "undefined") {
@@ -56,6 +60,7 @@ export async function exportTextArtifact(options: {
   window.URL.revokeObjectURL(url);
   return {
     method: "browser-download",
+    path: filename,
     pathHint: `${DOWNLOADS_PATH_PREFIX}/${filename}`,
   };
 }

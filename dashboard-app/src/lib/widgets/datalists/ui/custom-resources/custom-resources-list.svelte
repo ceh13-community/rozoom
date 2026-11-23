@@ -16,7 +16,7 @@
     resetConfigurationSyncStatus,
     setConfigurationSyncEnabled,
   } from "$features/check-health";
-  import { exportCsvArtifact } from "$shared/lib/text-export";
+  import { saveCsvExport } from "$shared/lib/save-export";
   import { fetchNamespacedSnapshotItems } from "../common/namespaced-snapshot";
   import {
     buildKubectlDescribeCommand,
@@ -726,13 +726,11 @@
           .join(","),
       ),
     ];
-    const result = await exportCsvArtifact({
+    await saveCsvExport({
       filename: "custom-resource-definitions.csv",
       csv: lines.join("\n"),
+      rows: filteredRows.length,
     });
-    actionNotification = notifySuccess(
-      `CSV exported: ${result.pathHint} (${filteredRows.length} rows).`,
-    );
   }
 
   $effect(() => {

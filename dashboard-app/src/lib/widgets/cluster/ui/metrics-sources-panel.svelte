@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { saveTextExport } from "$shared/lib/save-export";
   import { onMount } from "svelte";
   import { toast } from "svelte-sonner";
   import {
@@ -266,15 +267,11 @@
       preflight,
       dependents: SOURCE_DEPENDENTS,
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `metrics-sources-diagnostic-${clusterId}-${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    void saveTextExport({
+      filename: `metrics-sources-diagnostic-${clusterId}-${Date.now()}.json`,
+      text: JSON.stringify(payload, null, 2),
+      mimeType: "application/json",
+    });
   }
 
   function preflightIconColor(status: PreflightCheck["status"]): string {

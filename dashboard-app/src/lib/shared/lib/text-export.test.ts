@@ -12,6 +12,12 @@ vi.mock("./tauri-runtime", () => ({
   isTauriAvailable: () => isTauriAvailableMock(),
 }));
 
+const downloadDir = vi.fn();
+vi.mock("@tauri-apps/api/path", () => ({
+  downloadDir: () => downloadDir(),
+  join: async (...parts: string[]) => parts.join("/"),
+}));
+
 describe("buildTextExportFilename", async () => {
   const { buildTextExportFilename } = await import("./text-export");
 
@@ -29,9 +35,11 @@ describe("exportTextArtifact", async () => {
   beforeEach(() => {
     writeTextFile.mockReset();
     isTauriAvailableMock.mockReset();
+    downloadDir.mockReset();
+    downloadDir.mockResolvedValue("/home/u/Downloads");
   });
 
-  it("writes to the Downloads directory in Tauri", async () => {
+  it("writes to the Downloads directory in Tauri and returns its real path", async () => {
     isTauriAvailableMock.mockReturnValue(true);
     writeTextFile.mockResolvedValue(undefined);
 
@@ -49,8 +57,29 @@ describe("exportTextArtifact", async () => {
     );
     expect(result).toEqual({
       method: "tauri-download",
-      pathHint: "~/Downloads/debug-describe.txt",
+      path: "/home/u/Downloads/debug-describe.txt",
+      pathHint: "/home/u/Downloads/debug-describe.txt",
     });
+  });
+
+  it("shows the Downloads folder the OS names, not a fixed ~/Downloads", async () => {
+    isTauriAvailableMock.mockReturnValue(true);
+    writeTextFile.mockResolvedValue(undefined);
+    downloadDir.mockResolvedValue("/home/u/Завантаження");
+
+    const result = await exportTextArtifact({ filename: "pods.csv", text: "x" });
+
+    expect(result.path).toBe("/home/u/Завантаження/pods.csv");
+  });
+
+  it("fails before writing when the OS has no Downloads folder", async () => {
+    isTauriAvailableMock.mockReturnValue(true);
+    downloadDir.mockRejectedValue(new Error("unknown path"));
+
+    await expect(exportTextArtifact({ filename: "pods.csv", text: "x" })).rejects.toThrow(
+      "unknown path",
+    );
+    expect(writeTextFile).not.toHaveBeenCalled();
   });
 
   it("falls back to a browser download outside Tauri", async () => {
@@ -83,6 +112,7 @@ describe("exportTextArtifact", async () => {
     expect(appendChild).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       method: "browser-download",
+      path: "debug-describe.txt",
       pathHint: "~/Downloads/debug-describe.txt",
     });
 
@@ -92,7 +122,7 @@ describe("exportTextArtifact", async () => {
     appendChild.mockRestore();
   });
 
-  it("exports CSV files with a UTF-8 BOM and Downloads path hint", async () => {
+  it("exports CSV files with a UTF-8 BOM and the Downloads path", async () => {
     isTauriAvailableMock.mockReturnValue(true);
     writeTextFile.mockResolvedValue(undefined);
 
@@ -106,7 +136,8 @@ describe("exportTextArtifact", async () => {
     });
     expect(result).toEqual({
       method: "tauri-download",
-      pathHint: "~/Downloads/nodes-status.csv",
+      path: "/home/u/Downloads/nodes-status.csv",
+      pathHint: "/home/u/Downloads/nodes-status.csv",
     });
   });
 });

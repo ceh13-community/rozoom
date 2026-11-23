@@ -26,7 +26,7 @@
     toggleAllGroupsCollapsed,
   } from "../model/group-collapse-toggle";
   import TableChecklistDropdown from "../table-checklist-dropdown.svelte";
-  import { exportCsvArtifact } from "$shared/lib/text-export";
+  import { saveCsvExport } from "$shared/lib/save-export";
 
   export type DaemonSetsTableViewMode = "flat" | "namespace";
 
@@ -44,7 +44,6 @@
     onResetWatcherSettings: () => void;
     viewMode: DaemonSetsTableViewMode;
     onViewModeChange: (mode: DaemonSetsTableViewMode) => void;
-    onCsvDownloaded?: (payload: { pathHint: string; rows: number }) => void;
   };
 
   let {
@@ -61,7 +60,6 @@
     onResetWatcherSettings,
     viewMode,
     onViewModeChange,
-    onCsvDownloaded = () => {},
   }: DataTableProps<TData> = $props();
 
   let paginationPageIndex = $state(0);
@@ -233,8 +231,11 @@
       lines.push(values.map(toCsvCell).join(","));
     }
     const csv = lines.join("\n");
-    const result = await exportCsvArtifact({ filename: "daemon-sets.csv", csv });
-    onCsvDownloaded({ pathHint: result.pathHint, rows: table.getRowModel().rows.length });
+    await saveCsvExport({
+      filename: "daemon-sets.csv",
+      csv,
+      rows: table.getRowModel().rows.length,
+    });
   }
 
   function getToggleableColumns() {

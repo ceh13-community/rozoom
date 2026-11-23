@@ -2,7 +2,7 @@
   import { Button, SortingButton } from "$shared/ui/button";
   import { Input } from "$shared/ui/input";
   import InlineNotice from "$shared/ui/inline-notice.svelte";
-  import { exportCsvArtifact } from "$shared/lib/text-export";
+  import { saveCsvExport } from "$shared/lib/save-export";
   import { computeVirtualWindow } from "$shared/lib/virtual-window";
   import { compareNatural } from "$shared/lib/natural-compare";
   import TablePagination from "$shared/ui/table-pagination.svelte";
@@ -457,7 +457,11 @@
       if (isColumnVisible("age")) values.push(liveAge(row.startedAt, row.age));
       lines.push(values.map(toCsvCell).join(","));
     }
-    await exportCsvArtifact({ filename: "pods.csv", csv: lines.join("\n") });
+    await saveCsvExport({
+      filename: "pods.csv",
+      csv: lines.join("\n"),
+      rows: namespaceFilteredRows.length,
+    });
   }
 
   $effect(() => {
