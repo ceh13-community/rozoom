@@ -19,7 +19,7 @@ This means:
 
 Most K8s tools show one cluster at a time. ROZOOM shows all clusters simultaneously on a single dashboard. Health scores, alerts, and metrics are compared across the fleet at a glance.
 
-The dashboard is built for a fleet, not for one cluster: each cluster gets its own connection budget, the Data mode (Realtime, Balanced, Low Load, Fleet, Manual) sets the polling and the background load for all of them at once, and long lists render only the rows in view.
+The dashboard is built for a fleet, not for one cluster: the clusters share one connection budget, tunable per cluster, the Data mode (Realtime, Balanced, Low Load, Fleet, Manual) sets the polling and the background load for all of them at once, polling backs off on its own when a cluster errors, the request queue grows or the page is hidden, and long lists render only the rows in view.
 
 ### 3. Read-heavy, write-careful
 
@@ -32,7 +32,7 @@ Users should always know what ROZOOM is doing to their clusters.
 Not every cluster has metrics-server. Not every environment has Prometheus. ROZOOM adapts:
 
 - Metrics unavailable? Say so in one line and offer to install metrics-server; no error page
-- API server slow or the link weak? Switch the Data mode to Low Load or Manual; polling and background checks follow it
+- API server slow or the link weak? Polling backs off on its own (errors, a full request queue, a hidden page); Low Load or Manual cut it further
 - Connection lost? Show "Cluster unreachable" with the reason and Retry, and reload the lists once the cluster answers again
 - Partial data? Show what we have and mark it: Cached, Stale, Unknown or Not checked
 
