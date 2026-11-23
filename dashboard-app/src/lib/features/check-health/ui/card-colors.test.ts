@@ -230,20 +230,32 @@ describe("displayClusterCardState", () => {
 
   it("Paused wins over everything else: the user turned the linter off", () => {
     expect(
-      displayClusterCardState({ ...live, linterOn: false, disconnected: true, base: critical }),
+      displayClusterCardState({
+        ...live,
+        linterOn: false,
+        disconnected: true,
+        awaitingInitialRefresh: true,
+        base: critical,
+      }),
     ).toMatchObject({ color: "bg-slate-600", text: "Paused" });
   });
 
-  it("a cluster that does not answer is grey with the connectivity title and reason", () => {
+  it("a cluster that does not answer is grey with the connectivity title and reason, even before its first check", () => {
     expect(
       displayClusterCardState({
         ...live,
         disconnected: true,
+        awaitingInitialRefresh: true,
         connectivityTitle: "Auth expired",
         connectivityReason: "token expired",
         base: critical,
       }),
     ).toEqual({ color: "bg-slate-600", text: "Auth expired", tooltip: "token expired" });
+  });
+
+  it("the Warning class carries white text at AA contrast (amber-700, 5.02:1; amber-600 was 3.19:1)", () => {
+    expect(STATUS_CLASSES.warning).toContain("bg-amber-700");
+    expect(STATUS_CLASSES.warning).not.toContain("amber-600");
   });
 
   it("a check that has not run yet is Pending, lighter grey", () => {
