@@ -1715,6 +1715,7 @@
   </div>
 
   <DataTable
+    clusterName={resolvePageClusterName(data)}
     data={allNodeData}
     {columns}
     {watcherEnabled}
@@ -1723,10 +1724,6 @@
     onToggleWatcher={toggleWatcher}
     onWatcherRefreshSecondsChange={setWatcherRefreshSeconds}
     onResetWatcherSettings={resetWatcherSettings}
-    onCsvDownloaded={({ pathHint, rows }) => {
-      actionNotification = null;
-      actionNotification = notifySuccess(`CSV exported: ${pathHint} (${rows} rows).`);
-    }}
     onRowClick={(row) => {
       const node = findNodeByRow(row);
       if (node) openSheet(node);

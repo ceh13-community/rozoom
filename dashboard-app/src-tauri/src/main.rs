@@ -4,6 +4,7 @@
 use tauri::Manager;
 use tauri_plugin_log;
 
+mod downloads;
 mod install_kind;
 mod private_files;
 mod support_logs;
@@ -203,6 +204,7 @@ fn main() {
             support_logs::read_recent_log_tail,
             support_logs::open_logs_folder,
             support_logs::logs_folder_path,
+            downloads::save_download,
             private_files::harden_private_files,
             install_kind::linux_package_kind
         ])

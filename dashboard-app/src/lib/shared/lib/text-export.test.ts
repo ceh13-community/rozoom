@@ -1,11 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const writeTextFile = vi.fn();
+const invoke = vi.fn();
 const isTauriAvailableMock = vi.fn();
 
-vi.mock("@tauri-apps/plugin-fs", () => ({
-  BaseDirectory: { Download: "Download" },
-  writeTextFile: (...args: unknown[]) => writeTextFile(...args),
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: (...args: unknown[]) => invoke(...args),
 }));
 
 vi.mock("./tauri-runtime", () => ({
@@ -27,30 +26,46 @@ describe("exportTextArtifact", async () => {
   const { exportCsvArtifact, exportTextArtifact } = await import("./text-export");
 
   beforeEach(() => {
-    writeTextFile.mockReset();
+    invoke.mockReset();
     isTauriAvailableMock.mockReset();
   });
 
-  it("writes to the Downloads directory in Tauri", async () => {
+  it("saves through the app into the Downloads folder and returns its real path", async () => {
     isTauriAvailableMock.mockReturnValue(true);
-    writeTextFile.mockResolvedValue(undefined);
+    invoke.mockResolvedValue("/home/u/Downloads/debug-describe.txt");
 
     const result = await exportTextArtifact({
       filename: "debug-describe.txt",
       text: "kubectl describe pod/api -n prod",
     });
 
-    expect(writeTextFile).toHaveBeenCalledWith(
-      "debug-describe.txt",
-      "kubectl describe pod/api -n prod",
-      {
-        baseDir: "Download",
-      },
-    );
+    expect(invoke).toHaveBeenCalledWith("save_download", {
+      filename: "debug-describe.txt",
+      contents: "kubectl describe pod/api -n prod",
+    });
     expect(result).toEqual({
       method: "tauri-download",
-      pathHint: "~/Downloads/debug-describe.txt",
+      path: "/home/u/Downloads/debug-describe.txt",
+      pathHint: "/home/u/Downloads/debug-describe.txt",
     });
+  });
+
+  it("shows the folder the app saved into, not a fixed ~/Downloads", async () => {
+    isTauriAvailableMock.mockReturnValue(true);
+    invoke.mockResolvedValue("/home/u/Завантаження/pods.csv");
+
+    const result = await exportTextArtifact({ filename: "pods.csv", text: "x" });
+
+    expect(result.path).toBe("/home/u/Завантаження/pods.csv");
+  });
+
+  it("passes the app's error on", async () => {
+    isTauriAvailableMock.mockReturnValue(true);
+    invoke.mockRejectedValue("cannot write /home/u/Downloads/pods.csv: Permission denied");
+
+    await expect(exportTextArtifact({ filename: "pods.csv", text: "x" })).rejects.toBe(
+      "cannot write /home/u/Downloads/pods.csv: Permission denied",
+    );
   });
 
   it("falls back to a browser download outside Tauri", async () => {
@@ -81,8 +96,10 @@ describe("exportTextArtifact", async () => {
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:debug");
     expect(appendChild).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalled();
     expect(result).toEqual({
       method: "browser-download",
+      path: "debug-describe.txt",
       pathHint: "~/Downloads/debug-describe.txt",
     });
 
@@ -92,21 +109,23 @@ describe("exportTextArtifact", async () => {
     appendChild.mockRestore();
   });
 
-  it("exports CSV files with a UTF-8 BOM and Downloads path hint", async () => {
+  it("exports CSV files with a UTF-8 BOM and the Downloads path", async () => {
     isTauriAvailableMock.mockReturnValue(true);
-    writeTextFile.mockResolvedValue(undefined);
+    invoke.mockResolvedValue("/home/u/Downloads/nodes-status.csv");
 
     const result = await exportCsvArtifact({
       filename: "nodes-status.csv",
       csv: '"name"\n"node-a"',
     });
 
-    expect(writeTextFile).toHaveBeenCalledWith("nodes-status.csv", '\uFEFF"name"\n"node-a"', {
-      baseDir: "Download",
+    expect(invoke).toHaveBeenCalledWith("save_download", {
+      filename: "nodes-status.csv",
+      contents: '﻿"name"\n"node-a"',
     });
     expect(result).toEqual({
       method: "tauri-download",
-      pathHint: "~/Downloads/nodes-status.csv",
+      path: "/home/u/Downloads/nodes-status.csv",
+      pathHint: "/home/u/Downloads/nodes-status.csv",
     });
   });
 });

@@ -2,7 +2,9 @@
   import { Button, SortingButton } from "$shared/ui/button";
   import { Input } from "$shared/ui/input";
   import InlineNotice from "$shared/ui/inline-notice.svelte";
-  import { exportCsvArtifact } from "$shared/lib/text-export";
+  import { saveCsvExport } from "$shared/lib/save-export";
+  import { csvCell as toCsvCell } from "$shared/lib/csv";
+  import { buildTextExportFilename } from "$shared/lib/text-export";
   import { computeVirtualWindow } from "$shared/lib/virtual-window";
   import { compareNatural } from "$shared/lib/natural-compare";
   import TablePagination from "$shared/ui/table-pagination.svelte";
@@ -20,6 +22,8 @@
   import { GROUPED_VIEW_MAX_ROWS, type PodListRow } from "./model/pod-list-row";
 
   type DataTableProps = {
+    /** Cluster name in the export file name. */
+    clusterName?: string;
     rows: PodListRow[];
     query: string;
     onQueryChange: (value: string) => void;
@@ -87,6 +91,7 @@
   type SortDirection = "asc" | "desc";
 
   let {
+    clusterName = "",
     rows,
     query,
     onQueryChange,
@@ -431,11 +436,6 @@
     return allCollapsed ? "Expand groups" : "Collapse groups";
   }
 
-  function toCsvCell(value: unknown) {
-    if (value === null || value === undefined) return "";
-    const text = String(value).replaceAll('"', '""');
-    return `"${text}"`;
-  }
 
   async function downloadCsv() {
     const headers = getColumnEntries()
@@ -457,7 +457,11 @@
       if (isColumnVisible("age")) values.push(liveAge(row.startedAt, row.age));
       lines.push(values.map(toCsvCell).join(","));
     }
-    await exportCsvArtifact({ filename: "pods.csv", csv: lines.join("\n") });
+    await saveCsvExport({
+      filename: buildTextExportFilename("pods", [clusterName], "csv"),
+      csv: lines.join("\n"),
+      rows: namespaceFilteredRows.length,
+    });
   }
 
   $effect(() => {

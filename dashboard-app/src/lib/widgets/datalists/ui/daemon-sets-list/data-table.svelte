@@ -26,11 +26,15 @@
     toggleAllGroupsCollapsed,
   } from "../model/group-collapse-toggle";
   import TableChecklistDropdown from "../table-checklist-dropdown.svelte";
-  import { exportCsvArtifact } from "$shared/lib/text-export";
+  import { saveCsvExport } from "$shared/lib/save-export";
+  import { csvCell as toCsvCell } from "$shared/lib/csv";
+  import { buildTextExportFilename } from "$shared/lib/text-export";
 
   export type DaemonSetsTableViewMode = "flat" | "namespace";
 
   type DataTableProps<TData> = {
+    /** Cluster name in the export file name. */
+    clusterName?: string;
     columns: ColumnDef<TData>[];
     data: TData[];
     onRowClick: (row: TData) => void;
@@ -44,10 +48,10 @@
     onResetWatcherSettings: () => void;
     viewMode: DaemonSetsTableViewMode;
     onViewModeChange: (mode: DaemonSetsTableViewMode) => void;
-    onCsvDownloaded?: (payload: { pathHint: string; rows: number }) => void;
   };
 
   let {
+    clusterName = "",
     data,
     columns,
     onRowClick,
@@ -61,7 +65,6 @@
     onResetWatcherSettings,
     viewMode,
     onViewModeChange,
-    onCsvDownloaded = () => {},
   }: DataTableProps<TData> = $props();
 
   let paginationPageIndex = $state(0);
@@ -214,11 +217,6 @@
     collapsedGroups = toggleAllGroupsCollapsed(collapsedGroups, ids);
   }
 
-  function toCsvCell(value: unknown) {
-    if (value === null || value === undefined) return "";
-    const text = String(value).replaceAll('"', '""');
-    return `"${text}"`;
-  }
 
   async function downloadCsv() {
     const exportColumns = table
@@ -233,8 +231,11 @@
       lines.push(values.map(toCsvCell).join(","));
     }
     const csv = lines.join("\n");
-    const result = await exportCsvArtifact({ filename: "daemon-sets.csv", csv });
-    onCsvDownloaded({ pathHint: result.pathHint, rows: table.getRowModel().rows.length });
+    await saveCsvExport({
+      filename: buildTextExportFilename("daemon-sets", [clusterName], "csv"),
+      csv,
+      rows: table.getRowModel().rows.length,
+    });
   }
 
   function getToggleableColumns() {

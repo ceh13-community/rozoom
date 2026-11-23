@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { saveCsvExport } from "$shared/lib/save-export";
+  import { csvText } from "$shared/lib/csv";
   import { onMount } from "svelte";
   import {
     dashboardDataProfile,
@@ -776,21 +778,14 @@
         a.namespace ?? "",
         a.pod ?? "",
         a.node ?? "",
-        (a.summary ?? "").replace(/"/g, '""'),
+        a.summary ?? "",
       ]),
     ];
-    const csv = rows
-      .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `alerts-firing-${clusterId}-${Date.now()}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    const csv = csvText(rows);
+    void saveCsvExport({
+      filename: `alerts-firing-${clusterId}-${Date.now()}.csv`,
+      csv,
+    });
   }
 
   function preflightIconColor(status: PreflightCheck["status"]): string {

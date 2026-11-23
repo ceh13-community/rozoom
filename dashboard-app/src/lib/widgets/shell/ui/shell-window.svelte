@@ -12,7 +12,8 @@
   import { buildReadOnlyBlockedResult, getClusterSafetyInfo } from "$shared/lib/readonly-guard";
   import { confirmAction } from "$shared/lib/confirm-action";
   import { restoreFocus } from "$shared/lib/reveal-result";
-  import { buildTextExportFilename, exportTextArtifact } from "$shared/lib/text-export";
+  import { buildTextExportFilename } from "$shared/lib/text-export";
+  import { saveTextExport } from "$shared/lib/save-export";
   import {
     closeShellModal,
     focusShellModal,
@@ -535,8 +536,8 @@
       [sessionClusterId || "cluster", shellSessionKind, shellTargetLabel || "shell-output"],
       "txt",
     );
-    const result = await exportTextArtifact({ filename, text });
-    appendShellOutput(`ℹ️ ${label} exported to ${result.pathHint}`);
+    const result = await saveTextExport({ filename, text });
+    if (result) appendShellOutput(`ℹ️ ${label} exported to ${result.path}`);
   }
 
   function normalizeShellError(message: string) {

@@ -40,7 +40,6 @@ describe("deployments data-table", () => {
         onResetWatcherSettings: vi.fn(),
         viewMode: "node",
         onViewModeChange: vi.fn(),
-        onCsvDownloaded: vi.fn(),
       },
     });
 

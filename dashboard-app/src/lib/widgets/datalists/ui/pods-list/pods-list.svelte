@@ -1311,6 +1311,7 @@
   />
 
   <DataTable
+    clusterName={resolvePageClusterName(data)}
     rows={filteredRows}
     {query}
     onQueryChange={(value) => {

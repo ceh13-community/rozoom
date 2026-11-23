@@ -4,7 +4,8 @@
     dashboardDataProfile,
     shouldAutoRunDiagnostics,
   } from "$shared/lib/dashboard-data-profile.svelte";
-  import { BaseDirectory, mkdir, writeTextFile } from "@tauri-apps/plugin-fs";
+  import { saveTextExport } from "$shared/lib/save-export";
+  import { buildTextExportFilename } from "$shared/lib/text-export";
   import {
     backupAuditState,
     scanRestoreBackups,
@@ -266,9 +267,6 @@
     return match?.[1] ?? "unknown";
   }
 
-  function sanitizePathPart(value: string) {
-    return value.replace(/[^a-zA-Z0-9._-]+/g, "-");
-  }
 
   async function loadVeleroProfile() {
     const profile = await readVeleroInstallProfile(clusterId);
@@ -504,25 +502,25 @@
       }
 
       const nextSummary = await createBackupNow(clusterId, { scope });
-      const safeCluster = sanitizePathPart(clusterId) || "cluster";
-      const safeBackup = sanitizePathPart(nextSummary.backupName ?? `backup-${Date.now()}`);
-      const folder = `rozoom/backup/${safeCluster}`;
-      const filename = `${folder}/${safeBackup}.json`;
       const payload = {
         clusterId,
         exportedAt: new Date().toISOString(),
         summary: nextSummary,
       };
-
-      await mkdir(folder, { baseDir: BaseDirectory.Download, recursive: true });
-      await writeTextFile(filename, JSON.stringify(payload, null, 2), {
-        baseDir: BaseDirectory.Download,
+      const saved = await saveTextExport({
+        filename: buildTextExportFilename(
+          "velero-backup",
+          [clusterId, nextSummary.backupName ?? "backup"],
+          "json",
+        ),
+        text: JSON.stringify(payload, null, 2),
+        mimeType: "application/json",
       });
 
       const storageLocation = nextSummary.storage ?? "default";
       actionTitle = "Backup created";
       actionMessage =
-        `Velero backup created. Metadata snapshot saved to ~/Downloads/${filename}. ` +
+        `Velero backup created. ${saved ? `Metadata snapshot saved to ${saved.path}. ` : ""}` +
         `Backup data is stored in Velero BackupStorageLocation "${storageLocation}" ` +
         `(object storage backend such as S3/Blob/GCS configured in your cluster).`;
     } catch (error) {

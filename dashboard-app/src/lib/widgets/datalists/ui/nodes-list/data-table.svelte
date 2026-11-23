@@ -22,9 +22,13 @@
   import WatcherToolbarControls from "../watcher-toolbar-controls.svelte";
   import TableSurface from "$shared/ui/table-surface.svelte";
   import TableEmptyState from "$shared/ui/table-empty-state.svelte";
-  import { exportCsvArtifact } from "$shared/lib/text-export";
+  import { saveCsvExport } from "$shared/lib/save-export";
+  import { csvCell as toCsvCell } from "$shared/lib/csv";
+  import { buildTextExportFilename } from "$shared/lib/text-export";
 
   type DataTableProps<T extends NodesStatusesData> = {
+    /** Cluster name in the export file name. */
+    clusterName?: string;
     columns: ColumnDef<T>[];
     data: T[];
     onRowClick?: (row: T) => void;
@@ -34,10 +38,10 @@
     onToggleWatcher: () => void;
     onWatcherRefreshSecondsChange: (value: number) => void;
     onResetWatcherSettings: () => void;
-    onCsvDownloaded?: (payload: { pathHint: string; rows: number }) => void;
   };
 
   let {
+    clusterName = "",
     data,
     columns,
     onRowClick,
@@ -47,7 +51,6 @@
     onToggleWatcher,
     onWatcherRefreshSecondsChange,
     onResetWatcherSettings,
-    onCsvDownloaded,
   }: DataTableProps<TData> = $props();
 
   let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: 15 });
@@ -99,11 +102,6 @@
     },
   });
 
-  function toCsvCell(value: unknown) {
-    if (value === null || value === undefined) return "";
-    const text = String(value).replaceAll('"', '""');
-    return `"${text}"`;
-  }
 
   async function downloadCsv() {
     const exportColumns = table
@@ -118,9 +116,16 @@
       lines.push(values.map(toCsvCell).join(","));
     }
     const csv = lines.join("\n");
-    const filename = "nodes-status.csv";
-    const result = await exportCsvArtifact({ filename, csv });
-    onCsvDownloaded?.({ pathHint: result.pathHint, rows: table.getRowModel().rows.length });
+    const filename = buildTextExportFilename(
+      "nodes-status",
+      [clusterName],
+      "csv",
+    );
+    await saveCsvExport({
+      filename,
+      csv,
+      rows: table.getRowModel().rows.length,
+    });
   }
 
   function getToggleableColumns() {

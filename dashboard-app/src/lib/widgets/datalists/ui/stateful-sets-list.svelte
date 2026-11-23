@@ -8,7 +8,6 @@
   import ScaleDialog from "$shared/ui/scale-dialog.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
   import { onDestroy, onMount, untrack } from "svelte";
-  import { BaseDirectory, writeTextFile } from "@tauri-apps/plugin-fs";
   import Clock3 from "@lucide/svelte/icons/clock-3";
   import GitCompareArrows from "@lucide/svelte/icons/git-compare-arrows";
   import ListTree from "@lucide/svelte/icons/list-tree";
@@ -48,6 +47,7 @@
   import { Button, SortingButton } from "$shared/ui/button";
   import MultiPaneWorkbench from "$shared/ui/multi-pane-workbench.svelte";
   import { confirmAction } from "$shared/lib/confirm-action";
+  import { saveTextFiles } from "$shared/lib/save-export";
   import * as Alert from "$shared/ui/alert";
   import type { StatefulSetItem } from "$shared/model/clusters";
   import DataTable, {
@@ -1393,6 +1393,7 @@
     clearActionFeedback();
     actionInFlight = true;
     try {
+      const files: { filename: string; text: string }[] = [];
       for (const item of items) {
         const name = item.metadata?.name;
         const namespace = item.metadata?.namespace ?? "default";
@@ -1405,16 +1406,9 @@
           throw new Error(response.errors || `Failed to download YAML for ${namespace}/${name}.`);
         }
         const filename = buildYamlFilename("statefulset", namespace, name);
-        await writeTextFile(filename, response.output || "", { baseDir: BaseDirectory.Download });
+        files.push({ filename, text: response.output || "" });
       }
-      if (items.length === 1) {
-        const only = items[0];
-        const onlyName = only.metadata?.name ?? "statefulset";
-        const onlyNs = only.metadata?.namespace ?? "default";
-        yamlDownloadMessage = `StatefulSet YAML exported: ${onlyNs}/${onlyName} -> ~/Downloads/${buildYamlFilename("statefulset", onlyNs, onlyName)}`;
-      } else {
-        yamlDownloadMessage = `StatefulSet YAML export completed: ${items.length} files in ~/Downloads.`;
-      }
+      await saveTextFiles(files);
     } catch (error) {
       yamlDownloadError = error instanceof Error ? error.message : "Failed to download YAML.";
     } finally {
@@ -2636,6 +2630,7 @@
     />
   </div>
   <DataTable
+    clusterName={resolvePageClusterName(data)}
     data={rows}
     {columns}
     isRowSelected={(row) => isStatefulSetSelected(row.uid)}
@@ -2648,9 +2643,6 @@
     onToggleWatcher={toggleWatcher}
     onWatcherRefreshSecondsChange={setWatcherRefreshSeconds}
     onResetWatcherSettings={resetWatcherSettings}
-    onCsvDownloaded={({ pathHint, rows: csvRows }) => {
-      actionNotification = notifySuccess(`CSV exported: ${pathHint} (${csvRows} rows).`);
-    }}
     onRowClick={(row) => {
       const item = findStatefulSetItem(statefulSets, row);
       if (item) openSheet(item);

@@ -16,7 +16,9 @@
     resetConfigurationSyncStatus,
     setConfigurationSyncEnabled,
   } from "$features/check-health";
-  import { exportCsvArtifact } from "$shared/lib/text-export";
+  import { saveCsvExport } from "$shared/lib/save-export";
+  import { csvRow } from "$shared/lib/csv";
+  import { buildTextExportFilename } from "$shared/lib/text-export";
   import { fetchNamespacedSnapshotItems } from "../common/namespaced-snapshot";
   import {
     buildKubectlDescribeCommand,
@@ -713,7 +715,7 @@
     const lines = [
       ["name", "group", "version", "scope", "resource", "summary", "age"].join(","),
       ...filteredRows.map((row) =>
-        [
+        csvRow([
           row.name,
           row.group,
           row.version,
@@ -721,18 +723,18 @@
           row.resource,
           row.summary,
           liveAge(row.createdAt, row.age),
-        ]
-          .map((value) => `"${String(value).replaceAll('"', '""')}"`)
-          .join(","),
+        ]),
       ),
     ];
-    const result = await exportCsvArtifact({
-      filename: "custom-resource-definitions.csv",
+    await saveCsvExport({
+      filename: buildTextExportFilename(
+        "custom-resource-definitions",
+        [resolvePageClusterName(data)],
+        "csv",
+      ),
       csv: lines.join("\n"),
+      rows: filteredRows.length,
     });
-    actionNotification = notifySuccess(
-      `CSV exported: ${result.pathHint} (${filteredRows.length} rows).`,
-    );
   }
 
   $effect(() => {

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { saveCsvExport } from "$shared/lib/save-export";
+  import { csvText } from "$shared/lib/csv";
   import { onMount } from "svelte";
   import {
     getContainerReason,
@@ -327,18 +329,11 @@
         r.startedAt,
       ]),
     ];
-    const csv = rowsCsv
-      .map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `pod-restarts-${clusterId}-${Date.now()}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    const csv = csvText(rowsCsv);
+    void saveCsvExport({
+      filename: `pod-restarts-${clusterId}-${Date.now()}.csv`,
+      csv,
+    });
   }
 </script>
 

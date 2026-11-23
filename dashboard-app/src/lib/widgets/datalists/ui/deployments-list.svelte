@@ -44,6 +44,7 @@
   import { renderComponent, renderSnippet } from "$shared/ui/data-table";
   import { Button, SortingButton } from "$shared/ui/button";
   import { confirmAction } from "$shared/lib/confirm-action";
+  import { saveTextFiles } from "$shared/lib/save-export";
   import { trackCoreAction } from "$shared/analytics/wau-c";
   import * as Alert from "$shared/ui/alert";
   import { namespaceMatches, selectedNamespace } from "$features/namespace-management";
@@ -1560,6 +1561,7 @@
     clearActionFeedback();
     actionInFlight = true;
     try {
+      const files: { filename: string; text: string }[] = [];
       for (const item of items) {
         const name = item.metadata?.name;
         const namespace = item.metadata?.namespace ?? "default";
@@ -1572,16 +1574,9 @@
           throw new Error(response.errors || `Failed to download YAML for ${namespace}/${name}.`);
         }
         const filename = buildYamlFilename("deployment", namespace, name);
-        await writeTextFile(filename, response.output || "", { baseDir: BaseDirectory.Download });
+        files.push({ filename, text: response.output || "" });
       }
-      if (items.length === 1) {
-        const only = items[0];
-        const onlyName = only.metadata?.name ?? "deployment";
-        const onlyNs = only.metadata?.namespace ?? "default";
-        yamlDownloadMessage = `YAML exported ~/Downloads: ${buildYamlFilename("deployment", onlyNs, onlyName)}`;
-      } else {
-        yamlDownloadMessage = `YAML exported ~/Downloads: ${items.length} files.`;
-      }
+      await saveTextFiles(files);
     } catch (error) {
       yamlDownloadError = error instanceof Error ? error.message : "Failed to download YAML.";
     } finally {
@@ -3956,6 +3951,7 @@
     />
   </div>
   <DataTable
+    clusterName={resolvePageClusterName(data)}
     data={rows}
     {columns}
     {watcherEnabled}
@@ -3965,10 +3961,6 @@
     onToggleWatcher={toggleWatcher}
     onWatcherRefreshSecondsChange={setWatcherRefreshSeconds}
     onResetWatcherSettings={resetWatcherSettings}
-    onCsvDownloaded={({ pathHint, rows: csvRows }) => {
-      actionNotification = null;
-      actionNotification = notifySuccess(`CSV exported: ${pathHint} (${csvRows} rows).`);
-    }}
     onViewModeChange={(mode) => {
       deploymentsTableViewMode = mode;
       persistWatcherSettings();
