@@ -94,3 +94,37 @@ describe("port-forward tab", () => {
     expect(view.getByRole("button", { name: "Test" })).toBeDisabled();
   });
 });
+
+describe("port-forward tab: https and timers", () => {
+  it("Test is off for an https forward, with the reason next to the button", () => {
+    const onTest = vi.fn();
+    const view = render(PortForwardBrowserTab, {
+      props: props({ url: "https://127.0.0.1:30443", status: status(), onTest }),
+    });
+    expect(view.getByRole("button", { name: "Test" })).toBeDisabled();
+    expect(view.getByTestId("port-forward-test-unavailable")).toHaveTextContent(
+      "Test checks http forwards only",
+    );
+    expect(onTest).not.toHaveBeenCalled();
+  });
+
+  it("the uptime ticker is cleared when the tab goes away or the tunnel stops", async () => {
+    vi.useFakeTimers();
+    const clear = vi.spyOn(globalThis, "clearInterval");
+    try {
+      const view = render(PortForwardBrowserTab, { props: props({ status: status() }) });
+      await vi.advanceTimersByTimeAsync(2_100);
+      expect(clear).not.toHaveBeenCalled();
+
+      await view.rerender(props({ status: status({ state: "stopped", label: "Stopped" }) }));
+      expect(clear).toHaveBeenCalledTimes(1);
+
+      await view.rerender(props({ status: status() }));
+      view.unmount();
+      expect(clear).toHaveBeenCalledTimes(2);
+    } finally {
+      clear.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+});

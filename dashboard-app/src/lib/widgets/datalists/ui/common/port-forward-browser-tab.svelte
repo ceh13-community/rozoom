@@ -73,10 +73,15 @@
     return formatUptime(end - status.startedAt);
   });
 
+  // The HTTP plugin's scope covers http on the local host only; a red refusal on a working
+  // https tunnel would mislead, so Test is off for it with the reason next to the button.
+  const testUnavailable = $derived(
+    url.startsWith("https:") ? "Test checks http forwards only" : null,
+  );
   let testing = $state(false);
   let testResult = $state<PortForwardTestResult | null>(null);
   async function runTest() {
-    if (!onTest || testing) return;
+    if (!onTest || testing || testUnavailable) return;
     testing = true;
     try {
       testResult = await onTest();
@@ -155,7 +160,11 @@
       {/if}
       {#if onTest}
         <span class="ml-auto inline-flex items-center gap-2">
-          {#if testText}
+          {#if testUnavailable}
+            <span class="text-muted-foreground" data-testid="port-forward-test-unavailable"
+              >{testUnavailable}</span
+            >
+          {:else if testText}
             <span
               class={testResult?.ok
                 ? "text-emerald-700 dark:text-emerald-400"
@@ -167,7 +176,8 @@
             variant="outline"
             size="sm"
             onclick={runTest}
-            disabled={testing || status.state === "stopped"}
+            disabled={testing || status.state === "stopped" || Boolean(testUnavailable)}
+            title={testUnavailable ?? undefined}
           >
             {#if testing}
               <LoaderCircle class="h-4 w-4 animate-spin" />

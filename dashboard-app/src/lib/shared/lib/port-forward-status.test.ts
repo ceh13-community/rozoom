@@ -197,3 +197,27 @@ describe("port-forward Test stays local", () => {
     });
   });
 });
+
+describe("port-forward Test releases the response", () => {
+  it("cancels the body once the status is known", async () => {
+    const cancel = vi.fn(async () => undefined);
+    const fetchImpl = (async () =>
+      ({ status: 200, body: { cancel } }) as unknown as Response) as unknown as typeof fetch;
+    expect(
+      await testPortForwardUrl("http://127.0.0.1:30080", { fetchImpl, now: () => 0 }),
+    ).toMatchObject({
+      ok: true,
+      status: 200,
+    });
+    expect(cancel).toHaveBeenCalledTimes(1);
+
+    const noBody = (async () =>
+      ({ status: 204, body: null }) as unknown as Response) as unknown as typeof fetch;
+    expect(
+      await testPortForwardUrl("http://127.0.0.1:30080", { fetchImpl: noBody, now: () => 0 }),
+    ).toMatchObject({
+      ok: true,
+      status: 204,
+    });
+  });
+});

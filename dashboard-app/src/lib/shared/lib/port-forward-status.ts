@@ -145,6 +145,8 @@ export async function testPortForwardUrl(
     };
     const response = await fetchImpl(url, init);
     const ms = Math.max(0, Math.round(now() - started));
+    // Only the status and the time matter: release the body so the connection is not held.
+    await response.body?.cancel().catch(() => undefined);
     const status = response.status;
     if (status === 0) {
       // A browser fetch with redirect: "manual" answers an opaque 0 for a redirect.
