@@ -50,10 +50,10 @@ package by hand.
   screen expands the workbench and has no Collapse.
 - Helm reads (list, status, values) popped a command notification; only writes
   notify now, rollback and test included.
-- Download CSV, Download YAML and the other exports saved without a word, and
-  on a desktop without a Downloads folder set they did not save at all. Each one
-  now says "Saved to ~/Downloads/<file>" with Open folder, or why it failed, and
-  never overwrites a file already there.
+- Download CSV, Download YAML and the other report and CSV exports saved without
+  a word, and on a desktop without a Downloads folder set they did not save at
+  all. Each one now says "Saved to ~/Downloads/<file>" with Open folder, or why it
+  failed, and never overwrites a file already there.
 
 ## [0.26.5] - 2026-11-21
 
