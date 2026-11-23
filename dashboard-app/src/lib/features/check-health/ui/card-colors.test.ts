@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getColorForClusterCard } from "./card-colors";
+import { displayClusterCardState, getColorForClusterCard } from "./card-colors";
 import { STATUS_CLASSES } from "../../../entities/cluster/model/constants";
 import type { ClusterHealthChecks, ClusterCheckError } from "../model/types";
 
@@ -203,5 +203,52 @@ describe("getColorForClusterCard", () => {
       color: STATUS_CLASSES.warning,
       text: "Warning",
     });
+  });
+});
+
+describe("displayClusterCardState", () => {
+  const critical = { color: STATUS_CLASSES.error, text: "Critical" };
+  const ok = { color: STATUS_CLASSES.ok, text: "Ok" };
+  const live = {
+    linterOn: true,
+    disconnected: false,
+    connectivityTitle: "Cluster unreachable",
+    connectivityReason: null,
+    awaitingInitialRefresh: false,
+  };
+
+  it("paints Critical and Ok from the last check, with the matching tooltip", () => {
+    expect(displayClusterCardState({ ...live, base: critical })).toEqual({
+      ...critical,
+      tooltip: "Critical issues detected. Immediate attention recommended.",
+    });
+    expect(displayClusterCardState({ ...live, base: ok })).toEqual({
+      ...ok,
+      tooltip: "All health checks passed. Cluster is healthy.",
+    });
+  });
+
+  it("Paused wins over everything else: the user turned the linter off", () => {
+    expect(
+      displayClusterCardState({ ...live, linterOn: false, disconnected: true, base: critical }),
+    ).toMatchObject({ color: "bg-slate-600", text: "Paused" });
+  });
+
+  it("a cluster that does not answer is grey with the connectivity title and reason", () => {
+    expect(
+      displayClusterCardState({
+        ...live,
+        disconnected: true,
+        connectivityTitle: "Auth expired",
+        connectivityReason: "token expired",
+        base: critical,
+      }),
+    ).toEqual({ color: "bg-slate-600", text: "Auth expired", tooltip: "token expired" });
+  });
+
+  it("a check that has not run yet is Pending, lighter grey", () => {
+    expect(
+      displayClusterCardState({ ...live, awaitingInitialRefresh: true, base: critical }),
+    ).toMatchObject({ color: "bg-slate-500", text: "Pending" });
   });
 });

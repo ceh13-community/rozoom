@@ -242,7 +242,8 @@ export {
   getOverviewWarningEventsWatcherError,
 } from "./model/stream-watchers/overview/warning-events-watcher";
 export { sortedMetricsEndpoints, countPressuresByNodeStatus } from "./ui/formatters";
-export { getColorForClusterCard } from "./ui/card-colors";
+export { getColorForClusterCard, displayClusterCardState } from "./ui/card-colors";
+export type { ClusterCardState } from "./ui/card-colors";
 export { getContainerReason, getContainerStatus } from "../check-health/ui/formatters";
 export {
   startGlobalWatcher,
