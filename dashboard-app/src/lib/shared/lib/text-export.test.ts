@@ -1,21 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const writeTextFile = vi.fn();
+const invoke = vi.fn();
 const isTauriAvailableMock = vi.fn();
 
-vi.mock("@tauri-apps/plugin-fs", () => ({
-  BaseDirectory: { Download: "Download" },
-  writeTextFile: (...args: unknown[]) => writeTextFile(...args),
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: (...args: unknown[]) => invoke(...args),
 }));
 
 vi.mock("./tauri-runtime", () => ({
   isTauriAvailable: () => isTauriAvailableMock(),
-}));
-
-const downloadDir = vi.fn();
-vi.mock("@tauri-apps/api/path", () => ({
-  downloadDir: () => downloadDir(),
-  join: async (...parts: string[]) => parts.join("/"),
 }));
 
 describe("buildTextExportFilename", async () => {
@@ -33,28 +26,23 @@ describe("exportTextArtifact", async () => {
   const { exportCsvArtifact, exportTextArtifact } = await import("./text-export");
 
   beforeEach(() => {
-    writeTextFile.mockReset();
+    invoke.mockReset();
     isTauriAvailableMock.mockReset();
-    downloadDir.mockReset();
-    downloadDir.mockResolvedValue("/home/u/Downloads");
   });
 
-  it("writes to the Downloads directory in Tauri and returns its real path", async () => {
+  it("saves through the app into the Downloads folder and returns its real path", async () => {
     isTauriAvailableMock.mockReturnValue(true);
-    writeTextFile.mockResolvedValue(undefined);
+    invoke.mockResolvedValue("/home/u/Downloads/debug-describe.txt");
 
     const result = await exportTextArtifact({
       filename: "debug-describe.txt",
       text: "kubectl describe pod/api -n prod",
     });
 
-    expect(writeTextFile).toHaveBeenCalledWith(
-      "debug-describe.txt",
-      "kubectl describe pod/api -n prod",
-      {
-        baseDir: "Download",
-      },
-    );
+    expect(invoke).toHaveBeenCalledWith("save_download", {
+      filename: "debug-describe.txt",
+      contents: "kubectl describe pod/api -n prod",
+    });
     expect(result).toEqual({
       method: "tauri-download",
       path: "/home/u/Downloads/debug-describe.txt",
@@ -62,24 +50,22 @@ describe("exportTextArtifact", async () => {
     });
   });
 
-  it("shows the Downloads folder the OS names, not a fixed ~/Downloads", async () => {
+  it("shows the folder the app saved into, not a fixed ~/Downloads", async () => {
     isTauriAvailableMock.mockReturnValue(true);
-    writeTextFile.mockResolvedValue(undefined);
-    downloadDir.mockResolvedValue("/home/u/Завантаження");
+    invoke.mockResolvedValue("/home/u/Завантаження/pods.csv");
 
     const result = await exportTextArtifact({ filename: "pods.csv", text: "x" });
 
     expect(result.path).toBe("/home/u/Завантаження/pods.csv");
   });
 
-  it("fails before writing when the OS has no Downloads folder", async () => {
+  it("passes the app's error on", async () => {
     isTauriAvailableMock.mockReturnValue(true);
-    downloadDir.mockRejectedValue(new Error("unknown path"));
+    invoke.mockRejectedValue("cannot write /home/u/Downloads/pods.csv: Permission denied");
 
-    await expect(exportTextArtifact({ filename: "pods.csv", text: "x" })).rejects.toThrow(
-      "unknown path",
+    await expect(exportTextArtifact({ filename: "pods.csv", text: "x" })).rejects.toBe(
+      "cannot write /home/u/Downloads/pods.csv: Permission denied",
     );
-    expect(writeTextFile).not.toHaveBeenCalled();
   });
 
   it("falls back to a browser download outside Tauri", async () => {
@@ -110,6 +96,7 @@ describe("exportTextArtifact", async () => {
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:debug");
     expect(appendChild).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalled();
     expect(result).toEqual({
       method: "browser-download",
       path: "debug-describe.txt",
@@ -124,15 +111,16 @@ describe("exportTextArtifact", async () => {
 
   it("exports CSV files with a UTF-8 BOM and the Downloads path", async () => {
     isTauriAvailableMock.mockReturnValue(true);
-    writeTextFile.mockResolvedValue(undefined);
+    invoke.mockResolvedValue("/home/u/Downloads/nodes-status.csv");
 
     const result = await exportCsvArtifact({
       filename: "nodes-status.csv",
       csv: '"name"\n"node-a"',
     });
 
-    expect(writeTextFile).toHaveBeenCalledWith("nodes-status.csv", '\uFEFF"name"\n"node-a"', {
-      baseDir: "Download",
+    expect(invoke).toHaveBeenCalledWith("save_download", {
+      filename: "nodes-status.csv",
+      contents: '﻿"name"\n"node-a"',
     });
     expect(result).toEqual({
       method: "tauri-download",

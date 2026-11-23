@@ -20,6 +20,7 @@
     "allow-logs-folder-path",
     "allow-harden-private-files",
     "allow-linux-package-kind",
+    "allow-save-download",
     {
       "identifier": "shell:allow-execute",
       "allow": [

@@ -12,6 +12,7 @@ const APP_COMMANDS: &[&str] = &[
     "logs_folder_path",
     "harden_private_files",
     "linux_package_kind",
+    "save_download",
 ];
 
 fn main() {

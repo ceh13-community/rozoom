@@ -35,13 +35,10 @@ export async function exportTextArtifact(options: {
 }): Promise<TextExportResult> {
   const { filename, text, mimeType = "text/plain;charset=utf-8" } = options;
   if (isTauriAvailable()) {
-    const { BaseDirectory, writeTextFile } = await import("@tauri-apps/plugin-fs");
-    const { downloadDir, join } = await import("@tauri-apps/api/path");
-    // The Downloads folder is the OS one (on Linux XDG_DOWNLOAD_DIR, which may not be
-    // ~/Downloads); resolving it first gives the path to show and a clear error without one.
-    const folder = await downloadDir();
-    await writeTextFile(filename, text, { baseDir: BaseDirectory.Download });
-    const path = await join(folder, filename);
+    // The app writes it (src-tauri/src/downloads.rs): the OS Downloads folder (on Linux
+    // XDG_DOWNLOAD_DIR, which may not be ~/Downloads), else ~/Downloads, created if missing.
+    const { invoke } = await import("@tauri-apps/api/core");
+    const path = await invoke<string>("save_download", { filename, contents: text });
     return { method: "tauri-download", path, pathHint: path };
   }
 
