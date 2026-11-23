@@ -1477,7 +1477,15 @@
     {/snippet}
     {#snippet body()}
       {#if !workbenchCollapsed && activeWorkbenchTab}
-        <div class={workbenchFullscreen ? "min-h-0 flex-1" : "h-[min(70dvh,760px)] min-h-[430px]"}>
+        <!-- A port-forward tab is a strip, a status line and a short log: it takes the height of
+             its content instead of the fixed workbench height that left an empty field below. -->
+        <div
+          class={workbenchFullscreen
+            ? "min-h-0 flex-1"
+            : activeWorkbenchTab.kind === "port-forward"
+              ? "max-h-[min(70dvh,760px)]"
+              : "h-[min(70dvh,760px)] min-h-[430px]"}
+        >
           <!-- Metrics row at its own height, the panes take the rest: two auto rows in a
                full-height grid split the spare height and left an empty band under metrics. -->
           <div class="grid h-full grid-rows-[auto_minmax(0,1fr)] gap-2 p-2">

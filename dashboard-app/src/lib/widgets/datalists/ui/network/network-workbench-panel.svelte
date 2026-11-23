@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { describePortForwardState, testPortForwardUrl } from "$shared/lib/port-forward-status";
   import { popOutPortForwardPreview, withRefreshNonce } from "$shared/lib/port-forward-preview";
   import { confirmAction } from "$shared/lib/confirm-action";
   import { isTauriAvailable } from "$shared/lib/tauri-runtime";
@@ -172,6 +173,9 @@
         url={currentUrl}
         loading={currentLoading}
         message={currentForward?.lastError ?? currentMessage}
+        status={describePortForwardState(currentForward)}
+        logLines={currentForward?.log ?? []}
+        onTest={() => testPortForwardUrl(currentUrl)}
         onRefresh={() => {
           currentUrl = withRefreshNonce(currentUrl);
         }}
