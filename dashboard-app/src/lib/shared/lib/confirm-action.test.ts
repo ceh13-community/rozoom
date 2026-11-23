@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { confirmAction } from "./confirm-action";
+import { confirmDialog, registerConfirmHost, settleConfirm } from "./confirm-dialog.svelte";
 
 const tauriConfirmMock = vi.hoisted(() => vi.fn());
 
@@ -8,6 +9,31 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 }));
 
 describe("confirm-action", () => {
+  it("asks the in-app dialog when a host is mounted, system dialogs untouched", async () => {
+    const unregister = registerConfirmHost();
+    const browserConfirmSpy = vi.spyOn(window, "confirm");
+    try {
+      const answer = confirmAction("Stop this port-forward?", "Stop port-forward");
+      expect(confirmDialog.current).toMatchObject({
+        title: "Stop port-forward",
+        message: "Stop this port-forward?",
+      });
+      settleConfirm(true);
+      await expect(answer).resolves.toBe(true);
+
+      const declined = confirmAction("Close this tab?");
+      expect(confirmDialog.current?.title).toBe("Confirm");
+      settleConfirm(false);
+      await expect(declined).resolves.toBe(false);
+
+      expect(tauriConfirmMock).not.toHaveBeenCalled();
+      expect(browserConfirmSpy).not.toHaveBeenCalled();
+    } finally {
+      browserConfirmSpy.mockRestore();
+      unregister();
+    }
+  });
+
   beforeEach(() => {
     tauriConfirmMock.mockReset();
     delete (window as Window & { __TAURI__?: unknown }).__TAURI__;
