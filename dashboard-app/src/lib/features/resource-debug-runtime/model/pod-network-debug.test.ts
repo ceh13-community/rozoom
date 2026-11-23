@@ -365,3 +365,40 @@ describe("network debug Pod Security pre-check", () => {
     expect(kubectlRawArgsFront).toHaveBeenCalledTimes(3);
   });
 });
+
+describe("namespace Pod Security cache expiry", () => {
+  it("asks the cluster again once the minute is up, and the new answer replaces the old", async () => {
+    vi.useFakeTimers();
+    try {
+      clearNamespacePodSecurityCache();
+      kubectlRawArgsFront.mockReset();
+      const withLabel = JSON.stringify({
+        items: [
+          {
+            metadata: {
+              name: "shop",
+              labels: { "pod-security.kubernetes.io/enforce": "baseline" },
+            },
+          },
+        ],
+      });
+      const withoutLabel = JSON.stringify({ items: [{ metadata: { name: "shop", labels: {} } }] });
+      kubectlRawArgsFront
+        .mockResolvedValueOnce({ output: withLabel, errors: "", code: 0 })
+        .mockResolvedValueOnce({ output: withoutLabel, errors: "", code: 0 });
+
+      expect((await loadNamespacePodSecurityLevels("c1"))?.get("shop")).toBe("baseline");
+      vi.advanceTimersByTime(59_000);
+      expect((await loadNamespacePodSecurityLevels("c1"))?.get("shop")).toBe("baseline");
+      expect(kubectlRawArgsFront).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(2_000);
+      const levels = await loadNamespacePodSecurityLevels("c1");
+
+      expect(kubectlRawArgsFront).toHaveBeenCalledTimes(2);
+      expect(levels?.has("shop")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

@@ -27,6 +27,11 @@ export {
   startPodNetworkDebugSession,
 } from "./model/pod-network-debug";
 export type { PodNetworkDebugTarget } from "./model/pod-network-debug";
+export { createNamespacePodSecurityReader } from "./model/namespace-pod-security";
+export type {
+  NamespacePodSecurityLevels,
+  NamespacePodSecurityReader,
+} from "./model/namespace-pod-security";
 export {
   buildNodeDebugArgs,
   describeNodeDebugFailure,

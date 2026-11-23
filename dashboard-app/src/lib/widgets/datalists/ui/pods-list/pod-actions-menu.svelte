@@ -60,6 +60,8 @@
     onNetworkDebug?: () => void;
     /** Why network debug cannot start here (Pod Security baseline or restricted); disables the item and shows the reason. */
     networkDebugBlockedReason?: string | null;
+    /** The menu just opened: the owner may refresh what the items show. */
+    onOpen?: () => void;
     onPreviousLogs: () => void;
     onPortForward: () => void;
     onEvict: () => void;
@@ -104,6 +106,7 @@
     onCopyDebug,
     onNetworkDebug,
     networkDebugBlockedReason = null,
+    onOpen,
     onPreviousLogs,
     onPortForward,
     onEvict,
@@ -133,7 +136,9 @@
   }
 
   $effect(() => {
-    if (open) suppressCloseFocus = false;
+    if (!open) return;
+    suppressCloseFocus = false;
+    onOpen?.();
   });
 
   function selectAction(callback: () => void) {

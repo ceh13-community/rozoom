@@ -36,10 +36,21 @@ describe("pods list network debug Pod Security contract", () => {
     expect(list).toContain("if (blocked) {\n      toast.error(blocked);\n      return;\n    }");
   });
 
-  it("loads the enforce labels per cluster and leaves the menu enabled when they cannot be read", () => {
-    expect(list).toContain("loadNamespacePodSecurityLevels(clusterId)");
+  it("reads the levels per cluster through the reader and leaves the menu enabled when they cannot be read", () => {
+    expect(list).toContain("createNamespacePodSecurityReader((levels) => {");
+    expect(list).toContain("void namespacePodSecurityReader.use(data.slug || null);");
     expect(list).toContain("let namespacePodSecurity = $state<Map<string, string> | null>(null);");
     expect(list).toContain("networkDebugPodSecurityBlock(ns, namespacePodSecurity?.get(ns))");
+  });
+
+  it("reads again when a row menu opens and when the window regains focus", () => {
+    expect(list).toContain("onMenuOpen={() => void namespacePodSecurityReader.refresh()}");
+    expect(list).toContain('window.addEventListener("focus", refreshNamespacePodSecurity);');
+    expect(list).toContain('window.removeEventListener("focus", refreshNamespacePodSecurity)');
+    expect(
+      table.match(/onOpen=\{onMenuOpen \? \(\) => onMenuOpen\(row\) : undefined\}/g),
+    ).toHaveLength(2);
+    expect(menu).toContain("onOpen?.();");
   });
 
   it("a Pod Security refusal found only at launch is one sentence, kubectl's line goes to the log", () => {

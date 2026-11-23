@@ -15,7 +15,7 @@
   import {
     NETWORK_DEBUG_IMAGE,
     NetworkDebugRefusal,
-    loadNamespacePodSecurityLevels,
+    createNamespacePodSecurityReader,
     networkDebugPodSecurityBlock,
     runDebugDescribe,
     startPodNetworkDebugSession,
@@ -791,19 +791,20 @@
 
   // Pod Security enforce level per namespace, so a network debug that the namespace is sure
   // to refuse is never started. Null while loading or when namespaces cannot be listed: then
-  // the menu stays enabled and kubectl's answer decides.
+  // the menu stays enabled and kubectl's answer decides. Read again, through the one-minute
+  // cache, when a row menu opens or the window regains focus, so a label changed while the
+  // page is open shows up without leaving Pods.
   let namespacePodSecurity = $state<Map<string, string> | null>(null);
+  const namespacePodSecurityReader = createNamespacePodSecurityReader((levels) => {
+    namespacePodSecurity = levels;
+  });
   $effect(() => {
-    const clusterId = data.slug;
-    namespacePodSecurity = null;
-    if (!clusterId) return;
-    let cancelled = false;
-    void loadNamespacePodSecurityLevels(clusterId).then((levels) => {
-      if (!cancelled) namespacePodSecurity = levels;
-    });
-    return () => {
-      cancelled = true;
-    };
+    void namespacePodSecurityReader.use(data.slug || null);
+  });
+  onMount(() => {
+    const refreshNamespacePodSecurity = () => void namespacePodSecurityReader.refresh();
+    window.addEventListener("focus", refreshNamespacePodSecurity);
+    return () => window.removeEventListener("focus", refreshNamespacePodSecurity);
   });
 
   function networkDebugBlockReason(namespace: string | undefined): string | null {
@@ -1400,6 +1401,7 @@
       void startNetworkDebug(pod);
     }}
     networkDebugBlockedReason={(row) => networkDebugBlockReason(row.namespace)}
+    onMenuOpen={() => void namespacePodSecurityReader.refresh()}
     onPortForward={(row) => {
       const pod = getPodByUid(row.uid);
       if (!pod) return;

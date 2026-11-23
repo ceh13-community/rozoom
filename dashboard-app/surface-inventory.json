@@ -5,7 +5,7 @@
     "screens": 71,
     "sections": 10,
     "actionMenus": 24,
-    "actions": 243,
+    "actions": 244,
     "orphanScreens": 0
   },
   "plugins": [
@@ -1799,6 +1799,11 @@
         },
         {
           "name": "onNetworkDebug",
+          "optional": true,
+          "wired": true
+        },
+        {
+          "name": "onOpen",
           "optional": true,
           "wired": true
         },
