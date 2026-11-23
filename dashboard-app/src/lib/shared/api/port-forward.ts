@@ -3,6 +3,7 @@ import { appDataDir } from "@tauri-apps/api/path";
 import { error as logError } from "@tauri-apps/plugin-log";
 import { writable, get, readonly } from "svelte/store";
 import { spawnCli } from "$shared/api/cli";
+import { appendForwardLog, isHandlingConnectionLine } from "$shared/lib/port-forward-status";
 import {
   trackPortForwardStartAttempt,
   trackPortForwardStartResult,
@@ -24,6 +25,10 @@ export interface PortForwardProcess {
   lastMessage: string | null;
   lastError: string | null;
   closedAt: number | null;
+  /** Local connections kubectl accepted ("Handling connection for <port>"). */
+  connections: number;
+  /** The last lines kubectl printed, each with its time, for the tab's compact log. */
+  log: string[];
 }
 
 type ActiveForwardsState = Partial<Record<string, PortForwardProcess>>;
@@ -163,6 +168,8 @@ export async function startPortForward(
           ...current,
           lastHeartbeatAt: Date.now(),
           lastMessage: trimmed || current.lastMessage,
+          connections: current.connections + (isHandlingConnectionLine(trimmed) ? 1 : 0),
+          log: appendForwardLog(current.log, trimmed),
         }));
         console.log("[kubectl]", line.trim());
       },
@@ -172,9 +179,11 @@ export async function startPortForward(
         // count: an info line as lastError marked every healthy forward "Degraded" and
         // showed klog text in the port-forward panel.
         if (!isKubectlErrorLine(trimmed)) {
+          // klog info stays out of the log; a connection line is counted wherever it lands.
           updateForward(startArgs.uniqueKey, (current) => ({
             ...current,
             lastHeartbeatAt: Date.now(),
+            connections: current.connections + (isHandlingConnectionLine(trimmed) ? 1 : 0),
           }));
           console.debug("[kubectl]", trimmed);
           return;
@@ -185,6 +194,7 @@ export async function startPortForward(
           lastHeartbeatAt: Date.now(),
           lastError: trimmed || current.lastError,
           lastMessage: trimmed || current.lastMessage,
+          log: appendForwardLog(current.log, trimmed),
         }));
         console.error("[kubectl]", trimmed);
       },
@@ -195,6 +205,7 @@ export async function startPortForward(
           isRunning: false,
           closedAt: Date.now(),
           lastMessage: "Port-forward closed.",
+          log: appendForwardLog(current.log, "Port-forward closed."),
         }));
       },
       onError: (e) => {
@@ -225,6 +236,8 @@ export async function startPortForward(
         lastMessage: "Starting port-forward...",
         lastError: null,
         closedAt: null,
+        connections: 0,
+        log: [],
       },
     }));
 

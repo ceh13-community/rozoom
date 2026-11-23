@@ -769,3 +769,56 @@ describe("port-forward", () => {
     });
   });
 });
+
+describe("port-forward status data", () => {
+  it("counts kubectl's connection lines and keeps its lines for the tab's log", async () => {
+    vi.useRealTimers();
+    vi.mocked(tauriPath.appDataDir).mockResolvedValue("/mock/app/data");
+    const child = {
+      kill: vi.fn().mockResolvedValue(undefined),
+      pid: 1,
+      write: vi.fn(),
+    } as unknown as Child;
+    let handlers: Parameters<typeof cli.spawnCli>[2];
+    vi.mocked(cli.spawnCli).mockImplementation(async (_tool, _args, h) => {
+      handlers = h;
+      setTimeout(() => handlers?.onStdoutLine?.("Forwarding from 127.0.0.1:30080 -> 80"), 20);
+      return { command: {} as Command<IOPayload>, child };
+    });
+    const key = "status-data-key";
+    const result = await startPortForward({
+      namespace: "shop",
+      resource: "pod/web-a",
+      remotePort: 80,
+      localPort: 30080,
+      clusterId: "c1",
+      uniqueKey: key,
+    });
+    expect(result).toEqual({ success: true });
+
+    handlers?.onStdoutLine?.("Handling connection for 30080");
+    handlers?.onStdoutLine?.("Handling connection for 30080");
+    handlers?.onStderrLine?.(
+      "I1123 15:07:19.793300 1426131 envvar.go:195] klog info stays out of the log",
+    );
+    handlers?.onStderrLine?.(
+      "E1123 15:07:20.000000 1426131 portforward.go:400] error: lost connection to pod",
+    );
+
+    const forward = get(activePortForwards)[key];
+    expect(forward?.connections).toBe(2);
+    expect(forward?.log.map((line) => line.slice(10))).toEqual([
+      "Forwarding from 127.0.0.1:30080 -> 80",
+      "Handling connection for 30080",
+      "Handling connection for 30080",
+      "E1123 15:07:20.000000 1426131 portforward.go:400] error: lost connection to pod",
+    ]);
+    expect(forward?.log[0]).toMatch(/^\d{2}:\d{2}:\d{2}  /);
+
+    handlers?.onClose?.({ code: 1 });
+    const closed = get(activePortForwards)[key];
+    expect(closed?.isRunning).toBe(false);
+    expect(closed?.log.at(-1)).toContain("Port-forward closed.");
+    await stopPortForward(key);
+  });
+});

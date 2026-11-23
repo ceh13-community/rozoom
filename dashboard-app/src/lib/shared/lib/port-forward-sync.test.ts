@@ -17,6 +17,8 @@ function createForward(input: Partial<PortForwardProcess>): PortForwardProcess {
     lastMessage: null,
     lastError: null,
     closedAt: null,
+    connections: 0,
+    log: [],
     ...input,
   };
 }

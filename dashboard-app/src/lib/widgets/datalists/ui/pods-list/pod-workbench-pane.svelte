@@ -5,6 +5,8 @@
   import ResourceLogsSheet from "../common/resource-logs-sheet.svelte";
   import ResourceYamlSheet from "../common/resource-yaml-sheet.svelte";
   import PortForwardBrowserTab from "../common/port-forward-browser-tab.svelte";
+  import { activePortForwards } from "$shared/api/port-forward";
+  import { describePortForwardState, testPortForwardUrl } from "$shared/lib/port-forward-status";
   import { previousLogsAvailability } from "./model/previous-logs";
 
   type LogBookmark = {
@@ -59,6 +61,8 @@
         id: string;
         podRef: string;
         podUid: string;
+        /** Key of the forward in the port-forward store, for its state and kubectl lines. */
+        uniqueKey: string;
         url: string;
         message: string | null;
         loading: boolean;
@@ -235,12 +239,17 @@
     }}
   />
 {:else if paneTab.kind === "port-forward"}
-  <!-- Same panel as a Service port-forward tab: Copy URL, Open Web, Open external, Stop. -->
+  <!-- Same panel as a Service port-forward tab: Copy URL, Open Web, Open external, Stop,
+       plus the tunnel state, a Test request and kubectl's last lines. -->
+  {@const forward = $activePortForwards[paneTab.uniqueKey]}
   <PortForwardBrowserTab
     title={`Web ${paneTab.podRef}`}
     url={paneTab.url}
     loading={paneTab.loading}
     message={paneTab.message}
+    status={describePortForwardState(forward)}
+    logLines={forward?.log ?? []}
+    onTest={() => testPortForwardUrl(paneTab.url)}
     onRefresh={() => portForwardActions?.refresh(paneTab.id)}
     onCopyUrl={() => portForwardActions?.copyUrl(paneTab.id)}
     onOpenPreview={() => portForwardActions?.openWeb(paneTab.id)}
