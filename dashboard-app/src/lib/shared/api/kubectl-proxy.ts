@@ -158,6 +158,48 @@ function isWatchCommand(args: string[]) {
   return args.some((arg) => arg === "--watch" || arg === "--watch-only" || arg === "-w");
 }
 
+type ChunkSource = { on(event: "data", handler: (chunk: unknown) => void): unknown };
+type SidecarCommand = Pick<Command<string>, "spawn" | "on"> & {
+  stdout: ChunkSource;
+  stderr: ChunkSource;
+};
+
+// The shell plugin sends one IPC message per output line unless the output is raw. kubectl
+// prints JSON one token per line, so the 38 MB pod list of a 2,000-pod cluster arrived as over
+// a million messages and blocked the main thread for tens of seconds. Raw chunks come a few
+// thousand times instead. Watch commands keep line mode: their parsers read one event per line.
+function createSidecarCommand(args: string[]): SidecarCommand {
+  const command = isWatchCommand(args)
+    ? Command.sidecar("binaries/rozoom-kubectl", args)
+    : Command.sidecar("binaries/rozoom-kubectl", args, { encoding: "raw" });
+  return command as unknown as SidecarCommand;
+}
+
+// Raw chunks reach the page as bytes (a Uint8Array, or a plain array of numbers after the IPC
+// JSON); line mode and test fakes give strings. Both end as one string; a multi-byte character
+// split across two chunks is decoded whole.
+class OutputCollector {
+  private readonly decoder = new TextDecoder();
+  private text = "";
+
+  push(chunk: unknown) {
+    if (typeof chunk === "string") {
+      this.text += chunk;
+    } else if (ArrayBuffer.isView(chunk)) {
+      // isView, not instanceof: a typed array from another realm (the test DOM) is still bytes.
+      const bytes = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+      this.text += this.decoder.decode(bytes, { stream: true });
+    } else if (Array.isArray(chunk)) {
+      this.text += this.decoder.decode(Uint8Array.from(chunk as number[]), { stream: true });
+    }
+  }
+
+  finish() {
+    this.text += this.decoder.decode();
+    return this.text;
+  }
+}
+
 function clampBudgetValue(value: number, fallback: number) {
   if (!Number.isFinite(value)) return fallback;
   return Math.max(1, Math.round(value));
@@ -310,12 +352,12 @@ function redactKubectlArgs(args: string[]) {
 }
 
 async function executeCommandWithAbort(
-  command: Command<string>,
+  command: SidecarCommand,
   signal?: AbortSignal,
 ): Promise<KubectlExecResult> {
   abortIfNeeded(signal);
-  let stdout = "";
-  let stderr = "";
+  const stdout = new OutputCollector();
+  const stderr = new OutputCollector();
   let closeCode = 0;
   let killed = false;
   let resolveClose: (() => void) | null = null;
@@ -324,10 +366,10 @@ async function executeCommandWithAbort(
   });
 
   command.stdout.on("data", (chunk) => {
-    stdout += chunk;
+    stdout.push(chunk);
   });
   command.stderr.on("data", (chunk) => {
-    stderr += chunk;
+    stderr.push(chunk);
   });
   command.on("close", (event) => {
     closeCode = extractCloseCode(event);
@@ -359,8 +401,8 @@ async function executeCommandWithAbort(
   abortIfNeeded(signal);
   return {
     code: closeCode,
-    stdout,
-    stderr,
+    stdout: stdout.finish(),
+    stderr: stderr.finish(),
     startedAt,
     killed,
   };
@@ -399,7 +441,7 @@ export async function kubectlRawFront(
     splitArgs = ["--kubeconfig", kubeconfigPath, ...splitArgs];
   }
 
-  const command = Command.sidecar("binaries/rozoom-kubectl", splitArgs);
+  const command = createSidecarCommand(splitArgs);
   const debugEnabled = isRuntimeDebugEnabled("kubectl");
   const startedAt = Date.now();
   if (debugEnabled) {
@@ -512,7 +554,7 @@ export async function kubectlRawArgsFront(
       finalArgs = ["--kubeconfig", kubeconfigPath, ...finalArgs];
     }
 
-    const command = Command.sidecar("binaries/rozoom-kubectl", finalArgs);
+    const command = createSidecarCommand(finalArgs);
     const debugEnabled = isRuntimeDebugEnabled("kubectl");
     const startedAt = Date.now();
     if (debugEnabled) {

@@ -73,11 +73,11 @@ describe("kubectlJson argv handed to the kubectl sidecar", () => {
 
     expect(result).toEqual({ items: [] });
     expect(sidecarMock).toHaveBeenCalledTimes(1);
-    expect(sidecarMock).toHaveBeenCalledWith("binaries/rozoom-kubectl", [
-      "get",
-      "--raw=/x",
-      "--request-timeout=15s",
-    ]);
+    expect(sidecarMock).toHaveBeenCalledWith(
+      "binaries/rozoom-kubectl",
+      ["get", "--raw=/x", "--request-timeout=15s"],
+      { encoding: "raw" },
+    );
   });
 
   it("appends -o json to a plain read before the default request timeout", async () => {
@@ -85,12 +85,10 @@ describe("kubectlJson argv handed to the kubectl sidecar", () => {
 
     expect(result).toEqual({ items: [] });
     expect(sidecarMock).toHaveBeenCalledTimes(1);
-    expect(sidecarMock).toHaveBeenCalledWith("binaries/rozoom-kubectl", [
-      "get",
-      "pods",
-      "-o",
-      "json",
-      "--request-timeout=10s",
-    ]);
+    expect(sidecarMock).toHaveBeenCalledWith(
+      "binaries/rozoom-kubectl",
+      ["get", "pods", "-o", "json", "--request-timeout=10s"],
+      { encoding: "raw" },
+    );
   });
 });
