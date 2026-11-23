@@ -1,5 +1,6 @@
 <script lang="ts">
   import { saveTextExport } from "$shared/lib/save-export";
+  import { buildTextExportFilename } from "$shared/lib/text-export";
   import {
     complianceHubState,
     fetchLatestKubeBenchLogs,
@@ -379,7 +380,11 @@
   function downloadKubeBenchJson() {
     if (!kubeBenchLogsRaw || !hasJsonLogs()) return;
     void saveTextExport({
-      filename: `${(kubeBenchLogsTitle || "compliance-report").replace(/\s+/g, "-").toLowerCase()}.json`,
+      filename: buildTextExportFilename(
+        "kube-bench",
+        [kubeBenchLogsTitle || "report"],
+        "json",
+      ),
       text: kubeBenchLogsRaw,
       mimeType: "application/json",
     });

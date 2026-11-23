@@ -81,3 +81,42 @@ export function saveCsvExport(options: {
   const { filename, csv, rows } = options;
   return save(filename, rows, () => exportCsvArtifact({ filename, csv }));
 }
+
+function folderOf(path: string): string {
+  const cut = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  return cut > 0 ? path.slice(0, cut) : path;
+}
+
+/**
+ * Saves several files with one message: "Saved N files to <folder>" with Open folder, or the
+ * first failure with how many were saved before it. One file behaves as saveTextExport.
+ */
+export async function saveTextFiles(
+  files: { filename: string; text: string; mimeType?: string }[],
+): Promise<TextExportResult[] | null> {
+  if (files.length === 0) return [];
+  if (files.length === 1) {
+    const result = await saveTextExport(files[0]);
+    return result ? [result] : null;
+  }
+  const saved: TextExportResult[] = [];
+  for (const file of files) {
+    try {
+      saved.push(await exportTextArtifact(file));
+    } catch (error) {
+      const progress = saved.length > 0 ? ` (${saved.length} of ${files.length} saved)` : "";
+      toast.error(`Could not save ${file.filename}: ${errorText(error)}${progress}`);
+      return null;
+    }
+  }
+  const last = saved[saved.length - 1];
+  if (last.method === "tauri-download") {
+    toast.success(`Saved ${saved.length} files to ${await displayPath(folderOf(last.path))}`, {
+      duration: SAVED_TOAST_MS,
+      action: { label: "Open folder", onClick: () => void revealSavedExport(last.path) },
+    });
+  } else {
+    toast.success(`Downloaded ${saved.length} files`);
+  }
+  return saved;
+}

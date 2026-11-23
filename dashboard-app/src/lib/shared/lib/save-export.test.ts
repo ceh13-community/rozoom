@@ -13,7 +13,7 @@ vi.mock("@tauri-apps/plugin-opener", () => ({ revealItemInDir }));
 const homeDir = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/api/path", () => ({ homeDir }));
 
-import { saveCsvExport, saveTextExport } from "./save-export";
+import { saveCsvExport, saveTextExport, saveTextFiles } from "./save-export";
 
 type ToastAction = { label: string; onClick: () => void };
 
@@ -147,5 +147,65 @@ describe("save export", () => {
     expect(toast.success.mock.calls[0][1]).toEqual(
       expect.objectContaining({ description: "1 row" }),
     );
+  });
+
+  it("several files: one message with the count and the folder", async () => {
+    exportTextArtifact
+      .mockResolvedValueOnce({
+        method: "tauri-download",
+        path: "/home/u/Downloads/a.yaml",
+        pathHint: "",
+      })
+      .mockResolvedValueOnce({
+        method: "tauri-download",
+        path: "/home/u/Downloads/b.yaml",
+        pathHint: "",
+      });
+
+    const saved = await saveTextFiles([
+      { filename: "a.yaml", text: "a" },
+      { filename: "b.yaml", text: "b" },
+    ]);
+
+    expect(saved).toHaveLength(2);
+    expect(toast.success).toHaveBeenCalledTimes(1);
+    expect(toast.success).toHaveBeenCalledWith(
+      "Saved 2 files to ~/Downloads",
+      expect.objectContaining({ action: expect.objectContaining({ label: "Open folder" }) }),
+    );
+  });
+
+  it("several files: the first failure stops and says how many were saved", async () => {
+    exportTextArtifact
+      .mockResolvedValueOnce({
+        method: "tauri-download",
+        path: "/home/u/Downloads/a.yaml",
+        pathHint: "",
+      })
+      .mockRejectedValueOnce('not a plain file name: "b:c.yaml"');
+
+    const saved = await saveTextFiles([
+      { filename: "a.yaml", text: "a" },
+      { filename: "b:c.yaml", text: "b" },
+      { filename: "c.yaml", text: "c" },
+    ]);
+
+    expect(saved).toBeNull();
+    expect(exportTextArtifact).toHaveBeenCalledTimes(2);
+    expect(toast.error).toHaveBeenCalledWith(
+      'Could not save b:c.yaml: not a plain file name: "b:c.yaml" (1 of 3 saved)',
+    );
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("one file goes through the single-file message, none saves nothing", async () => {
+    exportTextArtifact.mockResolvedValue({
+      method: "tauri-download",
+      path: "/home/u/Downloads/a.yaml",
+      pathHint: "",
+    });
+    await saveTextFiles([{ filename: "a.yaml", text: "a" }]);
+    expect(toast.success.mock.calls[0][0]).toBe("Saved to ~/Downloads/a.yaml");
+    expect(await saveTextFiles([])).toEqual([]);
   });
 });
