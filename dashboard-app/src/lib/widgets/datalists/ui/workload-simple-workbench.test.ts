@@ -64,7 +64,7 @@ describe("workload-simple-workbench", () => {
 
   it("renders controls and toggles fullscreen/collapse", async () => {
     const props = buildProps("dashboard.test.workbench.1");
-    const { getByRole, queryByText } = render(WorkloadSimpleWorkbench, { props });
+    const { getByRole, queryByRole, queryByText } = render(WorkloadSimpleWorkbench, { props });
     vi.spyOn(window, "confirm").mockReturnValue(true);
 
     expect(getByRole("button", { name: "Close Logs tab" })).toBeTruthy();
@@ -81,7 +81,10 @@ describe("workload-simple-workbench", () => {
 
     await fireEvent.click(getByRole("button", { name: "Fullscreen" }));
     expect(getByRole("button", { name: "Exit Fullscreen" })).toBeTruthy();
+    // A collapsed fullscreen workbench would be a blank page: no Collapse while fullscreen.
+    expect(queryByRole("button", { name: "Collapse" })).toBeNull();
 
+    await fireEvent.click(getByRole("button", { name: "Exit Fullscreen" }));
     await fireEvent.click(getByRole("button", { name: "Collapse" }));
     expect(getByRole("button", { name: "Expand" })).toBeTruthy();
     expect(queryByText("Pane 1")).toBeNull();

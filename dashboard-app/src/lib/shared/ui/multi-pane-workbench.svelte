@@ -102,6 +102,13 @@
   let pendingScrollTabId: string | null = null;
 
   // Scroll workbench into view when a tab is activated (user clicked edit/logs/investigate).
+  // A collapsed workbench in fullscreen is a blank page: the panel covers everything and
+  // shows nothing but its tab strip. Fullscreen therefore expands the workbench, and the
+  // Collapse button is not offered while fullscreen is on.
+  $effect(() => {
+    if (fullscreen && collapsed) onToggleCollapse();
+  });
+
   // Two-phase approach: if the workbench is still collapsed when the tab changes,
   // store the intent and scroll once it expands.
   // Only for workbenches without a reveal token: a list that passes one reveals after row
@@ -340,13 +347,15 @@
       >
         {fullscreen ? "Exit Fullscreen" : "Fullscreen"}
       </button>
-      <button
-        type="button"
-        class="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-        onclick={onToggleCollapse}
-      >
-        {collapsed ? "Expand" : "Collapse"}
-      </button>
+      {#if !fullscreen}
+        <button
+          type="button"
+          class="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+          onclick={onToggleCollapse}
+        >
+          {collapsed ? "Expand" : "Collapse"}
+        </button>
+      {/if}
     {/snippet}
   </WorkbenchHeader>
 
