@@ -80,8 +80,8 @@ describe("kubectl one-shot output arrives in raw chunks", () => {
 
   it("joins byte chunks into one string, even across a split multi-byte character", async () => {
     const bytes = new TextEncoder().encode('{"name":"тест","n":1}\n');
-    // Split inside the two-byte "е" of "тест".
-    const cut = 11;
+    // Split inside the two-byte "е" of "тест" (byte 12 is its continuation byte).
+    const cut = 12;
     sidecarMock.mockImplementation(() =>
       sidecar([bytes.slice(0, cut), Array.from(bytes.slice(cut))]),
     );
