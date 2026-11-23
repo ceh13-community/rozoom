@@ -50,14 +50,19 @@ describe("workbench fullscreen and collapse", () => {
     expect(onToggleCollapse).not.toHaveBeenCalled();
   });
 
-  it("hides Collapse while fullscreen is on", async () => {
-    const view = render(MultiPaneWorkbench, { props: props({ fullscreen: true }) });
+  it("hides Collapse while fullscreen is on and leaves an expanded workbench alone", async () => {
+    const onToggleCollapse = vi.fn();
+    const view = render(MultiPaneWorkbench, {
+      props: props({ fullscreen: true, onToggleCollapse }),
+    });
     await settle();
 
     expect(view.getByRole("button", { name: "Exit Fullscreen" })).toBeInTheDocument();
     expect(view.queryByRole("button", { name: "Collapse" })).toBeNull();
     expect(view.queryByRole("button", { name: "Expand" })).toBeNull();
     expect(view.getByTestId("pane-body")).toBeInTheDocument();
+    // "if (fullscreen) onToggleCollapse()" would collapse an expanded workbench: the same blank page.
+    expect(onToggleCollapse).not.toHaveBeenCalled();
   });
 
   it("expands a collapsed workbench when fullscreen turns on, also for a restored state", async () => {

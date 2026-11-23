@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { Button } from "$shared/ui/button";
   import * as DropdownMenu from "$shared/ui/dropdown-menu";
   import { MoreVertical } from "$shared/ui/icons";
@@ -138,7 +139,8 @@
   $effect(() => {
     if (!open) return;
     suppressCloseFocus = false;
-    onOpen?.();
+    // untrack: the owner passes a fresh onOpen on every row update; only the opening matters.
+    untrack(() => onOpen?.());
   });
 
   function selectAction(callback: () => void) {

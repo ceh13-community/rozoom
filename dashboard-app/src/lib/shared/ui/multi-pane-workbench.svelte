@@ -101,7 +101,6 @@
   let prevActiveTabId: string | null = null;
   let pendingScrollTabId: string | null = null;
 
-  // Scroll workbench into view when a tab is activated (user clicked edit/logs/investigate).
   // A collapsed workbench in fullscreen is a blank page: the panel covers everything and
   // shows nothing but its tab strip. Fullscreen therefore expands the workbench, and the
   // Collapse button is not offered while fullscreen is on.
@@ -109,6 +108,7 @@
     if (fullscreen && collapsed) onToggleCollapse();
   });
 
+  // Scroll workbench into view when a tab is activated (user clicked edit/logs/investigate).
   // Two-phase approach: if the workbench is still collapsed when the tab changes,
   // store the intent and scroll once it expands.
   // Only for workbenches without a reveal token: a list that passes one reveals after row
