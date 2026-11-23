@@ -3,6 +3,7 @@
   import { Input } from "$shared/ui/input";
   import InlineNotice from "$shared/ui/inline-notice.svelte";
   import { saveCsvExport } from "$shared/lib/save-export";
+  import { csvCell as toCsvCell } from "$shared/lib/csv";
   import { buildTextExportFilename } from "$shared/lib/text-export";
   import { computeVirtualWindow } from "$shared/lib/virtual-window";
   import { compareNatural } from "$shared/lib/natural-compare";
@@ -435,11 +436,6 @@
     return allCollapsed ? "Expand groups" : "Collapse groups";
   }
 
-  function toCsvCell(value: unknown) {
-    if (value === null || value === undefined) return "";
-    const text = String(value).replaceAll('"', '""');
-    return `"${text}"`;
-  }
 
   async function downloadCsv() {
     const headers = getColumnEntries()

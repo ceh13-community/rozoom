@@ -17,6 +17,7 @@
     setConfigurationSyncEnabled,
   } from "$features/check-health";
   import { saveCsvExport } from "$shared/lib/save-export";
+  import { csvRow } from "$shared/lib/csv";
   import { buildTextExportFilename } from "$shared/lib/text-export";
   import { fetchNamespacedSnapshotItems } from "../common/namespaced-snapshot";
   import {
@@ -714,7 +715,7 @@
     const lines = [
       ["name", "group", "version", "scope", "resource", "summary", "age"].join(","),
       ...filteredRows.map((row) =>
-        [
+        csvRow([
           row.name,
           row.group,
           row.version,
@@ -722,9 +723,7 @@
           row.resource,
           row.summary,
           liveAge(row.createdAt, row.age),
-        ]
-          .map((value) => `"${String(value).replaceAll('"', '""')}"`)
-          .join(","),
+        ]),
       ),
     ];
     await saveCsvExport({

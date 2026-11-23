@@ -27,6 +27,7 @@
   } from "../model/group-collapse-toggle";
   import TableChecklistDropdown from "../table-checklist-dropdown.svelte";
   import { saveCsvExport } from "$shared/lib/save-export";
+  import { csvCell as toCsvCell } from "$shared/lib/csv";
   import { buildTextExportFilename } from "$shared/lib/text-export";
 
   export type DaemonSetsTableViewMode = "flat" | "namespace";
@@ -216,11 +217,6 @@
     collapsedGroups = toggleAllGroupsCollapsed(collapsedGroups, ids);
   }
 
-  function toCsvCell(value: unknown) {
-    if (value === null || value === undefined) return "";
-    const text = String(value).replaceAll('"', '""');
-    return `"${text}"`;
-  }
 
   async function downloadCsv() {
     const exportColumns = table

@@ -28,6 +28,7 @@
   import { buildTextExportFilename } from "$shared/lib/text-export";
   import { resolvePageClusterName } from "$entities/cluster";
   import { saveCsvExport, saveTextExport } from "$shared/lib/save-export";
+  import { csvCell as toCsvCell } from "$shared/lib/csv";
   import { readJsonFromStorage, writeJsonToStorage } from "$shared/lib/local-storage";
   import {
     dashboardDataProfile,
@@ -1711,11 +1712,6 @@
     selectedNamespaces = new Set();
   }
 
-  function toCsvCell(value: unknown) {
-    if (value === null || value === undefined) return "";
-    const text = String(value).replaceAll('"', '""');
-    return `"${text}"`;
-  }
 
   async function copyTextToClipboard(text: string, successMessage: string) {
     if (typeof window === "undefined") return;

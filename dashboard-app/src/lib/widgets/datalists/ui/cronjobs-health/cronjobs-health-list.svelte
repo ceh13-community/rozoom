@@ -1,5 +1,6 @@
 <script lang="ts">
   import { saveCsvExport } from "$shared/lib/save-export";
+  import { csvText } from "$shared/lib/csv";
   import { onDestroy, onMount } from "svelte";
   import { loadClusterEntities } from "$features/check-health/api/get-cluster-info";
   import { buildCronJobsHealth } from "$features/check-health/api/cronjobs-health";
@@ -501,9 +502,7 @@
         r.reasonRaw,
       ]),
     ];
-    const csv = data
-      .map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
+    const csv = csvText(data);
     void saveCsvExport({
       filename: `cronjobs-health-${data[1]?.[0] ?? "cluster"}-${Date.now()}.csv`,
       csv,

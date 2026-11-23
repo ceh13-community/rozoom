@@ -1,5 +1,6 @@
 <script lang="ts">
   import { saveCsvExport } from "$shared/lib/save-export";
+  import { csvText } from "$shared/lib/csv";
   import { onMount } from "svelte";
   import {
     dashboardDataProfile,
@@ -777,12 +778,10 @@
         a.namespace ?? "",
         a.pod ?? "",
         a.node ?? "",
-        (a.summary ?? "").replace(/"/g, '""'),
+        a.summary ?? "",
       ]),
     ];
-    const csv = rows
-      .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
+    const csv = csvText(rows);
     void saveCsvExport({
       filename: `alerts-firing-${clusterId}-${Date.now()}.csv`,
       csv,

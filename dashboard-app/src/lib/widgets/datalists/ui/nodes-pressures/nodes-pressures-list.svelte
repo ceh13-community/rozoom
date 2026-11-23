@@ -1,5 +1,6 @@
 <script lang="ts">
   import { saveCsvExport } from "$shared/lib/save-export";
+  import { csvText } from "$shared/lib/csv";
   import { onMount } from "svelte";
   import { timeAgo, type NodeItem } from "$shared";
   import type { PageData } from "$entities/cluster";
@@ -600,9 +601,7 @@
       formatK8sMemory(n.capacity.memory),
       n.flappingTypes.join(";"),
     ]);
-    const csv = [header, ...body]
-      .map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
+    const csv = csvText([header, ...body]);
     void saveCsvExport({
       filename: `nodes-pressures-${clusterSlug}-${Date.now()}.csv`,
       csv,
