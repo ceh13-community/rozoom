@@ -119,6 +119,14 @@ export async function testPortForwardUrl(
 ): Promise<PortForwardTestResult> {
   const now = options.now ?? (() => performance.now());
   const timeoutMs = options.timeoutMs ?? PORT_FORWARD_TEST_TIMEOUT_MS;
+  if (!isLocalForwardUrl(url)) {
+    return {
+      ok: false,
+      status: null,
+      ms: 0,
+      error: "Test only reaches the local end of the tunnel",
+    };
+  }
   const fetchImpl = options.fetchImpl ?? (await pickFetch());
   const controller = new AbortController();
   const timer = setTimeout(() => {
@@ -126,13 +134,22 @@ export async function testPortForwardUrl(
   }, timeoutMs);
   const started = now();
   try {
-    const response = await fetchImpl(url, {
+    // No redirects: the service behind the tunnel must not send this request anywhere else.
+    // `redirect: "manual"` is the browser fetch's switch, `maxRedirections: 0` the HTTP plugin's.
+    const init: RequestInit & { maxRedirections: number } = {
       method: "GET",
       signal: controller.signal,
       cache: "no-store",
-    });
+      redirect: "manual",
+      maxRedirections: 0,
+    };
+    const response = await fetchImpl(url, init);
     const ms = Math.max(0, Math.round(now() - started));
     const status = response.status;
+    if (status === 0) {
+      // A browser fetch with redirect: "manual" answers an opaque 0 for a redirect.
+      return { ok: true, status: null, ms, error: "Redirect answered, not followed" };
+    }
     const ok = status >= 200 && status < 400;
     return { ok, status, ms, error: ok ? null : `HTTP ${status}` };
   } catch (error) {
@@ -150,6 +167,19 @@ export async function testPortForwardUrl(
     };
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/** The Test request goes to the local end of the tunnel and nowhere else. */
+export function isLocalForwardUrl(url: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(url);
+    return (
+      (protocol === "http:" || protocol === "https:") &&
+      (hostname === "127.0.0.1" || hostname === "localhost" || hostname === "[::1]")
+    );
+  } catch {
+    return false;
   }
 }
 

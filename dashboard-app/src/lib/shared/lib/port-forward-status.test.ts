@@ -5,6 +5,7 @@ import {
   describePortForwardState,
   formatUptime,
   isHandlingConnectionLine,
+  isLocalForwardUrl,
   testPortForwardUrl,
 } from "./port-forward-status";
 
@@ -146,6 +147,53 @@ describe("port-forward status", () => {
       ok: false,
       status: null,
       error: "connection refused",
+    });
+  });
+});
+
+describe("port-forward Test stays local", () => {
+  it("accepts only http(s) on 127.0.0.1, localhost or [::1]", () => {
+    expect(isLocalForwardUrl("http://127.0.0.1:30080")).toBe(true);
+    expect(isLocalForwardUrl("https://localhost:30443/path")).toBe(true);
+    expect(isLocalForwardUrl("http://[::1]:30080")).toBe(true);
+    expect(isLocalForwardUrl("http://169.254.169.254/latest/meta-data")).toBe(false);
+    expect(isLocalForwardUrl("http://127.0.0.1.evil.example:30080")).toBe(false);
+    expect(isLocalForwardUrl("file:///etc/passwd")).toBe(false);
+    expect(isLocalForwardUrl("not a url")).toBe(false);
+  });
+
+  it("refuses a non-local URL without sending anything", async () => {
+    const fetchImpl = vi.fn() as unknown as typeof fetch;
+    expect(await testPortForwardUrl("http://169.254.169.254/", { fetchImpl })).toEqual({
+      ok: false,
+      status: null,
+      ms: 0,
+      error: "Test only reaches the local end of the tunnel",
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("never follows a redirect: manual for the browser fetch, zero for the HTTP plugin", async () => {
+    const fetchImpl = vi.fn(
+      async () => new Response("", { status: 302 }),
+    ) as unknown as typeof fetch;
+    const result = await testPortForwardUrl("http://127.0.0.1:30080", { fetchImpl, now: () => 0 });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "http://127.0.0.1:30080",
+      expect.objectContaining({ redirect: "manual", maxRedirections: 0 }),
+    );
+    expect(result).toMatchObject({ ok: true, status: 302 });
+
+    const opaque = (async () => new Response(null, { status: 200 })) as unknown as typeof fetch;
+    // A browser fetch reports a manual redirect as an opaque response with status 0.
+    const zero = (async () => ({ status: 0 }) as unknown as Response) as unknown as typeof fetch;
+    void opaque;
+    expect(
+      await testPortForwardUrl("http://127.0.0.1:30080", { fetchImpl: zero, now: () => 0 }),
+    ).toMatchObject({
+      ok: true,
+      status: null,
+      error: "Redirect answered, not followed",
     });
   });
 });
