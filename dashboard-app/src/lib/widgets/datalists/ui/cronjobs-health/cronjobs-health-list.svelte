@@ -1,6 +1,8 @@
 <script lang="ts">
   import { saveCsvExport } from "$shared/lib/save-export";
   import { csvText } from "$shared/lib/csv";
+  import { buildTextExportFilename } from "$shared/lib/text-export";
+  import { findClusterByUuid } from "$features/cluster-manager";
   import { onDestroy, onMount } from "svelte";
   import { loadClusterEntities } from "$features/check-health/api/get-cluster-info";
   import { buildCronJobsHealth } from "$features/check-health/api/cronjobs-health";
@@ -472,7 +474,7 @@
       toast.info("No rows to export");
       return;
     }
-    const data: (string | number)[][] = [
+    const csvRows: (string | number)[][] = [
       [
         "namespace",
         "name",
@@ -502,9 +504,13 @@
         r.reasonRaw,
       ]),
     ];
-    const csv = csvText(data);
+    const csv = csvText(csvRows);
     void saveCsvExport({
-      filename: `cronjobs-health-${data[1]?.[0] ?? "cluster"}-${Date.now()}.csv`,
+      filename: buildTextExportFilename(
+        "cronjobs-health",
+        [findClusterByUuid(data.uuid)?.name ?? data.uuid],
+        "csv",
+      ),
       csv,
     });
   }

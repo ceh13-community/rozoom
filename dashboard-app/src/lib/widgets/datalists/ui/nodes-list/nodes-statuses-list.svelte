@@ -13,6 +13,8 @@
   import X from "@lucide/svelte/icons/x";
 
   import { resolvePageClusterName, type PageData } from "$entities/cluster";
+  import { saveTextExport } from "$shared/lib/save-export";
+  import { buildTextExportFilename } from "$shared/lib/text-export";
   import type { NodeItem } from "$shared/model/clusters";
   import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
   import { buildKubectlDescribeCommand } from "$features/workloads-management";
@@ -1113,22 +1115,23 @@
   }
 
   async function downloadYamlForNode(row: NodesStatusesData) {
-    const clusterId = data?.slug;
-    if (!clusterId || !row.name) return;
+    if (!data?.slug || !row.name) return;
     try {
       const result = await kubectlRawArgsFront(["get", "node", row.name, "-o", "yaml"], {
-        clusterId,
+        clusterId: data.slug,
       });
       if (result.errors || result.code !== 0) {
         actionNotification = notifyError(result.errors || "Failed to fetch node YAML.");
         return;
       }
-      const filename = `node-${row.name}.yaml`;
-      const dir = `downloads`;
-      await mkdir(dir, { baseDir: BaseDirectory.AppData, recursive: true });
-      const filePath = await path.join(dir, filename);
-      await writeTextFile(filePath, result.output, { baseDir: BaseDirectory.AppData });
-      actionNotification = notifySuccess(`Downloaded YAML to ${filePath}`);
+      await saveTextExport({
+        filename: buildTextExportFilename(
+          "node",
+          [resolvePageClusterName(data), row.name],
+          "yaml",
+        ),
+        text: result.output,
+      });
     } catch (err) {
       actionNotification = notifyError(
         err instanceof Error ? err.message : "Failed to download YAML.",

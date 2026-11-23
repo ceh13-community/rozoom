@@ -27,6 +27,21 @@ const SAVE_PATHS: { what: string; pattern: RegExp; allowed: string[] }[] = [
     allowed: ["lib/shared/lib/text-export.ts"],
   },
   {
+    what: "an export written by the fs plugin under its own name (filename or buildTextExportFilename)",
+    pattern: /writeTextFile\(\s*(?:[^,()]*[Ff]ile[Nn]ame|buildTextExportFilename)/,
+    allowed: ["lib/features/yaml-backup/model/backup-api.ts"],
+  },
+  {
+    what: "a downloads or exports folder of the app's own (app data is not where people look)",
+    pattern: /["'`](?:[\w.-]+\/)*(?:downloads|exports)(?:\/[^"'`]*)?["'`]/,
+    allowed: [],
+  },
+  {
+    what: "a message announcing a saved file (save-export says where it went)",
+    pattern: /\b(?:Downloaded|Exported|Saved)\b[^"'`\n]{0,40}\bto \$\{/,
+    allowed: ["lib/shared/lib/save-export.ts"],
+  },
+  {
     what: "the export helpers that save without telling the user",
     pattern: /\bexportCsvArtifact\s*\(|\bexportTextArtifact\s*\(/,
     allowed: ["lib/shared/lib/text-export.ts", "lib/shared/lib/save-export.ts"],
@@ -67,7 +82,21 @@ describe("exports save through save-export", () => {
         SAVE_PATHS[2].pattern.source,
       ],
       ["link.download = name;", SAVE_PATHS[2].pattern.source],
-      ["exportTextArtifact({ filename, text });", SAVE_PATHS[3].pattern.source],
+      [
+        "await writeTextFile(filePath, result.output, { baseDir: BaseDirectory.AppData });".replace(
+          "filePath",
+          "fileName",
+        ),
+        SAVE_PATHS[3].pattern.source,
+      ],
+      [
+        'await writeTextFile(buildTextExportFilename("node", [n], "yaml"), y);',
+        SAVE_PATHS[3].pattern.source,
+      ],
+      ["const dir = `downloads`;", SAVE_PATHS[4].pattern.source],
+      ['await mkdir("app/exports/x", opts);', SAVE_PATHS[4].pattern.source],
+      ["notifySuccess(`Downloaded YAML to ${filePath}`);", SAVE_PATHS[5].pattern.source],
+      ["exportTextArtifact({ filename, text });", SAVE_PATHS[6].pattern.source],
     ];
     for (const [code, source] of probes) expect(new RegExp(source).test(code), code).toBe(true);
   });
