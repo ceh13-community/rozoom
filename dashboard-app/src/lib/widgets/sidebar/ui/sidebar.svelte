@@ -355,16 +355,16 @@
           Runtime {diagnosticsEnabled ? "on" : "off"}
         </span>
       </button>
-      <!-- The state reads in words like its neighbours (Linter on, Runtime off), not by colour
-           alone; the collapsed rail has no words, so a dot on the icon marks on. Off is the
-           plain rail colour, not dimmed: it is a choice, not a disabled control. The name
-           stays fixed and aria-pressed carries the state. -->
+      <!-- Looks and reads like its neighbours: the same off colours as Linter and Runtime, a
+           short label on one line (Commands on / off), the full name in the hint and the
+           aria-label; aria-pressed carries the state and the collapsed rail marks on with a
+           dot on the icon. -->
       <button
         class={cn(
           "rail-toggle flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium",
           cliNotificationsEnabled
             ? cn(NAV_ACTIVE_CLASS, NAV_ACTIVE_HOVER_CLASS)
-            : "text-slate-100 hover:bg-slate-600/30",
+            : "bg-slate-600/20 text-slate-400 hover:bg-slate-600/30",
         )}
         onclick={toggleCliNotifications}
         aria-pressed={cliNotificationsEnabled}
@@ -381,8 +381,8 @@
             ></span>
           {/if}
         </span>
-        <span class={cn(sidebarOpen ? "block" : "hidden")}>
-          Show kubectl commands {cliNotificationsEnabled ? "on" : "off"}
+        <span class={cn(sidebarOpen ? "block" : "hidden", "whitespace-nowrap text-left")}>
+          Commands {cliNotificationsEnabled ? "on" : "off"}
         </span>
       </button>
     </nav>

@@ -2,16 +2,22 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-// The switch for kubectl command toasts read as disabled when off (grey text, a struck
-// message icon) and was named "CLI toasts". One name and the terminal icon for both
-// states; the state reads in words, and on the collapsed rail as a dot, not by colour
-// alone (WCAG 1.4.1). Off is the plain rail colour, on is highlighted.
+// The switch for kubectl command toasts sits in the rail next to Linter and Runtime and must
+// look like them: the same off colours, a short label on one line ("Commands on" / "off"),
+// left-aligned. The full name stays in the aria-label and the hint; the state reads in words,
+// and on the collapsed rail as a dot, not by colour alone (WCAG 1.4.1).
 const source = readFileSync(resolve(__dirname, "sidebar.svelte"), "utf8");
-const click = source.indexOf("onclick={toggleCliNotifications}");
-const toggle = source.slice(
-  source.lastIndexOf("<button", click),
-  source.indexOf("</button>", click),
-);
+
+function buttonFor(handler: string): string {
+  const click = source.indexOf(`onclick={${handler}}`);
+  return source.slice(source.lastIndexOf("<button", click), source.indexOf("</button>", click));
+}
+
+function offClasses(button: string): string | undefined {
+  return /\?\s*cn\(NAV_ACTIVE_CLASS, NAV_ACTIVE_HOVER_CLASS\)\s*:\s*"([^"]+)"/.exec(button)?.[1];
+}
+
+const toggle = buttonFor("toggleCliNotifications");
 
 describe("kubectl commands switch", () => {
   it("is named Show kubectl commands, with the terminal icon in both states", () => {
@@ -21,8 +27,9 @@ describe("kubectl commands switch", () => {
     expect(toggle).not.toContain("MessageSquare");
   });
 
-  it("says on or off in words, in the label and the hint", () => {
-    expect(toggle).toContain('Show kubectl commands {cliNotificationsEnabled ? "on" : "off"}');
+  it("says on or off in a short label on one line, the full name in the hint", () => {
+    expect(toggle).toContain('Commands {cliNotificationsEnabled ? "on" : "off"}');
+    expect(toggle).toContain('"whitespace-nowrap text-left"');
     expect(toggle).toContain(
       'use:hint={`Show kubectl commands: ${cliNotificationsEnabled ? "on" : "off"}`}',
     );
@@ -33,8 +40,11 @@ describe("kubectl commands switch", () => {
     expect(toggle).toContain('data-testid="kubectl-commands-on-dot"');
   });
 
-  it("highlights on, and keeps off in the plain rail colour", () => {
-    expect(toggle).toContain("cn(NAV_ACTIVE_CLASS, NAV_ACTIVE_HOVER_CLASS)");
-    expect(toggle).not.toMatch(/text-slate-400|opacity-50|bg-slate-600\/20/);
+  it("highlights on, and is off in the same colours as Linter and Runtime", () => {
+    const linterOff = offClasses(buttonFor("toggleLinter"));
+    const runtimeOff = offClasses(buttonFor("toggleDiagnostics"));
+    expect(linterOff).toBeDefined();
+    expect(runtimeOff).toBe(linterOff);
+    expect(offClasses(toggle)).toBe(linterOff);
   });
 });
