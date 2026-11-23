@@ -26,4 +26,16 @@ describe("exports save through save-export", () => {
       .filter((file) => SILENT_SAVE.test(readFileSync(join(SRC, file), "utf8")));
     expect(offenders).toEqual([]);
   });
+
+  it("list exports name the cluster and the time, so a new file never replaces the last one", () => {
+    const fixedName = /filename: "[a-z-]+\.csv"|const filename = "[a-z-]+\.csv"/;
+    const tables = sourceFiles(join(SRC, "lib/widgets/datalists/ui"))
+      .map((path) => relative(SRC, path))
+      .filter((file) => file.endsWith(".svelte"));
+    const offenders = tables.filter((file) =>
+      fixedName.test(readFileSync(join(SRC, file), "utf8")),
+    );
+    expect(tables.length).toBeGreaterThan(10);
+    expect(offenders).toEqual([]);
+  });
 });

@@ -3956,6 +3956,7 @@
     />
   </div>
   <DataTable
+    clusterName={resolvePageClusterName(data)}
     data={rows}
     {columns}
     {watcherEnabled}

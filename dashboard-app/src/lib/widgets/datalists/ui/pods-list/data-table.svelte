@@ -3,6 +3,7 @@
   import { Input } from "$shared/ui/input";
   import InlineNotice from "$shared/ui/inline-notice.svelte";
   import { saveCsvExport } from "$shared/lib/save-export";
+  import { buildTextExportFilename } from "$shared/lib/text-export";
   import { computeVirtualWindow } from "$shared/lib/virtual-window";
   import { compareNatural } from "$shared/lib/natural-compare";
   import TablePagination from "$shared/ui/table-pagination.svelte";
@@ -20,6 +21,8 @@
   import { GROUPED_VIEW_MAX_ROWS, type PodListRow } from "./model/pod-list-row";
 
   type DataTableProps = {
+    /** Cluster name in the export file name. */
+    clusterName?: string;
     rows: PodListRow[];
     query: string;
     onQueryChange: (value: string) => void;
@@ -87,6 +90,7 @@
   type SortDirection = "asc" | "desc";
 
   let {
+    clusterName = "",
     rows,
     query,
     onQueryChange,
@@ -458,7 +462,7 @@
       lines.push(values.map(toCsvCell).join(","));
     }
     await saveCsvExport({
-      filename: "pods.csv",
+      filename: buildTextExportFilename("pods", [clusterName], "csv"),
       csv: lines.join("\n"),
       rows: namespaceFilteredRows.length,
     });

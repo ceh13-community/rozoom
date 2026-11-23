@@ -27,10 +27,13 @@
   import TableChecklistDropdown from "../table-checklist-dropdown.svelte";
   import WatcherToolbarControls from "../watcher-toolbar-controls.svelte";
   import { saveCsvExport } from "$shared/lib/save-export";
+  import { buildTextExportFilename } from "$shared/lib/text-export";
 
   export type CronJobsTableViewMode = "flat" | "namespace";
 
   type DataTableProps<TData> = {
+    /** Cluster name in the export file name. */
+    clusterName?: string;
     columns: ColumnDef<TData>[];
     data: TData[];
     onRowClick: (row: TData) => void;
@@ -47,6 +50,7 @@
   };
 
   let {
+    clusterName = "",
     data,
     columns,
     onRowClick,
@@ -221,7 +225,7 @@
     }
     const csv = lines.join("\n");
     await saveCsvExport({
-      filename: "cron-jobs.csv",
+      filename: buildTextExportFilename("cron-jobs", [clusterName], "csv"),
       csv,
       rows: table.getRowModel().rows.length,
     });

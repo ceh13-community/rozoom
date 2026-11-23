@@ -17,6 +17,7 @@
     setConfigurationSyncEnabled,
   } from "$features/check-health";
   import { saveCsvExport } from "$shared/lib/save-export";
+  import { buildTextExportFilename } from "$shared/lib/text-export";
   import { fetchNamespacedSnapshotItems } from "../common/namespaced-snapshot";
   import {
     buildKubectlDescribeCommand,
@@ -727,7 +728,11 @@
       ),
     ];
     await saveCsvExport({
-      filename: "custom-resource-definitions.csv",
+      filename: buildTextExportFilename(
+        "custom-resource-definitions",
+        [resolvePageClusterName(data)],
+        "csv",
+      ),
       csv: lines.join("\n"),
       rows: filteredRows.length,
     });

@@ -23,8 +23,11 @@
   import TableSurface from "$shared/ui/table-surface.svelte";
   import TableEmptyState from "$shared/ui/table-empty-state.svelte";
   import { saveCsvExport } from "$shared/lib/save-export";
+  import { buildTextExportFilename } from "$shared/lib/text-export";
 
   type DataTableProps<T extends NodesStatusesData> = {
+    /** Cluster name in the export file name. */
+    clusterName?: string;
     columns: ColumnDef<T>[];
     data: T[];
     onRowClick?: (row: T) => void;
@@ -37,6 +40,7 @@
   };
 
   let {
+    clusterName = "",
     data,
     columns,
     onRowClick,
@@ -116,7 +120,11 @@
       lines.push(values.map(toCsvCell).join(","));
     }
     const csv = lines.join("\n");
-    const filename = "nodes-status.csv";
+    const filename = buildTextExportFilename(
+      "nodes-status",
+      [clusterName],
+      "csv",
+    );
     await saveCsvExport({
       filename,
       csv,

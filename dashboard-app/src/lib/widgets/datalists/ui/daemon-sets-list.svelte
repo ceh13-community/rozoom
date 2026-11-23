@@ -3323,6 +3323,7 @@
 </div>
 
 <DataTable
+  clusterName={resolvePageClusterName(data)}
   data={rows}
   {columns}
   isRowSelected={(row) => isDaemonSetSelected(row.uid)}

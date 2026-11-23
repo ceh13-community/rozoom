@@ -2202,6 +2202,7 @@
     />
   </div>
   <DataTable
+    clusterName={resolvePageClusterName(data)}
     data={rows}
     {columns}
     isRowSelected={(row) => isJobSelected(row.uid)}

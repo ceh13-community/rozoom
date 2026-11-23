@@ -2636,6 +2636,7 @@
     />
   </div>
   <DataTable
+    clusterName={resolvePageClusterName(data)}
     data={rows}
     {columns}
     isRowSelected={(row) => isStatefulSetSelected(row.uid)}

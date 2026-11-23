@@ -1715,6 +1715,7 @@
   </div>
 
   <DataTable
+    clusterName={resolvePageClusterName(data)}
     data={allNodeData}
     {columns}
     {watcherEnabled}

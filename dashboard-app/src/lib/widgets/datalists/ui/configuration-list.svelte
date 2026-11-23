@@ -26,6 +26,7 @@
   import { resolveClusterIds, resolvePrimaryClusterId } from "$shared/lib/cluster-ids";
   import { debounce } from "$shared/lib/debounce";
   import { buildTextExportFilename } from "$shared/lib/text-export";
+  import { resolvePageClusterName } from "$entities/cluster";
   import { saveCsvExport, saveTextExport } from "$shared/lib/save-export";
   import { readJsonFromStorage, writeJsonToStorage } from "$shared/lib/local-storage";
   import {
@@ -1898,7 +1899,11 @@
       lines.push(values.map(toCsvCell).join(","));
     }
     const csv = lines.join("\n");
-    const filename = `${workloadKey || "configuration"}.csv`;
+    const filename = buildTextExportFilename(
+      workloadKey || "configuration",
+      [resolvePageClusterName(data)],
+      "csv",
+    );
     await saveCsvExport({ filename, csv, rows: filteredRows.length });
   }
 

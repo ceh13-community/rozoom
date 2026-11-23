@@ -27,10 +27,13 @@
   } from "../model/group-collapse-toggle";
   import TableChecklistDropdown from "../table-checklist-dropdown.svelte";
   import { saveCsvExport } from "$shared/lib/save-export";
+  import { buildTextExportFilename } from "$shared/lib/text-export";
 
   export type DaemonSetsTableViewMode = "flat" | "namespace";
 
   type DataTableProps<TData> = {
+    /** Cluster name in the export file name. */
+    clusterName?: string;
     columns: ColumnDef<TData>[];
     data: TData[];
     onRowClick: (row: TData) => void;
@@ -47,6 +50,7 @@
   };
 
   let {
+    clusterName = "",
     data,
     columns,
     onRowClick,
@@ -232,7 +236,7 @@
     }
     const csv = lines.join("\n");
     await saveCsvExport({
-      filename: "daemon-sets.csv",
+      filename: buildTextExportFilename("daemon-sets", [clusterName], "csv"),
       csv,
       rows: table.getRowModel().rows.length,
     });
