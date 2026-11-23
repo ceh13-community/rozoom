@@ -104,6 +104,7 @@
     isSameClosedTab,
     undoForClosedTab,
   } from "./common/workbench-confirm";
+  import { confirmRolloutRestart, rolloutRestartTargets } from "./common/rollout-restart-confirm";
 
   interface StatefulSetsListProps {
     data: PageData & { statefulsets?: StatefulSetItem[] };
@@ -1423,6 +1424,8 @@
 
   async function restartStatefulSets(items: StatefulSetItem[]) {
     if (!data?.slug || items.length === 0) return;
+    // A restart recreates every pod: it asks first and names the command.
+    if (!(await confirmRolloutRestart("statefulset", rolloutRestartTargets(items)))) return;
     clearActionFeedback();
     actionInFlight = true;
     try {
