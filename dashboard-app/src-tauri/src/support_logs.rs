@@ -25,6 +25,7 @@ pub const MENU_DOCUMENTATION: &str = "help-documentation";
 pub const MENU_KEYBOARD_SHORTCUTS: &str = "help-keyboard-shortcuts";
 pub const MENU_REPORT_ISSUE: &str = "help-report-issue";
 pub const MENU_CHECK_FOR_UPDATES: &str = "help-check-for-updates";
+pub const MENU_ABOUT_TEAM: &str = "help-about-team";
 
 /// Event the webview listens to for the Help items it shows itself.
 pub const HELP_MENU_EVENT: &str = "help-menu";
@@ -106,13 +107,14 @@ pub fn logs_folder_path<R: Runtime>(app: AppHandle<R>) -> Result<String, String>
 
 /// Native Help menu on every OS. On macOS it extends the default menu (Edit/Window
 /// shortcuts stay intact, About is in the app menu); elsewhere the app has no other menu,
-/// so Help carries About too. Keyboard Shortcuts and Check for Updates are shown by the
-/// webview, which listens for HELP_MENU_EVENT.
+/// so Help carries About too. Keyboard Shortcuts, Check for Updates and About the team are
+/// shown by the webview, which listens for HELP_MENU_EVENT.
 pub fn install_help_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let documentation = MenuItemBuilder::with_id(MENU_DOCUMENTATION, "Documentation").build(app)?;
     let shortcuts =
         MenuItemBuilder::with_id(MENU_KEYBOARD_SHORTCUTS, "Keyboard Shortcuts").build(app)?;
     let report = MenuItemBuilder::with_id(MENU_REPORT_ISSUE, "Report an Issue").build(app)?;
+    let about_team = MenuItemBuilder::with_id(MENU_ABOUT_TEAM, "About the team").build(app)?;
     let updates =
         MenuItemBuilder::with_id(MENU_CHECK_FOR_UPDATES, "Check for Updates").build(app)?;
     let open_logs =
@@ -123,7 +125,9 @@ pub fn install_help_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .item(&report)
         .separator()
         .item(&updates)
-        .item(&open_logs);
+        .item(&open_logs)
+        .separator()
+        .item(&about_team);
     #[cfg(not(target_os = "macos"))]
     let builder = builder.separator().item(&PredefinedMenuItem::about(
         app,
@@ -199,6 +203,7 @@ pub fn help_action(id: &str) -> Option<HelpAction> {
         MENU_REPORT_ISSUE => Some(HelpAction::OpenUrl(REPORT_ISSUE_URL)),
         MENU_KEYBOARD_SHORTCUTS => Some(HelpAction::Webview("keyboard-shortcuts")),
         MENU_CHECK_FOR_UPDATES => Some(HelpAction::Webview("check-for-updates")),
+        MENU_ABOUT_TEAM => Some(HelpAction::Webview("about-team")),
         MENU_OPEN_LOGS_FOLDER => Some(HelpAction::OpenLogsFolder),
         _ => None,
     }
@@ -244,6 +249,10 @@ mod tests {
         assert_eq!(
             help_action("help-check-for-updates"),
             Some(HelpAction::Webview("check-for-updates"))
+        );
+        assert_eq!(
+            help_action("help-about-team"),
+            Some(HelpAction::Webview("about-team"))
         );
         assert_eq!(
             help_action("help-open-logs-folder"),

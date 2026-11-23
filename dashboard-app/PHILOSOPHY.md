@@ -19,11 +19,11 @@ This means:
 
 Most K8s tools show one cluster at a time. ROZOOM shows all clusters simultaneously on a single dashboard. Health scores, alerts, and metrics are compared across the fleet at a glance.
 
-The dashboard is designed to scale from 4 to 100+ clusters with virtualized rendering, adaptive polling, and connection budgeting.
+The dashboard is built for a fleet, not for one cluster: the clusters share one connection budget, tunable per cluster, the Data mode (Realtime, Balanced, Low Load, Fleet, Manual) sets the polling and the background load for all of them at once, polling backs off on its own when a cluster errors, the request queue grows or the page is hidden, and long lists render only the rows in view.
 
 ### 3. Read-heavy, write-careful
 
-ROZOOM is primarily an observability tool. Reads (get, describe, logs, top) happen automatically in the background. Writes (apply, delete, scale, rollout) require explicit user action and show a CLI notification with the exact command being executed.
+ROZOOM is primarily an observability tool. Reads (get, describe, logs, top) happen automatically in the background. Writes (apply, delete, scale, rollout) require explicit user action; a destructive one asks first and names the kubectl command it will run. With Show kubectl commands switched on in the sidebar, every write also shows a notification with the exact command (see Transparency).
 
 Users should always know what ROZOOM is doing to their clusters.
 
@@ -31,14 +31,14 @@ Users should always know what ROZOOM is doing to their clusters.
 
 Not every cluster has metrics-server. Not every environment has Prometheus. ROZOOM adapts:
 
-- Metrics unavailable? Hide the metrics section, don't show an error
-- API server slow? Increase polling intervals automatically
-- Connection lost? Show "Offline" clearly, resume when back
-- Partial data? Show what we have, indicate what's missing
+- Metrics unavailable? Say so in one line and offer to install metrics-server; no error page
+- API server slow or the link weak? Polling backs off on its own (errors, a full request queue, a hidden page); Low Load or Manual cut it further
+- Connection lost? Show "Cluster unreachable" with the reason and Retry, and reload the lists once the cluster answers again
+- Partial data? Show what we have and mark it: Cached, Stale, Unknown or Not checked
 
 ### 5. No cloud lock-in
 
-ROZOOM works with any Kubernetes cluster: minikube, kind, EKS, GKE, AKS, DOKS, Hetzner, OpenShift, bare metal. Cloud-specific features (like managed node pools) are detected automatically but never required.
+ROZOOM works with any Kubernetes cluster: minikube, kind, EKS, GKE, AKS, DOKS, Hetzner, OpenShift, bare metal. The provider is recognised from the cluster itself, and cloud import through a provider CLI is optional: nothing in ROZOOM needs a cloud account.
 
 ### 6. Local-first
 
@@ -52,7 +52,7 @@ Cluster data stays on the user's machine:
 
 ### 7. Transparency
 
-Every kubectl/helm command executed by ROZOOM is visible to the user via CLI notifications. The notification shows the full command, completion time, and has a Copy button so users can reproduce any action in their terminal.
+Every write ROZOOM runs can be watched: switch on Show kubectl commands in the sidebar and each kubectl or helm command behind your actions shows a notification with the full command, its completion time and a Copy button, so you can reproduce it in your terminal. The switch is off by default; background reads and the app's own housekeeping commands never notify.
 
 ## Goals
 

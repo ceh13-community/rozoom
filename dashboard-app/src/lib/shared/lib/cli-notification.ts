@@ -41,6 +41,9 @@ const MUTATING_SUBCOMMANDS = new Set([
   "install",
   "upgrade",
   "uninstall",
+  "rollback",
+  // helm test runs the chart's test pods; kubectl has no such subcommand.
+  "test",
 ]);
 
 export function isUserFacingCommand(args: string[]): boolean {
@@ -56,15 +59,19 @@ function sanitizeForDisplay(tool: string, args: string[]): string {
     .join(" ")}`;
 }
 
+/** "Command executed in 1.2 s": the title carries the completion time when it is known. */
+export function cliNotificationTitle(n: Pick<CliNotification, "success" | "durationMs">): string {
+  const base = n.success ? "Command executed" : "Command failed";
+  if (n.durationMs === undefined || n.durationMs < 0) return base;
+  return `${base} in ${(n.durationMs / 1000).toFixed(1)} s`;
+}
+
 export function initCliNotifications() {
   const handler = (n: CliNotification) => {
     const displayCmd = sanitizeForDisplay(n.tool, n.args);
     const fullCmd = `${n.tool} ${n.args.join(" ")}`;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for future toast display
-    const duration = n.durationMs ? `${(n.durationMs / 1000).toFixed(1)}s` : "";
-
     const toastFn = n.success ? toast.success : toast.error;
-    toastFn(n.success ? "Command executed" : "Command failed", {
+    toastFn(cliNotificationTitle(n), {
       description: displayCmd,
       descriptionClass:
         "font-mono !text-xs !leading-relaxed !break-all !whitespace-pre-wrap !max-h-24 !overflow-y-auto",

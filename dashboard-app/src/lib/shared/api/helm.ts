@@ -11,7 +11,7 @@ import {
 } from "$shared/lib/readonly-guard";
 import { PRIVATE_FILE_MODE } from "$shared/lib/private-files";
 import { getClusterNodesNames } from "$shared/api/tauri";
-import { emitCliNotification } from "$shared/lib/cli-notification";
+import { emitCliNotification, isUserFacingCommand } from "$shared/lib/cli-notification";
 import {
   LOCAL_CLUSTER_NODE_NAME_PATTERNS,
   METRICS_SERVER_INSTALL_PROFILES,
@@ -130,6 +130,20 @@ async function resolveMetricsServerProfile(
   }
 }
 
+/**
+ * Only writes notify: `helm list`, `helm status` and the other reads that the panels and
+ * scans run in the background stay quiet, like background kubectl reads do.
+ */
+function notifyCommand(
+  tool: "helm" | "kubectl",
+  args: string[],
+  success: boolean,
+  durationMs: number,
+) {
+  if (!isUserFacingCommand(args)) return;
+  emitCliNotification({ tool, args, success, durationMs });
+}
+
 async function runKubectl(args: string[]): Promise<HelmCommandResult> {
   let stdout = "";
   let stderr = "";
@@ -162,7 +176,7 @@ async function runKubectl(args: string[]): Promise<HelmCommandResult> {
   const durationMs = Date.now() - startMs;
   const error =
     stderr.trim() || (code !== 0 ? stdout.trim() || "kubectl command failed" : undefined);
-  emitCliNotification({ tool: "kubectl", args, success: code === 0, durationMs });
+  notifyCommand("kubectl", args, code === 0, durationMs);
   return { success: code === 0, stdout, stderr, code, ...(error && code !== 0 ? { error } : {}) };
 }
 
@@ -258,7 +272,7 @@ async function runHelmCommand(
     } catch {
       // ignore kill errors
     }
-    emitCliNotification({ tool: "helm", args, success: false, durationMs });
+    notifyCommand("helm", args, false, durationMs);
     return {
       success: false,
       error: `Helm command timed out after ${timeoutMs}ms`,
@@ -269,7 +283,7 @@ async function runHelmCommand(
   }
 
   if (code !== 0) {
-    emitCliNotification({ tool: "helm", args, success: false, durationMs });
+    notifyCommand("helm", args, false, durationMs);
     return {
       success: false,
       error: stderr || stdout || `Helm command failed with code ${code}`,
@@ -279,7 +293,7 @@ async function runHelmCommand(
     };
   }
 
-  emitCliNotification({ tool: "helm", args, success: true, durationMs });
+  notifyCommand("helm", args, true, durationMs);
   return { success: true, stdout, stderr, code };
 }
 

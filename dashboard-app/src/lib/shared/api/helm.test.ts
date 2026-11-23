@@ -19,6 +19,7 @@ import {
   installNodeExporter,
   installModelArmor,
   installTrivyOperator,
+  listHelmReleases,
   listHelmRepos,
   installPrometheusStack,
   removeHelmRepo,
@@ -41,6 +42,11 @@ vi.mock("@tauri-apps/api/path");
 vi.mock("@/lib/shared/api/cli");
 vi.mock("@/lib/shared/api/tauri", () => ({
   getClusterNodesNames: vi.fn(),
+}));
+const emitCliNotification = vi.hoisted(() => vi.fn());
+vi.mock("$shared/lib/cli-notification", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("$shared/lib/cli-notification")>()),
+  emitCliNotification,
 }));
 
 describe("helm api", () => {
@@ -963,5 +969,46 @@ describe("helm api", () => {
       ]),
       expect.any(Object),
     );
+  });
+});
+
+// Reviewer FIX on the About the team card: helm reads notified on every call (helm list from
+// the Helm panel and the deprecation scan), unlike kubectl reads. Only writes notify now.
+describe("helm CLI notifications", () => {
+  const clusterId = "cluster id";
+  const mockChild = { kill: vi.fn().mockResolvedValue(undefined) } as unknown as Child;
+  const mockCommand = {} as Command<IOPayload>;
+
+  beforeEach(() => {
+    emitCliNotification.mockClear();
+    resetClusterSafetyRegistryForTests();
+    registerClusterSafetyInfo([{ uuid: clusterId, name: clusterId, readOnly: false }]);
+    vi.mocked(tauriPath.appDataDir).mockResolvedValue("/mock/app/data");
+    vi.mocked(cli.spawnCli).mockImplementation(async (_tool, _args, handlers) => {
+      handlers?.onStdoutLine?.("[]");
+      handlers?.onClose?.({ code: 0 });
+      return { command: mockCommand, child: mockChild };
+    });
+  });
+
+  it("helm list and helm status stay quiet", async () => {
+    await listHelmReleases(clusterId);
+    await getHelmReleaseStatus(clusterId, { releaseName: "web", namespace: "shop" });
+    expect(cli.spawnCli).toHaveBeenCalled();
+    expect(emitCliNotification).not.toHaveBeenCalled();
+  });
+
+  it("helm uninstall, rollback and test notify with the command and its time", async () => {
+    await uninstallHelmRelease(clusterId, { releaseName: "web", namespace: "shop" });
+    await rollbackHelmRelease(clusterId, { releaseName: "web", namespace: "shop", revision: "3" });
+    // helm test runs the chart's test pods in the cluster: a write, not a read.
+    await testHelmRelease(clusterId, { releaseName: "web", namespace: "shop" });
+    expect(emitCliNotification).toHaveBeenCalledTimes(3);
+    expect(emitCliNotification.mock.calls.map(([n]) => [n.tool, n.args[0], n.success])).toEqual([
+      ["helm", "uninstall", true],
+      ["helm", "rollback", true],
+      ["helm", "test", true],
+    ]);
+    expect(typeof emitCliNotification.mock.calls[0][0].durationMs).toBe("number");
   });
 });
