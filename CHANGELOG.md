@@ -8,6 +8,43 @@ the user-facing change in plain language. The in-app update notification
 deliberately shows fixed copy and never displays these notes.
 The release build fails if the section for the released version is missing.
 
+## [0.26.6] - 2026-11-26
+
+Questions the app asks (stop a port-forward, delete, node shell, rollout
+restart) open inside the app, with Cancel focused and Esc as No. A port-forward
+tab shows whether the tunnel is up, with a Test button, and Help > About the
+team names the people and the seven principles we build by. On Linux (.deb,
+.rpm) install the new package by hand.
+
+### Added
+
+- Help > About the team: the people with GitHub and LinkedIn, and How we build
+  with the seven principles and a link to the full text.
+- Port-forward tab: Active with uptime and connection count, a Test button with
+  the HTTP code and time (local http only), a compact log.
+- Rollout restart asks first and names the kubectl command for every selected
+  deployment, stateful set or daemon set.
+
+### Changed
+
+- Confirm dialogs open inside the app: focus on Cancel, Esc or a click outside
+  is No, two questions wait their turn. Purge cluster, remove selected clusters
+  and restart to update use it too.
+- The command notification title shows how long the command took.
+- The pod port-forward tab takes the height of its content.
+
+### Fixed
+
+- Fleet cluster card in Compact stayed grey on a CRITICAL cluster while Detailed
+  turned red. Both modes now colour the card the same way.
+- Network debug on a namespace with Pod Security baseline or restricted
+  started, then failed with a raw kubectl error: the menu item is disabled with
+  the reason.
+- Full screen on a collapsed workbench showed a black page with no Stop: full
+  screen expands the workbench and has no Collapse.
+- Helm reads (list, status, values) popped a command notification; only writes
+  notify now, rollback and test included.
+
 ## [0.26.5] - 2026-11-21
 
 Lists update live now: a pod that dies or starts shows up at once, and Pods no
