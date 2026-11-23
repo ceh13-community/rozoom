@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { compareNatural } from "$shared/lib/natural-compare";
   import { untrack } from "svelte";
   import { resolvePageClusterName, type PageData } from "$entities/cluster";
   import { toClusterWorkloadHref } from "$pages/cluster/model/cluster-page-workspace";
@@ -156,9 +157,7 @@
     }
   }
 
-  function compareText(left: string, right: string) {
-    return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
-  }
+  const compareText = compareNatural;
 
   function toggleSort(column: typeof sortBy) {
     if (sortBy !== column) {

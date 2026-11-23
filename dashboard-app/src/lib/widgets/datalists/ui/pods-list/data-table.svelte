@@ -4,6 +4,7 @@
   import InlineNotice from "$shared/ui/inline-notice.svelte";
   import { exportCsvArtifact } from "$shared/lib/text-export";
   import { computeVirtualWindow } from "$shared/lib/virtual-window";
+  import { compareNatural } from "$shared/lib/natural-compare";
   import TablePagination from "$shared/ui/table-pagination.svelte";
   import { totalPages as calcTotalPages } from "$shared/lib/use-pagination";
   import FileDown from "@lucide/svelte/icons/file-down";
@@ -193,9 +194,11 @@
     return rows.filter((row) => selectedNamespaces.has(row.namespace));
   });
 
-  function compareText(left: string, right: string) {
-    return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
-  }
+  const compareText = compareNatural;
+
+  // Age now, from the start time: ageSeconds froze when the row was built, and rows
+  // built at different moments would sort by stale ages. One clock per sort.
+  let sortNow = Date.now();
 
   function getSortValue(row: PodListRow, column: ColumnId) {
     if (column === "name") return row.name;
@@ -204,10 +207,8 @@
     if (column === "ready") return row.readyContainers / Math.max(row.totalContainers, 1);
     if (column === "restarts") return row.restarts;
     if (column === "node") return row.node;
-    // Age now, from the start time: ageSeconds froze when the row was built, and rows
-    // built at different moments would sort by stale ages.
     if (column === "age")
-      return row.startedAt ? (Date.now() - Date.parse(row.startedAt)) / 1000 : row.ageSeconds;
+      return row.startedAt ? (sortNow - Date.parse(row.startedAt)) / 1000 : row.ageSeconds;
     if (column === "cpu") return getMetricsForRow(row)?.cpuMillicores ?? -1;
     if (column === "memory") return getMetricsForRow(row)?.memoryBytes ?? -1;
     return row.name;
@@ -229,7 +230,10 @@
     return sortDirection === "asc" ? result : result * -1;
   }
 
-  const sortedRows = $derived.by(() => [...namespaceFilteredRows].sort(compareRows));
+  const sortedRows = $derived.by(() => {
+    sortNow = Date.now();
+    return [...namespaceFilteredRows].sort(compareRows);
+  });
 
   const isGroupedView = $derived(viewMode === "namespace" || viewMode === "node");
   const groupedViewRows = $derived(sortedRows.slice(0, GROUPED_VIEW_MAX_ROWS));
