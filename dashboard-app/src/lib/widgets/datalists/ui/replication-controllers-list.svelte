@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { compareNatural } from "$shared/lib/natural-compare";
   import { provideListFreshness } from "./common/list-freshness-context.svelte";
   import { invalidateAll } from "$app/navigation";
   import { onMount } from "svelte";
@@ -31,9 +32,7 @@
       : "-";
   }
 
-  function compareText(left: string, right: string) {
-    return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
-  }
+  const compareText = compareNatural;
 
   function toggleSort(column: typeof sortBy) {
     if (sortBy !== column) {

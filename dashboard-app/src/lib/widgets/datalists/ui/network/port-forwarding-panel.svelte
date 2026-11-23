@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { compareNatural } from "$shared/lib/natural-compare";
   import { toast } from "svelte-sonner";
   import { getTimeDifference } from "$shared";
   import type { PageData } from "$entities/cluster";
@@ -94,9 +95,7 @@
     return entries;
   });
 
-  function compareText(left: string, right: string) {
-    return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
-  }
+  const compareText = compareNatural;
 
   function toggleSort(column: typeof sortBy) {
     if (sortBy !== column) {

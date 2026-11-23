@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { compareNatural } from "$shared/lib/natural-compare";
   import { provideListFreshness } from "../common/list-freshness-context.svelte";
   import ActionNotificationBar from "$shared/ui/action-notification-bar.svelte";
   import { liveAge } from "$shared/lib/live-age.svelte";
@@ -135,9 +136,7 @@
 
   const sourceItems = $derived(runtimeItems);
   const rows = $derived.by(() => createCustomResourceRows(sourceItems));
-  function compareText(left: string, right: string) {
-    return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
-  }
+  const compareText = compareNatural;
 
   function getTimestamp(value: unknown) {
     const timestamp = typeof value === "string" ? Date.parse(value) : NaN;
