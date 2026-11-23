@@ -10,46 +10,75 @@ The release build fails if the section for the released version is missing.
 
 ## [0.26.5] - 2026-11-21
 
-Cluster lists now update live. In the desktop app the Kubernetes watch never
-worked, so lists fell back to a kubectl watch whose events all went to Pods:
-Services, Deployments and other lists jumped, showed Stale while the data was
-current, and Pods switched CPU and Memory to Loading every 30 seconds. Pod and
-workload changes such as Terminating, Pending or a new Ready count now show up
-as they happen. Workload logs open as a live stream, keep the line you are
-reading in place, and continue after a short dropped connection without
-repeating lines. On Linux (.deb, .rpm) download the new package from the
-release page and install it the way you installed this one. We recommend this
-update.
+Lists update live now: a pod that dies or starts shows up at once, and Pods no
+longer jumps every 30 seconds. Logs stream, keep your place, and survive a
+dropped connection. Big clusters got fast: 2,000 pods list in seconds and the
+filter answers as you type. Worth updating. On Linux (.deb, .rpm) install the
+new package by hand.
+
+### Added
+
+- Port-forward for Pods and Services: one dialog, a tab under the list, a Stop
+  button.
+- Shell on a node that works, like `kubectl debug node`. Asks first, cleans up
+  after itself.
+- Ingresses show Class, Hosts, Address, Ports and a URL you can open.
+- Edit YAML for custom resource definitions and custom resources, with Apply.
+- Cluster score: one headline number, then every posture rule with Pass, Fail or
+  Not checked.
+- Resource Quotas show used against hard, per limit.
+- One freshness indicator per list (Live, or Stale with the last update time).
+- App version on the splash screen.
+
+### Changed
+
+- A row action's result (Logs, YAML, Events, port-forward) scrolls into view on
+  every list.
+- Unsaved YAML is never lost silently: leaving the page, Refresh, Reload or a
+  jump asks first.
+- Esc in a full-screen panel leaves full screen and keeps the tab.
+- Scale, Delete and port-forward are centred dialogs. One Scale dialog for all
+  workloads.
+- Pod logs stream by default; Previous only when the container restarted.
+- Compact rows: 15 or more fit at 1200x650. No text under 12 px.
+- Details panels show the object's pods, follow a rollout, close when it is
+  deleted.
+- Events in details: one row per event, repeats as xN, Warning first.
+- Opaque page and table headers in every theme. Connect wizard readable on the
+  light theme.
+- Slim build imports cloud clusters through the CLI installed on your machine.
+- Force finalize on a namespace really removes the finalizers and says what it
+  costs first.
+- Unread count sits on the bell's corner. The kubectl commands switch says on or
+  off.
+- Row actions menu is one Tab stop. Groups toggle lives in the table.
+- Lists on big clusters: 2,000 pods in a few seconds instead of over a minute.
 
 ### Fixed
 
-- The desktop app sends Kubernetes API requests from the Rust side, so the
-  watch is no longer blocked and lists get changes as they happen. The watch
-  request no longer sends parameters the API server rejects.
-- When the app has to fall back to kubectl watch, each event goes to its own
-  list instead of Pods. After every restart of that watch the list is loaded
-  again, so changes made in between are not lost.
-- A list is marked live only while its stream is running. When the fallback
-  watch gives up, for example on a permission error, the list says so instead
-  of showing old data as live, and the app tries the API again after a minute,
-  then less often.
-- Pods come from the pod watch: a deleted or starting pod changes state in the
-  table without waiting for the next refresh. The Refreshing banner shows only
-  when a refresh fails, so the table no longer moves down and up, and CPU and
-  Memory keep their values between samples.
-- Logs of Deployments, DaemonSets, StatefulSets, ReplicaSets, Jobs and Cron
-  Jobs open as a follow stream instead of polling. The first lines are not
-  shown twice, and the line you are reading stays in place while new lines
-  arrive.
-- After a dropped connection the log stream resumes where it stopped. Lines
-  already shown are not repeated, and new lines with the same text are kept. A
-  break longer than five minutes starts a fresh stream.
-- DaemonSet logs no longer reconnect every 8 seconds, and they show timestamps
-  like the other workload logs.
-- Workload log text is capped at about one million characters, which keeps
-  memory bounded.
-- Each API request has its own cancel signal, so long sessions do not pile up
-  listeners.
+- Global Triage called a crashing pod Running. It says CrashLoopBackOff.
+- Compliance showed a red 0 / 100 with nothing scored. Now No data.
+- Version audit no longer reports a green OK when charts could not be checked.
+- Trivy statuses in words. Deprecation scan uses the cluster's own version.
+- The Cached banner shows only when the data is really stale.
+- A list you have no RBAC access to says so, not "No secrets found".
+- Empty band under the CPU/Memory row in the Pods workbench.
+- Deployment and DaemonSet headers no longer show Node and Pod IP.
+- Esc in full-screen Deployments and DaemonSets panels closed the tab.
+- Row menu actions in every list run after the menu closes, as in Pods.
+- Full-screen panels no longer hide under the page header.
+- Maps jump to the resource's namespace.
+- Cancelling the Service jump from an Ingress keeps the details open.
+- A finished pod stopped reconnecting its log stream.
+- Port-forward counted kubectl info lines as errors.
+- Flag values on the kubectl command line never reach the app log.
+- App commands accepted only from the main window.
+- Text size steps no longer freeze the page.
+
+### Known limitations
+
+- Exec runs one command at a time, no vi or top yet. Full terminal planned; use
+  `kubectl exec -it` meanwhile.
 
 ## [0.26.4] - 2026-11-20
 
