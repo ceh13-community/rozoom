@@ -12,9 +12,10 @@ The release build fails if the section for the released version is missing.
 
 Questions the app asks (stop a port-forward, delete, node shell, rollout
 restart) open inside the app, with Cancel focused and Esc as No. Every Download
-and Export button now says where the file went, a port-forward tab shows whether
-the tunnel is up, and Help > About the team names the people and the seven
-principles we build by. On Linux (.deb, .rpm) install the new package by hand.
+button and the CSV and report exports now say where the file went, a port-forward
+tab shows whether the tunnel is up, and Help > About the team names the people
+and the seven principles we build by. On Linux (.deb, .rpm) install the new
+package by hand.
 
 ### Added
 
