@@ -14,7 +14,7 @@ export type TeamMember = {
 export const TEAM_MEMBERS: readonly TeamMember[] = [
   {
     name: "Stanislav Ponomaryov",
-    role: "Senior Full Stack Developer",
+    role: "Full Stack Developer",
     github: "https://github.com/StasPonomaryov",
     linkedin: "https://www.linkedin.com/in/stasponomaryov/",
   },
