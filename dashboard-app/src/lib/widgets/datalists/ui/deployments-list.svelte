@@ -133,6 +133,7 @@
     isSameClosedTab,
     undoForClosedTab,
   } from "./common/workbench-confirm";
+  import { confirmRolloutRestart, rolloutRestartTargets } from "./common/rollout-restart-confirm";
 
   interface DeploymentsListProps {
     data: PageData & {
@@ -1593,6 +1594,13 @@
     items: DeploymentItem[],
   ) {
     if (!data?.slug || items.length === 0) return;
+    // A restart recreates every pod: it asks first and names the command.
+    if (
+      action === "restart" &&
+      !(await confirmRolloutRestart("deployment", rolloutRestartTargets(items)))
+    ) {
+      return;
+    }
     clearActionFeedback();
     actionInFlight = true;
     try {

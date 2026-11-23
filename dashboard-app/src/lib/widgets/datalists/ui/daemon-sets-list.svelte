@@ -123,6 +123,7 @@
     isSameClosedTab,
     undoForClosedTab,
   } from "./common/workbench-confirm";
+  import { confirmRolloutRestart, rolloutRestartTargets } from "./common/rollout-restart-confirm";
 
   interface DaemonSetsListProps {
     data: PageData & { daemonsets?: DaemonSetItem[] };
@@ -1928,6 +1929,8 @@
 
   async function restartDaemonSets(items: DaemonSetItem[]) {
     if (!data?.slug || items.length === 0) return;
+    // A restart recreates every pod: it asks first and names the command.
+    if (!(await confirmRolloutRestart("daemonset", rolloutRestartTargets(items)))) return;
     clearActionFeedback();
     actionInFlight = true;
     try {
