@@ -1,3 +1,5 @@
+import { hasConfirmHost, requestConfirm } from "./confirm-dialog.svelte";
+
 type TauriInternals = {
   invoke?: (cmd: string, payload?: unknown) => Promise<unknown>;
   transformCallback?: unknown;
@@ -47,6 +49,8 @@ export async function safeDialogAsk(
   message: string,
   options: { title: string; kind?: "info" | "warning" | "error" } = { title: "Confirm" },
 ) {
+  // The in-app dialog answers it wherever a host is mounted; the system ask is the fallback.
+  if (hasConfirmHost()) return requestConfirm({ title: options.title, message });
   if (!isTauriAvailable()) {
     return typeof window !== "undefined" ? window.confirm(message) : false;
   }

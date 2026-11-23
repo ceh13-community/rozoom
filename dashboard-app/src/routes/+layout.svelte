@@ -21,6 +21,7 @@
   import { initAnalytics, trackAppOpened } from "$shared/analytics/wau-c";
   import SplashScreen from "$shared/ui/splash-screen.svelte";
   import TextPromptHost from "$shared/ui/text-prompt-host.svelte";
+  import ConfirmDialogHost from "$shared/ui/confirm-dialog-host.svelte";
   import { installUiZoom } from "$shared/lib/ui-zoom";
 
   import "$lib/app/styles/index.css";
@@ -122,6 +123,8 @@
 <Toaster richColors />
 <!-- In-app text dialog for requestText(); replaces window.prompt. -->
 <TextPromptHost />
+<!-- In-app question for confirmAction(); replaces the system confirm in every window with this layout. -->
+<ConfirmDialogHost />
 
 <SplashScreen />
 <KeyboardShortcutsDialog
