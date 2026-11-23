@@ -66,7 +66,7 @@ export const CORE_PRINCIPLES: readonly CorePrinciple[] = [
   },
   {
     title: "Transparency",
-    line: "Switch on Show kubectl commands and every write shows its command with the time and a Copy button.",
+    line: "Turn on the Commands switch (Show kubectl commands) in the sidebar and every write shows its command with the time and a Copy button.",
   },
 ];
 

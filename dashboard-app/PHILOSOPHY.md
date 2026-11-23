@@ -23,7 +23,7 @@ The dashboard is built for a fleet, not for one cluster: the clusters share one 
 
 ### 3. Read-heavy, write-careful
 
-ROZOOM is primarily an observability tool. Reads (get, describe, logs, top) happen automatically in the background. Writes (apply, delete, scale, rollout) require explicit user action; a destructive one asks first and names the kubectl command it will run. With Show kubectl commands switched on in the sidebar, every write also shows a notification with the exact command (see Transparency).
+ROZOOM is primarily an observability tool. Reads (get, describe, logs, top) happen automatically in the background. Writes (apply, delete, scale, rollout) require explicit user action; a destructive one asks first and names the kubectl command it will run. With the Commands switch (Show kubectl commands) on in the sidebar, every write also shows a notification with the exact command (see Transparency).
 
 Users should always know what ROZOOM is doing to their clusters.
 
@@ -52,7 +52,7 @@ Cluster data stays on the user's machine:
 
 ### 7. Transparency
 
-Every write ROZOOM runs can be watched: switch on Show kubectl commands in the sidebar and each kubectl or helm command behind your actions shows a notification with the full command, its completion time and a Copy button, so you can reproduce it in your terminal. The switch is off by default; background reads and the app's own housekeeping commands never notify.
+Every write ROZOOM runs can be watched: turn on the Commands switch (Show kubectl commands) in the sidebar and each kubectl or helm command behind your actions shows a notification with the full command, its completion time and a Copy button, so you can reproduce it in your terminal. The switch is off by default; background reads and the app's own housekeeping commands never notify.
 
 ## Goals
 
