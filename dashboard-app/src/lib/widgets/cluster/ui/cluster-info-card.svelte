@@ -29,7 +29,7 @@
   import { versionAuditState } from "$features/version-audit";
   import { backupAuditState } from "$features/backup-audit";
   import type { ApiServerHealth as ApiServerHealthStatus } from "$features/check-health/model/types";
-  import { getColorForClusterCard } from "$features/check-health";
+  import { getColorForClusterCard, displayClusterCardState } from "$features/check-health";
   import { countTotalPodRestarts, sortedMetricsEndpoints } from "$features/check-health";
   import { globalLinterEnabled } from "$features/check-health/model/linter-preferences";
   import {
@@ -341,37 +341,17 @@
   const connectivityTitle = $derived(
     connectivity.state === "auth-expired" ? "Auth expired" : "Cluster unreachable",
   );
-  const displayClusterCardColor = $derived.by(() => {
-    if (!effectiveLinter)
-      return {
-        color: "bg-slate-600",
-        text: "Paused",
-        tooltip:
-          "Linter is off for this cluster - diagnostics won't run. Click the gauge icon to turn it on.",
-      };
-    if (disconnected)
-      return {
-        color: "bg-slate-600",
-        text: connectivityTitle,
-        tooltip: connectivity.reason ?? "",
-      };
-    if (awaitingInitialRefresh)
-      return {
-        color: "bg-slate-500",
-        text: "Pending",
-        tooltip: "Waiting for initial health check. Click the refresh button to start.",
-      };
-    const base = clusterCardColor;
-    const tooltip =
-      base.text === "Ok"
-        ? "All health checks passed. Cluster is healthy."
-        : base.text === "Warning"
-          ? "Some health checks have warnings. Review the diagnostics for details."
-          : base.text === "Critical"
-            ? "Critical issues detected. Immediate attention recommended."
-            : "Cluster status could not be determined. Run a health check to update.";
-    return { ...base, tooltip };
-  });
+  // Same rule as the Compact card: the header and the badge share this colour.
+  const displayClusterCardColor = $derived.by(() =>
+    displayClusterCardState({
+      linterOn: effectiveLinter,
+      disconnected,
+      connectivityTitle,
+      connectivityReason: connectivity.reason,
+      awaitingInitialRefresh,
+      base: clusterCardColor,
+    }),
+  );
   const primaryAlert = $derived.by(() => {
     if (awaitingInitialRefresh) {
       return {

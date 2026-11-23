@@ -31,6 +31,7 @@ describe("cluster info card data profile contract", () => {
       "const awaitingInitialRefresh = $derived(Boolean(cluster.needsInitialRefreshHint) && !lastCheck);",
     );
     expect(source).toContain("const displayClusterCardColor = $derived.by(() =>");
+    expect(source).toContain("displayClusterCardState({");
     expect(source).toContain("let refreshUiLoading = $state(false);");
     expect(source).toContain(
       "const isRefreshLoading = $derived(checkState.loading || refreshUiLoading);",

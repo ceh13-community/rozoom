@@ -5,7 +5,11 @@
     clusterStates,
     type ClusterHealthChecks,
   } from "$features/check-health/";
-  import { getColorForClusterCard, countTotalPodRestarts } from "$features/check-health";
+  import {
+    getColorForClusterCard,
+    displayClusterCardState,
+    countTotalPodRestarts,
+  } from "$features/check-health";
   import { buildClusterHealthScore } from "$features/check-health/model/cluster-health-score";
   import { buildClusterScore } from "$features/check-health/model/cluster-score";
   import { selectClusterDrift } from "$features/fleet-drift";
@@ -102,34 +106,23 @@
   const isClustersListRoute = $derived($page.url.pathname === "/dashboard");
   const awaitingInitialRefresh = $derived(Boolean(cluster.needsInitialRefreshHint) && !lastCheck);
   const clusterCardColor = $derived(getColorForClusterCard(lastCheck));
-  const displayClusterCardColor = $derived.by(() => {
-    if (!effectiveLinter)
-      return {
-        color: "bg-slate-600",
-        text: "Paused",
-        tooltip:
-          "Linter is off for this cluster - diagnostics won't run. Click the gauge icon to turn it on.",
-      };
-    if (awaitingInitialRefresh)
-      return {
-        color: "bg-slate-500",
-        text: "Pending",
-        tooltip: "Waiting for initial health check. Click the refresh button to start.",
-      };
-    const base = clusterCardColor;
-    const tooltip =
-      base.text === "Ok"
-        ? "All health checks passed. Cluster is healthy."
-        : base.text === "Warning"
-          ? "Some health checks have warnings. Review the diagnostics for details."
-          : base.text === "Critical"
-            ? "Critical issues detected. Immediate attention recommended."
-            : "Cluster status could not be determined. Run a health check to update.";
-    return { ...base, tooltip };
-  });
+  const connectivityTitle = $derived(
+    connectivity.state === "auth-expired" ? "Auth expired" : "Cluster unreachable",
+  );
+  // Same rule as the Detailed card: the header and the badge share this colour.
+  const displayClusterCardColor = $derived.by(() =>
+    displayClusterCardState({
+      linterOn: effectiveLinter,
+      disconnected,
+      connectivityTitle,
+      connectivityReason: connectivity.reason,
+      awaitingInitialRefresh,
+      base: clusterCardColor,
+    }),
+  );
   const platformLabel = $derived(getClusterPlatformLabel(cluster.name));
-  // Header stays neutral; status lives only in the badge, where a glyph
-  // keeps the three actionable states tellable apart without color.
+  // The badge adds a glyph, so the three actionable states stay tellable
+  // apart without color.
   const statusGlyph = $derived.by(() => {
     switch (displayClusterCardColor?.text) {
       case "Ok":
@@ -495,7 +488,7 @@
   >
     <!-- Header -->
     <Card.Title
-      class="flex items-center text-white px-4 py-3 cursor-pointer bg-slate-600 rounded-t-xl"
+      class="flex items-center text-white px-4 py-3 cursor-pointer {displayClusterCardColor?.color} rounded-t-xl transition-colors duration-500"
     >
       <div class="relative flex">
         <Button
