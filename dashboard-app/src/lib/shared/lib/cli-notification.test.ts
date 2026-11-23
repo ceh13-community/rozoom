@@ -17,6 +17,7 @@ describe("CLI notifications", () => {
     expect(isUserFacingCommand(["rollout", "restart", "deployment/web"])).toBe(true);
     expect(isUserFacingCommand(["rollback", "web", "3", "--kubeconfig", "/k"])).toBe(true);
     expect(isUserFacingCommand(["uninstall", "web"])).toBe(true);
+    expect(isUserFacingCommand(["test", "web", "--namespace", "shop"])).toBe(true);
     expect(isUserFacingCommand(["list", "-A", "-o", "json"])).toBe(false);
     expect(isUserFacingCommand(["get", "pods", "-o", "json"])).toBe(false);
     expect(isUserFacingCommand(["--kubeconfig", "/k", "get", "pods"])).toBe(false);

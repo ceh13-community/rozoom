@@ -998,13 +998,16 @@ describe("helm CLI notifications", () => {
     expect(emitCliNotification).not.toHaveBeenCalled();
   });
 
-  it("helm uninstall and helm rollback notify with the command and its time", async () => {
+  it("helm uninstall, rollback and test notify with the command and its time", async () => {
     await uninstallHelmRelease(clusterId, { releaseName: "web", namespace: "shop" });
     await rollbackHelmRelease(clusterId, { releaseName: "web", namespace: "shop", revision: "3" });
-    expect(emitCliNotification).toHaveBeenCalledTimes(2);
+    // helm test runs the chart's test pods in the cluster: a write, not a read.
+    await testHelmRelease(clusterId, { releaseName: "web", namespace: "shop" });
+    expect(emitCliNotification).toHaveBeenCalledTimes(3);
     expect(emitCliNotification.mock.calls.map(([n]) => [n.tool, n.args[0], n.success])).toEqual([
       ["helm", "uninstall", true],
       ["helm", "rollback", true],
+      ["helm", "test", true],
     ]);
     expect(typeof emitCliNotification.mock.calls[0][0].durationMs).toBe("number");
   });

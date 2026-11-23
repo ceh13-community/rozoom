@@ -42,6 +42,8 @@ const MUTATING_SUBCOMMANDS = new Set([
   "upgrade",
   "uninstall",
   "rollback",
+  // helm test runs the chart's test pods; kubectl has no such subcommand.
+  "test",
 ]);
 
 export function isUserFacingCommand(args: string[]): boolean {
