@@ -159,10 +159,75 @@ export function describeNetworkDebugRefusal(
   const kubectlLine = lastStderrLine(stderr) || stderr.trim();
   const level = kubectlLine.match(/violates PodSecurity "([a-z]+):/)?.[1];
   if (!level) return new NetworkDebugRefusal(kubectlLine, null);
-  return new NetworkDebugRefusal(
-    `Namespace ${namespace} does not allow network debug: its Pod Security level is "${level}", and network debug needs the "privileged" level for the NET_RAW capability that tcpdump, ping and mtr use.`,
-    kubectlLine,
-  );
+  return new NetworkDebugRefusal(podSecurityRefusalMessage(namespace, level), kubectlLine);
+}
+
+export const POD_SECURITY_ENFORCE_LABEL = "pod-security.kubernetes.io/enforce";
+/** Pod Security levels that forbid NET_RAW, so the debug container can never be admitted. */
+const POD_SECURITY_LEVELS_WITHOUT_NET_RAW = new Set(["baseline", "restricted"]);
+const NAMESPACE_POD_SECURITY_TTL_MS = 60_000;
+const namespacePodSecurityCache = new Map<string, { at: number; levels: Map<string, string> }>();
+
+/** The one sentence a user reads when Pod Security refuses network debug, before or after kubectl. */
+export function podSecurityRefusalMessage(namespace: string, level: string): string {
+  return `Namespace ${namespace} does not allow network debug: its Pod Security level is "${level}", and network debug needs the "privileged" level for the NET_RAW capability that tcpdump, ping and mtr use.`;
+}
+
+/**
+ * The reason network debug cannot start in a namespace, known before anything runs, or
+ * null. Only an explicit baseline or restricted label blocks. A missing label is not
+ * "privileged": the cluster may enforce a default level through its AdmissionConfiguration,
+ * and that refusal still arrives from kubectl and is read by describeNetworkDebugRefusal.
+ */
+export function networkDebugPodSecurityBlock(
+  namespace: string,
+  enforce: string | null | undefined,
+): string | null {
+  const level = enforce?.trim().toLowerCase() ?? "";
+  if (!POD_SECURITY_LEVELS_WITHOUT_NET_RAW.has(level)) return null;
+  return podSecurityRefusalMessage(namespace, level);
+}
+
+export function clearNamespacePodSecurityCache(): void {
+  namespacePodSecurityCache.clear();
+}
+
+/**
+ * The enforce label of every namespace, read once per cluster and kept for a minute. Null
+ * when the namespaces cannot be listed (no RBAC for namespaces, cluster offline): the menu
+ * item then stays enabled and kubectl's own answer decides. A namespace without the label
+ * is absent from the map.
+ */
+export async function loadNamespacePodSecurityLevels(
+  clusterId: string,
+): Promise<Map<string, string> | null> {
+  const cached = namespacePodSecurityCache.get(clusterId);
+  if (cached && Date.now() - cached.at < NAMESPACE_POD_SECURITY_TTL_MS) return cached.levels;
+  let result: Awaited<ReturnType<typeof kubectlRawArgsFront>>;
+  try {
+    result = await kubectlRawArgsFront(["get", "namespaces", "-o", "json"], { clusterId });
+  } catch {
+    return null;
+  }
+  if (result.errors || result.code !== 0) return null;
+  let items: unknown;
+  try {
+    items = (JSON.parse(result.output) as { items?: unknown }).items;
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(items)) return null;
+  const levels = new Map<string, string>();
+  for (const item of items as Array<{ metadata?: { name?: unknown; labels?: unknown } }>) {
+    const name = item.metadata?.name;
+    const labels = item.metadata?.labels as Record<string, unknown> | undefined;
+    const enforce = labels?.[POD_SECURITY_ENFORCE_LABEL];
+    if (typeof name === "string" && typeof enforce === "string") {
+      levels.set(name, enforce.trim().toLowerCase());
+    }
+  }
+  namespacePodSecurityCache.set(clusterId, { at: Date.now(), levels });
+  return levels;
 }
 
 /** kubectl debug --custom reads a file, so the spec is written to the app data folder. */

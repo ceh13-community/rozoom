@@ -48,6 +48,10 @@
     onRunDebugDescribe: (row: PodListRow) => void;
     onCopyDebug: (row: PodListRow) => void;
     onNetworkDebug?: (row: PodListRow) => void;
+    /** Reason network debug is blocked for the row's namespace, or null. */
+    networkDebugBlockedReason?: (row: PodListRow) => string | null;
+    /** A row menu opened: a chance to refresh what the menu shows (Pod Security levels). */
+    onMenuOpen?: (row: PodListRow) => void;
     onPreviousLogs: (row: PodListRow) => void;
     onPortForward: (row: PodListRow) => void;
     onEvict: (row: PodListRow) => void;
@@ -111,6 +115,8 @@
     onRunDebugDescribe,
     onCopyDebug,
     onNetworkDebug,
+    networkDebugBlockedReason,
+    onMenuOpen,
     onPreviousLogs,
     onPortForward,
     onEvict,
@@ -759,6 +765,8 @@
                       onRunDebugDescribe={() => onRunDebugDescribe(row)}
                       onCopyDebug={() => onCopyDebug(row)}
                       onNetworkDebug={onNetworkDebug ? () => onNetworkDebug(row) : undefined}
+                      networkDebugBlockedReason={networkDebugBlockedReason?.(row) ?? null}
+                      onOpen={onMenuOpen ? () => onMenuOpen(row) : undefined}
                       onPreviousLogs={() => onPreviousLogs(row)}
                       onPortForward={() => onPortForward(row)}
                       onEvict={() => onEvict(row)}
@@ -881,6 +889,8 @@
                 onRunDebugDescribe={() => onRunDebugDescribe(row)}
                 onCopyDebug={() => onCopyDebug(row)}
                 onNetworkDebug={onNetworkDebug ? () => onNetworkDebug(row) : undefined}
+                networkDebugBlockedReason={networkDebugBlockedReason?.(row) ?? null}
+                onOpen={onMenuOpen ? () => onMenuOpen(row) : undefined}
                 onPreviousLogs={() => onPreviousLogs(row)}
                 onPortForward={() => onPortForward(row)}
                 onEvict={() => onEvict(row)}
