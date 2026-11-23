@@ -13,6 +13,20 @@ function errorText(error: unknown): string {
   return "unknown error";
 }
 
+/** The path as people read it: the home folder shown as ~. Falls back to the full path. */
+export async function displayPath(path: string): Promise<string> {
+  try {
+    const { homeDir } = await import("@tauri-apps/api/path");
+    const home = (await homeDir()).replace(/[\\/]+$/, "");
+    if (home && (path === home || path.startsWith(`${home}/`) || path.startsWith(`${home}\\`))) {
+      return `~${path.slice(home.length)}`;
+    }
+  } catch {
+    // No home folder known: the full path is still right.
+  }
+  return path;
+}
+
 /** Opens the file manager on the saved file. */
 export async function revealSavedExport(path: string): Promise<void> {
   try {
@@ -32,7 +46,7 @@ async function save(
     const result = await write();
     const description = rows === undefined ? undefined : `${rows} ${rows === 1 ? "row" : "rows"}`;
     if (result.method === "tauri-download") {
-      toast.success(`Saved to ${result.path}`, {
+      toast.success(`Saved to ${await displayPath(result.path)}`, {
         description,
         duration: SAVED_TOAST_MS,
         action: { label: "Open folder", onClick: () => void revealSavedExport(result.path) },

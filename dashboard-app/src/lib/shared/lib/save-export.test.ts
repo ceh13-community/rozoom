@@ -10,6 +10,9 @@ vi.mock("./text-export", () => ({ exportCsvArtifact, exportTextArtifact }));
 const revealItemInDir = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/plugin-opener", () => ({ revealItemInDir }));
 
+const homeDir = vi.hoisted(() => vi.fn());
+vi.mock("@tauri-apps/api/path", () => ({ homeDir }));
+
 import { saveCsvExport, saveTextExport } from "./save-export";
 
 type ToastAction = { label: string; onClick: () => void };
@@ -21,6 +24,8 @@ describe("save export", () => {
     exportCsvArtifact.mockReset();
     exportTextArtifact.mockReset();
     revealItemInDir.mockReset();
+    homeDir.mockReset();
+    homeDir.mockResolvedValue("/home/u");
   });
 
   it("says where the file is, with the row count and Open folder", async () => {
@@ -35,7 +40,7 @@ describe("save export", () => {
     expect(result?.path).toBe("/home/u/Downloads/pods.csv");
     expect(exportCsvArtifact).toHaveBeenCalledWith({ filename: "pods.csv", csv: '"Name"' });
     expect(toast.success).toHaveBeenCalledWith(
-      "Saved to /home/u/Downloads/pods.csv",
+      "Saved to ~/Downloads/pods.csv",
       expect.objectContaining({
         description: "3 rows",
         action: expect.objectContaining({ label: "Open folder" }),
@@ -102,6 +107,34 @@ describe("save export", () => {
     expect(toast.success).toHaveBeenCalledWith("Downloaded report.json", {
       description: undefined,
     });
+  });
+
+  it("keeps the full path outside the home folder or when home is unknown", async () => {
+    exportCsvArtifact.mockResolvedValue({
+      method: "tauri-download",
+      path: "/srv/exports/pods.csv",
+      pathHint: "/srv/exports/pods.csv",
+    });
+    await saveCsvExport({ filename: "pods.csv", csv: "x" });
+    expect(toast.success.mock.calls[0][0]).toBe("Saved to /srv/exports/pods.csv");
+
+    homeDir.mockRejectedValue(new Error("no home"));
+    exportCsvArtifact.mockResolvedValue({
+      method: "tauri-download",
+      path: "/home/u/Downloads/pods.csv",
+      pathHint: "/home/u/Downloads/pods.csv",
+    });
+    await saveCsvExport({ filename: "pods.csv", csv: "x" });
+    expect(toast.success.mock.calls[1][0]).toBe("Saved to /home/u/Downloads/pods.csv");
+
+    homeDir.mockResolvedValue("/home/u");
+    exportCsvArtifact.mockResolvedValue({
+      method: "tauri-download",
+      path: "/home/user2/Downloads/pods.csv",
+      pathHint: "/home/user2/Downloads/pods.csv",
+    });
+    await saveCsvExport({ filename: "pods.csv", csv: "x" });
+    expect(toast.success.mock.calls[2][0]).toBe("Saved to /home/user2/Downloads/pods.csv");
   });
 
   it("one row reads as a row", async () => {
