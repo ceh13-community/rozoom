@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { csvCell, csvRow, csvText } from "./csv";
 
@@ -28,8 +30,33 @@ describe("csv", () => {
     expect(csvCell("\r=1")).toBe('"\'\r=1"');
   });
 
-  it("does not let an emoji hide a formula", () => {
-    expect(csvCell("🏃=1+1")).toBe('"\'=1+1"');
+  it("drops only the status emoji the lists glue to a word", () => {
+    for (const [shown, saved] of [
+      ["🏃Running", "Running"],
+      ["🕰️Pending", "Pending"],
+      ["😔Failed", "Failed"],
+      ["⚠️Critical", "Critical"],
+      ["🔃Restarted", "Restarted"],
+      ["💪Succeed", "Succeed"],
+      ["❌Terminated", "Terminated"],
+      ["📉Degraded", "Degraded"],
+      ["🐌Progressing", "Progressing"],
+      ["🍏Available", "Available"],
+    ]) {
+      expect(csvCell(shown)).toBe(`"${saved}"`);
+    }
+  });
+
+  it("keeps other symbols at the start of a cell", () => {
+    expect(csvCell("©2024 Corp")).toBe('"©2024 Corp"');
+    expect(csvCell("™Brand")).toBe('"™Brand"');
+    expect(csvCell("↔ both ways")).toBe('"↔ both ways"');
+    expect(csvCell("🔥hot")).toBe('"🔥hot"');
+    expect(csvCell("🏃 running late")).toBe('"🏃 running late"');
+  });
+
+  it("an emoji before a formula is not stripped, so the cell stays text", () => {
+    expect(csvCell("🏃=1+1")).toBe('"🏃=1+1"');
   });
 
   it("keeps plain numbers and the - placeholder as they are", () => {
@@ -42,5 +69,22 @@ describe("csv", () => {
   it("joins cells into rows and rows into a text", () => {
     expect(csvRow(["a", null, "🏃Running"])).toBe('"a",,"Running"');
     expect(csvText([["Name"], ["web"]])).toBe('"Name"\n"web"');
+  });
+
+  it("knows every status emoji the app glues to a word", () => {
+    const files = (dir: string): string[] =>
+      readdirSync(dir).flatMap((name) => {
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) return files(path);
+        return /\.(svelte|ts)$/.test(name) && !name.endsWith(".test.ts") ? [path] : [];
+      });
+    const glued = /"((?:\p{Extended_Pictographic}|\u{FE0F})+)(\p{Lu}[A-Za-z]*)"/gu;
+    const found = new Map<string, string>();
+    for (const file of files(resolve(__dirname, "../../.."))) {
+      for (const m of readFileSync(file, "utf8").matchAll(glued))
+        found.set(m[0].slice(1, -1), m[2]);
+    }
+    expect(found.size).toBeGreaterThan(5);
+    for (const [shown, word] of found) expect(csvCell(shown), shown).toBe(`"${word}"`);
   });
 });
