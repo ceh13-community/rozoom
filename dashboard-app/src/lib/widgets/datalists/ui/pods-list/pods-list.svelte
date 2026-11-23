@@ -14,6 +14,9 @@
   import { openPodAttachModal, openPodShellModal } from "$features/shell";
   import {
     NETWORK_DEBUG_IMAGE,
+    NetworkDebugRefusal,
+    loadNamespacePodSecurityLevels,
+    networkDebugPodSecurityBlock,
     runDebugDescribe,
     startPodNetworkDebugSession,
   } from "$features/resource-debug-runtime";
@@ -52,7 +55,11 @@
     dashboardDataProfile,
     getDashboardDataProfileDisplayName,
   } from "$shared/lib/dashboard-data-profile.svelte";
-  import { getBrowserInvokeFallback, isTauriAvailable } from "$shared/lib/tauri-runtime";
+  import {
+    getBrowserInvokeFallback,
+    isTauriAvailable,
+    safeAppLog,
+  } from "$shared/lib/tauri-runtime";
   import { fetchNamespacedSnapshotItems } from "../common/namespaced-snapshot";
   import {
     buildMetricsRecommendationText,
@@ -782,8 +789,35 @@
     showActionSuccess(`Copied kubectl debug for ${getPodRef(pod)}.`);
   }
 
+  // Pod Security enforce level per namespace, so a network debug that the namespace is sure
+  // to refuse is never started. Null while loading or when namespaces cannot be listed: then
+  // the menu stays enabled and kubectl's answer decides.
+  let namespacePodSecurity = $state<Map<string, string> | null>(null);
+  $effect(() => {
+    const clusterId = data.slug;
+    namespacePodSecurity = null;
+    if (!clusterId) return;
+    let cancelled = false;
+    void loadNamespacePodSecurityLevels(clusterId).then((levels) => {
+      if (!cancelled) namespacePodSecurity = levels;
+    });
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  function networkDebugBlockReason(namespace: string | undefined): string | null {
+    const ns = namespace?.trim() || "default";
+    return networkDebugPodSecurityBlock(ns, namespacePodSecurity?.get(ns));
+  }
+
   async function startNetworkDebug(pod: Partial<PodItem>) {
     if (!data.slug || !pod.metadata?.name) return;
+    const blocked = networkDebugBlockReason(pod.metadata?.namespace);
+    if (blocked) {
+      toast.error(blocked);
+      return;
+    }
     const confirmed = await confirmAction(
       `Start network debug in ${getPodRef(pod)}?\n\nAdds an ephemeral container with ${NETWORK_DEBUG_IMAGE} (dig, curl, nc, tcpdump, mtr) to this pod, with the NET_RAW capability. It shares the pod's network and stops when you close the session, or after an hour. Kubernetes keeps the container, and NET_RAW with it, in the pod spec until the pod is recreated. The first start downloads about 210 MB.`,
       "Confirm network debug",
@@ -793,6 +827,13 @@
     try {
       await startPodNetworkDebugSession({ clusterId: data.slug, pod });
     } catch (error) {
+      if (error instanceof NetworkDebugRefusal && error.detail) {
+        // Pod Security refused at launch (a cluster default or a label newer than the
+        // cache): the sentence alone; kubectl's own line goes to the log, not the toast.
+        void safeAppLog("warn", `[network-debug] ${getPodRef(pod)}: ${error.detail}`);
+        toast.error(error.message);
+        return;
+      }
       const detail =
         error instanceof Error && "detail" in error && typeof error.detail === "string"
           ? error.detail
@@ -1358,6 +1399,7 @@
       if (!pod) return;
       void startNetworkDebug(pod);
     }}
+    networkDebugBlockedReason={(row) => networkDebugBlockReason(row.namespace)}
     onPortForward={(row) => {
       const pod = getPodByUid(row.uid);
       if (!pod) return;

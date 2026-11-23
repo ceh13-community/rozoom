@@ -14,9 +14,15 @@ export {
 export type { PodDebugSessionTarget } from "./model/pod-debug-session";
 export {
   NETWORK_DEBUG_IMAGE,
+  NetworkDebugRefusal,
+  POD_SECURITY_ENFORCE_LABEL,
   buildNetworkDebugContainerName,
   buildNetworkDebugStartArgs,
   buildNetworkDebugStopArgs,
+  clearNamespacePodSecurityCache,
+  loadNamespacePodSecurityLevels,
+  networkDebugPodSecurityBlock,
+  podSecurityRefusalMessage,
   readEphemeralContainerState,
   startPodNetworkDebugSession,
 } from "./model/pod-network-debug";

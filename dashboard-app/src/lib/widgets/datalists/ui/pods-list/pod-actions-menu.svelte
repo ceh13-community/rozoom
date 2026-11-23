@@ -58,6 +58,8 @@
     onCopyDebug: () => void;
     /** Shown only when given: needs a cluster that allows ephemeral containers. */
     onNetworkDebug?: () => void;
+    /** Why network debug cannot start here (Pod Security baseline or restricted); disables the item and shows the reason. */
+    networkDebugBlockedReason?: string | null;
     onPreviousLogs: () => void;
     onPortForward: () => void;
     onEvict: () => void;
@@ -101,13 +103,13 @@
     onRunDebugDescribe,
     onCopyDebug,
     onNetworkDebug,
+    networkDebugBlockedReason = null,
     onPreviousLogs,
     onPortForward,
     onEvict,
     onLogs,
     onDelete,
-  }: PodActionsMenuProps =
-    $props();
+  }: PodActionsMenuProps = $props();
 
   let open = $state(false);
   let triggerRef = $state<HTMLElement | null>(null);
@@ -262,9 +264,20 @@
         </DropdownMenu.Item>
       {/if}
       {#if onNetworkDebug}
-        <DropdownMenu.Item onSelect={() => selectAction(onNetworkDebug)}>
-          <Network class="mr-2 h-4 w-4" />
-          Network debug (netshoot)
+        <DropdownMenu.Item
+          disabled={Boolean(networkDebugBlockedReason)}
+          title={networkDebugBlockedReason ?? undefined}
+          onSelect={() => selectAction(onNetworkDebug)}
+        >
+          <Network class="mr-2 h-4 w-4 shrink-0" />
+          <span class="flex min-w-0 flex-col">
+            <span>Network debug (netshoot)</span>
+            {#if networkDebugBlockedReason}
+              <span class="max-w-72 whitespace-normal text-xs text-muted-foreground"
+                >{networkDebugBlockedReason}</span
+              >
+            {/if}
+          </span>
         </DropdownMenu.Item>
       {/if}
       {#if showInvestigate}

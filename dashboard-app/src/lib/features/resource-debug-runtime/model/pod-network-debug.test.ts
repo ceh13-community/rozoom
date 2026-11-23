@@ -5,7 +5,11 @@ import {
   buildNetworkDebugContainerName,
   buildNetworkDebugStartArgs,
   buildNetworkDebugStopArgs,
+  clearNamespacePodSecurityCache,
   describeNetworkDebugRefusal,
+  loadNamespacePodSecurityLevels,
+  networkDebugPodSecurityBlock,
+  podSecurityRefusalMessage,
   NetworkDebugRefusal,
   readEphemeralContainerState,
   startPodNetworkDebugSession,
@@ -277,5 +281,87 @@ describe("pod network debug", () => {
       pod,
       expect.objectContaining({ notice: "kubectl warning: Warning: would violate PodSecurity" }),
     );
+  });
+});
+
+describe("network debug Pod Security pre-check", () => {
+  const namespacesJson = (items: Array<{ name: string; enforce?: string }>) =>
+    JSON.stringify({
+      items: items.map((ns) => ({
+        metadata: {
+          name: ns.name,
+          labels: ns.enforce ? { "pod-security.kubernetes.io/enforce": ns.enforce } : {},
+        },
+      })),
+    });
+
+  beforeEach(() => {
+    kubectlRawArgsFront.mockReset();
+    clearNamespacePodSecurityCache();
+  });
+
+  it("blocks baseline and restricted with the sentence kubectl's refusal also gets", () => {
+    expect(networkDebugPodSecurityBlock("shop", "baseline")).toBe(
+      podSecurityRefusalMessage("shop", "baseline"),
+    );
+    expect(networkDebugPodSecurityBlock("shop", " Restricted ")).toBe(
+      podSecurityRefusalMessage("shop", "restricted"),
+    );
+    expect(
+      describeNetworkDebugRefusal('x violates PodSecurity "baseline:latest"', "shop").message,
+    ).toBe(podSecurityRefusalMessage("shop", "baseline"));
+  });
+
+  it("does not block privileged, and not a namespace without the label: the cluster default is unknown here", () => {
+    expect(networkDebugPodSecurityBlock("shop", "privileged")).toBeNull();
+    expect(networkDebugPodSecurityBlock("shop", undefined)).toBeNull();
+    expect(networkDebugPodSecurityBlock("shop", "")).toBeNull();
+    expect(networkDebugPodSecurityBlock("shop", "custom-level")).toBeNull();
+  });
+
+  it("reads the enforce label per namespace once per cluster and keeps it for a minute", async () => {
+    kubectlRawArgsFront.mockResolvedValue({
+      output: namespacesJson([
+        { name: "shop", enforce: "baseline" },
+        { name: "lab", enforce: "Privileged" },
+        { name: "free" },
+      ]),
+      errors: "",
+      code: 0,
+    });
+
+    const levels = await loadNamespacePodSecurityLevels("c1");
+    const again = await loadNamespacePodSecurityLevels("c1");
+
+    expect(kubectlRawArgsFront).toHaveBeenCalledTimes(1);
+    expect(kubectlRawArgsFront).toHaveBeenCalledWith(["get", "namespaces", "-o", "json"], {
+      clusterId: "c1",
+    });
+    expect(levels).toEqual(
+      new Map([
+        ["shop", "baseline"],
+        ["lab", "privileged"],
+      ]),
+    );
+    expect(again).toBe(levels);
+    expect(networkDebugPodSecurityBlock("free", levels?.get("free"))).toBeNull();
+  });
+
+  it("returns null when namespaces cannot be listed (RBAC, offline), so the menu stays enabled", async () => {
+    kubectlRawArgsFront.mockResolvedValueOnce({
+      output: "",
+      errors:
+        'Error from server (Forbidden): namespaces is forbidden: User "dev" cannot list resource "namespaces"',
+      code: 1,
+    });
+    expect(await loadNamespacePodSecurityLevels("c1")).toBeNull();
+
+    kubectlRawArgsFront.mockRejectedValueOnce(new Error("cluster offline"));
+    expect(await loadNamespacePodSecurityLevels("c1")).toBeNull();
+
+    kubectlRawArgsFront.mockResolvedValueOnce({ output: "not json", errors: "", code: 0 });
+    expect(await loadNamespacePodSecurityLevels("c1")).toBeNull();
+    // A failed read is not cached: the next call asks again.
+    expect(kubectlRawArgsFront).toHaveBeenCalledTimes(3);
   });
 });
