@@ -22,6 +22,23 @@ describe("buildTextExportFilename", async () => {
   });
 });
 
+describe("plainCsvCells", async () => {
+  const { plainCsvCells } = await import("./text-export");
+
+  it("drops the status emoji at the start of a cell and keeps the value", () => {
+    expect(
+      plainCsvCells(
+        '"Name","Status"\n"web","🏃Running"\n"db","🕰️Pending"\n"n1","⚠️Critical"\n"x","💪Ready"',
+      ),
+    ).toBe('"Name","Status"\n"web","Running"\n"db","Pending"\n"n1","Critical"\n"x","Ready"');
+  });
+
+  it("keeps emoji inside the text, escaped quotes and empty cells as they are", () => {
+    const csv = '"note","a 🔥 b",,"say ""🔥"" here","🔥"\n"🔥start",""';
+    expect(plainCsvCells(csv)).toBe('"note","a 🔥 b",,"say ""🔥"" here",""\n"start",""');
+  });
+});
+
 describe("exportTextArtifact", async () => {
   const { exportCsvArtifact, exportTextArtifact } = await import("./text-export");
 
@@ -107,6 +124,18 @@ describe("exportTextArtifact", async () => {
     createObjectURL.mockRestore();
     revokeObjectURL.mockRestore();
     appendChild.mockRestore();
+  });
+
+  it("exports CSV with plain status values", async () => {
+    isTauriAvailableMock.mockReturnValue(true);
+    invoke.mockResolvedValue("/home/u/Downloads/pods.csv");
+
+    await exportCsvArtifact({ filename: "pods.csv", csv: '"Status"\n"🏃Running"' });
+
+    expect(invoke).toHaveBeenCalledWith("save_download", {
+      filename: "pods.csv",
+      contents: '\uFEFF"Status"\n"Running"',
+    });
   });
 
   it("exports CSV files with a UTF-8 BOM and the Downloads path", async () => {

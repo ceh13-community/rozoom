@@ -62,6 +62,16 @@ export async function exportTextArtifact(options: {
   };
 }
 
+// Status cells in the lists carry a decorative emoji ("🏃Running", "⚠️Critical"). A quoted cell
+// that starts with pictographs loses them, so the file holds the plain value; emoji inside the
+// text stay. Every CSV here quotes each cell, so a cell start is a quote at a line start or
+// after a comma (an escaped quote inside a cell is doubled and never matches).
+const LEADING_CELL_EMOJI = /(^|,)"(?:\p{Extended_Pictographic}|\u{FE0F}|\u{200D})+/gmu;
+
+export function plainCsvCells(csv: string): string {
+  return csv.replace(LEADING_CELL_EMOJI, '$1"');
+}
+
 export async function exportCsvArtifact(options: {
   filename: string;
   csv: string;
@@ -69,7 +79,7 @@ export async function exportCsvArtifact(options: {
   const { filename, csv } = options;
   return exportTextArtifact({
     filename,
-    text: `\uFEFF${csv}`,
+    text: `\uFEFF${plainCsvCells(csv)}`,
     mimeType: "text/csv;charset=utf-8;",
   });
 }
