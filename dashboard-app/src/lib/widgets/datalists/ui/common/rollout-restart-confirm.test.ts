@@ -41,6 +41,18 @@ describe("rollout restart confirm", () => {
     );
   });
 
+  it("lists at most ten commands and counts the rest", () => {
+    const targets = Array.from({ length: 12 }, (_, i) => ({
+      name: `web-${i}`,
+      namespace: "shop",
+    }));
+    const lines = describeRolloutRestart("deployment", targets).split("\n");
+    expect(lines[0]).toBe("Restart the rollout of 12 deployments? Every pod of them is recreated.");
+    expect(lines.filter((line) => line.startsWith("kubectl "))).toHaveLength(10);
+    expect(lines.at(-1)).toBe("and 2 more");
+    expect(describeRolloutRestart("deployment", targets.slice(0, 10))).not.toContain("more");
+  });
+
   it("asks through confirmAction with the Rollout restart title", async () => {
     await expect(
       confirmRolloutRestart("deployment", [{ name: "web", namespace: "shop" }]),

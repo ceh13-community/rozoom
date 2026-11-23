@@ -21,13 +21,20 @@ export function rolloutRestartCommand(kind: RolloutRestartKind, target: RolloutR
   return `rollout restart ${kind}/${target.name} --namespace ${target.namespace}`;
 }
 
+/** Commands listed in the question; a larger selection ends with "and N more". */
+export const LISTED_COMMANDS = 10;
+
 export function describeRolloutRestart(kind: RolloutRestartKind, targets: RolloutRestartTarget[]) {
   const label = KIND_LABEL[kind];
   const head =
     targets.length === 1
       ? `Restart the rollout of ${label.one} ${targets[0].namespace}/${targets[0].name}? Every pod of it is recreated.`
       : `Restart the rollout of ${targets.length} ${label.many}? Every pod of them is recreated.`;
-  const commands = targets.map((target) => `kubectl ${rolloutRestartCommand(kind, target)}`);
+  const commands = targets
+    .slice(0, LISTED_COMMANDS)
+    .map((target) => `kubectl ${rolloutRestartCommand(kind, target)}`);
+  const rest = targets.length - commands.length;
+  if (rest > 0) commands.push(`and ${rest} more`);
   return `${head}\n\n${commands.join("\n")}`;
 }
 
