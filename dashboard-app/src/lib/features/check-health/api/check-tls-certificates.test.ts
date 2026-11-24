@@ -163,8 +163,8 @@ describe("check-tls-certificates", () => {
     expect(output.match(/printf "%q"/g)).toHaveLength(2);
   });
 
-  // Reviewer FIX on the jsonpath version: a newline in an annotation printed a
-  // second line that read as a secret in another namespace.
+  // An unquoted annotation value with a newline would print a second line that
+  // reads as a TLS secret in any namespace, with any certificate and issuer.
   it("a newline or tab in an annotation cannot forge a record", () => {
     // Line as kubectl 1.33 printed it with the go-template for such a secret on minikube.
     const evil = [
