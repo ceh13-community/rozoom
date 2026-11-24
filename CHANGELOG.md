@@ -11,10 +11,11 @@ The release build fails if the section for the released version is missing.
 ## [0.26.6] - 2026-11-26
 
 Questions the app asks (stop a port-forward, delete, node shell, rollout
-restart) open inside the app, with Cancel focused and Esc as No. A port-forward
-tab shows whether the tunnel is up, with a Test button, and Help > About the
-team names the people and the seven principles we build by. On Linux (.deb,
-.rpm) install the new package by hand.
+restart) open inside the app, with Cancel focused and Esc as No. Every Download
+button and the CSV and report exports now say where the file went, a port-forward
+tab shows whether the tunnel is up, and Help > About the team names the people
+and the seven principles we build by. On Linux (.deb, .rpm) install the new
+package by hand.
 
 ### Added
 
@@ -32,6 +33,11 @@ team names the people and the seven principles we build by. On Linux (.deb,
   and restart to update use it too.
 - The command notification title shows how long the command took.
 - The pod port-forward tab takes the height of its content.
+- CSV exports carry the cluster and the time in the file name, so a new export
+  never replaces the last one, and hold the plain status without the list's
+  emoji.
+- The kubectl commands switch in the sidebar reads Commands on or off on one
+  line and looks like Linter and Runtime.
 
 ### Fixed
 
@@ -44,6 +50,17 @@ team names the people and the seven principles we build by. On Linux (.deb,
   screen expands the workbench and has no Collapse.
 - Helm reads (list, status, values) popped a command notification; only writes
   notify now, rollback and test included.
+- Download CSV, Download YAML and the other report and CSV exports saved without
+  a word, and on a desktop without a Downloads folder set they did not save at
+  all. Each one now says "Saved to ~/Downloads/<file>" with Open folder, or why it
+  failed, and never overwrites a file already there.
+
+### Security
+
+- A CSV cell starting with =, +, - or @ opened in a spreadsheet as a formula,
+  and labels and annotations from the cluster can start that way. Every CSV
+  export now saves such a cell with a leading ' so it opens as text; plain
+  numbers stay numbers.
 
 ## [0.26.5] - 2026-11-21
 
