@@ -1,6 +1,7 @@
 <script lang="ts">
   import { revealListFilteredTo } from "$shared/lib/jump-reveal";
   import { kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
+  import { listSecretNames } from "$shared/api/secret-names";
   import { Button } from "$shared/ui/button";
   import LoadingDots from "$shared/ui/loading-dots.svelte";
   import ArrowRight from "@lucide/svelte/icons/arrow-right";
@@ -247,7 +248,8 @@
         kubectlJson("get pods -A -o json"),
         kubectlJson("get ingresses -A -o json"),
         kubectlJson("get configmaps -A -o json"),
-        kubectlJson("get secrets -A -o json"),
+        // Names only: the map indexes secrets by namespace/name, -o json would bring their data.
+        listSecretNames(["-A"], { clusterId }).then((r) => (typeof r === "string" ? null : r)),
         kubectlJson("get persistentvolumeclaims -A -o json"),
         kubectlJson("get endpoints -A -o json"),
       ]);

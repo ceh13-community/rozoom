@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("$shared/api/kubectl-proxy", () => ({
   kubectlJson: vi.fn(() => new Promise(() => {})),
+  kubectlRawArgsFront: vi.fn(() => new Promise(() => {})),
 }));
 
 import VisualizerPanel from "./visualizer-panel.svelte";
