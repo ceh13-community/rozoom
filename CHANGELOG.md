@@ -55,6 +55,13 @@ package by hand.
   all. Each one now says "Saved to ~/Downloads/<file>" with Open folder, or why it
   failed, and never overwrites a file already there.
 
+### Security
+
+- A CSV cell starting with =, +, - or @ opened in a spreadsheet as a formula,
+  and labels and annotations from the cluster can start that way. Every CSV
+  export now saves such a cell with a leading ' so it opens as text; plain
+  numbers stay numbers.
+
 ## [0.26.5] - 2026-11-21
 
 Lists update live now: a pod that dies or starts shows up at once, and Pods no
