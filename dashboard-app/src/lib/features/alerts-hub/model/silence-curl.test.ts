@@ -61,4 +61,23 @@ describe("buildSilenceCurlCommand", () => {
     expect(payload.matchers[0].value).toBe(injected);
     expect(payload.matchers[1]).toEqual({ name: "team", value: "a'b", isRegex: false });
   });
+
+  it.each([
+    ["command substitution", "$(echo INJECTED)"],
+    ["backticks", "`echo INJECTED`"],
+    ["a backslash", "a\\'b\\"],
+    ["a newline", "line1\n'; echo INJECTED; echo '\nline2"],
+    ["everything at once", "`x` $(y) ${z} \\ ' \" \n\t; | & > <"],
+  ])("passes %s to curl as text", (_case, value) => {
+    const command = buildSilenceCurlCommand(
+      draft({ alertname: value, namespace: value, comment: value }),
+      NOW,
+    );
+    const shellSees = payloadAsShellSeesIt(command);
+    expect(shellSees).not.toContain("\nINJECTED");
+    const payload = JSON.parse(shellSees);
+    expect(payload.matchers[0].value).toBe(value);
+    expect(payload.matchers[1].value).toBe(value);
+    expect(payload.comment).toBe(value);
+  });
 });
