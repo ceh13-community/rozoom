@@ -111,6 +111,10 @@ const CERT_MANAGER_ISSUER_ANNOTATION = "cert-manager.io/issuer-name";
  * and Certificate Rotation, without a click. All annotations are not asked for
  * either: last-applied-configuration of a secret made with kubectl apply holds
  * the key too.
+ *
+ * Namespace, name and base64 never hold a tab or a newline; annotation values
+ * can. The two annotations are printed Go-quoted (%q), so a newline in one of
+ * them cannot start a second, forged record.
  */
 export const TLS_SECRETS_LISTING_ARGS = [
   "get",
@@ -119,7 +123,7 @@ export const TLS_SECRETS_LISTING_ARGS = [
   "--field-selector",
   "type=kubernetes.io/tls",
   "-o",
-  'jsonpath={range .items[*]}{.metadata.namespace}{"\\t"}{.metadata.name}{"\\t"}{.data.tls\\.crt}{"\\t"}{.metadata.annotations.cert-manager\\.io/certificate-name}{"\\t"}{.metadata.annotations.cert-manager\\.io/issuer-name}{"\\n"}{end}',
+  'go-template={{range .items}}{{.metadata.namespace}}{{"\\t"}}{{.metadata.name}}{{"\\t"}}{{with .data}}{{index . "tls.crt"}}{{end}}{{"\\t"}}{{with .metadata.annotations}}{{printf "%q" (or (index . "cert-manager.io/certificate-name") "")}}{{"\\t"}}{{printf "%q" (or (index . "cert-manager.io/issuer-name") "")}}{{else}}""{{"\\t"}}""{{end}}{{"\\n"}}{{end}}',
 ];
 
 export type TlsSecretListingRow = {
@@ -131,28 +135,56 @@ export type TlsSecretListingRow = {
 
 const OBJECT_NAME = /^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$/;
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+const GO_QUOTED = /^"(?:[^"\\]|\\.)*"$/;
+const GO_ESCAPES: Partial<Record<string, string>> = {
+  a: "\x07",
+  b: "\b",
+  f: "\f",
+  n: "\n",
+  r: "\r",
+  t: "\t",
+  v: "\v",
+  "\\": "\\",
+  '"': '"',
+};
 
 /**
- * Reads the TLS_SECRETS_LISTING_ARGS output. Names and base64 never hold a tab or a
- * newline; annotation values can. A record whose annotations carry a tab keeps
- * only "is managed by cert-manager"; a line that is not a namespace, a name and
- * base64 is skipped.
+ * Reverses Go's %q for one string. JSON.parse covers most of it but not \a, \v,
+ * \xNN or \UNNNNNNNN, which %q prints for control and non-printable runes.
+ * Returns null for anything that is not a quoted string.
+ */
+export function unquoteGoString(quoted: string): string | null {
+  if (!GO_QUOTED.test(quoted)) return null;
+  const unknown: string[] = [];
+  const text = quoted
+    .slice(1, -1)
+    .replace(/\\(x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|.)/g, (_match, esc: string) => {
+      if (esc.length > 1) return String.fromCodePoint(Number.parseInt(esc.slice(1), 16));
+      const plain = GO_ESCAPES[esc];
+      if (plain === undefined) unknown.push(esc);
+      return plain ?? "";
+    });
+  return unknown.length > 0 ? null : text;
+}
+
+/**
+ * Reads the TLS_SECRETS_LISTING_ARGS output: exactly five tab-separated fields per
+ * line, the last two Go-quoted. Any other line is skipped, so nothing in an
+ * annotation can add or reshape a record.
  */
 export function parseTlsSecretListing(output: string): TlsSecretListingRow[] {
   const rows: TlsSecretListingRow[] = [];
   for (const line of output.split("\n")) {
     const parts = line.split("\t");
-    if (parts.length < 5) continue;
+    if (parts.length !== 5) continue;
     const [namespace, name, certData] = parts;
     if (!OBJECT_NAME.test(namespace) || !OBJECT_NAME.test(name) || !BASE64.test(certData)) continue;
+    const certificateName = unquoteGoString(parts[3]);
+    const issuerName = unquoteGoString(parts[4]);
+    if (certificateName === null || issuerName === null) continue;
     const annotations: Record<string, string> = {};
-    if (parts.length === 5) {
-      if (parts[3]) annotations[CERT_MANAGER_CERTIFICATE_ANNOTATION] = parts[3];
-      if (parts[4]) annotations[CERT_MANAGER_ISSUER_ANNOTATION] = parts[4];
-    } else if (parts.slice(3).some(Boolean)) {
-      // Which annotation the tab belongs to is unknown: managed, issuer not shown.
-      annotations[CERT_MANAGER_CERTIFICATE_ANNOTATION] = "?";
-    }
+    if (certificateName) annotations[CERT_MANAGER_CERTIFICATE_ANNOTATION] = certificateName;
+    if (issuerName) annotations[CERT_MANAGER_ISSUER_ANNOTATION] = issuerName;
     rows.push({ namespace, name, certData, annotations });
   }
   return rows;

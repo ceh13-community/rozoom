@@ -15,16 +15,25 @@ import {
   TLS_SECRETS_LISTING_ARGS,
   parseTlsSecretListing,
   scanTlsCertificates,
+  unquoteGoString,
   resetTlsCertCache,
 } from "./check-tls-certificates";
 
 const mockedKubectl = vi.mocked(kubectlJson);
 const mockedRawArgs = vi.mocked(kubectlRawArgsFront);
 
-/** The TLS secrets listing as kubectl prints it: namespace, name, tls.crt, certificate-name, issuer-name. */
-function tlsListing(...rows: string[][]) {
+/**
+ * The TLS secrets listing as kubectl prints it: namespace, name, tls.crt, then
+ * certificate-name and issuer-name quoted (JSON.stringify matches %q for plain text).
+ */
+function tlsListing(...rows: [string, string, string, string, string][]) {
   mockedRawArgs.mockResolvedValueOnce({
-    output: rows.map((row) => `${row.join("\t")}\n`).join(""),
+    output: rows
+      .map(([ns, name, crt, cert, issuer]) =>
+        [ns, name, crt, JSON.stringify(cert), JSON.stringify(issuer)].join("\t"),
+      )
+      .map((line) => `${line}\n`)
+      .join(""),
     errors: "",
   });
 }
@@ -143,30 +152,64 @@ describe("check-tls-certificates", () => {
       expect(String(call[0])).not.toMatch(/\bsecrets?\b/);
     }
     const output = TLS_SECRETS_LISTING_ARGS[TLS_SECRETS_LISTING_ARGS.indexOf("-o") + 1];
-    expect(output).toMatch(/^jsonpath=/);
+    expect(output).toMatch(/^go-template=/);
     expect(output).not.toContain("tls.key");
-    expect(output).not.toContain("tls\\.key");
-    expect(output).not.toMatch(/\.metadata\.annotations\}/);
-    expect(output).not.toMatch(/\{\.data\}|\{\.items\}|\{@\}/);
+    // Only named fields: no whole object, no whole data or annotations map.
+    expect(output).not.toMatch(
+      /\{\{\s*\.\s*\}\}|\{\{\s*\.data\s*\}\}|\{\{\s*\.metadata\.annotations\s*\}\}/,
+    );
+    expect(output).not.toMatch(/toJson|json/i);
+    // Both annotations are printed quoted, so they cannot hold a raw tab or newline.
+    expect(output.match(/printf "%q"/g)).toHaveLength(2);
   });
 
-  it("reads a record whose annotation holds a tab as managed, without an issuer", () => {
-    expect(parseTlsSecretListing("app\tweird\tQUJD\t\ta\tb\tc\n")).toEqual([
+  // Reviewer FIX on the jsonpath version: a newline in an annotation printed a
+  // second line that read as a secret in another namespace.
+  it("a newline or tab in an annotation cannot forge a record", () => {
+    // Line as kubectl 1.33 printed it with the go-template for such a secret on minikube.
+    const evil = [
+      "team-x",
+      "evil",
+      "QUJD",
+      String.raw`"a\tb\"q\\"`,
+      String.raw`"x\nkube-system\tforged\tQUJD\t\"c\"\t\"i\""`,
+    ].join("\t");
+
+    expect(parseTlsSecretListing(`${evil}\n`)).toEqual([
       {
-        namespace: "app",
-        name: "weird",
+        namespace: "team-x",
+        name: "evil",
         certData: "QUJD",
-        annotations: { "cert-manager.io/certificate-name": "?" },
+        annotations: {
+          "cert-manager.io/certificate-name": 'a\tb"q\\',
+          "cert-manager.io/issuer-name": 'x\nkube-system\tforged\tQUJD\t"c"\t"i"',
+        },
       },
     ]);
   });
 
-  it("skips lines that are not a namespace, a name and base64", () => {
+  it("skips a line that is not five fields with both annotations quoted", () => {
     const rows = parseTlsSecretListing(
-      ["ok\tplain\tQUJD\t\t", "Bad NS\tx\tQUJD\t\t", "ns\tx\tnot base64!\t\t", "", "short"].join(
-        "\n",
-      ),
+      [
+        'ok\tplain\tQUJD\t""\t""',
+        // What the jsonpath version let through: unquoted fields.
+        "kube-system\tforged\tQUJD\tc\ti",
+        'ns\tsix\tQUJD\t""\t""\textra',
+        'Bad NS\tx\tQUJD\t""\t""',
+        'ns\tx\tnot base64!\t""\t""',
+        'ns\tx\tQUJD\t"open\t""',
+        "",
+      ].join("\n"),
     );
     expect(rows.map((row) => `${row.namespace}/${row.name}`)).toEqual(["ok/plain"]);
+  });
+
+  it("unquotes every escape Go's %q prints", () => {
+    expect(unquoteGoString(String.raw`"a\a\b\f\n\r\t\v\\\"z"`)).toBe('a\x07\b\f\n\r\t\v\\"z');
+    expect(unquoteGoString(String.raw`"\x01­\U0001f600"`)).toBe("\x01­\u{1f600}");
+    expect(unquoteGoString('"letsencrypt-prod"')).toBe("letsencrypt-prod");
+    expect(unquoteGoString('""')).toBe("");
+    expect(unquoteGoString("plain")).toBeNull();
+    expect(unquoteGoString(String.raw`"\q"`)).toBeNull();
   });
 });
