@@ -1,4 +1,4 @@
-import { kubectlJson } from "$shared/api/kubectl-proxy";
+import { kubectlJson, kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
 
 export interface TlsCertInfo {
   name: string;
@@ -101,31 +101,112 @@ function parseNotAfterFromDer(der: Uint8Array): string | null {
   }
 }
 
+const CERT_MANAGER_CERTIFICATE_ANNOTATION = "cert-manager.io/certificate-name";
+const CERT_MANAGER_ISSUER_ANNOTATION = "cert-manager.io/issuer-name";
+
+/**
+ * Only the fields the scan uses: namespace, name, tls.crt and two cert-manager
+ * annotations, one secret per line. `-o json` would also bring tls.key of every
+ * TLS secret in the cluster into the app, and the scan runs on opening Overview
+ * and Certificate Rotation, without a click. All annotations are not asked for
+ * either: last-applied-configuration of a secret made with kubectl apply holds
+ * the key too.
+ *
+ * Namespace, name and base64 never hold a tab or a newline; annotation values
+ * can. The two annotations are printed Go-quoted (%q), so a newline in one of
+ * them cannot start a second, forged record.
+ */
+export const TLS_SECRETS_LISTING_ARGS = [
+  "get",
+  "secrets",
+  "--all-namespaces",
+  "--field-selector",
+  "type=kubernetes.io/tls",
+  "-o",
+  'go-template={{range .items}}{{.metadata.namespace}}{{"\\t"}}{{.metadata.name}}{{"\\t"}}{{with .data}}{{index . "tls.crt"}}{{end}}{{"\\t"}}{{with .metadata.annotations}}{{printf "%q" (or (index . "cert-manager.io/certificate-name") "")}}{{"\\t"}}{{printf "%q" (or (index . "cert-manager.io/issuer-name") "")}}{{else}}""{{"\\t"}}""{{end}}{{"\\n"}}{{end}}',
+];
+
+export type TlsSecretListingRow = {
+  namespace: string;
+  name: string;
+  certData: string;
+  annotations: Record<string, string>;
+};
+
+const OBJECT_NAME = /^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$/;
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+const GO_QUOTED = /^"(?:[^"\\]|\\.)*"$/;
+const GO_ESCAPES: Partial<Record<string, string>> = {
+  a: "\x07",
+  b: "\b",
+  f: "\f",
+  n: "\n",
+  r: "\r",
+  t: "\t",
+  v: "\v",
+  "\\": "\\",
+  '"': '"',
+};
+
+/**
+ * Reverses Go's %q for one string. JSON.parse covers most of it but not \a, \v,
+ * \xNN or \UNNNNNNNN, which %q prints for control and non-printable runes.
+ * Returns null for anything that is not a quoted string.
+ */
+export function unquoteGoString(quoted: string): string | null {
+  if (!GO_QUOTED.test(quoted)) return null;
+  const unknown: string[] = [];
+  const text = quoted
+    .slice(1, -1)
+    .replace(/\\(x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|.)/g, (_match, esc: string) => {
+      if (esc.length > 1) return String.fromCodePoint(Number.parseInt(esc.slice(1), 16));
+      const plain = GO_ESCAPES[esc];
+      if (plain === undefined) unknown.push(esc);
+      return plain ?? "";
+    });
+  return unknown.length > 0 ? null : text;
+}
+
+/**
+ * Reads the TLS_SECRETS_LISTING_ARGS output: exactly five tab-separated fields per
+ * line, the last two Go-quoted. Any other line is skipped, so nothing in an
+ * annotation can add or reshape a record.
+ */
+export function parseTlsSecretListing(output: string): TlsSecretListingRow[] {
+  const rows: TlsSecretListingRow[] = [];
+  for (const line of output.split("\n")) {
+    const parts = line.split("\t");
+    if (parts.length !== 5) continue;
+    const [namespace, name, certData] = parts;
+    if (!OBJECT_NAME.test(namespace) || !OBJECT_NAME.test(name) || !BASE64.test(certData)) continue;
+    const certificateName = unquoteGoString(parts[3]);
+    const issuerName = unquoteGoString(parts[4]);
+    if (certificateName === null || issuerName === null) continue;
+    const annotations: Record<string, string> = {};
+    if (certificateName) annotations[CERT_MANAGER_CERTIFICATE_ANNOTATION] = certificateName;
+    if (issuerName) annotations[CERT_MANAGER_ISSUER_ANNOTATION] = issuerName;
+    rows.push({ namespace, name, certData, annotations });
+  }
+  return rows;
+}
+
 async function scanTlsSecrets(
   clusterId: string,
 ): Promise<{ certs: TlsCertInfo[]; errors: string[] }> {
   const certs: TlsCertInfo[] = [];
   const errors: string[] = [];
 
-  const result = await kubectlJson<{
-    items?: Array<{
-      metadata?: { name?: string; namespace?: string; annotations?: Record<string, string> };
-      data?: { "tls.crt"?: string };
-    }>;
-  }>("get secrets --all-namespaces --field-selector type=kubernetes.io/tls", { clusterId });
+  const result = await kubectlRawArgsFront(TLS_SECRETS_LISTING_ARGS, { clusterId });
 
-  if (typeof result === "string") {
-    if (!result.includes("not found") && !result.includes("No resources")) {
-      errors.push(`TLS secrets: ${result}`);
+  if (result.errors.length > 0) {
+    if (!result.errors.includes("not found") && !result.errors.includes("No resources")) {
+      errors.push(`TLS secrets: ${result.errors}`);
     }
     return { certs, errors };
   }
 
-  const items = result.items ?? [];
-  for (const item of items) {
-    const name = item.metadata?.name ?? "unknown";
-    const namespace = item.metadata?.namespace ?? "default";
-    const certData = item.data?.["tls.crt"];
+  for (const item of parseTlsSecretListing(result.output)) {
+    const { name, namespace, certData, annotations } = item;
 
     let notAfter: string | null = null;
     if (certData) {
@@ -133,9 +214,9 @@ async function scanTlsSecrets(
     }
 
     const days = notAfter ? daysUntil(notAfter) : null;
-    const annotations = item.metadata?.annotations ?? {};
     const isCertManager = Boolean(
-      annotations["cert-manager.io/certificate-name"] || annotations["cert-manager.io/issuer-name"],
+      annotations[CERT_MANAGER_CERTIFICATE_ANNOTATION] ||
+        annotations[CERT_MANAGER_ISSUER_ANNOTATION],
     );
 
     certs.push({
@@ -146,7 +227,7 @@ async function scanTlsSecrets(
       notAfter,
       daysLeft: days,
       status: computeStatus(days),
-      issuer: annotations["cert-manager.io/issuer-name"] ?? null,
+      issuer: annotations[CERT_MANAGER_ISSUER_ANNOTATION] ?? null,
       renewAction: isCertManager ? `kubectl cert-manager renew ${name} -n ${namespace}` : null,
     });
   }
