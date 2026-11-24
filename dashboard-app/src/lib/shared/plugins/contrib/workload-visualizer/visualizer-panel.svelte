@@ -9,6 +9,7 @@
     type GraphEdge,
   } from "./model";
   import { kubectlJson } from "$shared/api/kubectl-proxy";
+  import { listSecretNames } from "$shared/api/secret-names";
   import * as Card from "$shared/ui/card";
   import * as Popover from "$shared/ui/popover";
   import { Button } from "$shared/ui/button";
@@ -118,7 +119,8 @@
         kubectlJson<{ items: unknown[] }>(`get daemonsets ${ns} -o json`, opts),
         kubectlJson<{ items: unknown[] }>(`get pods ${ns} -o json`, opts),
         kubectlJson<{ items: unknown[] }>(`get configmaps ${ns} -o json`, opts),
-        kubectlJson<{ items: unknown[] }>(`get secrets ${ns} -o json`, opts),
+        // Names only: the graph draws secrets by namespace/name, -o json would bring their data.
+        listSecretNames(ns.split(" "), opts),
         kubectlJson<{ items: unknown[] }>(`get pvc ${ns} -o json`, opts),
         kubectlJson<{ items: unknown[] }>(`get serviceaccounts ${ns} -o json`, opts),
         kubectlJson<{ items: unknown[] }>(`get networkpolicies ${ns} -o json`, opts),
