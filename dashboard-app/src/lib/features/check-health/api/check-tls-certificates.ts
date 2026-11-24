@@ -1,4 +1,4 @@
-import { kubectlJson } from "$shared/api/kubectl-proxy";
+import { kubectlJson, kubectlRawArgsFront } from "$shared/api/kubectl-proxy";
 
 export interface TlsCertInfo {
   name: string;
@@ -101,31 +101,80 @@ function parseNotAfterFromDer(der: Uint8Array): string | null {
   }
 }
 
+const CERT_MANAGER_CERTIFICATE_ANNOTATION = "cert-manager.io/certificate-name";
+const CERT_MANAGER_ISSUER_ANNOTATION = "cert-manager.io/issuer-name";
+
+/**
+ * Only the fields the scan uses: namespace, name, tls.crt and two cert-manager
+ * annotations, one secret per line. `-o json` would also bring tls.key of every
+ * TLS secret in the cluster into the app, and the scan runs on opening Overview
+ * and Certificate Rotation, without a click. All annotations are not asked for
+ * either: last-applied-configuration of a secret made with kubectl apply holds
+ * the key too.
+ */
+export const TLS_SECRETS_LISTING_ARGS = [
+  "get",
+  "secrets",
+  "--all-namespaces",
+  "--field-selector",
+  "type=kubernetes.io/tls",
+  "-o",
+  'jsonpath={range .items[*]}{.metadata.namespace}{"\\t"}{.metadata.name}{"\\t"}{.data.tls\\.crt}{"\\t"}{.metadata.annotations.cert-manager\\.io/certificate-name}{"\\t"}{.metadata.annotations.cert-manager\\.io/issuer-name}{"\\n"}{end}',
+];
+
+export type TlsSecretListingRow = {
+  namespace: string;
+  name: string;
+  certData: string;
+  annotations: Record<string, string>;
+};
+
+const OBJECT_NAME = /^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$/;
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+
+/**
+ * Reads the TLS_SECRETS_LISTING_ARGS output. Names and base64 never hold a tab or a
+ * newline; annotation values can. A record whose annotations carry a tab keeps
+ * only "is managed by cert-manager"; a line that is not a namespace, a name and
+ * base64 is skipped.
+ */
+export function parseTlsSecretListing(output: string): TlsSecretListingRow[] {
+  const rows: TlsSecretListingRow[] = [];
+  for (const line of output.split("\n")) {
+    const parts = line.split("\t");
+    if (parts.length < 5) continue;
+    const [namespace, name, certData] = parts;
+    if (!OBJECT_NAME.test(namespace) || !OBJECT_NAME.test(name) || !BASE64.test(certData)) continue;
+    const annotations: Record<string, string> = {};
+    if (parts.length === 5) {
+      if (parts[3]) annotations[CERT_MANAGER_CERTIFICATE_ANNOTATION] = parts[3];
+      if (parts[4]) annotations[CERT_MANAGER_ISSUER_ANNOTATION] = parts[4];
+    } else if (parts.slice(3).some(Boolean)) {
+      // Which annotation the tab belongs to is unknown: managed, issuer not shown.
+      annotations[CERT_MANAGER_CERTIFICATE_ANNOTATION] = "?";
+    }
+    rows.push({ namespace, name, certData, annotations });
+  }
+  return rows;
+}
+
 async function scanTlsSecrets(
   clusterId: string,
 ): Promise<{ certs: TlsCertInfo[]; errors: string[] }> {
   const certs: TlsCertInfo[] = [];
   const errors: string[] = [];
 
-  const result = await kubectlJson<{
-    items?: Array<{
-      metadata?: { name?: string; namespace?: string; annotations?: Record<string, string> };
-      data?: { "tls.crt"?: string };
-    }>;
-  }>("get secrets --all-namespaces --field-selector type=kubernetes.io/tls", { clusterId });
+  const result = await kubectlRawArgsFront(TLS_SECRETS_LISTING_ARGS, { clusterId });
 
-  if (typeof result === "string") {
-    if (!result.includes("not found") && !result.includes("No resources")) {
-      errors.push(`TLS secrets: ${result}`);
+  if (result.errors.length > 0) {
+    if (!result.errors.includes("not found") && !result.errors.includes("No resources")) {
+      errors.push(`TLS secrets: ${result.errors}`);
     }
     return { certs, errors };
   }
 
-  const items = result.items ?? [];
-  for (const item of items) {
-    const name = item.metadata?.name ?? "unknown";
-    const namespace = item.metadata?.namespace ?? "default";
-    const certData = item.data?.["tls.crt"];
+  for (const item of parseTlsSecretListing(result.output)) {
+    const { name, namespace, certData, annotations } = item;
 
     let notAfter: string | null = null;
     if (certData) {
@@ -133,9 +182,9 @@ async function scanTlsSecrets(
     }
 
     const days = notAfter ? daysUntil(notAfter) : null;
-    const annotations = item.metadata?.annotations ?? {};
     const isCertManager = Boolean(
-      annotations["cert-manager.io/certificate-name"] || annotations["cert-manager.io/issuer-name"],
+      annotations[CERT_MANAGER_CERTIFICATE_ANNOTATION] ||
+        annotations[CERT_MANAGER_ISSUER_ANNOTATION],
     );
 
     certs.push({
@@ -146,7 +195,7 @@ async function scanTlsSecrets(
       notAfter,
       daysLeft: days,
       status: computeStatus(days),
-      issuer: annotations["cert-manager.io/issuer-name"] ?? null,
+      issuer: annotations[CERT_MANAGER_ISSUER_ANNOTATION] ?? null,
       renewAction: isCertManager ? `kubectl cert-manager renew ${name} -n ${namespace}` : null,
     });
   }
