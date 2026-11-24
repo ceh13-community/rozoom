@@ -60,4 +60,9 @@ describe.each([
     expect(source).not.toMatch(/get secrets?\b[^\n]*-o\s*(json|yaml)/);
     expect(source).not.toMatch(/kubectlJson[^\n]*secret/i);
   });
+
+  it("a failed secrets listing leaves the rest of the panel working", () => {
+    // Resource map: Promise.all, so the call must not reject. Workload map: Promise.allSettled.
+    expect(source).toMatch(/listSecretNames\([^;]*\.catch\(\(\) => null\)|Promise\.allSettled\(/);
+  });
 });

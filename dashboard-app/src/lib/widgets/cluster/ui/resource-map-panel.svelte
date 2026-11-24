@@ -249,7 +249,10 @@
         kubectlJson("get ingresses -A -o json"),
         kubectlJson("get configmaps -A -o json"),
         // Names only: the map indexes secrets by namespace/name, -o json would bring their data.
-        listSecretNames(["-A"], { clusterId }).then((r) => (typeof r === "string" ? null : r)),
+        // Like kubectlJson above, a failure is null, never a rejected Promise.all.
+        listSecretNames(["-A"], { clusterId })
+          .then((r) => (typeof r === "string" ? null : r))
+          .catch(() => null),
         kubectlJson("get persistentvolumeclaims -A -o json"),
         kubectlJson("get endpoints -A -o json"),
       ]);
