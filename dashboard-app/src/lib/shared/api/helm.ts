@@ -710,15 +710,9 @@ export async function installOrUpgradeHelmRelease(
 
   let valuesCleanup: (() => Promise<void>) | null = null;
   if (params.valuesYaml?.trim()) {
-    const { writeTextFile, remove } = await import("@tauri-apps/plugin-fs");
-    const appDir = await appDataDir();
-    const path = `${appDir}/helm-values-${Math.random().toString(36).slice(2, 10)}.yaml`;
-    // Values files often carry passwords and keys: owner-only while they exist.
-    await writeTextFile(path, params.valuesYaml, { mode: PRIVATE_FILE_MODE });
-    args.push("--values", path);
-    valuesCleanup = async () => {
-      await remove(path).catch(() => {});
-    };
+    const valuesFile = await writePrivateHelmValuesFile(params.valuesYaml);
+    args.push("--values", valuesFile.path);
+    valuesCleanup = valuesFile.cleanup;
   }
 
   try {
@@ -734,6 +728,28 @@ export async function installOrUpgradeHelmRelease(
   } finally {
     if (valuesCleanup) await valuesCleanup();
   }
+}
+
+/**
+ * Writes chart values to an owner-only `helm-values-<rand>.yaml` in the app data
+ * dir for `--values`. Values often carry passwords and keys: a file keeps them
+ * off the command line, which shows in the console banner, the Commands toast
+ * with Copy, and `ps`. The caller removes it with `cleanup` in a `finally`; the
+ * startup sweep catches files left by a crash.
+ */
+async function writePrivateHelmValuesFile(
+  contents: string,
+): Promise<{ path: string; cleanup: () => Promise<void> }> {
+  const { writeTextFile, remove } = await import("@tauri-apps/plugin-fs");
+  const appDir = await appDataDir();
+  const path = `${appDir}/helm-values-${Math.random().toString(36).slice(2, 10)}.yaml`;
+  await writeTextFile(path, contents, { mode: PRIVATE_FILE_MODE });
+  return {
+    path,
+    cleanup: async () => {
+      await remove(path).catch(() => {});
+    },
+  };
 }
 
 /**
@@ -1571,6 +1587,9 @@ export async function installVelero(
   const gcpCredentialsJson = options?.gcpCredentialsJson?.trim();
   const hasGcpStorageConfig = Boolean(bucket);
   const hasGcpSecretCredentials = Boolean(gcpCredentialsJson);
+  // Contents of the chart's cloud credentials Secret. Goes to helm in a values
+  // file, never as --set: argv is visible on screen, in Copy and in ps.
+  let cloudCredentials: string | null = null;
 
   if (provider === "do" && !hasDoStorageConfig) {
     return {
@@ -1662,12 +1681,8 @@ export async function installVelero(
           `aws_access_key_id=${awsAccessKeyId}`,
           `aws_secret_access_key=${awsSecretAccessKey}`,
         ].join("\n");
-        installArgs.push(
-          "--set",
-          "credentials.useSecret=true",
-          "--set-string",
-          `credentials.secretContents.cloud=${cloudIni}`,
-        );
+        installArgs.push("--set", "credentials.useSecret=true");
+        cloudCredentials = cloudIni;
       }
       if (s3Url) {
         installArgs.push(
@@ -1740,7 +1755,7 @@ export async function installVelero(
           `AZURE_CLIENT_SECRET=${azureClientSecret}`,
           `AZURE_TENANT_ID=${azureTenantId}`,
         ].join("\n");
-        installArgs.push("--set-string", `credentials.secretContents.cloud=${azureCreds}`);
+        cloudCredentials = azureCreds;
       }
     }
   } else {
@@ -1782,45 +1797,58 @@ export async function installVelero(
         );
       }
       if (hasGcpSecretCredentials) {
-        installArgs.push("--set-string", `credentials.secretContents.cloud=${gcpCredentialsJson}`);
+        cloudCredentials = gcpCredentialsJson ?? null;
       }
     }
   }
 
-  const installResult = await runHelmCommand(installArgs, undefined, onOutput);
+  const credentialsFile = cloudCredentials
+    ? await writePrivateHelmValuesFile(
+        // JSON is valid YAML and quotes the multi-line ini / env / JSON contents safely.
+        JSON.stringify({ credentials: { secretContents: { cloud: cloudCredentials } } }),
+      )
+    : null;
+  if (credentialsFile) installArgs.push("--values", credentialsFile.path);
 
-  if (installResult.success) {
-    return { success: true };
+  try {
+    const installResult = await runHelmCommand(installArgs, undefined, onOutput);
+
+    if (installResult.success) {
+      return { success: true };
+    }
+
+    const message = installResult.error?.toLowerCase() ?? "";
+    if (!message.includes("cannot re-use a name") && !message.includes("already exists")) {
+      return { success: false, error: formatHelmError(installResult, "Helm install failed") };
+    }
+
+    const upgradeArgs = [
+      "upgrade",
+      "--install",
+      VELERO_RELEASE,
+      VELERO_CHART,
+      "--namespace",
+      namespace,
+      "--create-namespace",
+      "--wait=watcher",
+      "--rollback-on-failure",
+      "--timeout",
+      "10m",
+      "--kubeconfig",
+      kubeconfigPath,
+    ];
+    const firstSetFlagIndex = installArgs.findIndex(
+      (arg) => arg === "--set" || arg === "--set-string" || arg === "--values",
+    );
+    upgradeArgs.push(
+      ...installArgs.slice(firstSetFlagIndex > -1 ? firstSetFlagIndex : installArgs.length),
+    );
+
+    // await: the values file must outlive the upgrade, not just its start.
+    return await runHelm(upgradeArgs, undefined, onOutput);
+  } finally {
+    await credentialsFile?.cleanup();
   }
-
-  const message = installResult.error?.toLowerCase() ?? "";
-  if (!message.includes("cannot re-use a name") && !message.includes("already exists")) {
-    return { success: false, error: formatHelmError(installResult, "Helm install failed") };
-  }
-
-  const upgradeArgs = [
-    "upgrade",
-    "--install",
-    VELERO_RELEASE,
-    VELERO_CHART,
-    "--namespace",
-    namespace,
-    "--create-namespace",
-    "--wait=watcher",
-    "--rollback-on-failure",
-    "--timeout",
-    "10m",
-    "--kubeconfig",
-    kubeconfigPath,
-  ];
-  const firstSetFlagIndex = installArgs.findIndex(
-    (arg) => arg === "--set" || arg === "--set-string",
-  );
-  upgradeArgs.push(
-    ...installArgs.slice(firstSetFlagIndex > -1 ? firstSetFlagIndex : installArgs.length),
-  );
-
-  return runHelm(upgradeArgs, undefined, onOutput);
 }
 
 export async function installPrometheusStack(
