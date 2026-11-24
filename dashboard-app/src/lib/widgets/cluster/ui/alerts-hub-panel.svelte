@@ -23,6 +23,7 @@
     type PreflightCheck,
   } from "$features/alerts-hub/model/preflight";
   import { lookupRunbook } from "$features/alerts-hub/model/runbooks";
+  import { buildSilenceCurlCommand } from "$features/alerts-hub/model/silence-curl";
   import {
     getPrometheusStackRelease,
     installPrometheusStack,
@@ -661,31 +662,7 @@
   }
 
   function silenceCurlCommand(): string {
-    const matchers = [
-      { name: "alertname", value: silenceDraft.alertname, isRegex: false },
-      ...(silenceDraft.namespace
-        ? [{ name: "namespace", value: silenceDraft.namespace, isRegex: false }]
-        : []),
-      ...silenceDraft.extraMatchers
-        .filter((m) => m.name && m.value)
-        .map((m) => ({ name: m.name, value: m.value, isRegex: false })),
-    ];
-    const endsAt = new Date(Date.now() + silenceDraft.durationHours * 60 * 60 * 1000).toISOString();
-    const payload = {
-      matchers,
-      startsAt: new Date().toISOString(),
-      endsAt,
-      createdBy: silenceDraft.author,
-      comment: silenceDraft.comment,
-    };
-    return [
-      "# Port-forward Alertmanager first:",
-      "# kubectl port-forward -n monitoring svc/alertmanager 9093:9093",
-      "",
-      `curl -X POST http://localhost:9093/api/v2/silences \\`,
-      `  -H 'Content-Type: application/json' \\`,
-      `  -d '${JSON.stringify(payload)}'`,
-    ].join("\n");
+    return buildSilenceCurlCommand(silenceDraft);
   }
 
   function jumpToResource(kind: string, name: string | undefined, namespace: string | undefined) {
